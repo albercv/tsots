@@ -1,0 +1,260 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+
+PAUSA_CORTE = 0.6
+MAX_PALABRAS_REELS = 3
+MAX_CHARS_FRASE = 84
+MAX_CHARS_LINEA = 42
+DURACION_MINIMA = 0.5
+ANCHO_CARACTER = 0.55
+MARGEN_LATERAL = 40
+
+_PUNTUACION_FINAL = (".", "!", "?", "…")
+
+
+@dataclass
+class Palabra:
+    texto: str
+    inicio: float
+    fin: float
+
+
+@dataclass
+class Bloque:
+    palabras: list[Palabra]
+    inicio: float
+    fin: float
+
+    @property
+    def texto(self) -> str:
+        return " ".join(p.texto for p in self.palabras)
+
+
+@dataclass
+class EstiloPreset:
+    fuente: str
+    tamano_rel: float
+    primario: str
+    contorno_color: str
+    fondo: str
+    negrita: int
+    borde_estilo: int
+    grosor_contorno: int
+    sombra: int
+    mayusculas: bool
+    tipo: str  # "palabras" | "frases"
+    resaltado: str | None
+
+
+PRESETS: dict[str, EstiloPreset] = {
+    "reels_bold": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.075,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=3, sombra=2,
+        mayusculas=True, tipo="palabras", resaltado=None,
+    ),
+    "reels_karaoke": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.07,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=3, sombra=2,
+        mayusculas=True, tipo="palabras", resaltado="&H000AD6FF",
+    ),
+    "caja": EstiloPreset(
+        fuente="Helvetica", tamano_rel=0.045,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H59000000",
+        negrita=0, borde_estilo=3, grosor_contorno=1, sombra=0,
+        mayusculas=False, tipo="frases", resaltado=None,
+    ),
+}
+
+
+def _cerrar_bloque(palabras: list[Palabra]) -> Bloque:
+    inicio = palabras[0].inicio
+    fin = max(palabras[-1].fin, inicio + DURACION_MINIMA)
+    return Bloque(palabras=list(palabras), inicio=inicio, fin=fin)
+
+
+def agrupar(palabras: list[Palabra], preset_id: str) -> list[Bloque]:
+    preset = PRESETS[preset_id]
+    bloques: list[Bloque] = []
+    actual: list[Palabra] = []
+    for palabra in palabras:
+        if actual:
+            pausa = palabra.inicio - actual[-1].fin
+            texto_actual = " ".join(p.texto for p in actual)
+            if preset.tipo == "palabras":
+                corta = len(actual) >= MAX_PALABRAS_REELS or pausa > PAUSA_CORTE
+            else:
+                corta = (
+                    pausa > PAUSA_CORTE
+                    or actual[-1].texto.endswith(_PUNTUACION_FINAL)
+                    or len(texto_actual) + 1 + len(palabra.texto) > MAX_CHARS_FRASE
+                )
+            if corta:
+                bloques.append(_cerrar_bloque(actual))
+                actual = []
+        actual.append(palabra)
+    if actual:
+        bloques.append(_cerrar_bloque(actual))
+
+    for anterior, siguiente in zip(bloques, bloques[1:]):
+        natural = anterior.palabras[-1].fin
+        anterior.fin = max(natural, min(anterior.fin, siguiente.inicio))
+
+    return bloques
+
+
+def _tiempo_srt(segundos: float) -> str:
+    ms = round(segundos * 1000)
+    h, resto = divmod(ms, 3_600_000)
+    m, resto = divmod(resto, 60_000)
+    s, ms = divmod(resto, 1000)
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def generar_srt(bloques: list[Bloque], ruta: Path) -> None:
+    lineas: list[str] = []
+    for indice, bloque in enumerate(bloques, start=1):
+        lineas.append(str(indice))
+        lineas.append(f"{_tiempo_srt(bloque.inicio)} --> {_tiempo_srt(bloque.fin)}")
+        lineas.append(bloque.texto)
+        lineas.append("")
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text("\n".join(lineas), encoding="utf-8")
+
+
+def _tiempo_ass(segundos: float) -> str:
+    cs = round(segundos * 100)
+    h, resto = divmod(cs, 360_000)
+    m, resto = divmod(resto, 6_000)
+    s, cs = divmod(resto, 100)
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def _envolver(texto: str) -> str:
+    if len(texto) <= MAX_CHARS_LINEA:
+        return texto
+    posiciones_espacio = [i for i, c in enumerate(texto) if c == " "]
+    if not posiciones_espacio:
+        return texto
+    mejor_corte = min(
+        posiciones_espacio,
+        key=lambda i: max(len(texto[:i]), len(texto[i + 1:])),
+    )
+    return texto[:mejor_corte] + "\\N" + texto[mejor_corte + 1:]
+
+
+def _fs_ajustado(texto_plano: str, tamano_fuente: int, ancho: int) -> int | None:
+    """Fuente reducida para que la línea más larga quepa; None si ya cabe."""
+    util = ancho - 2 * MARGEN_LATERAL
+    lineas = texto_plano.split("\\N")
+    max_chars = max((len(l) for l in lineas), default=0)
+    if max_chars == 0:
+        return None
+    if max_chars * ANCHO_CARACTER * tamano_fuente <= util:
+        return None
+    return max(8, int(util / (max_chars * ANCHO_CARACTER)))
+
+
+def _texto_bloque(bloque: Bloque, preset: EstiloPreset,
+                  palabra_activa: int | None = None) -> str:
+    piezas: list[str] = []
+    for indice, palabra in enumerate(bloque.palabras):
+        texto = palabra.texto.upper() if preset.mayusculas else palabra.texto
+        if palabra_activa is not None and indice == palabra_activa:
+            texto = (
+                f"{{\\c{preset.resaltado}&}}{texto}"
+                f"{{\\c{preset.primario}&}}"
+            ).replace("&&", "&")
+        piezas.append(texto)
+    unido = " ".join(piezas)
+    if preset.tipo == "frases":
+        unido = _envolver(unido)
+    return unido
+
+
+def generar_ass(bloques: list[Bloque], preset_id: str, posicion: int,
+                resolucion: tuple[int, int], ruta: Path, tamano: int = 100) -> None:
+    preset = PRESETS[preset_id]
+    ancho, alto = resolucion
+    margen_v = int(alto * (100 - posicion) / 100)
+    tamano_fuente = int(alto * preset.tamano_rel * tamano / 100)
+
+    cabecera = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        f"PlayResX: {ancho}",
+        f"PlayResY: {alto}",
+        "WrapStyle: 2",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
+        "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
+        "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding",
+        f"Style: Sub,{preset.fuente},{tamano_fuente},{preset.primario},&H00FFFFFF,"
+        f"{preset.contorno_color},{preset.fondo},{preset.negrita},0,0,0,"
+        f"100,100,0,0,{preset.borde_estilo},{preset.grosor_contorno},"
+        f"{preset.sombra},2,{MARGEN_LATERAL},{MARGEN_LATERAL},{margen_v},1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
+        "Effect, Text",
+    ]
+
+    eventos: list[str] = []
+    for bloque in bloques:
+        texto_plano = bloque.texto.upper() if preset.mayusculas else bloque.texto
+        if preset.tipo == "frases":
+            texto_plano = _envolver(texto_plano)
+        ajuste = _fs_ajustado(texto_plano, tamano_fuente, ancho)
+        prefijo = f"{{\\fs{ajuste}}}" if ajuste is not None else ""
+        if preset.resaltado is not None:
+            for indice, palabra in enumerate(bloque.palabras):
+                fin = (
+                    bloque.palabras[indice + 1].inicio
+                    if indice + 1 < len(bloque.palabras)
+                    else bloque.fin
+                )
+                eventos.append(
+                    f"Dialogue: 0,{_tiempo_ass(palabra.inicio)},"
+                    f"{_tiempo_ass(fin)},Sub,,0,0,0,,"
+                    f"{prefijo}{_texto_bloque(bloque, preset, palabra_activa=indice)}"
+                )
+        else:
+            eventos.append(
+                f"Dialogue: 0,{_tiempo_ass(bloque.inicio)},"
+                f"{_tiempo_ass(bloque.fin)},Sub,,0,0,0,,"
+                f"{prefijo}{_texto_bloque(bloque, preset)}"
+            )
+
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text("\n".join(cabecera + eventos) + "\n", encoding="utf-8")
+
+
+def _crear_whisper(modelo: str):
+    # Import perezoso: faster-whisper solo se carga en el subproceso del runner.
+    from faster_whisper import WhisperModel
+
+    return WhisperModel(modelo, device="auto", compute_type="auto")
+
+
+def transcribir(video: Path, idioma: str, modelo: str) -> list[Palabra]:
+    whisper = _crear_whisper(modelo)
+    segmentos, _info = whisper.transcribe(
+        str(video),
+        language=None if idioma == "auto" else idioma,
+        word_timestamps=True,
+        vad_filter=True,
+    )
+    palabras: list[Palabra] = []
+    for segmento in segmentos:
+        for palabra in segmento.words or []:
+            texto = palabra.word.strip()
+            if texto:
+                palabras.append(
+                    Palabra(texto=texto, inicio=palabra.start, fin=palabra.end)
+                )
+    return palabras

@@ -1,0 +1,352 @@
+from __future__ import annotations
+
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Callable
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+class PasoFallido(RuntimeError):
+    def __init__(self, mensaje: str, detalle: str = ""):
+        super().__init__(mensaje)
+        self.detalle = detalle
+
+
+def comprobar_dependencias() -> list[str]:
+    return [
+        nombre
+        for nombre in ("ffmpeg", "ffprobe", "auto-editor")
+        if shutil.which(nombre) is None
+    ]
+
+
+def _ejecutar(cmd: list[str], descripcion: str) -> None:
+    resultado = subprocess.run(cmd, capture_output=True, text=True)
+    if resultado.returncode != 0:
+        raise PasoFallido(
+            f"{descripcion} falló (código {resultado.returncode})",
+            detalle=resultado.stderr.strip()[-4000:],
+        )
+
+
+def cmd_extraer_audio(
+    ffmpeg: str, video: Path, wav: Path, sample_rate: int
+) -> list[str]:
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-map", "0:a:0", "-vn",
+        "-ac", "1", "-ar", str(sample_rate),
+        "-c:a", "pcm_s16le",
+        str(wav),
+    ]
+
+
+def cmd_remux(ffmpeg: str, video: Path, audio: Path, salida: Path) -> list[str]:
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video), "-i", str(audio),
+        "-map", "0:v:0", "-map", "1:a:0",
+        "-map_metadata", "0",
+        "-c:v", "copy",
+        "-c:a", "aac", "-b:a", "192k",
+        "-movflags", "+faststart",
+        "-shortest",
+        str(salida),
+    ]
+
+
+def cmd_cortar_silencios(
+    auto_editor: str,
+    entrada: Path,
+    salida: Path,
+    margen: str,
+    umbral: str,
+    silencios: str,
+    velocidad: int,
+) -> list[str]:
+    cmd = [
+        auto_editor, str(entrada),
+        "--margin", margen,
+        "--edit", f"audio:threshold={umbral}",
+        "--progress", "machine",
+        "--no-open",
+        "-o", str(salida),
+    ]
+    if silencios == "acelerar":
+        cmd[2:2] = ["--when-silent", f"speed:{velocidad}"]
+    return cmd
+
+
+def _binario(nombre: str) -> str:
+    ruta = shutil.which(nombre)
+    if ruta is None:
+        raise PasoFallido(f"{nombre} no está instalado o no está en PATH")
+    return ruta
+
+
+_RUTAS_FFMPEG_ASS = (
+    Path("/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg"),
+    Path("/usr/local/opt/ffmpeg-full/bin/ffmpeg"),
+)
+
+_ffmpeg_ass_cache: str | None = None
+
+
+def ffmpeg_con_ass() -> str:
+    """Devuelve un ffmpeg con soporte del filtro ass (libass).
+
+    El resultado se memoiza en proceso: sondear cada candidato lanza un
+    subproceso por quemado de subtítulos, y el binario válido no cambia
+    durante la vida de la aplicación.
+    """
+    global _ffmpeg_ass_cache
+    if _ffmpeg_ass_cache is not None:
+        return _ffmpeg_ass_cache
+    candidatos = [str(r) for r in _RUTAS_FFMPEG_ASS if r.is_file()]
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        candidatos.append(ffmpeg_path)
+    for candidato in candidatos:
+        resultado = subprocess.run(
+            [candidato, "-hide_banner", "-filters"],
+            capture_output=True, text=True,
+            timeout=10,
+        )
+        if " ass " in resultado.stdout:
+            _ffmpeg_ass_cache = candidato
+            return candidato
+    raise PasoFallido(
+        "Ningún ffmpeg disponible soporta subtítulos (libass). "
+        "Instala ffmpeg-full: brew install ffmpeg-full"
+    )
+
+
+def extraer_audio(video: Path, wav: Path, sample_rate: int) -> None:
+    wav.parent.mkdir(parents=True, exist_ok=True)
+    _ejecutar(
+        cmd_extraer_audio(_binario("ffmpeg"), video, wav, sample_rate),
+        "Extracción de audio",
+    )
+    if not wav.is_file() or wav.stat().st_size == 0:
+        raise PasoFallido(f"No se generó el WAV: {wav}")
+
+
+def remux(video: Path, audio: Path, salida: Path) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    _ejecutar(
+        cmd_remux(_binario("ffmpeg"), video, audio, salida),
+        "Sustitución de la pista de audio",
+    )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(f"No se generó el vídeo remuxado: {salida}")
+
+
+def _parsear_progreso(linea: str) -> float | None:
+    """Extrae el porcentaje de una línea de progreso de auto-editor.
+
+    El formato real de ``auto-editor --progress machine`` no usa '%'; usa
+    campos separados por '~', p. ej.:
+        (mp4) h264+aac~1497.0~1801.0~0.06
+    donde el segundo campo es el valor actual y el tercero el total.
+    """
+    campos = linea.strip().split("~")
+    if len(campos) < 3:
+        return None
+    try:
+        actual = float(campos[1])
+        total = float(campos[2])
+    except ValueError:
+        return None
+    if total <= 0:
+        return None
+    return min(100.0, actual / total * 100.0)
+
+
+def cortar_silencios(
+    entrada: Path,
+    salida: Path,
+    margen: str,
+    umbral: str,
+    silencios: str,
+    velocidad: int,
+    on_percent: Callable[[float], None] | None = None,
+) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    cmd = cmd_cortar_silencios(
+        _binario("auto-editor"), entrada, salida, margen, umbral, silencios, velocidad
+    )
+    proceso = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    lineas: list[str] = []
+    assert proceso.stdout is not None
+    for linea in proceso.stdout:
+        lineas.append(linea)
+        if on_percent is not None:
+            porcentaje = _parsear_progreso(linea)
+            if porcentaje is not None:
+                on_percent(porcentaje)
+    proceso.wait()
+    if proceso.returncode != 0:
+        raise PasoFallido(
+            f"auto-editor falló (código {proceso.returncode})",
+            detalle="".join(lineas)[-4000:],
+        )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(f"No se generó el vídeo editado: {salida}")
+
+
+def tiene_pista_audio(video: Path) -> bool:
+    resultado = subprocess.run(
+        [
+            _binario("ffprobe"), "-v", "error",
+            "-select_streams", "a:0",
+            "-show_entries", "stream=index",
+            "-of", "csv=p=0",
+            str(video),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    return bool(resultado.stdout.strip())
+
+
+def resolucion_video(video: Path) -> tuple[int, int]:
+    """Resolución de DISPLAY: aplica la rotación de los metadatos.
+
+    Parseo por líneas clave=valor: robusto ante side-data extra que en
+    formato CSV producía campos vacíos/colas de coma.
+    """
+    resultado = subprocess.run(
+        [
+            _binario("ffprobe"), "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height:stream_side_data=rotation",
+            "-of", "default=noprint_wrappers=1",
+            str(video),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    valores: dict[str, str] = {}
+    for linea in resultado.stdout.splitlines():
+        clave, separador, valor = linea.partition("=")
+        if separador:
+            valores[clave.strip()] = valor.strip()
+    try:
+        ancho = int(valores["width"])
+        alto = int(valores["height"])
+    except (KeyError, ValueError):
+        raise PasoFallido(
+            f"No se pudo leer la resolución del vídeo: {video}",
+            detalle=(resultado.stderr or resultado.stdout).strip()[-1000:],
+        ) from None
+    if resultado.returncode != 0:
+        raise PasoFallido(
+            f"No se pudo leer la resolución del vídeo: {video}",
+            detalle=resultado.stderr.strip()[-1000:],
+        )
+    try:
+        rotacion = float(valores.get("rotation") or 0)
+    except ValueError:
+        rotacion = 0.0
+    if abs(rotacion) % 180 == 90:
+        ancho, alto = alto, ancho
+    return ancho, alto
+
+
+def duracion_video(video: Path) -> float:
+    resultado = subprocess.run(
+        [
+            _binario("ffprobe"), "-v", "error",
+            "-show_entries", "format=duration",
+            "-of", "csv=p=0",
+            str(video),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    try:
+        return float(resultado.stdout.strip().rstrip(","))
+    except ValueError:
+        return 0.0
+
+
+def cmd_quemar_subtitulos(
+    ffmpeg: str, video: Path, ass_nombre: str, salida: Path
+) -> list[str]:
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-vf", f"ass={ass_nombre}",
+        "-c:v", "libx264", "-crf", "18", "-preset", "medium",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        "-progress", "pipe:1", "-nostats",
+        str(salida),
+    ]
+
+
+def quemar_subtitulos(
+    video: Path,
+    ass: Path,
+    salida: Path,
+    on_percent: Callable[[float], None] | None = None,
+) -> None:
+    if not ass.is_file():
+        raise PasoFallido(f"No existe el archivo de subtítulos: {ass}")
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    duracion = duracion_video(video)
+    cmd = cmd_quemar_subtitulos(ffmpeg_con_ass(), video, ass.name, salida)
+    proceso = subprocess.Popen(
+        cmd,
+        cwd=str(ass.parent),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    lineas: list[str] = []
+    assert proceso.stdout is not None
+    for linea in proceso.stdout:
+        lineas.append(linea)
+        if on_percent is not None and duracion > 0 and "out_time_us=" in linea:
+            try:
+                us = int(linea.split("=", 1)[1])
+                on_percent(min(100.0, us / 1_000_000 / duracion * 100.0))
+            except ValueError:
+                pass
+    proceso.wait()
+    if proceso.returncode != 0:
+        raise PasoFallido(
+            f"El quemado de subtítulos falló (código {proceso.returncode})",
+            detalle="".join(lineas).strip()[-4000:],
+        )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(f"No se generó el vídeo con subtítulos: {salida}")
+
+
+def _crear_clearvoice(tarea: str, modelo: str):
+    # Import perezoso: torch solo se carga en el subproceso del runner.
+    from clearvoice import ClearVoice
+
+    return ClearVoice(task=tarea, model_names=[modelo])
+
+
+def limpiar_audio(entrada: Path, salida: Path, tarea: str, modelo: str) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    clear_voice = _crear_clearvoice(tarea, modelo)
+    audio = clear_voice(input_path=str(entrada), online_write=False)
+    clear_voice.write(audio, output_path=str(salida))
+    if not salida.is_file():
+        # Separación de hablantes: ClearVoice escribe <stem>_s1/_s2.
+        s1 = salida.with_name(f"{salida.stem}_s1{salida.suffix}")
+        if s1.is_file():
+            shutil.copyfile(s1, salida)
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(f"ClearVoice no generó el audio limpio: {salida}")

@@ -1,0 +1,10 @@
+.venv-clearvoice/
+__pycache__/
+.pytest_cache/
+*.egg-info/
+.DS_Store
+*.MOV
+*.mov
+*.mp4
+*.wav
+audio_procesado/

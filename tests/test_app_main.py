@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from PySide6.QtCore import QSettings
+
+from app.main import VentanaPrincipal
+from app.queue_model import EstadoTrabajo
+from app.settings import Ajustes
+
+
+def _ventana(qtbot, tmp_path, monkeypatch) -> VentanaPrincipal:
+    ajustes = Ajustes(
+        QSettings(str(tmp_path / "test.ini"), QSettings.Format.IniFormat)
+    )
+    monkeypatch.setattr("app.main._tiene_pista_audio", lambda ruta: True)
+    ventana = VentanaPrincipal(ajustes=ajustes)
+    qtbot.addWidget(ventana)
+    return ventana
+
+
+def test_anadir_videos_encola(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mov"])
+    assert ventana.modelo_cola.rowCount() == 2
+    assert ventana.boton_procesar.isEnabled()
+
+
+def test_sin_audio_no_encola(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr("app.main._tiene_pista_audio", lambda ruta: False)
+    avisos = []
+    monkeypatch.setattr(
+        "app.main.QMessageBox.warning",
+        lambda *args, **kwargs: avisos.append(args),
+    )
+    ventana.anadir_videos([tmp_path / "mudo.mp4"])
+    assert ventana.modelo_cola.rowCount() == 0
+    assert len(avisos) == 1
+    assert not ventana.boton_procesar.isEnabled()
+
+
+def test_procesar_construye_configs(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "salidas"
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    lanzado = {}
+    monkeypatch.setattr(
+        ventana.ejecutor, "iniciar", lambda trabajos: lanzado.setdefault("t", trabajos)
+    )
+    ventana.procesar()
+    filas_configs = lanzado["t"]
+    assert len(filas_configs) == 1
+    fila, config_json = filas_configs[0]
+    datos = json.loads(config_json)
+    assert datos["video"].endswith("a.mp4")
+    assert datos["salida"].endswith("salidas")
+    assert datos["modo"] == "completo"
+    # iniciar está mockeado, así que trabajo_iniciado no se emite todavía:
+    # la fila permanece en ESPERA hasta que el ejecutor la arranca de verdad.
+    assert ventana.modelo_cola.trabajo(fila).estado == EstadoTrabajo.ESPERA
+    ventana.ejecutor.trabajo_iniciado.emit(fila)
+    assert ventana.modelo_cola.trabajo(fila).estado == EstadoTrabajo.PROCESANDO
+
+
+def test_progreso_actualiza_cola(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.progreso.emit(
+        0, {"step": 2, "total": 4, "label": "Limpiando audio", "percent": 50.0}
+    )
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.etiqueta == "Limpiando audio"
+    assert trabajo.percent == 50.0
+
+
+def test_trabajo_terminado_ok_y_error(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.ejecutor.trabajo_terminado.emit(0, True, "/tmp/a_limpio.mp4", "")
+    ventana.ejecutor.trabajo_terminado.emit(1, False, "", "explotó")
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.HECHO
+    assert ventana.modelo_cola.trabajo(0).salida == Path("/tmp/a_limpio.mp4")
+    assert ventana.modelo_cola.trabajo(1).estado == EstadoTrabajo.ERROR
+    assert "explotó" in ventana.modelo_cola.trabajo(1).error
+
+
+def test_cancelado_limpia_temporal(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    temporal = tmp_path / ".a_limpio_tmp.mp4"
+    temporal.write_bytes(b"MEDIO")
+    temporal_subs = tmp_path / ".a_limpio_subs_tmp.mp4"
+    temporal_subs.write_bytes(b"MEDIO")
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "Cancelado")
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.CANCELADO
+    assert not temporal.exists()
+    assert not temporal_subs.exists()
+
+
+def test_boton_alterna_procesar_cancelar(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda t: None)
+    ventana.procesar()
+    assert "Cancelar" in ventana.boton_procesar.text()
+    ventana.ejecutor.cola_terminada.emit()
+    assert "Procesar" in ventana.boton_procesar.text()
+
+
+def test_quitar_y_limpiar_bloqueados_durante_proceso(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda t: None)
+    ventana.procesar()
+
+    # Row 0 finishes (HECHO) while row 1 stays PROCESANDO: _procesando is
+    # still True because cola_terminada has not fired yet.
+    ventana.ejecutor.trabajo_terminado.emit(0, True, "/tmp/x.mp4", "")
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.HECHO
+    assert ventana._procesando
+
+    ventana._limpiar_hechos()
+    assert ventana.modelo_cola.rowCount() == 2
+
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    ventana._quitar_seleccionado()
+    assert ventana.modelo_cola.rowCount() == 2
+
+    assert not ventana.boton_quitar.isEnabled()
+    assert not ventana.boton_limpiar.isEnabled()
+
+    ventana.ejecutor.cola_terminada.emit()
+
+    assert ventana.boton_quitar.isEnabled()
+    assert ventana.boton_limpiar.isEnabled()
+
+    # Guard lifted: the still-HECHO row can now be cleared.
+    ventana._limpiar_hechos()
+    assert ventana.modelo_cola.rowCount() == 1
+
+
+def test_limpiar_hechos_funciona_en_reposo(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.ejecutor.trabajo_terminado.emit(0, True, "/tmp/x.mp4", "")
+
+    ventana._limpiar_hechos()
+
+    assert ventana.modelo_cola.rowCount() == 1
+
+
+def test_aviso_actualiza_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.aviso.emit(0, "subs fallaron")
+    assert ventana.modelo_cola.trabajo(0).aviso == "subs fallaron"
+
+
+def test_seleccion_cola_alimenta_preview(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    recibido = []
+    monkeypatch.setattr(
+        ventana.vista_previa, "establecer_video",
+        lambda ruta: recibido.append(ruta),
+    )
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert recibido and recibido[-1] == tmp_path / "a.mp4"
