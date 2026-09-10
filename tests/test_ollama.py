@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -32,7 +33,11 @@ class _Falso(BaseHTTPRequestHandler):
         self._responder(codigo, datos)
 
     def _responder(self, codigo, datos):
-        cuerpo = json.dumps(datos).encode()
+        # Si datos es bytes, envía sin JSON encoding
+        if isinstance(datos, bytes):
+            cuerpo = datos
+        else:
+            cuerpo = json.dumps(datos).encode()
         self.send_response(codigo)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(cuerpo)))
@@ -92,6 +97,19 @@ def test_chat_json_contenido_no_json(servidor_falso):
     assert "esto no es json" in info.value.detalle
 
 
+def test_chat_json_envoltura_no_json(servidor_falso):
+    _Falso.respuestas["/api/chat"] = (200, b"<html>gateway error</html>")
+    with pytest.raises(PasoFallido, match="respuesta no válida") as info:
+        ollama.chat_json("m", [], {}, url=servidor_falso)
+    assert "gateway error" in info.value.detalle
+
+
+def test_chat_json_envoltura_no_dict(servidor_falso):
+    _Falso.respuestas["/api/chat"] = (200, ["no", "es", "dict"])
+    with pytest.raises(PasoFallido, match="respuesta no válida"):
+        ollama.chat_json("m", [], {}, url=servidor_falso)
+
+
 def test_asegurar_servidor_no_arranca_si_ya_responde(servidor_falso, monkeypatch):
     monkeypatch.setattr(ollama.subprocess, "Popen",
                         lambda *a, **k: pytest.fail("no debe lanzar ollama serve"))
@@ -106,15 +124,22 @@ def test_asegurar_servidor_arranca_y_cierra(monkeypatch):
     class ProcesoFalso:
         def __init__(self):
             self.terminado = False
+            self.wait_llamado_veces = 0
+            self.kill_llamado = False
 
         def terminate(self):
             self.terminado = True
 
         def wait(self, timeout=None):
+            self.wait_llamado_veces += 1
+            # Primera llamada: timeout; segunda: éxito
+            if self.wait_llamado_veces == 1 and timeout == 5:
+                raise subprocess.TimeoutExpired("ollama", 5)
             return 0
 
         def kill(self):
             self.terminado = True
+            self.kill_llamado = True
 
     proceso = ProcesoFalso()
 
@@ -134,6 +159,8 @@ def test_asegurar_servidor_arranca_y_cierra(monkeypatch):
     assert s.arrancado_por_nosotros is True
     s.cerrar()
     assert proceso.terminado is True
+    assert proceso.kill_llamado is True
+    assert proceso.wait_llamado_veces == 2  # Una vez con timeout, otra para reap
 
 
 def test_asegurar_servidor_sin_binario(monkeypatch):

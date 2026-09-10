@@ -44,6 +44,7 @@ class Servidor:
             self.proceso.wait(timeout=5)
         except subprocess.TimeoutExpired:
             self.proceso.kill()
+            self.proceso.wait()  # Reap el proceso tras kill
         self.proceso = None
 
 
@@ -91,7 +92,15 @@ def chat_json(
     )
     try:
         with urllib.request.urlopen(peticion, timeout=timeout) as r:
-            respuesta = json.load(r)
+            cuerpo_bruto = r.read()
+        try:
+            respuesta = json.loads(cuerpo_bruto)
+        except (json.JSONDecodeError, ValueError):
+            # El cuerpo no es JSON válido
+            detalle = cuerpo_bruto.decode("utf-8", errors="replace")
+            raise PasoFallido(
+                "Ollama devolvió una respuesta no válida", detalle=detalle[:2000]
+            ) from None
     except urllib.error.HTTPError as error:
         detalle = error.read().decode("utf-8", errors="replace")
         if error.code == 404 and "not found" in detalle:
@@ -99,7 +108,14 @@ def chat_json(
         raise PasoFallido(f"Ollama devolvió HTTP {error.code}", detalle=detalle) from None
     except (urllib.error.URLError, OSError) as error:
         raise PasoFallido(f"Ollama no responde en {url}", detalle=str(error)) from None
-    contenido = respuesta.get("message", {}).get("content", "")
+    try:
+        contenido = respuesta.get("message", {}).get("content", "")
+    except (AttributeError, TypeError):
+        # respuesta no es un dict: e.g. JSON array o valor primitivo
+        raise PasoFallido(
+            "Ollama devolvió una respuesta no válida",
+            detalle=json.dumps(respuesta)[:2000]
+        ) from None
     try:
         return json.loads(contenido)
     except (json.JSONDecodeError, TypeError):
