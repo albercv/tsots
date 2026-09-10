@@ -320,3 +320,123 @@ def test_aviso_de_cortar_silencios_modo_solo_silencios(entorno, tmp_path):
     assert [e["warning"] for e in eventos if "warning" in e] == [
         "reencodado por auto-editor"
     ]
+
+
+@pytest.fixture()
+def entorno_caption(entorno_subs, monkeypatch):
+    """Extiende `entorno_subs` mockeando Ollama y el generador de caption."""
+    llamadas, video, base = entorno_subs
+
+    class ServidorFalso:
+        def cerrar(self):
+            llamadas.append("ollama:cerrar")
+
+    def falso_asegurar(*args, **kwargs):
+        llamadas.append("ollama:asegurar")
+        return ServidorFalso()
+
+    def falso_generar(transcripcion, contexto_marca, modelo, cliente=None):
+        llamadas.append(f"generar:{modelo}:{contexto_marca}:{transcripcion}")
+        from videopipeline.caption import Caption
+        return Caption(titulo="T", caption="C", hashtags=["#a"], palabras_clave=["k"])
+
+    monkeypatch.setattr(pipeline, "asegurar_servidor", falso_asegurar)
+    monkeypatch.setattr(pipeline, "generar_caption", falso_generar)
+    return llamadas, video, base
+
+
+def test_caption_con_subtitulos_reutiliza_transcripcion(entorno_caption, tmp_path):
+    llamadas, video, base = entorno_caption
+    salida = tmp_path / "f.mp4"
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=salida, subtitulos=True,
+                       caption_seo=True, contexto_marca="marca X"),
+        eventos.append,
+    )
+    assert llamadas.count("transcribir:es:small") == 1
+    assert "generar:qwen3.5:9b:marca X:hola" in llamadas
+    assert llamadas.index("ollama:asegurar") < llamadas.index("ollama:cerrar")
+    md = (tmp_path / "f.md").read_text(encoding="utf-8")
+    assert md.startswith("# T")
+    etiquetas = [e["label"] for e in eventos if "label" in e]
+    assert "Generando caption SEO" in etiquetas
+    assert etiquetas.count("Transcribiendo") == 1
+    assert all(e["total"] == 7 for e in eventos if "total" in e)  # 4 + 2 subs + 1
+
+
+def test_caption_sin_subtitulos_transcribe(entorno_caption, tmp_path):
+    llamadas, video, base = entorno_caption
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True),
+        eventos.append,
+    )
+    assert llamadas.count("transcribir:es:small") == 1
+    assert "srt" not in llamadas and "quemar" not in llamadas
+    etiquetas = [e["label"] for e in eventos if "label" in e]
+    assert etiquetas[-2:] == ["Transcribiendo", "Generando caption SEO"]
+    assert all(e["total"] == 6 for e in eventos if "total" in e)  # 4 + 2
+
+
+def test_caption_off_no_toca_nada(entorno_caption, tmp_path):
+    llamadas, video, base = entorno_caption
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4"), None)
+    assert not any(l.startswith("generar:") or l.startswith("ollama:") for l in llamadas)
+    assert not (tmp_path / "f.md").exists()
+
+
+def test_caption_falla_degrada_con_warning(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, base = entorno_caption
+
+    def revienta(*a, **k):
+        raise RuntimeError("modelo caído")
+
+    monkeypatch.setattr(pipeline, "generar_caption", revienta)
+    salida = tmp_path / "f.mp4"
+    (tmp_path / "f.md").write_text("viejo", encoding="utf-8")
+    eventos: list[dict] = []
+    resultado = pipeline.run(
+        PipelineConfig(video=video, salida=salida, caption_seo=True), eventos.append
+    )
+    assert resultado == salida and salida.is_file()
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert len(avisos) == 1
+    assert avisos[0].startswith("Caption SEO falló: modelo caído")
+    assert "sin caption" in avisos[0]
+    assert not (tmp_path / "f.md").exists()  # el .md obsoleto se borra
+    assert "ollama:cerrar" in llamadas  # el servidor se cierra aunque falle
+
+
+def test_caption_con_subtitulos_fallidos_transcribe_de_nuevo(entorno_caption, tmp_path,
+                                                             monkeypatch):
+    """Si la transcripción de subtítulos falló, el caption lo reintenta él."""
+    llamadas, video, base = entorno_caption
+    intentos = {"n": 0}
+
+    def transcribir_flaky(video_, idioma, modelo):
+        intentos["n"] += 1
+        if intentos["n"] == 1:
+            raise RuntimeError("whisper caído")
+        from videopipeline.subtitles import Palabra
+        return [Palabra(texto="hola", inicio=0.0, fin=0.5)]
+
+    monkeypatch.setattr(pipeline, "transcribir", transcribir_flaky)
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", subtitulos=True,
+                       caption_seo=True),
+        eventos.append,
+    )
+    assert intentos["n"] == 2
+    assert (tmp_path / "f.md").is_file()
+
+
+def test_pasos_extra():
+    base = PipelineConfig(video=Path("/v.mp4"))
+    assert pipeline.pasos_extra(base) == 0
+    assert pipeline.pasos_extra(PipelineConfig(video=Path("/v.mp4"), subtitulos=True)) == 2
+    assert pipeline.pasos_extra(PipelineConfig(video=Path("/v.mp4"), caption_seo=True)) == 2
+    assert pipeline.pasos_extra(
+        PipelineConfig(video=Path("/v.mp4"), subtitulos=True, caption_seo=True)
+    ) == 3

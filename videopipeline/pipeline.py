@@ -14,6 +14,10 @@ from .steps import (
     resolucion_video,
 )
 from .subtitles import agrupar, generar_ass, generar_srt, transcribir
+from .caption import escribir_md, texto_plano
+from .caption import generar as generar_caption
+from .ollama import asegurar_servidor
+from .subtitles import Palabra
 
 Progreso = Callable[[dict], None]
 
@@ -33,11 +37,12 @@ def _avisar(on_progress: Progreso | None, texto: str) -> None:
 
 def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
                      trabajo: Path, on_progress: Progreso | None,
-                     paso: int, total: int) -> Path:
-    """Añade subtítulos a tmp_final. Devuelve la ruta a publicar.
+                     paso: int, total: int) -> tuple[Path, list[Palabra] | None]:
+    """Añade subtítulos a tmp_final. Devuelve (ruta a publicar, palabras).
 
     Si algo falla, emite {"warning": ...} y devuelve tmp_final sin tocar:
-    el pipeline nunca falla por subtítulos.
+    el pipeline nunca falla por subtítulos. `palabras` es None si la
+    transcripción no se consiguió (el caption la reintentará).
     """
     try:
         cache_whisper = Path.home() / ".cache" / "huggingface" / "hub"
@@ -61,7 +66,7 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
                 "warning": f"Subtítulos fallaron: {error}. "
                            "Vídeo guardado sin subtítulos."
             })
-        return tmp_final
+        return tmp_final, None
 
     ass = trabajo / "subs.ass"
     tmp_subs = final.with_name(f".{final.stem}_subs_tmp{final.suffix}")
@@ -79,7 +84,7 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
         )
         ass.unlink(missing_ok=True)
         tmp_final.unlink(missing_ok=True)
-        return tmp_subs
+        return tmp_subs, palabras
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         ass.unlink(missing_ok=True)
         tmp_subs.unlink(missing_ok=True)
@@ -88,7 +93,43 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
                 "warning": f"Subtítulos fallaron: {error}. "
                            "Vídeo guardado sin subtítulos (.srt conservado)."
             })
-        return tmp_final
+        return tmp_final, palabras
+
+
+def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
+                  palabras: list[Palabra] | None, on_progress: Progreso | None,
+                  paso: int, total: int) -> None:
+    """Genera final.with_suffix('.md'). Nunca hace fallar el vídeo."""
+    ruta_md = final.with_suffix(".md")
+    ruta_md.unlink(missing_ok=True)  # nunca dejar un caption obsoleto
+    servidor = None
+    try:
+        if palabras is None:
+            _emitir(on_progress, paso, total, "Transcribiendo")
+            palabras = transcribir(video_publicable, config.idioma_subs,
+                                   config.modelo_whisper)
+            paso += 1
+        _emitir(on_progress, paso, total, "Generando caption SEO")
+        servidor = asegurar_servidor()
+        caption = generar_caption(
+            texto_plano(palabras), config.contexto_marca, config.modelo_caption
+        )
+        escribir_md(caption, ruta_md)
+    except Exception as error:  # noqa: BLE001 — degradación deliberada
+        ruta_md.unlink(missing_ok=True)
+        _avisar(on_progress,
+                f"Caption SEO falló: {error}. Vídeo guardado sin caption.")
+    finally:
+        if servidor is not None:
+            servidor.cerrar()
+
+
+def pasos_extra(config: PipelineConfig) -> int:
+    """Pasos añadidos por subtítulos (2) y caption (1, o 2 si transcribe él)."""
+    extra = 2 if config.subtitulos else 0
+    if config.caption_seo:
+        extra += 1 if config.subtitulos else 2
+    return extra
 
 
 def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
@@ -106,7 +147,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     tmp_final = final.with_name(f".{final.stem}_tmp{final.suffix}")
     tmp_final.unlink(missing_ok=True)
 
-    extra = 2 if config.subtitulos else 0
+    extra = pasos_extra(config)
     trabajo = BASE_DIR / "audio_procesado" / nombre
 
     if config.modo == "solo_silencios":
@@ -120,11 +161,15 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             ),
             on_aviso=lambda texto: _avisar(on_progress, texto),
         )
-        publicar = tmp_final
+        publicar, palabras = tmp_final, None
         if config.subtitulos:
-            publicar = _fase_subtitulos(
+            publicar, palabras = _fase_subtitulos(
                 config, tmp_final, final, trabajo, on_progress, 2, total
             )
+        if config.caption_seo:
+            primer_paso_caption = 1 + (2 if config.subtitulos else 0) + 1
+            _fase_caption(config, publicar, final, palabras, on_progress,
+                          primer_paso_caption, total)
         publicar.replace(final)
         return final
 
@@ -165,11 +210,15 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
         )
         video_intermedio.unlink(missing_ok=True)
 
-    publicar = tmp_final
+    publicar, palabras = tmp_final, None
+    pasos_base = total - pasos_extra(config)
     if config.subtitulos:
-        paso_subs = total - 1  # penúltimo paso
-        publicar = _fase_subtitulos(
-            config, tmp_final, final, trabajo, on_progress, paso_subs, total
+        publicar, palabras = _fase_subtitulos(
+            config, tmp_final, final, trabajo, on_progress, pasos_base + 1, total
         )
+    if config.caption_seo:
+        primer_paso_caption = pasos_base + (2 if config.subtitulos else 0) + 1
+        _fase_caption(config, publicar, final, palabras, on_progress,
+                      primer_paso_caption, total)
     publicar.replace(final)
     return final
