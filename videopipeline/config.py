@@ -48,6 +48,9 @@ class PipelineConfig:
     idioma_subs: str = "es"
     modelo_whisper: str = "small"
     tamano_subs: int = 100
+    caption_seo: bool = False
+    contexto_marca: str = ""
+    modelo_caption: str = "qwen3.5:9b"
 
     def validar(self) -> None:
         if self.modo not in MODOS:
@@ -84,6 +87,8 @@ class PipelineConfig:
             raise ValueError(
                 f"tamano_subs fuera de rango: {self.tamano_subs} (esperado 50-150)"
             )
+        if not self.modelo_caption.strip():
+            raise ValueError("modelo_caption no puede estar vacío")
 
     def to_json(self) -> str:
         datos = asdict(self)

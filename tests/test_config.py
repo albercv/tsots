@@ -141,3 +141,24 @@ def test_validar_tamano_subs_fuera_de_rango():
         _config_minima(tamano_subs=49).validar()
     with pytest.raises(ValueError, match="tamano_subs"):
         _config_minima(tamano_subs=151).validar()
+
+
+def test_caption_defectos():
+    c = _config_minima()
+    assert c.caption_seo is False
+    assert c.contexto_marca == ""
+    assert c.modelo_caption == "qwen3.5:9b"
+
+
+def test_caption_json_ida_y_vuelta():
+    c = _config_minima(caption_seo=True, contexto_marca="Soy Alberto, tono cercano",
+                       modelo_caption="qwen3.5:9b-q8_0")
+    c2 = PipelineConfig.from_json(c.to_json())
+    assert c2 == c
+    assert c2.caption_seo is True
+    assert c2.contexto_marca == "Soy Alberto, tono cercano"
+
+
+def test_caption_modelo_vacio_invalido():
+    with pytest.raises(ValueError, match="modelo_caption"):
+        _config_minima(caption_seo=True, modelo_caption="").validar()
