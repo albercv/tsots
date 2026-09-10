@@ -5,17 +5,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QListView,
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -91,15 +93,32 @@ class VentanaPrincipal(QMainWindow):
 
         fila_superior.addLayout(columna_izquierda, 2)
 
+        # La columna derecha apilada (opciones + preview + caption) supera los
+        # 1100 px; va dentro de un QScrollArea para que la ventana pueda
+        # encoger en pantallas pequeñas y aparezca scroll en vez de bloquear.
         self.panel = PanelOpciones()
         self.panel.cargar(self.ajustes.cargar_panel())
-        columna_derecha = QVBoxLayout()
+        contenido_derecha = QWidget()
+        columna_derecha = QVBoxLayout(contenido_derecha)
+        columna_derecha.setContentsMargins(0, 0, 0, 0)
         columna_derecha.addWidget(self.panel)
         self.vista_previa = VistaPrevia()
         columna_derecha.addWidget(self.vista_previa)
         self.panel_caption = PanelCaption()
         columna_derecha.addWidget(self.panel_caption)
-        fila_superior.addLayout(columna_derecha, 1)
+        columna_derecha.addStretch(1)
+        self.scroll_derecha = QScrollArea()
+        self.scroll_derecha.setWidget(contenido_derecha)
+        self.scroll_derecha.setWidgetResizable(True)
+        self.scroll_derecha.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_derecha.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_derecha.setMinimumWidth(
+            contenido_derecha.minimumSizeHint().width()
+            + self.scroll_derecha.verticalScrollBar().sizeHint().width()
+        )
+        fila_superior.addWidget(self.scroll_derecha, 1)
         raiz.addLayout(fila_superior, 1)
 
         fila_inferior = QHBoxLayout()
@@ -137,6 +156,24 @@ class VentanaPrincipal(QMainWindow):
         geometria = self.ajustes.cargar_geometria()
         if geometria:
             self.restoreGeometry(geometria)
+        self._ajustar_a_pantalla()
+
+    def _ajustar_a_pantalla(self) -> None:
+        """Evita ventanas más grandes que el área útil (geometría guardada en
+        otro monitor, o mínimos antiguos)."""
+        pantalla = self.screen() or QApplication.primaryScreen()
+        if pantalla is None:
+            return
+        disponible = pantalla.availableGeometry()
+        ancho = min(self.width(), disponible.width())
+        alto = min(self.height(), disponible.height())
+        if (ancho, alto) != (self.width(), self.height()):
+            self.resize(ancho, alto)
+        if not disponible.contains(self.frameGeometry()):
+            self.move(
+                max(disponible.left(), min(self.x(), disponible.right() - ancho)),
+                max(disponible.top(), min(self.y(), disponible.bottom() - alto)),
+            )
 
     # --- cola ---
 

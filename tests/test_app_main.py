@@ -273,3 +273,29 @@ def test_procesar_incluye_marca_y_modelo_caption(qtbot, tmp_path, monkeypatch):
     assert config["caption_seo"] is True
     assert config["contexto_marca"] == "Soy Alberto"
     assert config["modelo_caption"] == "qwen3.5:9b-q8_0"
+
+
+def test_ventana_cabe_en_pantallas_pequenas(qtbot, tmp_path, monkeypatch):
+    """La columna derecha (opciones + preview + caption) supera los 1100 px
+    apilada; la ventana no debe imponer ese mínimo: se hace scroll."""
+    from videopipeline.caption import Caption
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.show()
+    ventana.panel_caption.mostrar(Caption("t", "c", ["#a"], ["k"]))
+    assert ventana.minimumSizeHint().height() <= 600
+    assert ventana.minimumSizeHint().width() <= 700
+
+
+def test_geometria_restaurada_se_limita_a_la_pantalla(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtCore import QRect
+    from PySide6.QtWidgets import QApplication
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(3000, 2500)
+    ventana.ajustes.guardar_geometria(bytes(ventana.saveGeometry()))
+    disponible = QApplication.primaryScreen().availableGeometry()
+    ventana2 = _ventana(qtbot, tmp_path, monkeypatch)  # restaura la geometría
+    ventana2.show()
+    assert ventana2.width() <= disponible.width()
+    assert ventana2.height() <= disponible.height()
