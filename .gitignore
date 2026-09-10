@@ -8,3 +8,5 @@ __pycache__/
 *.mp4
 *.wav
 audio_procesado/
+logs/
+TheSilenceOfTheShorts.app/Contents/MacOS/

@@ -345,3 +345,97 @@ def test_quemar_subtitulos_fallo(tmp_path, video_sintetico):
         quemar_subtitulos(
             video_sintetico, tmp_path / "no_existe.ass", tmp_path / "o.mp4"
         )
+
+
+def _auto_editor_falso(tmp_path, cuerpo: str) -> Path:
+    fake = tmp_path / "fake_auto_editor.py"
+    fake.write_text("#!/usr/bin/env python3\nimport sys\n" + cuerpo)
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    return fake
+
+
+_FALLA_SI_NO_NORMALIZADO = """
+argv = sys.argv[1:]
+entrada, salida = argv[0], argv[argv.index('-o') + 1]
+if '_normalizado' not in entrada:
+    print('(mp4) h264+aac~389.0~13944.0~28.51', flush=True)
+    print('\\x1b[31mError! Could not write packet: Invalid argument '
+          '(stream 0, pts 313600, dts 312000)\\x1b[0m', flush=True)
+    sys.exit(1)
+with open(salida, 'wb') as f:
+    f.write(b'EDITADO')
+sys.exit(0)
+"""
+
+
+def test_cmd_normalizar_video():
+    cmd = steps.cmd_normalizar_video("ffmpeg", Path("i.mp4"), Path("o.mp4"))
+    assert cmd[0] == "ffmpeg"
+    assert "h264_videotoolbox" in cmd
+    assert cmd[cmd.index("-c:a") + 1] == "copy"
+    assert cmd[-1] == "o.mp4"
+
+
+def test_cortar_silencios_reintenta_con_video_normalizado(
+    video_sintetico, tmp_path, monkeypatch
+):
+    """auto-editor 31.x falla con 'Could not write packet' en ciertos H.264;
+    reencodar la entrada lo arregla. El paso debe reintentar solo una vez,
+    avisar de ello, y no dejar el temporal normalizado."""
+    fake = _auto_editor_falso(tmp_path, _FALLA_SI_NO_NORMALIZADO)
+    real_binario = steps._binario
+    monkeypatch.setattr(
+        steps, "_binario",
+        lambda nombre: str(fake) if nombre == "auto-editor" else real_binario(nombre),
+    )
+    salida = tmp_path / "out.mp4"
+    avisos: list[str] = []
+    cortar_silencios(
+        video_sintetico, salida, "0.2s", "4%", "cortar", 4, on_aviso=avisos.append
+    )
+    assert salida.read_bytes() == b"EDITADO"
+    assert len(avisos) == 1 and "reencod" in avisos[0].lower()
+    assert not list(video_sintetico.parent.glob("*_normalizado*"))
+    assert not list(tmp_path.glob("*_normalizado*"))
+
+
+def test_cortar_silencios_no_reintenta_otros_errores(tmp_path, monkeypatch):
+    fake = _auto_editor_falso(
+        tmp_path,
+        "print('Error! Input file doesn\\'t exist', flush=True)\nsys.exit(1)\n",
+    )
+
+    def binario(nombre):
+        if nombre == "ffmpeg":
+            raise AssertionError("no debe normalizar ante otros errores")
+        return str(fake)
+
+    monkeypatch.setattr(steps, "_binario", binario)
+    entrada = tmp_path / "in.mp4"
+    entrada.write_bytes(b"fake")
+    avisos: list[str] = []
+    with pytest.raises(PasoFallido) as info:
+        cortar_silencios(entrada, tmp_path / "o.mp4", "0.2s", "4%", "cortar", 4,
+                         on_aviso=avisos.append)
+    assert "Input file doesn't exist" in info.value.detalle
+    assert avisos == []
+
+
+def test_cortar_silencios_falla_si_persiste_tras_normalizar(
+    video_sintetico, tmp_path, monkeypatch
+):
+    fake = _auto_editor_falso(
+        tmp_path,
+        "print('Error! Could not write packet: Invalid argument', flush=True)\n"
+        "sys.exit(1)\n",
+    )
+    real_binario = steps._binario
+    monkeypatch.setattr(
+        steps, "_binario",
+        lambda nombre: str(fake) if nombre == "auto-editor" else real_binario(nombre),
+    )
+    with pytest.raises(PasoFallido) as info:
+        cortar_silencios(video_sintetico, tmp_path / "o.mp4", "0.2s", "4%",
+                         "cortar", 4)
+    assert "Could not write packet" in info.value.detalle
+    assert "reencod" in str(info.value).lower()  # el mensaje dice que ya se intentó

@@ -25,6 +25,7 @@ class Trabajo:
     error: str = ""
     aviso: str = ""
     salida: Path | None = None
+    diagnostico: dict | None = None  # titulo, causa, solucion, detalle, paso, log
 
 
 class ModeloCola(QAbstractListModel):
@@ -46,6 +47,9 @@ class ModeloCola(QAbstractListModel):
                     partes.append(f"· {trabajo.etiqueta}")
                 if trabajo.percent is not None:
                     partes.append(f"({trabajo.percent:.0f}%)")
+            if trabajo.estado == EstadoTrabajo.ERROR and trabajo.error:
+                # Primera línea = título legible; el resto va al tooltip/diálogo.
+                partes.append(f"· {trabajo.error.splitlines()[0]}")
             if trabajo.aviso:
                 partes.append("⚠")
             return " ".join(partes)

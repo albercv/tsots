@@ -165,16 +165,47 @@ def _parsear_progreso(linea: str) -> float | None:
     return min(100.0, actual / total * 100.0)
 
 
-def cortar_silencios(
+def cmd_normalizar_video(ffmpeg: str, entrada: Path, salida: Path) -> list[str]:
+    """Reencoda solo el vídeo (audio copiado) con el encoder por hardware.
+
+    auto-editor 31.x falla ("Could not write packet") con el H.264 de algunas
+    exportaciones; una pasada por h264_videotoolbox produce un stream que sí
+    acepta. Bitrate alto: auto-editor vuelve a codificar después.
+    """
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(entrada),
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-c:v", "h264_videotoolbox", "-b:v", "14M",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        str(salida),
+    ]
+
+
+def normalizar_video(entrada: Path, salida: Path) -> None:
+    _ejecutar(
+        cmd_normalizar_video(_binario("ffmpeg"), entrada, salida),
+        "Reencodado del vídeo (h264_videotoolbox)",
+    )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(f"No se generó el vídeo reencodado: {salida}")
+
+
+# Firma del bug de auto-editor que se resuelve reencodando la entrada.
+_ERROR_PAQUETE_AUTO_EDITOR = "Could not write packet"
+
+
+def _ejecutar_auto_editor(
     entrada: Path,
     salida: Path,
     margen: str,
     umbral: str,
     silencios: str,
     velocidad: int,
-    on_percent: Callable[[float], None] | None = None,
-) -> None:
-    salida.parent.mkdir(parents=True, exist_ok=True)
+    on_percent: Callable[[float], None] | None,
+) -> tuple[int, str]:
+    """Lanza auto-editor y devuelve (código, salida cruda)."""
     cmd = cmd_cortar_silencios(
         _binario("auto-editor"), entrada, salida, margen, umbral, silencios, velocidad
     )
@@ -193,11 +224,46 @@ def cortar_silencios(
             if porcentaje is not None:
                 on_percent(porcentaje)
     proceso.wait()
-    if proceso.returncode != 0:
-        raise PasoFallido(
-            f"auto-editor falló (código {proceso.returncode})",
-            detalle="".join(lineas)[-4000:],
-        )
+    return proceso.returncode, "".join(lineas)
+
+
+def cortar_silencios(
+    entrada: Path,
+    salida: Path,
+    margen: str,
+    umbral: str,
+    silencios: str,
+    velocidad: int,
+    on_percent: Callable[[float], None] | None = None,
+    on_aviso: Callable[[str], None] | None = None,
+) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    codigo, texto = _ejecutar_auto_editor(
+        entrada, salida, margen, umbral, silencios, velocidad, on_percent
+    )
+    reintentado = False
+    if codigo != 0 and _ERROR_PAQUETE_AUTO_EDITOR in texto:
+        reintentado = True
+        normalizado = salida.with_name(f".{entrada.stem}_normalizado.mp4")
+        try:
+            normalizar_video(entrada, normalizado)
+            if on_aviso is not None:
+                on_aviso(
+                    "auto-editor no aceptó el stream H.264 original "
+                    f"({_ERROR_PAQUETE_AUTO_EDITOR}); el vídeo se ha "
+                    "reencodado con h264_videotoolbox y se ha reintentado."
+                )
+            codigo, texto = _ejecutar_auto_editor(
+                normalizado, salida, margen, umbral, silencios, velocidad,
+                on_percent,
+            )
+        finally:
+            normalizado.unlink(missing_ok=True)
+    if codigo != 0:
+        mensaje = f"auto-editor falló (código {codigo})"
+        if reintentado:
+            mensaje += " incluso tras reencodar la entrada"
+        raise PasoFallido(mensaje, detalle=texto[-4000:])
     if not salida.is_file() or salida.stat().st_size == 0:
         raise PasoFallido(f"No se generó el vídeo editado: {salida}")
 

@@ -56,7 +56,7 @@ def _tiene_pista_audio(ruta: Path) -> bool:
 class VentanaPrincipal(QMainWindow):
     def __init__(self, ajustes: Ajustes | None = None):
         super().__init__()
-        self.setWindowTitle("Limpiador de Vídeo")
+        self.setWindowTitle("The Silence of the Shorts")
         self.ajustes = ajustes or Ajustes()
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)
@@ -117,6 +117,7 @@ class VentanaPrincipal(QMainWindow):
         self.ejecutor.trabajo_terminado.connect(self._al_terminar_trabajo)
         self.ejecutor.cola_terminada.connect(self._al_terminar_cola)
         self.ejecutor.aviso.connect(self._al_avisar)
+        self.ejecutor.diagnostico.connect(self._al_diagnosticar)
         self.modelo_cola.rowsInserted.connect(self._refrescar_boton)
         self.modelo_cola.rowsRemoved.connect(self._refrescar_boton)
         self.modelo_cola.dataChanged.connect(self._refrescar_boton)
@@ -164,6 +165,47 @@ class VentanaPrincipal(QMainWindow):
         trabajo = self.modelo_cola.trabajo(indice.row())
         if trabajo.estado == EstadoTrabajo.HECHO and trabajo.salida:
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(trabajo.salida)))
+        elif trabajo.estado == EstadoTrabajo.ERROR:
+            self._mostrar_error(trabajo)
+
+    # --- errores ---
+
+    def _dialogo_error(self, trabajo) -> QMessageBox:
+        diag = trabajo.diagnostico or {}
+        titulo = diag.get("titulo") or trabajo.error.splitlines()[0]
+        # macOS ignora el windowTitle de QMessageBox: el título va en el cuerpo.
+        lineas = [f"<b>{titulo}</b>", trabajo.ruta.name]
+        if diag.get("paso"):
+            lineas.append(f"Paso: {diag['paso']}")
+        if diag.get("causa"):
+            lineas.append(f"<br>Causa: {diag['causa']}")
+        if diag.get("solucion"):
+            lineas.append(f"<br>Qué hacer: {diag['solucion']}")
+        if not diag:
+            lineas.append(trabajo.error)
+        dialogo = QMessageBox(self)
+        dialogo.setIcon(QMessageBox.Icon.Critical)
+        dialogo.setWindowTitle(f"Error: {titulo}")
+        dialogo.setText("<br>".join(lineas))
+        detalle = diag.get("detalle") or trabajo.error
+        if detalle:
+            dialogo.setDetailedText(detalle)
+        dialogo.addButton(QMessageBox.StandardButton.Close)
+        log = diag.get("log")
+        if log and Path(log).is_file():
+            boton_log = dialogo.addButton(
+                "Abrir log", QMessageBox.ButtonRole.ActionRole
+            )
+            boton_log.clicked.connect(
+                lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(log))
+            )
+        return dialogo
+
+    def _mostrar_error(self, trabajo) -> None:
+        self._dialogo_error(trabajo).exec()
+
+    def _al_diagnosticar(self, fila: int, diagnostico: dict) -> None:
+        self.modelo_cola.actualizar(fila, diagnostico=diagnostico)
 
     # --- preview ---
 

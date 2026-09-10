@@ -1,4 +1,4 @@
-# Limpiador de Vídeo — instalación
+# The Silence of the Shorts — instalación
 
 Aplicación de escritorio (PySide6) que limpia el audio de un vídeo con
 ClearVoice (MossFormer2_SE_48K), recorta silencios con auto-editor y
@@ -6,10 +6,10 @@ opcionalmente genera/quema subtítulos con faster-whisper.
 
 ## Arrancar
 
-Doble clic en `LimpiadorVideo.command`, o desde terminal:
+Doble clic en `TheSilenceOfTheShorts.command`, o desde terminal:
 
 ```bash
-./LimpiadorVideo.command
+./TheSilenceOfTheShorts.command
 ```
 
 CLI sin GUI:
@@ -59,6 +59,35 @@ QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m "not slow"
 
 Añade `-m slow` para los dos tests de integración que cargan el modelo
 real (~40 s).
+
+## Acceso directo en el Dock (TheSilenceOfTheShorts.app)
+
+`TheSilenceOfTheShorts.app` es un bundle mínimo dentro del proyecto: un lanzador
+nativo (`lanzador/lanzador.c`) que hace `exec` de una copia del intérprete
+de Python con el venv activado (`__PYVENV_LAUNCHER__`) y `caffeinate -i`.
+Un solo proceso, con la identidad de la app: icono propio en el Dock y
+permisos de macOS (Documentos, Escritorio) a nombre de "The Silence of the Shorts".
+
+- Se lanza sin Terminal. Lo que escriban python/Qt va a `logs/lanzador.log`.
+- El ejecutable principal NO puede ser un script: macOS lo atribuye a
+  `/bin/bash` y deniega Documentos sin preguntar.
+- Tras `brew upgrade python@3.11` (o si no arranca): `lanzador/construir_app.sh`.
+- Para arrastrarlo al Dock otra vez: Finder → arrastrar `TheSilenceOfTheShorts.app`
+  a la parte izquierda del Dock.
+
+## Errores y logs
+
+- Cada trabajo escribe `logs/<vídeo>_<fecha>.log` con la config, los pasos
+  con tiempos y, si falla, el diagnóstico completo (causa, qué hacer, salida
+  cruda de la herramienta que falló).
+- En la cola, una fila en error muestra el título del problema. Doble clic
+  abre un diálogo con causa, solución, detalle técnico y botón "Abrir log".
+- Los errores conocidos se traducen en `videopipeline/errores.py`
+  (tabla `_CONOCIDOS`). Un error que salga como "desconocido" es un
+  candidato a añadir ahí.
+- auto-editor 31.x falla con "Could not write packet" en el H.264 de
+  algunas exportaciones (p. ej. los mp4 del podcast). El paso de recorte
+  reencoda con `h264_videotoolbox` y reintenta solo; la fila queda con ⚠.
 
 ## Origen
 

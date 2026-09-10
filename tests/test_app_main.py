@@ -169,3 +169,39 @@ def test_seleccion_cola_alimenta_preview(qtbot, tmp_path, monkeypatch):
     ventana.anadir_videos([tmp_path / "a.mp4"])
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     assert recibido and recibido[-1] == tmp_path / "a.mp4"
+
+
+def test_diagnostico_se_guarda_y_dialogo_lo_muestra(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    log = tmp_path / "a_x.log"
+    log.write_text("log", encoding="utf-8")
+    diag = {"titulo": "auto-editor no pudo escribir el vídeo",
+            "causa": "porque sí", "solucion": "reencodar",
+            "detalle": "Error! Could not write packet", "conocido": True,
+            "paso": "Recortando silencios", "log": str(log)}
+    ventana.ejecutor.diagnostico.emit(0, diag)
+    ventana.ejecutor.trabajo_terminado.emit(
+        0, False, "", "auto-editor no pudo escribir el vídeo\nCausa: porque sí"
+    )
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.estado == EstadoTrabajo.ERROR
+    assert trabajo.diagnostico == diag
+    dialogo = ventana._dialogo_error(trabajo)
+    assert "auto-editor no pudo escribir el vídeo" in dialogo.text()
+    assert "porque sí" in dialogo.text()
+    assert "reencodar" in dialogo.text()
+    assert "Recortando silencios" in dialogo.text()
+    assert "Could not write packet" in dialogo.detailedText()
+    assert any("log" in b.text().lower() for b in dialogo.buttons())
+
+
+def test_doble_clic_en_error_abre_dialogo(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "explotó")
+    mostrados = []
+    monkeypatch.setattr(ventana, "_mostrar_error",
+                        lambda trabajo: mostrados.append(trabajo.error))
+    ventana._abrir_resultado(ventana.modelo_cola.index(0))
+    assert mostrados == ["explotó"]

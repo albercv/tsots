@@ -72,3 +72,11 @@ def video_con_voz(tmp_path_factory) -> Path:
         check=True,
     )
     return destino
+
+
+@pytest.fixture(autouse=True)
+def logs_en_tmp(tmp_path, monkeypatch):
+    """El runner escribe un log por trabajo; en tests nunca en el proyecto."""
+    from videopipeline import runner
+
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")

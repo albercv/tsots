@@ -247,3 +247,87 @@ def test_warning_emite_senal_aviso(qtbot, tmp_path):
     with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
         ejecutor.iniciar([(0, "{}")])
     assert avisos == [(0, "subs fallaron")]
+
+
+def test_crash_sin_json_conserva_la_salida_cruda(qtbot, tmp_path):
+    """Si el runner muere sin emitir JSON de error (traceback, crash nativo),
+    el texto crudo NO se descarta como ruido: es la única pista."""
+    script = _runner_falso(
+        tmp_path,
+        """
+        import json, sys
+        print(json.dumps({"step": 2, "total": 4, "label": "Limpiando audio",
+                          "percent": None}), flush=True)
+        print("algo de ruido de una librería", flush=True)
+        1 / 0
+        """,
+    )
+    ejecutor = EjecutorCola()
+    ejecutor.PROGRAMA = [sys.executable, str(script)]
+    terminados = []
+    ejecutor.trabajo_terminado.connect(
+        lambda fila, ok, salida, error: terminados.append((ok, error))
+    )
+    with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
+        ejecutor.iniciar([(0, "{}")])
+    ok, error = terminados[0]
+    assert ok is False
+    assert "código 1" in error
+    assert "Limpiando audio" in error  # último paso conocido
+    assert "ZeroDivisionError" in error
+    assert "algo de ruido" in error
+
+
+def test_muerte_por_senal_se_explica(qtbot, tmp_path):
+    script = _runner_falso(
+        tmp_path,
+        """
+        import os, signal
+        os.kill(os.getpid(), signal.SIGKILL)
+        """,
+    )
+    ejecutor = EjecutorCola()
+    ejecutor.PROGRAMA = [sys.executable, str(script)]
+    terminados = []
+    ejecutor.trabajo_terminado.connect(
+        lambda fila, ok, salida, error: terminados.append(error)
+    )
+    with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
+        ejecutor.iniciar([(0, "{}")])
+    assert "SIGKILL" in terminados[0]
+    assert "memoria" in terminados[0].lower()
+
+
+def test_error_estructurado_emite_diagnostico(qtbot, tmp_path):
+    script = _runner_falso(
+        tmp_path,
+        """
+        import json, sys
+        print(json.dumps({
+            "error": "auto-editor falló (código 1)\\nError! Could not write packet",
+            "step": 4, "paso": "Recortando silencios",
+            "diagnostico": {"titulo": "auto-editor no pudo escribir el vídeo",
+                            "causa": "porque sí", "solucion": "reencodar",
+                            "detalle": "Error! Could not write packet",
+                            "conocido": True},
+            "log": "/tmp/x.log",
+        }), flush=True)
+        sys.exit(1)
+        """,
+    )
+    ejecutor = EjecutorCola()
+    ejecutor.PROGRAMA = [sys.executable, str(script)]
+    terminados, diagnosticos = [], []
+    ejecutor.trabajo_terminado.connect(
+        lambda fila, ok, salida, error: terminados.append(error)
+    )
+    ejecutor.diagnostico.connect(lambda fila, d: diagnosticos.append((fila, d)))
+    with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
+        ejecutor.iniciar([(0, "{}")])
+    assert diagnosticos[0][0] == 0
+    assert diagnosticos[0][1]["titulo"] == "auto-editor no pudo escribir el vídeo"
+    assert diagnosticos[0][1]["log"] == "/tmp/x.log"
+    assert diagnosticos[0][1]["paso"] == "Recortando silencios"
+    # El texto de error empieza por el título legible, no por el mensaje crudo.
+    assert terminados[0].startswith("auto-editor no pudo escribir el vídeo")
+    assert "Qué hacer: reencodar" in terminados[0]

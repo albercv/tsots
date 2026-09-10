@@ -99,6 +99,70 @@ def test_help_sale_limpio(capsys):
     assert codigo == 0
 
 
+def test_error_incluye_diagnostico_y_log(tmp_path, monkeypatch, capsys):
+    ruta = _config_json(tmp_path)
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+
+    def falso_run(config, on_progress):
+        on_progress({"step": 4, "total": 4, "label": "Recortando silencios",
+                     "percent": 2.8})
+        raise PasoFallido(
+            "auto-editor falló (código 1)",
+            detalle="(mp4) h264+aac~38.0~13944.0~8.48\r"
+                    "\x1b[31mError! Could not write packet: Invalid argument\x1b[0m",
+        )
+
+    monkeypatch.setattr(runner, "run", falso_run)
+    monkeypatch.setattr(runner.os, "chdir", lambda ruta_: None)
+    assert runner.main(["--config", str(ruta)]) == 1
+    ultimo = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    diag = ultimo["diagnostico"]
+    assert diag["titulo"] == "auto-editor no pudo escribir el vídeo"
+    assert diag["conocido"] is True
+    assert "\x1b" not in diag["detalle"]
+    assert ultimo["paso"] == "Recortando silencios"
+    log = Path(ultimo["log"])
+    assert log.is_file() and log.parent == tmp_path / "logs"
+    contenido = log.read_text(encoding="utf-8")
+    assert '"modelo": "MossFormer2_SE_48K"' in contenido  # config completa
+    assert "Recortando silencios" in contenido  # eventos de progreso
+    assert "Could not write packet" in contenido  # detalle técnico
+    assert "auto-editor no pudo escribir el vídeo" in contenido  # diagnóstico
+
+
+def test_excepcion_inesperada_lleva_tipo_y_traceback(tmp_path, monkeypatch,
+                                                      capsys):
+    ruta = _config_json(tmp_path)
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+
+    def falso_run(config, on_progress):
+        raise KeyError("width")
+
+    monkeypatch.setattr(runner, "run", falso_run)
+    monkeypatch.setattr(runner.os, "chdir", lambda ruta_: None)
+    assert runner.main(["--config", str(ruta)]) == 1
+    ultimo = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert ultimo["error"].startswith("KeyError: 'width'")
+    diag = ultimo["diagnostico"]
+    assert diag["conocido"] is False
+    assert "Traceback" in diag["detalle"]
+    assert "falso_run" in diag["detalle"]
+    assert "Traceback" in Path(ultimo["log"]).read_text(encoding="utf-8")
+
+
+def test_exito_tambien_escribe_log(tmp_path, monkeypatch, capsys):
+    ruta = _config_json(tmp_path)
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner, "run", lambda c, p: c.ruta_salida_final())
+    monkeypatch.setattr(runner.os, "chdir", lambda ruta_: None)
+    assert runner.main(["--config", str(ruta)]) == 0
+    ultimo = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert ultimo["done"] is True
+    logs = list((tmp_path / "logs").glob("v_*.log"))
+    assert len(logs) == 1
+    assert "OK" in logs[0].read_text(encoding="utf-8")
+
+
 def test_warning_pasa_por_stdout(tmp_path, monkeypatch, capsys):
     ruta = _config_json(tmp_path)
 

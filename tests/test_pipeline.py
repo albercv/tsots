@@ -28,8 +28,10 @@ def entorno(tmp_path, monkeypatch):
         salida.write_bytes(b"MP4")
 
     def falso_cortar(entrada, salida, margen, umbral, silencios, velocidad,
-                     on_percent=None):
+                     on_percent=None, on_aviso=None):
         llamadas.append(f"cortar:{margen}:{umbral}:{silencios}:{velocidad}")
+        if on_aviso is not None and "_avisa" in entrada.stem:
+            on_aviso("reencodado por auto-editor")
         salida.write_bytes(b"MP4FINAL")
 
     monkeypatch.setattr(pipeline, "extraer_audio", falso_extraer)
@@ -289,3 +291,32 @@ def test_quemado_falla_limpia_temporales(entorno_subs, tmp_path, monkeypatch):
     ocultos = [p for p in tmp_path.iterdir() if p.name.startswith(".")]
     assert ocultos == []
     assert not list((base / "audio_procesado").rglob("subs.ass"))
+
+
+def test_aviso_de_cortar_silencios_llega_como_warning(entorno, tmp_path):
+    """El reintento con vídeo reencodado debe quedar visible (⚠ + log)."""
+    llamadas, video, base = entorno
+    video_avisa = video.with_name("charla_avisa.mov")
+    video_avisa.write_bytes(b"VID")
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video_avisa, salida=tmp_path / "f.mp4"),
+        eventos.append,
+    )
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert avisos == ["reencodado por auto-editor"]
+
+
+def test_aviso_de_cortar_silencios_modo_solo_silencios(entorno, tmp_path):
+    llamadas, video, base = entorno
+    video_avisa = video.with_name("charla_avisa.mov")
+    video_avisa.write_bytes(b"VID")
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video_avisa, salida=tmp_path / "f.mp4",
+                       modo="solo_silencios"),
+        eventos.append,
+    )
+    assert [e["warning"] for e in eventos if "warning" in e] == [
+        "reencodado por auto-editor"
+    ]

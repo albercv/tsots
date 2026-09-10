@@ -26,6 +26,11 @@ def _emitir(on_progress: Progreso | None, step: int, total: int, label: str,
         )
 
 
+def _avisar(on_progress: Progreso | None, texto: str) -> None:
+    if on_progress is not None:
+        on_progress({"warning": texto})
+
+
 def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
                      trabajo: Path, on_progress: Progreso | None,
                      paso: int, total: int) -> Path:
@@ -113,6 +118,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             on_percent=lambda p: _emitir(
                 on_progress, 1, total, "Recortando silencios", p
             ),
+            on_aviso=lambda texto: _avisar(on_progress, texto),
         )
         publicar = tmp_final
         if config.subtitulos:
@@ -155,6 +161,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             on_percent=lambda p: _emitir(
                 on_progress, 4, total, "Recortando silencios", p
             ),
+            on_aviso=lambda texto: _avisar(on_progress, texto),
         )
         video_intermedio.unlink(missing_ok=True)
 

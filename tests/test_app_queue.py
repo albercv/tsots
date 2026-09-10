@@ -115,3 +115,16 @@ def test_aviso_en_display_y_tooltip(qtbot):
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert "⚠" in texto
     assert "subs fallaron" in m.data(m.index(0), Qt.ItemDataRole.ToolTipRole)
+
+
+def test_error_muestra_titulo_en_la_fila(qtbot):
+    m = ModeloCola()
+    m.anadir([Path("/v/a.mp4")])
+    m.actualizar(
+        0, estado=EstadoTrabajo.ERROR,
+        error="auto-editor no pudo escribir el vídeo\nCausa: X\nQué hacer: Y",
+    )
+    texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
+    assert "auto-editor no pudo escribir el vídeo" in texto
+    assert "Causa" not in texto  # solo la primera línea en la fila
+    assert "Causa: X" in m.data(m.index(0), Qt.ItemDataRole.ToolTipRole)
