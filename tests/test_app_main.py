@@ -205,3 +205,71 @@ def test_doble_clic_en_error_abre_dialogo(qtbot, tmp_path, monkeypatch):
                         lambda trabajo: mostrados.append(trabajo.error))
     ventana._abrir_resultado(ventana.modelo_cola.index(0))
     assert mostrados == ["explotó"]
+
+
+def _md_ejemplo(ruta: Path) -> None:
+    from videopipeline.caption import Caption, escribir_md
+    escribir_md(Caption(titulo="Título X", caption="Cuerpo", hashtags=["#a"],
+                        palabras_clave=["k"]), ruta)
+
+
+def test_seleccion_de_hecho_muestra_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    salida_a = tmp_path / "a_limpio.mp4"
+    salida_a.write_bytes(b"MP4")
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(salida_a), "")
+    ventana.ejecutor.trabajo_terminado.emit(1, True, str(tmp_path / "b_limpio.mp4"), "")
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert not ventana.panel_caption.isHidden()
+    assert ventana.panel_caption.etiqueta_titulo.text() == "Título X"
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(1))  # sin .md
+    assert ventana.panel_caption.isHidden()
+
+
+def test_terminar_trabajo_seleccionado_refresca_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert ventana.panel_caption.isHidden()
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    assert not ventana.panel_caption.isHidden()
+
+
+def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.contexto_marca = "antes"
+    visto = {}
+
+    class DialogoFalso:
+        def __init__(self, texto_inicial="", parent=None):
+            visto["inicial"] = texto_inicial
+
+        def exec(self):
+            return 1  # QDialog.DialogCode.Accepted
+
+        def texto(self):
+            return "después"
+
+    monkeypatch.setattr("app.main.DialogoMarca", DialogoFalso)
+    ventana.panel.editar_marca.emit()
+    assert visto["inicial"] == "antes"
+    assert ventana.ajustes.contexto_marca == "después"
+
+
+def test_procesar_incluye_marca_y_modelo_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.contexto_marca = "Soy Alberto"
+    ventana.ajustes.modelo_caption = "qwen3.5:9b-q8_0"
+    ventana.panel.check_caption.setChecked(True)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    capturado = {}
+    monkeypatch.setattr(ventana.ejecutor, "iniciar",
+                        lambda trabajos: capturado.setdefault("t", trabajos))
+    ventana.procesar()
+    config = json.loads(capturado["t"][0][1])
+    assert config["caption_seo"] is True
+    assert config["contexto_marca"] == "Soy Alberto"
+    assert config["modelo_caption"] == "qwen3.5:9b-q8_0"

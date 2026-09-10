@@ -20,10 +20,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig
 
 from .queue_model import EstadoTrabajo, ModeloCola
 from .settings import Ajustes
+from .widgets.dialogo_marca import DialogoMarca
+from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
 from .widgets.vista_previa import VistaPrevia
 from .widgets.zona_drop import ZonaDrop
@@ -94,6 +97,8 @@ class VentanaPrincipal(QMainWindow):
         columna_derecha.addWidget(self.panel)
         self.vista_previa = VistaPrevia()
         columna_derecha.addWidget(self.vista_previa)
+        self.panel_caption = PanelCaption()
+        columna_derecha.addWidget(self.panel_caption)
         fila_superior.addLayout(columna_derecha, 1)
         raiz.addLayout(fila_superior, 1)
 
@@ -124,6 +129,7 @@ class VentanaPrincipal(QMainWindow):
         self._refrescar_boton()
 
         self.panel.opciones_subs_cambiadas.connect(self._refrescar_preview)
+        self.panel.editar_marca.connect(self._editar_marca)
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
         )
@@ -211,12 +217,18 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_cambiar_seleccion(self, indice, _anterior) -> None:
         if indice.isValid():
-            self.vista_previa.establecer_video(
-                self.modelo_cola.trabajo(indice.row()).ruta
-            )
+            trabajo = self.modelo_cola.trabajo(indice.row())
+            self.vista_previa.establecer_video(trabajo.ruta)
             self._refrescar_preview()
+            self.panel_caption.mostrar(self._caption_de(trabajo))
         else:
             self.vista_previa.establecer_video(None)
+            self.panel_caption.mostrar(None)
+
+    def _caption_de(self, trabajo) -> Caption | None:
+        if trabajo.estado != EstadoTrabajo.HECHO or not trabajo.salida:
+            return None
+        return leer_md(trabajo.salida.with_suffix(".md"))
 
     def _refrescar_preview(self) -> None:
         valores = self.panel.valores()
@@ -239,6 +251,11 @@ class VentanaPrincipal(QMainWindow):
             self.ajustes.carpeta_salida = Path(carpeta)
             self._refrescar_etiqueta_salida()
 
+    def _editar_marca(self) -> None:
+        dialogo = DialogoMarca(self.ajustes.contexto_marca, self)
+        if dialogo.exec():
+            self.ajustes.contexto_marca = dialogo.texto()
+
     # --- procesado ---
 
     def procesar(self) -> None:
@@ -252,7 +269,10 @@ class VentanaPrincipal(QMainWindow):
         for fila in pendientes:
             trabajo = self.modelo_cola.trabajo(fila)
             config = PipelineConfig(
-                video=trabajo.ruta, salida=carpeta, **valores
+                video=trabajo.ruta, salida=carpeta,
+                contexto_marca=self.ajustes.contexto_marca,
+                modelo_caption=self.ajustes.modelo_caption,
+                **valores,
             )
             trabajos.append((fila, config.to_json()))
         self._procesando = True
@@ -288,6 +308,11 @@ class VentanaPrincipal(QMainWindow):
                 fila, estado=EstadoTrabajo.HECHO, salida=Path(salida),
                 percent=None, etiqueta="",
             )
+            actual = self.vista_cola.currentIndex()
+            if actual.isValid() and actual.row() == fila:
+                self.panel_caption.mostrar(
+                    self._caption_de(self.modelo_cola.trabajo(fila))
+                )
         else:
             estado = (
                 EstadoTrabajo.CANCELADO
