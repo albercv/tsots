@@ -237,3 +237,41 @@ def test_panel_boton_marca_emite_senal(qtbot):
     qtbot.addWidget(panel)
     with qtbot.waitSignal(panel.editar_marca, timeout=1000):
         panel.boton_marca.click()
+
+
+def _caption_ejemplo():
+    from videopipeline.caption import Caption
+    return Caption(titulo="Título X", caption="Cuerpo\ndos líneas",
+                   hashtags=["#a", "#b"], palabras_clave=["k"])
+
+
+def test_panel_caption_oculto_sin_datos_y_muestra_con_datos(qtbot):
+    from app.widgets.panel_caption import PanelCaption
+
+    panel = PanelCaption()
+    qtbot.addWidget(panel)
+    panel.mostrar(None)
+    assert panel.isHidden()
+    panel.mostrar(_caption_ejemplo())
+    assert not panel.isHidden()
+    assert panel.etiqueta_titulo.text() == "Título X"
+    assert panel.texto_caption.toPlainText() == "Cuerpo\ndos líneas"
+    assert panel.etiqueta_hashtags.text() == "#a #b"
+
+
+def test_panel_caption_copia_al_portapapeles(qtbot):
+    from PySide6.QtWidgets import QApplication
+    from app.widgets.panel_caption import PanelCaption
+
+    panel = PanelCaption()
+    qtbot.addWidget(panel)
+    panel.mostrar(_caption_ejemplo())
+    portapapeles = QApplication.clipboard()
+    panel.boton_copiar_titulo.click()
+    assert portapapeles.text() == "Título X"
+    panel.boton_copiar_caption.click()
+    assert portapapeles.text() == "Cuerpo\ndos líneas"
+    panel.boton_copiar_hashtags.click()
+    assert portapapeles.text() == "#a #b"
+    panel.boton_copiar_todo.click()
+    assert portapapeles.text() == "Título X\n\nCuerpo\ndos líneas\n\n#a #b\n"
