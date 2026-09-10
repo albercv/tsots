@@ -275,3 +275,17 @@ def test_panel_caption_copia_al_portapapeles(qtbot):
     assert portapapeles.text() == "#a #b"
     panel.boton_copiar_todo.click()
     assert portapapeles.text() == "Título X\n\nCuerpo\ndos líneas\n\n#a #b\n"
+
+
+def test_panel_caption_copiar_sin_datos_no_revienta(qtbot):
+    from PySide6.QtWidgets import QApplication
+    from app.widgets.panel_caption import PanelCaption
+
+    panel = PanelCaption()
+    qtbot.addWidget(panel)
+    QApplication.clipboard().setText("intacto")
+    panel.mostrar(None)
+    for boton in (panel.boton_copiar_titulo, panel.boton_copiar_caption,
+                  panel.boton_copiar_hashtags, panel.boton_copiar_todo):
+        boton.click()  # no debe lanzar ni tocar el portapapeles
+    assert QApplication.clipboard().text() == "intacto"

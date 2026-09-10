@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Callable
+
 from PySide6.QtWidgets import (
     QApplication,
     QGroupBox,
@@ -42,13 +44,13 @@ class PanelCaption(QWidget):
         self.boton_copiar_hashtags = QPushButton("Copiar hashtags")
         self.boton_copiar_todo = QPushButton("Copiar todo")
         self.boton_copiar_titulo.clicked.connect(
-            lambda: self._copiar(self._caption.titulo))
+            lambda: self._copiar(lambda c: c.titulo))
         self.boton_copiar_caption.clicked.connect(
-            lambda: self._copiar(self._caption.caption))
+            lambda: self._copiar(lambda c: c.caption))
         self.boton_copiar_hashtags.clicked.connect(
-            lambda: self._copiar(self._caption.hashtags_texto))
+            lambda: self._copiar(lambda c: c.hashtags_texto))
         self.boton_copiar_todo.clicked.connect(
-            lambda: self._copiar(self._caption.texto_completo()))
+            lambda: self._copiar(lambda c: c.texto_completo()))
         for boton in (self.boton_copiar_titulo, self.boton_copiar_caption,
                       self.boton_copiar_hashtags, self.boton_copiar_todo):
             botones.addWidget(boton)
@@ -66,6 +68,7 @@ class PanelCaption(QWidget):
         self.etiqueta_hashtags.setText(caption.hashtags_texto)
         self.show()
 
-    def _copiar(self, texto: str) -> None:
-        if self._caption is not None:
-            QApplication.clipboard().setText(texto)
+    def _copiar(self, extraer: Callable[[Caption], str]) -> None:
+        if self._caption is None:
+            return
+        QApplication.clipboard().setText(extraer(self._caption))
