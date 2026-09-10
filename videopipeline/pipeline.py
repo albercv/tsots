@@ -121,7 +121,10 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
                 f"Caption SEO falló: {error}. Vídeo guardado sin caption.")
     finally:
         if servidor is not None:
-            servidor.cerrar()
+            try:
+                servidor.cerrar()
+            except Exception as error:  # noqa: BLE001
+                _avisar(on_progress, f"No se pudo cerrar ollama serve: {error}")
 
 
 def pasos_extra(config: PipelineConfig) -> int:

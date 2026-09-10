@@ -432,6 +432,44 @@ def test_caption_con_subtitulos_fallidos_transcribe_de_nuevo(entorno_caption, tm
     assert (tmp_path / "f.md").is_file()
 
 
+def test_caption_avisa_si_cerrar_servidor_falla(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, base = entorno_caption
+
+    class ServidorRoto:
+        def cerrar(self):
+            raise ProcessLookupError("ya no existe")
+
+    monkeypatch.setattr(pipeline, "asegurar_servidor", lambda *a, **k: ServidorRoto())
+    salida = tmp_path / "f.mp4"
+    eventos: list[dict] = []
+    resultado = pipeline.run(
+        PipelineConfig(video=video, salida=salida, caption_seo=True), eventos.append
+    )
+    assert resultado == salida and salida.is_file()  # el vídeo se publica igual
+    assert (tmp_path / "f.md").is_file()  # el caption se generó antes del fallo
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert any("No se pudo cerrar ollama serve" in a for a in avisos)
+
+
+def test_caption_reutiliza_transcripcion_aunque_falle_el_quemado(entorno_caption, tmp_path,
+                                                                  monkeypatch):
+    llamadas, video, base = entorno_caption
+
+    def revienta(*a, **k):
+        raise RuntimeError("ffmpeg caído")
+
+    monkeypatch.setattr(pipeline, "quemar_subtitulos", revienta)
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", subtitulos=True,
+                       caption_seo=True),
+        eventos.append,
+    )
+    assert llamadas.count("transcribir:es:small") == 1
+    assert (tmp_path / "f.md").is_file()
+    assert (tmp_path / "f.srt").is_file()
+
+
 def test_pasos_extra():
     base = PipelineConfig(video=Path("/v.mp4"))
     assert pipeline.pasos_extra(base) == 0
