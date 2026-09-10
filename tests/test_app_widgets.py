@@ -200,3 +200,13 @@ def test_panel_emite_opciones_subs_cambiadas(qtbot):
         panel.spin_posicion.setValue(80)
     with qtbot.waitSignal(panel.opciones_subs_cambiadas, timeout=1000):
         panel.combo_diseno.setCurrentText("Caja negra")
+
+
+def test_dialogo_marca_devuelve_texto(qtbot):
+    from app.widgets.dialogo_marca import DialogoMarca
+
+    d = DialogoMarca("inicial")
+    qtbot.addWidget(d)
+    assert d.texto() == "inicial"
+    d.editor.setPlainText("  Soy Alberto  ")
+    assert d.texto() == "Soy Alberto"
