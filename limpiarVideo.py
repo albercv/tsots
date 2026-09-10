@@ -28,6 +28,14 @@ def main(argv: list[str] | None = None) -> None:
         nargs="?",
         help="Vídeo final. Por defecto: nombre_limpio.mp4",
     )
+    parser.add_argument(
+        "--caption", action="store_true",
+        help="Genera título SEO, caption y hashtags (nombre_limpio.md) con Ollama.",
+    )
+    parser.add_argument(
+        "--marca", default="",
+        help="Contexto de marca para el caption (quién eres, tono, CTA).",
+    )
     args = parser.parse_args(argv)
 
     faltan = comprobar_dependencias()
@@ -51,7 +59,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     salida = args.salida.expanduser().resolve() if args.salida else None
-    config = PipelineConfig(video=video, salida=salida)
+    config = PipelineConfig(
+        video=video, salida=salida,
+        caption_seo=args.caption, contexto_marca=args.marca,
+    )
 
     if config.ruta_salida_final() == video:
         print(

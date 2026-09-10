@@ -140,3 +140,21 @@ def test_limpiar_audio_error_de_paso(tmp_path, monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "ClearVoice falló" in err
     assert "det" in err
+
+
+def test_cli_caption_y_marca(tmp_path, monkeypatch, capsys):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"VID")
+    capturado = {}
+
+    def falso_run(config, on_progress=None):
+        capturado["config"] = config
+        return config.ruta_salida_final()
+
+    monkeypatch.setattr(limpiarVideo, "run", falso_run)
+    monkeypatch.setattr(limpiarVideo, "comprobar_dependencias", lambda: [])
+    monkeypatch.setattr(limpiarVideo, "tiene_pista_audio", lambda v: True)
+    limpiarVideo.main([str(video), "--caption", "--marca", "Soy Alberto"])
+    config = capturado["config"]
+    assert config.caption_seo is True
+    assert config.contexto_marca == "Soy Alberto"
