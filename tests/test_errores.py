@@ -89,3 +89,22 @@ def test_diagnostico_texto_es_multilinea_legible():
     assert any(l.startswith("Causa: ") for l in lineas)
     assert any(l.startswith("Qué hacer: ") for l in lineas)
     assert texto.rstrip().endswith("Error! Could not write packet: Invalid argument")
+
+
+def test_explicar_ollama_no_instalado():
+    d = explicar("Ollama no está instalado (no se encuentra 'ollama' en PATH)")
+    assert d.conocido
+    assert "brew install ollama" in d.solucion
+
+
+def test_explicar_modelo_ollama_no_descargado():
+    d = explicar("Modelo no descargado: qwen3.5:9b",
+                 '{"error":"model \'qwen3.5:9b\' not found"}')
+    assert d.conocido
+    assert "ollama pull" in d.solucion
+
+
+def test_explicar_ollama_no_responde():
+    d = explicar("Ollama no responde en http://localhost:11434 tras 15 s")
+    assert d.conocido
+    assert "11434" in d.causa or "11434" in d.solucion

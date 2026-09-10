@@ -117,6 +117,28 @@ _CONOCIDOS: tuple[tuple[re.Pattern[str], str, str, str], ...] = (
         "Conecta a internet y vuelve a procesar; los modelos se descargan "
         "una sola vez.",
     ),
+    (
+        re.compile(r"Ollama no está instalado", re.I),
+        "Ollama no está instalado",
+        "El caption SEO se genera con un modelo local servido por Ollama y "
+        "no se encuentra el ejecutable `ollama` en PATH.",
+        "brew install ollama   (y luego: ollama pull qwen3.5:9b)",
+    ),
+    (
+        re.compile(r"Modelo no descargado", re.I),
+        "Modelo de Ollama no descargado",
+        "Ollama responde pero no tiene el modelo pedido en local.",
+        "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)",
+    ),
+    (
+        re.compile(r"Ollama no responde", re.I),
+        "Ollama no responde",
+        "No hay servidor en http://localhost:11434 y no se pudo arrancar "
+        "`ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, "
+        "o descarga del modelo en curso).",
+        "Ejecuta `ollama serve` en una terminal para ver el error, o abre la "
+        "app de Ollama. Si el puerto 11434 está ocupado, libéralo.",
+    ),
 )
 
 
