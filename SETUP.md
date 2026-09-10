@@ -75,6 +75,24 @@ permisos de macOS (Documentos, Escritorio) a nombre de "The Silence of the Short
 - Para arrastrarlo al Dock otra vez: Finder → arrastrar `TheSilenceOfTheShorts.app`
   a la parte izquierda del Dock.
 
+## Caption SEO (título, caption, hashtags)
+
+Casilla "Caption SEO" en el panel. Al terminar el vídeo se escribe
+`nombre_limpio.md` junto a él con título (≤ 60 caracteres), caption
+(120-200 palabras) y 8-15 hashtags, generados desde la transcripción por un
+modelo local en Ollama. Al seleccionar el vídeo hecho en la cola aparece el
+panel con botones de copiar.
+
+- Requisitos: `brew install ollama` y `ollama pull qwen3.5:9b`. La app
+  arranca `ollama serve` sola si no está corriendo y lo cierra al acabar.
+- "Marca…": texto libre (quién eres, tono, CTA, hashtags fijos) que se
+  añade al prompt. Se guarda en los ajustes.
+- Modelo: `qwen3.5:9b` por defecto. Para cambiarlo, editar la clave
+  `caption/modelo` de los ajustes (`defaults write com.albercv.LimpiadorVideo caption.modelo <modelo>`).
+- Nunca hace fallar el vídeo: si Ollama no responde o el modelo no está
+  descargado, la fila queda con ⚠ y el log dice qué instalar.
+- CLI: `python limpiarVideo.py video.mp4 --caption --marca "Soy …"`.
+
 ## Errores y logs
 
 - Cada trabajo escribe `logs/<vídeo>_<fecha>.log` con la config, los pasos

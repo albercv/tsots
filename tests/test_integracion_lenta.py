@@ -50,3 +50,31 @@ def test_pipeline_con_subtitulos_real(video_con_voz, tmp_path, monkeypatch):
     assert "hola" in contenido or "mundo" in contenido or "prueba" in contenido
     assert any(e.get("label") == "Quemando subtítulos" for e in eventos
                if "label" in e)
+
+
+@pytest.mark.slow
+def test_pipeline_con_caption_real(video_con_voz, tmp_path, monkeypatch):
+    from videopipeline import ollama
+    from videopipeline.caption import leer_md
+
+    if comprobar_dependencias():
+        pytest.skip("faltan ffmpeg/auto-editor")
+    if not (BASE_DIR / "checkpoints" / "MossFormer2_SE_48K").is_dir():
+        pytest.skip("checkpoint MossFormer2_SE_48K no descargado")
+    if not ollama.disponible():
+        pytest.skip("Ollama no responde en localhost:11434")
+    monkeypatch.chdir(BASE_DIR)
+    salida = tmp_path / "final.mp4"
+    eventos: list[dict] = []
+    run(
+        PipelineConfig(video=video_con_voz, salida=salida, umbral="1%",
+                       caption_seo=True, contexto_marca="Prueba automática"),
+        eventos.append,
+    )
+    avisos = [e for e in eventos if "warning" in e]
+    assert avisos == [], avisos
+    caption = leer_md(tmp_path / "final.md")
+    assert caption is not None
+    assert 0 < len(caption.titulo) <= 60
+    assert 8 <= len(caption.hashtags) <= 15
+    assert all(h.startswith("#") for h in caption.hashtags)
