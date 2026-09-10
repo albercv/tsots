@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
     QRadioButton,
     QSlider,
     QSpinBox,
@@ -54,6 +55,7 @@ MODELO_WHISPER_ETIQUETA = {v: k for k, v in ETIQUETA_MODELO_WHISPER.items()}
 
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
+    editar_marca = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -152,6 +154,20 @@ class PanelOpciones(QWidget):
         )
         self._actualizar_subtitulos()
 
+        grupo_caption = QGroupBox("Caption SEO")
+        fila_caption = QHBoxLayout(grupo_caption)
+        self.check_caption = QCheckBox("Título, caption y hashtags")
+        self.check_caption.setToolTip(
+            "Genera nombre_limpio.md con un modelo local (Ollama) a partir "
+            "de la transcripción."
+        )
+        self.boton_marca = QPushButton("Marca…")
+        self.boton_marca.setToolTip("Contexto de marca que se añade al prompt.")
+        self.boton_marca.clicked.connect(self.editar_marca)
+        fila_caption.addWidget(self.check_caption, 1)
+        fila_caption.addWidget(self.boton_marca)
+        layout.addWidget(grupo_caption)
+
         layout.addStretch(1)
 
         self._grupo_audio = grupo_audio
@@ -240,6 +256,7 @@ class PanelOpciones(QWidget):
             "modelo_whisper": ETIQUETA_MODELO_WHISPER[
                 self.combo_modelo_whisper.currentText()
             ],
+            "caption_seo": self.check_caption.isChecked(),
         }
 
     def cargar(self, valores: dict) -> None:
@@ -281,6 +298,12 @@ class PanelOpciones(QWidget):
         if modelo in MODELO_WHISPER_ETIQUETA:
             self.combo_modelo_whisper.setCurrentText(
                 MODELO_WHISPER_ETIQUETA[modelo]
+            )
+        if "caption_seo" in valores:
+            valor = valores["caption_seo"]
+            self.check_caption.setChecked(
+                valor if isinstance(valor, bool)
+                else str(valor).lower() in ("true", "1")
             )
         self._actualizar_habilitados()
         self._actualizar_subtitulos()

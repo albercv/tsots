@@ -210,3 +210,30 @@ def test_dialogo_marca_devuelve_texto(qtbot):
     assert d.texto() == "inicial"
     d.editor.setPlainText("  Soy Alberto  ")
     assert d.texto() == "Soy Alberto"
+
+
+def test_panel_caption_defecto_off_y_en_valores(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.valores()["caption_seo"] is False
+    panel.check_caption.setChecked(True)
+    assert panel.valores()["caption_seo"] is True
+    PipelineConfig(video=Path("/v.mp4"), **panel.valores()).validar()
+
+
+def test_panel_caption_cargar_desde_qsettings(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"caption_seo": "true"})
+    assert panel.check_caption.isChecked()
+    panel.cargar({"caption_seo": False})
+    assert not panel.check_caption.isChecked()
+    panel.cargar({})  # clave ausente → sigue como estaba
+    assert not panel.check_caption.isChecked()
+
+
+def test_panel_boton_marca_emite_senal(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    with qtbot.waitSignal(panel.editar_marca, timeout=1000):
+        panel.boton_marca.click()
