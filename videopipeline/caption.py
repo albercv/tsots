@@ -142,34 +142,53 @@ def escribir_md(caption: Caption, ruta: Path) -> None:
     ruta.write_text("\n".join(lineas), encoding="utf-8")
 
 
-_ENCABEZADOS = ("## Caption", "## Hashtags", "## Palabras clave")
-
-
 def leer_md(ruta: Path) -> Caption | None:
-    """Inverso de `escribir_md`. `None` si no existe o no tiene el formato."""
+    """Inverso de `escribir_md`. `None` si no existe o no tiene el formato.
+
+    Se ancla el análisis desde el final porque las secciones posteriores nunca pueden
+    contener líneas de encabezado: los hashtags son tokens sin espacios que empiezan
+    con #, las palabras clave empiezan con "- ". Así se garantiza exactitud incluso
+    si el caption contiene líneas como "## Nota".
+    """
     try:
         lineas = ruta.read_text(encoding="utf-8").splitlines()
     except OSError:
         return None
-    if not lineas or not lineas[0].startswith("# "):
-        return None
-    titulo = lineas[0][2:].strip()
-    posiciones = []
-    siguiente = 0
-    for i, linea in enumerate(lineas[1:], start=1):
-        if siguiente < len(_ENCABEZADOS) and linea == _ENCABEZADOS[siguiente]:
-            posiciones.append(i)
-            siguiente += 1
-    if len(posiciones) != len(_ENCABEZADOS):
+
+    # Validar estructura mínima: línea 0 con "# ", línea 1 vacía, línea 2 exactamente "## Caption"
+    if len(lineas) < 3 or not lineas[0].startswith("# ") or lineas[1] != "" or lineas[2] != "## Caption":
         return None
 
-    def cuerpo(k: int) -> str:
-        fin = posiciones[k + 1] if k + 1 < len(posiciones) else len(lineas)
-        return "\n".join(lineas[posiciones[k] + 1:fin]).strip()
+    titulo = lineas[0][2:].strip()
+
+    # Encontrar la ÚLTIMA línea igual a "## Palabras clave"
+    pos_pc = None
+    for i in range(len(lineas) - 1, -1, -1):
+        if lineas[i] == "## Palabras clave":
+            pos_pc = i
+            break
+
+    if pos_pc is None or pos_pc <= 2:
+        return None
+
+    # Encontrar la ÚLTIMA línea igual a "## Hashtags" con índice < pos_pc
+    pos_h = None
+    for i in range(pos_pc - 1, -1, -1):
+        if lineas[i] == "## Hashtags":
+            pos_h = i
+            break
+
+    if pos_h is None or pos_h <= 2:
+        return None
+
+    # Extraer secciones
+    caption = "\n".join(lineas[3:pos_h]).strip()
+    hashtags = "\n".join(lineas[pos_h + 1:pos_pc]).split()
+    palabras_clave = [l[2:].strip() for l in lineas[pos_pc + 1:] if l.startswith("- ")]
 
     return Caption(
         titulo=titulo,
-        caption=cuerpo(0),
-        hashtags=cuerpo(1).split(),
-        palabras_clave=[l[2:].strip() for l in cuerpo(2).splitlines() if l.startswith("- ")],
+        caption=caption,
+        hashtags=hashtags,
+        palabras_clave=palabras_clave,
     )

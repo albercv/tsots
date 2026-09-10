@@ -123,3 +123,15 @@ def test_leer_md_sin_alguna_seccion_devuelve_none(tmp_path):
     ruta = tmp_path / "v.md"
     ruta.write_text("# T\n\n## Caption\nx\n\n## Hashtags\n#a\n", encoding="utf-8")
     assert cap.leer_md(ruta) is None  # falta "## Palabras clave"
+
+
+def test_md_ida_y_vuelta_con_cabeceras_reales_dentro_del_caption(tmp_path):
+    c = cap.Caption(
+        titulo="Título",
+        caption="Hola\n## Hashtags\n## Palabras clave\n## Caption\nAdiós",
+        hashtags=["#a", "#b"],
+        palabras_clave=["k1"],
+    )
+    ruta = tmp_path / "v_limpio.md"
+    cap.escribir_md(c, ruta)
+    assert cap.leer_md(ruta) == c
