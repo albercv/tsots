@@ -87,8 +87,11 @@ panel con botones de copiar.
   arranca `ollama serve` sola si no está corriendo y lo cierra al acabar.
 - "Marca…": texto libre (quién eres, tono, CTA, hashtags fijos) que se
   añade al prompt. Se guarda en los ajustes.
-- Modelo: `qwen3.5:9b` por defecto. Para cambiarlo, editar la clave
-  `caption/modelo` de los ajustes (`defaults write com.albercv.LimpiadorVideo caption.modelo <modelo>`).
+- Modelo: desplegable "Modelo" en el grupo Caption SEO, rellenado con los
+  modelos instalados en Ollama (`GET /api/tags`). Los que no caben en la
+  memoria de la GPU (≈ 75 % de la RAM, menos 1,5 GB de contexto) aparecen
+  deshabilitados con el motivo en el tooltip. Tras `ollama pull`, pulsa ↻.
+  La elección se guarda en los ajustes (clave `caption/modelo`).
 - Nunca hace fallar el vídeo: si Ollama no responde o el modelo no está
   descargado, la fila queda con ⚠ y el log dice qué instalar.
 - CLI: `python limpiarVideo.py video.mp4 --caption --marca "Soy …"`.

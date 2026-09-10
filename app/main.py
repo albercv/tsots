@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig
+from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
 from .queue_model import EstadoTrabajo, ModeloCola
 from .settings import Ajustes
@@ -149,6 +150,9 @@ class VentanaPrincipal(QMainWindow):
 
         self.panel.opciones_subs_cambiadas.connect(self._refrescar_preview)
         self.panel.editar_marca.connect(self._editar_marca)
+        self.panel.modelo_caption_cambiado.connect(self._al_cambiar_modelo_caption)
+        self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
+        self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
         )
@@ -287,6 +291,16 @@ class VentanaPrincipal(QMainWindow):
         if carpeta:
             self.ajustes.carpeta_salida = Path(carpeta)
             self._refrescar_etiqueta_salida()
+
+    def _cargar_modelos_ollama(self) -> None:
+        """Rellena el selector con los modelos instalados en Ollama (reales)."""
+        self.panel.poblar_modelos(
+            listar_modelos(), memoria_para_modelos(), self.ajustes.modelo_caption
+        )
+
+    def _al_cambiar_modelo_caption(self, modelo: str) -> None:
+        if modelo:
+            self.ajustes.modelo_caption = modelo
 
     def _editar_marca(self) -> None:
         dialogo = DialogoMarca(self.ajustes.contexto_marca, self)

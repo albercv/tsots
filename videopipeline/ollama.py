@@ -70,6 +70,62 @@ def asegurar_servidor(url: str = URL, espera_max: float = 15.0) -> Servidor:
     raise PasoFallido(f"Ollama no responde en {url} tras {espera_max:.0f} s")
 
 
+GB = 1024 ** 3
+# macOS deja a Metal ~3/4 de la memoria unificada para la GPU.
+FRACCION_GPU = 0.75
+# Contexto de 16k tokens + KV cache + sobrecarga del runner.
+MARGEN_CONTEXTO = int(1.5 * GB)
+
+
+@dataclass(frozen=True)
+class Modelo:
+    nombre: str
+    tamano: int  # bytes en disco (≈ memoria que ocupa cargado)
+
+    @property
+    def etiqueta(self) -> str:
+        return f"{self.nombre} · {_gb(self.tamano)} GB"
+
+
+def _gb(n: int) -> str:
+    return f"{n / GB:.1f}".replace(".", ",")
+
+
+def listar_modelos(url: str = URL, timeout: float = 2.0) -> list[Modelo]:
+    """Modelos instalados según `GET /api/tags`. Sin servidor → lista vacía."""
+    try:
+        with urllib.request.urlopen(f"{url}/api/tags", timeout=timeout) as r:
+            datos = json.load(r)
+    except (urllib.error.URLError, OSError, ValueError):
+        return []
+    modelos = []
+    for entrada in datos.get("models", []) if isinstance(datos, dict) else []:
+        nombre = entrada.get("name")
+        if nombre:
+            modelos.append(Modelo(str(nombre), int(entrada.get("size", 0) or 0)))
+    return sorted(modelos, key=lambda m: m.nombre.lower())
+
+
+def memoria_para_modelos(ram_bytes: int | None = None) -> int:
+    """Memoria que macOS deja a la GPU para modelos (≈ 75 % de la RAM)."""
+    if ram_bytes is None:
+        import os
+        ram_bytes = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    return int(ram_bytes * FRACCION_GPU)
+
+
+def cabe(modelo: Modelo, memoria: int) -> bool:
+    return modelo.tamano + MARGEN_CONTEXTO <= memoria
+
+
+def motivo_no_cabe(modelo: Modelo, memoria: int) -> str:
+    return (
+        f"Necesita ~{_gb(modelo.tamano + MARGEN_CONTEXTO)} GB de memoria "
+        f"({_gb(modelo.tamano)} GB del modelo + contexto) y este Mac deja "
+        f"~{_gb(memoria)} GB para modelos."
+    )
+
+
 def chat_json(
     modelo: str,
     mensajes: list[dict],

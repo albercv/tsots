@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from videopipeline.config import MODELOS_POR_TAREA
+from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
 
 # clearvoice/app/widgets/panel_opciones.py → clearvoice/checkpoints
 CHECKPOINTS_DIR = Path(__file__).resolve().parents[2] / "checkpoints"
@@ -56,6 +57,8 @@ MODELO_WHISPER_ETIQUETA = {v: k for k, v in ETIQUETA_MODELO_WHISPER.items()}
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
     editar_marca = Signal()
+    modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
+    refrescar_modelos = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -155,7 +158,8 @@ class PanelOpciones(QWidget):
         self._actualizar_subtitulos()
 
         grupo_caption = QGroupBox("Caption SEO")
-        fila_caption = QHBoxLayout(grupo_caption)
+        caption_layout = QVBoxLayout(grupo_caption)
+        fila_caption = QHBoxLayout()
         self.check_caption = QCheckBox("Título, caption y hashtags")
         self.check_caption.setToolTip(
             "Genera nombre_limpio.md con un modelo local (Ollama) a partir "
@@ -166,6 +170,32 @@ class PanelOpciones(QWidget):
         self.boton_marca.clicked.connect(self.editar_marca)
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
+        caption_layout.addLayout(fila_caption)
+        # Selector de modelo: se rellena con los modelos instalados en Ollama
+        # (poblar_modelos); los que no caben en memoria quedan deshabilitados.
+        fila_modelo = QHBoxLayout()
+        self.combo_modelo_caption = QComboBox()
+        self.combo_modelo_caption.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.combo_modelo_caption.setMinimumContentsLength(18)
+        self.boton_refrescar_modelos = QPushButton("↻")
+        self.boton_refrescar_modelos.setToolTip(
+            "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+        )
+        self.boton_refrescar_modelos.setFixedWidth(32)
+        self.boton_refrescar_modelos.clicked.connect(self.refrescar_modelos)
+        fila_modelo.addWidget(QLabel("Modelo:"))
+        fila_modelo.addWidget(self.combo_modelo_caption, 1)
+        fila_modelo.addWidget(self.boton_refrescar_modelos)
+        caption_layout.addLayout(fila_modelo)
+        self.aviso_modelos = QLabel("")
+        self.aviso_modelos.setStyleSheet("color: #b8860b;")
+        self.aviso_modelos.setWordWrap(True)
+        caption_layout.addWidget(self.aviso_modelos)
+        self.combo_modelo_caption.currentIndexChanged.connect(
+            self._emitir_cambio_modelo
+        )
         layout.addWidget(grupo_caption)
 
         layout.addStretch(1)
@@ -238,6 +268,52 @@ class PanelOpciones(QWidget):
             "" if en_cache
             else "El modelo Whisper se descargará al primer uso (~500MB)."
         )
+
+    # --- selector de modelo de caption ---
+
+    def poblar_modelos(self, modelos: list[Modelo], memoria: int,
+                       seleccionado: str) -> None:
+        """Rellena el desplegable con los modelos instalados.
+
+        Los que no caben en `memoria` quedan deshabilitados con el motivo en
+        el tooltip. Si `seleccionado` no está instalado (o no hay lista), se
+        añade marcado para no perder el ajuste guardado.
+        """
+        combo = self.combo_modelo_caption
+        combo.blockSignals(True)
+        combo.clear()
+        for modelo in modelos:
+            combo.addItem(modelo.etiqueta, modelo.nombre)
+            if not cabe(modelo, memoria):
+                item = combo.model().item(combo.count() - 1)
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
+                item.setToolTip(motivo_no_cabe(modelo, memoria))
+        if seleccionado and combo.findData(seleccionado) < 0:
+            combo.insertItem(0, f"{seleccionado} (no instalado)", seleccionado)
+        combo.setCurrentIndex(max(0, combo.findData(seleccionado)))
+        combo.blockSignals(False)
+        if not modelos:
+            self.aviso_modelos.setText(
+                "Ollama no responde: no se pueden listar los modelos. "
+                "Ábrelo y pulsa ↻."
+            )
+        else:
+            deshabilitados = sum(
+                1 for i in range(combo.count())
+                if not combo.model().item(i).flags() & Qt.ItemFlag.ItemIsEnabled
+            )
+            self.aviso_modelos.setText(
+                f"{deshabilitados} modelo(s) no caben en memoria (ver tooltip)."
+                if deshabilitados else ""
+            )
+
+    def modelo_caption(self) -> str:
+        return str(self.combo_modelo_caption.currentData() or "")
+
+    def _emitir_cambio_modelo(self, *args) -> None:
+        modelo = self.modelo_caption()
+        if modelo:
+            self.modelo_caption_cambiado.emit(modelo)
 
     def valores(self) -> dict:
         return {

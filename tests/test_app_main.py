@@ -299,3 +299,32 @@ def test_geometria_restaurada_se_limita_a_la_pantalla(qtbot, tmp_path, monkeypat
     ventana2.show()
     assert ventana2.width() <= disponible.width()
     assert ventana2.height() <= disponible.height()
+
+
+def test_ventana_pobla_modelos_y_persiste_seleccion(qtbot, tmp_path, monkeypatch):
+    from videopipeline.ollama import Modelo
+
+    GB = 1024 ** 3
+    llamadas = {"n": 0}
+
+    def falso_listar(*a, **k):
+        llamadas["n"] += 1
+        return [Modelo("a:1", 1 * GB), Modelo("b:2", 2 * GB)]
+
+    monkeypatch.setattr("app.main.listar_modelos", falso_listar)
+    monkeypatch.setattr("app.main.memoria_para_modelos", lambda *a, **k: 27 * GB)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    assert llamadas["n"] == 1
+    assert ventana.panel.combo_modelo_caption.count() >= 2
+    ventana.panel.combo_modelo_caption.setCurrentIndex(
+        ventana.panel.combo_modelo_caption.findData("b:2")
+    )
+    assert ventana.ajustes.modelo_caption == "b:2"
+    ventana.panel.boton_refrescar_modelos.click()
+    assert llamadas["n"] == 2
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    capturado = {}
+    monkeypatch.setattr(ventana.ejecutor, "iniciar",
+                        lambda trabajos: capturado.setdefault("t", trabajos))
+    ventana.procesar()
+    assert json.loads(capturado["t"][0][1])["modelo_caption"] == "b:2"

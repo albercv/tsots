@@ -303,3 +303,55 @@ def test_panel_caption_copiar_sin_datos_no_revienta(qtbot):
                   panel.boton_copiar_hashtags, panel.boton_copiar_todo):
         boton.click()  # no debe lanzar ni tocar el portapapeles
     assert QApplication.clipboard().text() == "intacto"
+
+
+def _modelos():
+    from videopipeline.ollama import Modelo
+    GB = 1024 ** 3
+    return [Modelo("chico:1b", 1 * GB), Modelo("grande:70b", 40 * GB),
+            Modelo("medio:9b", 10 * GB)]
+
+
+def test_panel_modelos_pobla_deshabilita_grandes_y_selecciona(qtbot):
+    from PySide6.QtCore import Qt
+
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.poblar_modelos(_modelos(), memoria=27 * 1024 ** 3, seleccionado="medio:9b")
+    combo = panel.combo_modelo_caption
+    assert [combo.itemData(i) for i in range(combo.count())] == [
+        "chico:1b", "grande:70b", "medio:9b"
+    ]
+    assert combo.itemText(1).startswith("grande:70b")
+    item_grande = combo.model().item(1)
+    assert not (item_grande.flags() & Qt.ItemFlag.ItemIsEnabled)
+    assert "GB" in item_grande.toolTip() and "27" in item_grande.toolTip()
+    assert combo.model().item(0).flags() & Qt.ItemFlag.ItemIsEnabled
+    assert panel.modelo_caption() == "medio:9b"
+
+
+def test_panel_modelos_sin_ollama_conserva_el_guardado(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.poblar_modelos([], memoria=27 * 1024 ** 3, seleccionado="qwen3.5:9b")
+    assert panel.modelo_caption() == "qwen3.5:9b"
+    assert "Ollama" in panel.aviso_modelos.text()
+
+
+def test_panel_modelos_guardado_no_instalado_aparece_marcado(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.poblar_modelos(_modelos(), memoria=27 * 1024 ** 3, seleccionado="viejo:x")
+    assert panel.modelo_caption() == "viejo:x"
+    assert "no instalado" in panel.combo_modelo_caption.currentText()
+
+
+def test_panel_modelos_cambio_emite_senal(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.poblar_modelos(_modelos(), memoria=27 * 1024 ** 3, seleccionado="chico:1b")
+    with qtbot.waitSignal(panel.modelo_caption_cambiado, timeout=1000) as bloque:
+        panel.combo_modelo_caption.setCurrentIndex(2)
+    assert bloque.args == ["medio:9b"]
+    with qtbot.waitSignal(panel.refrescar_modelos, timeout=1000):
+        panel.boton_refrescar_modelos.click()

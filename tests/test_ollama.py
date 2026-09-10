@@ -20,8 +20,12 @@ class _Falso(BaseHTTPRequestHandler):
     def log_message(self, *args):  # silencio
         pass
 
+    respuestas_get: dict = {}
+
     def do_GET(self):
-        if self.path == "/api/version":
+        if self.path in _Falso.respuestas_get:
+            self._responder(*_Falso.respuestas_get[self.path])
+        elif self.path == "/api/version":
             self._responder(200, {"version": "0.33.2"})
         else:
             self._responder(404, {"error": "no"})
@@ -48,6 +52,7 @@ class _Falso(BaseHTTPRequestHandler):
 @pytest.fixture()
 def servidor_falso():
     _Falso.respuestas = {}
+    _Falso.respuestas_get = {}
     _Falso.peticiones = []
     httpd = HTTPServer(("127.0.0.1", 0), _Falso)
     hilo = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -186,3 +191,37 @@ def test_asegurar_servidor_no_responde_tras_arrancar(monkeypatch):
     monkeypatch.setattr(ollama.time, "monotonic", lambda: next(tiempos))
     with pytest.raises(PasoFallido, match="Ollama no responde"):
         ollama.asegurar_servidor("http://x", espera_max=15.0)
+
+
+GB = 1024 ** 3
+
+
+def test_listar_modelos_devuelve_nombre_y_tamano_ordenados(servidor_falso):
+    _Falso.respuestas_get["/api/tags"] = (200, {"models": [
+        {"name": "zeta:9b", "size": 7 * GB, "details": {"family": "qwen3"}},
+        {"name": "alfa:latest", "size": 2 * GB},
+    ]})
+    modelos = ollama.listar_modelos(servidor_falso)
+    assert [m.nombre for m in modelos] == ["alfa:latest", "zeta:9b"]
+    assert modelos[1].tamano == 7 * GB
+
+
+def test_listar_modelos_sin_servidor_es_lista_vacia():
+    assert ollama.listar_modelos("http://127.0.0.1:1", timeout=0.2) == []
+
+
+def test_memoria_para_modelos_es_tres_cuartos_de_la_ram():
+    assert ollama.memoria_para_modelos(ram_bytes=36 * GB) == 27 * GB
+
+
+def test_cabe_y_motivo():
+    memoria = 27 * GB
+    assert ollama.cabe(ollama.Modelo("chico", 10 * GB), memoria) is True
+    assert ollama.cabe(ollama.Modelo("justo", 25 * GB), memoria) is True
+    assert ollama.cabe(ollama.Modelo("grande", 26 * GB), memoria) is False  # + margen
+    motivo = ollama.motivo_no_cabe(ollama.Modelo("grande", 30 * GB), memoria)
+    assert "30" in motivo and "27" in motivo and "GB" in motivo
+
+
+def test_modelo_etiqueta_con_tamano():
+    assert ollama.Modelo("qwen3.5:9b", int(6.6 * GB)).etiqueta == "qwen3.5:9b · 6,6 GB"
