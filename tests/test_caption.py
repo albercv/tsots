@@ -73,7 +73,7 @@ def test_generar_normaliza_hashtags_y_titulo():
 
 
 def test_generar_falla_si_faltan_campos():
-    with pytest.raises(PasoFallido, match="respuesta del modelo no válida") as info:
+    with pytest.raises(PasoFallido, match="respuesta del modelo no es válida") as info:
         cap.generar("t", "", "m", cliente=lambda *a: {"titulo": "solo"})
     assert "solo" in info.value.detalle
 
@@ -105,3 +105,21 @@ def test_texto_completo_y_hashtags_texto():
     completo = c.texto_completo()
     assert completo.splitlines()[0] == c.titulo
     assert completo.rstrip().endswith(c.hashtags_texto)
+
+
+def test_md_ida_y_vuelta_con_encabezados_dentro_del_caption(tmp_path):
+    c = cap.Caption(
+        titulo="Título",
+        caption="Primera línea\n## Nota\nUna línea que empieza como encabezado\n# Otra",
+        hashtags=["#a", "#b"],
+        palabras_clave=["k1", "k2"],
+    )
+    ruta = tmp_path / "v_limpio.md"
+    cap.escribir_md(c, ruta)
+    assert cap.leer_md(ruta) == c
+
+
+def test_leer_md_sin_alguna_seccion_devuelve_none(tmp_path):
+    ruta = tmp_path / "v.md"
+    ruta.write_text("# T\n\n## Caption\nx\n\n## Hashtags\n#a\n", encoding="utf-8")
+    assert cap.leer_md(ruta) is None  # falta "## Palabras clave"

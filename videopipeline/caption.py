@@ -102,7 +102,7 @@ def _validar(datos: dict) -> Caption:
     )
     if faltan or tipos_mal:
         raise PasoFallido(
-            "La respuesta del modelo no válida: faltan campos o tipos incorrectos",
+            "La respuesta del modelo no es válida: faltan campos o tipos incorrectos",
             detalle=json.dumps(datos, ensure_ascii=False)[:2000],
         )
     vistos: list[str] = []
@@ -142,27 +142,34 @@ def escribir_md(caption: Caption, ruta: Path) -> None:
     ruta.write_text("\n".join(lineas), encoding="utf-8")
 
 
+_ENCABEZADOS = ("## Caption", "## Hashtags", "## Palabras clave")
+
+
 def leer_md(ruta: Path) -> Caption | None:
     """Inverso de `escribir_md`. `None` si no existe o no tiene el formato."""
     try:
-        texto = ruta.read_text(encoding="utf-8")
+        lineas = ruta.read_text(encoding="utf-8").splitlines()
     except OSError:
         return None
-    partes = re.split(r"^## ", texto, flags=re.M)
-    if len(partes) < 4 or not partes[0].startswith("# "):
+    if not lineas or not lineas[0].startswith("# "):
         return None
-    titulo = partes[0][2:].strip()
-    secciones = {}
-    for parte in partes[1:]:
-        nombre, _, cuerpo = parte.partition("\n")
-        secciones[nombre.strip()] = cuerpo.strip()
-    try:
-        return Caption(
-            titulo=titulo,
-            caption=secciones["Caption"],
-            hashtags=secciones["Hashtags"].split(),
-            palabras_clave=[l[2:].strip() for l in secciones["Palabras clave"].splitlines()
-                            if l.startswith("- ")],
-        )
-    except KeyError:
+    titulo = lineas[0][2:].strip()
+    posiciones = []
+    siguiente = 0
+    for i, linea in enumerate(lineas[1:], start=1):
+        if siguiente < len(_ENCABEZADOS) and linea == _ENCABEZADOS[siguiente]:
+            posiciones.append(i)
+            siguiente += 1
+    if len(posiciones) != len(_ENCABEZADOS):
         return None
+
+    def cuerpo(k: int) -> str:
+        fin = posiciones[k + 1] if k + 1 < len(posiciones) else len(lineas)
+        return "\n".join(lineas[posiciones[k] + 1:fin]).strip()
+
+    return Caption(
+        titulo=titulo,
+        caption=cuerpo(0),
+        hashtags=cuerpo(1).split(),
+        palabras_clave=[l[2:].strip() for l in cuerpo(2).splitlines() if l.startswith("- ")],
+    )
