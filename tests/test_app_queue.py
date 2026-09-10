@@ -128,3 +128,14 @@ def test_error_muestra_titulo_en_la_fila(qtbot):
     assert "auto-editor no pudo escribir el vídeo" in texto
     assert "Causa" not in texto  # solo la primera línea en la fila
     assert "Causa: X" in m.data(m.index(0), Qt.ItemDataRole.ToolTipRole)
+
+
+def test_ajustes_caption_persistidos(tmp_path):
+    a = _ajustes(tmp_path)
+    assert a.contexto_marca == ""
+    assert a.modelo_caption == "qwen3.5:9b"
+    a.contexto_marca = "Soy Alberto\ntono cercano"
+    a.modelo_caption = "qwen3.5:9b-q8_0"
+    b = _ajustes(tmp_path)  # misma ruta .ini → mismos datos
+    assert b.contexto_marca == "Soy Alberto\ntono cercano"
+    assert b.modelo_caption == "qwen3.5:9b-q8_0"

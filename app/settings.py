@@ -21,6 +21,22 @@ class Ajustes:
         else:
             self._q.setValue("salida/carpeta", str(valor))
 
+    @property
+    def contexto_marca(self) -> str:
+        return str(self._q.value("caption/contexto_marca", "") or "")
+
+    @contexto_marca.setter
+    def contexto_marca(self, texto: str) -> None:
+        self._q.setValue("caption/contexto_marca", texto)
+
+    @property
+    def modelo_caption(self) -> str:
+        return str(self._q.value("caption/modelo", "qwen3.5:9b") or "qwen3.5:9b")
+
+    @modelo_caption.setter
+    def modelo_caption(self, modelo: str) -> None:
+        self._q.setValue("caption/modelo", modelo)
+
     def guardar_panel(self, valores: dict) -> None:
         for clave, valor in valores.items():
             self._q.setValue(f"panel/{clave}", valor)
