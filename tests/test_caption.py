@@ -125,6 +125,23 @@ def test_leer_md_sin_alguna_seccion_devuelve_none(tmp_path):
     assert cap.leer_md(ruta) is None  # falta "## Palabras clave"
 
 
+def test_generar_normaliza_saltos_de_linea_en_titulo_y_palabras_clave(tmp_path):
+    r = _respuesta_ok()
+    r["titulo"] = "Chat GPT Ads\nsegundo día"
+    r["palabras_clave"] = ["a\nb"]
+
+    def cliente(modelo, mensajes, esquema):
+        return r
+
+    c = cap.generar("t", "", "m", cliente=cliente)
+    assert c.titulo == "Chat GPT Ads segundo día"
+    assert c.palabras_clave == ["a b"]
+
+    ruta = tmp_path / "v_limpio.md"
+    cap.escribir_md(c, ruta)
+    assert cap.leer_md(ruta) == c
+
+
 def test_md_ida_y_vuelta_con_cabeceras_reales_dentro_del_caption(tmp_path):
     c = cap.Caption(
         titulo="Título",

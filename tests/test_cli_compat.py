@@ -158,3 +158,23 @@ def test_cli_caption_y_marca(tmp_path, monkeypatch, capsys):
     config = capturado["config"]
     assert config.caption_seo is True
     assert config.contexto_marca == "Soy Alberto"
+
+
+def test_cli_on_progress_no_revienta_con_warning(tmp_path, monkeypatch, capsys):
+    """Un evento {"warning": ...} (caption, o reintento de auto-editor) no debe
+    tirar abajo on_progress con un KeyError antes de publicar el vídeo."""
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"VID")
+
+    def falso_run(config, on_progress=None):
+        on_progress({"warning": "algo"})
+        on_progress({"step": 1, "total": 1, "label": "x", "percent": None})
+        return config.ruta_salida_final()
+
+    monkeypatch.setattr(limpiarVideo, "run", falso_run)
+    monkeypatch.setattr(limpiarVideo, "comprobar_dependencias", lambda: [])
+    monkeypatch.setattr(limpiarVideo, "tiene_pista_audio", lambda v: True)
+    limpiarVideo.main([str(video)])
+    salida = capsys.readouterr()
+    assert "Proceso completado" in salida.out
+    assert "AVISO: algo" in salida.err

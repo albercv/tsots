@@ -259,6 +259,20 @@ def test_panel_caption_oculto_sin_datos_y_muestra_con_datos(qtbot):
     assert panel.etiqueta_hashtags.text() == "#a #b"
 
 
+def test_panel_caption_etiquetas_no_interpretan_html(qtbot):
+    from PySide6.QtCore import Qt
+    from app.widgets.panel_caption import PanelCaption
+    from videopipeline.caption import Caption
+
+    panel = PanelCaption()
+    qtbot.addWidget(panel)
+    panel.mostrar(Caption(titulo="<b>x</b>", caption="c", hashtags=["#a"],
+                          palabras_clave=["k"]))
+    assert panel.etiqueta_titulo.text() == "<b>x</b>"
+    assert panel.etiqueta_titulo.textFormat() == Qt.TextFormat.PlainText
+    assert panel.etiqueta_hashtags.textFormat() == Qt.TextFormat.PlainText
+
+
 def test_panel_caption_copia_al_portapapeles(qtbot):
     from PySide6.QtWidgets import QApplication
     from app.widgets.panel_caption import PanelCaption

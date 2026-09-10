@@ -72,6 +72,9 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit(1)
 
     def on_progress(evento: dict) -> None:
+        if "warning" in evento:
+            print(f"AVISO: {evento['warning']}", file=sys.stderr)
+            return
         print(f"[{evento['step']}/{evento['total']}] {evento['label']}...")
 
     try:

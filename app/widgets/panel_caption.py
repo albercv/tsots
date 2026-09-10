@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QApplication,
     QGroupBox,
@@ -29,12 +30,14 @@ class PanelCaption(QWidget):
         self.etiqueta_titulo = QLabel()
         self.etiqueta_titulo.setStyleSheet("font-weight: bold;")
         self.etiqueta_titulo.setWordWrap(True)
+        self.etiqueta_titulo.setTextFormat(Qt.TextFormat.PlainText)
         self.texto_caption = QTextEdit()
         self.texto_caption.setReadOnly(True)
         self.texto_caption.setFixedHeight(110)
         self.etiqueta_hashtags = QLabel()
         self.etiqueta_hashtags.setWordWrap(True)
         self.etiqueta_hashtags.setStyleSheet("color: #1e88e5;")
+        self.etiqueta_hashtags.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.etiqueta_titulo)
         layout.addWidget(self.texto_caption)
         layout.addWidget(self.etiqueta_hashtags)

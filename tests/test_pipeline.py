@@ -379,8 +379,9 @@ def test_caption_sin_subtitulos_transcribe(entorno_caption, tmp_path):
     assert all(e["total"] == 6 for e in eventos if "total" in e)  # 4 + 2
 
 
-def test_caption_off_no_toca_nada(entorno_caption, tmp_path):
+def test_caption_off_borra_md_obsoleto(entorno_caption, tmp_path):
     llamadas, video, base = entorno_caption
+    (tmp_path / "f.md").write_text("viejo", encoding="utf-8")
     pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4"), None)
     assert not any(l.startswith("generar:") or l.startswith("ollama:") for l in llamadas)
     assert not (tmp_path / "f.md").exists()
@@ -406,6 +407,29 @@ def test_caption_falla_degrada_con_warning(entorno_caption, tmp_path, monkeypatc
     assert "sin caption" in avisos[0]
     assert not (tmp_path / "f.md").exists()  # el .md obsoleto se borra
     assert "ollama:cerrar" in llamadas  # el servidor se cierra aunque falle
+
+
+def test_caption_falla_por_ollama_no_instalado_explica_solucion(entorno_caption, tmp_path,
+                                                                 monkeypatch):
+    """El diagnóstico de errores.explicar debe llegar al aviso, no solo el mensaje crudo."""
+    from videopipeline.steps import PasoFallido
+
+    llamadas, video, base = entorno_caption
+
+    def revienta(*a, **k):
+        raise PasoFallido("Ollama no está instalado (no se encuentra 'ollama' en PATH)")
+
+    monkeypatch.setattr(pipeline, "asegurar_servidor", revienta)
+    salida = tmp_path / "f.mp4"
+    eventos: list[dict] = []
+    resultado = pipeline.run(
+        PipelineConfig(video=video, salida=salida, caption_seo=True), eventos.append
+    )
+    assert resultado == salida and salida.is_file()
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert len(avisos) == 1
+    assert "Caption SEO falló" in avisos[0]
+    assert "brew install ollama" in avisos[0]
 
 
 def test_caption_con_subtitulos_fallidos_transcribe_de_nuevo(entorno_caption, tmp_path,

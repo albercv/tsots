@@ -16,6 +16,7 @@ from .steps import (
 from .subtitles import agrupar, generar_ass, generar_srt, transcribir
 from .caption import escribir_md, texto_plano
 from .caption import generar as generar_caption
+from .errores import explicar
 from .ollama import asegurar_servidor
 from .subtitles import Palabra
 
@@ -101,9 +102,9 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
                   paso: int, total: int) -> None:
     """Genera final.with_suffix('.md'). Nunca hace fallar el vídeo."""
     ruta_md = final.with_suffix(".md")
-    ruta_md.unlink(missing_ok=True)  # nunca dejar un caption obsoleto
     servidor = None
     try:
+        ruta_md.unlink(missing_ok=True)  # nunca dejar un caption obsoleto
         if palabras is None:
             _emitir(on_progress, paso, total, "Transcribiendo")
             palabras = transcribir(video_publicable, config.idioma_subs,
@@ -117,8 +118,10 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
         escribir_md(caption, ruta_md)
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         ruta_md.unlink(missing_ok=True)
+        diag = explicar(str(error), getattr(error, "detalle", ""))
+        sugerencia = f" Qué hacer: {diag.solucion}" if diag.conocido else ""
         _avisar(on_progress,
-                f"Caption SEO falló: {error}. Vídeo guardado sin caption.")
+                f"Caption SEO falló: {error}. Vídeo guardado sin caption.{sugerencia}")
     finally:
         if servidor is not None:
             try:
@@ -173,6 +176,8 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             primer_paso_caption = 1 + (2 if config.subtitulos else 0) + 1
             _fase_caption(config, publicar, final, palabras, on_progress,
                           primer_paso_caption, total)
+        else:
+            final.with_suffix(".md").unlink(missing_ok=True)
         publicar.replace(final)
         return final
 
@@ -223,5 +228,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
         primer_paso_caption = pasos_base + (2 if config.subtitulos else 0) + 1
         _fase_caption(config, publicar, final, palabras, on_progress,
                       primer_paso_caption, total)
+    else:
+        final.with_suffix(".md").unlink(missing_ok=True)
     publicar.replace(final)
     return final

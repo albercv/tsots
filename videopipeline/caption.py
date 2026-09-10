@@ -111,10 +111,12 @@ def _validar(datos: dict) -> Caption:
         if n and n not in vistos:
             vistos.append(n)
     return Caption(
-        titulo=datos["titulo"].strip()[:MAX_TITULO],
+        titulo=" ".join(datos["titulo"].split())[:MAX_TITULO],
         caption=datos["caption"].strip(),
         hashtags=vistos,
-        palabras_clave=[str(p).strip() for p in datos["palabras_clave"] if str(p).strip()],
+        palabras_clave=[
+            " ".join(str(p).split()) for p in datos["palabras_clave"] if str(p).strip()
+        ],
     )
 
 
