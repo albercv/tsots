@@ -335,8 +335,10 @@ def entorno_caption(entorno_subs, monkeypatch):
         llamadas.append("ollama:asegurar")
         return ServidorFalso()
 
-    def falso_generar(transcripcion, contexto_marca, modelo, cliente=None):
+    def falso_generar(transcripcion, contexto_marca, modelo, cliente=None,
+                      idioma="es"):
         llamadas.append(f"generar:{modelo}:{contexto_marca}:{transcripcion}")
+        llamadas.append(f"idioma_caption:{idioma}")
         from videopipeline.caption import Caption
         return Caption(titulo="T", caption="C", hashtags=["#a"], palabras_clave=["k"])
 
@@ -502,3 +504,34 @@ def test_pasos_extra():
     assert pipeline.pasos_extra(
         PipelineConfig(video=Path("/v.mp4"), subtitulos=True, caption_seo=True)
     ) == 3
+
+
+def test_caption_usa_idioma_subs_ingles(entorno_caption, tmp_path):
+    """config.idioma_subs == 'en' se propaga a generar_caption(idioma=...)."""
+    llamadas, video, base = entorno_caption
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True,
+                       idioma_subs="en"),
+        None,
+    )
+    assert "idioma_caption:en" in llamadas
+
+
+def test_caption_usa_es_por_defecto(entorno_caption, tmp_path):
+    llamadas, video, base = entorno_caption
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True),
+        None,
+    )
+    assert "idioma_caption:es" in llamadas
+
+
+def test_caption_usa_es_si_idioma_subs_auto(entorno_caption, tmp_path):
+    """idioma_subs='auto' no es 'es' ni 'en': el caption cae a español."""
+    llamadas, video, base = entorno_caption
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True,
+                       idioma_subs="auto"),
+        None,
+    )
+    assert "idioma_caption:es" in llamadas

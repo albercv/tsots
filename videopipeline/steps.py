@@ -5,6 +5,8 @@ import subprocess
 from pathlib import Path
 from typing import Callable
 
+from .i18n import _
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -26,7 +28,8 @@ def _ejecutar(cmd: list[str], descripcion: str) -> None:
     resultado = subprocess.run(cmd, capture_output=True, text=True)
     if resultado.returncode != 0:
         raise PasoFallido(
-            f"{descripcion} falló (código {resultado.returncode})",
+            _("{descripcion} falló (código {codigo})").format(
+                descripcion=descripcion, codigo=resultado.returncode),
             detalle=resultado.stderr.strip()[-4000:],
         )
 
@@ -83,7 +86,9 @@ def cmd_cortar_silencios(
 def _binario(nombre: str) -> str:
     ruta = shutil.which(nombre)
     if ruta is None:
-        raise PasoFallido(f"{nombre} no está instalado o no está en PATH")
+        raise PasoFallido(
+            _("{nombre} no está instalado o no está en PATH").format(nombre=nombre)
+        )
     return ruta
 
 
@@ -119,8 +124,8 @@ def ffmpeg_con_ass() -> str:
             _ffmpeg_ass_cache = candidato
             return candidato
     raise PasoFallido(
-        "Ningún ffmpeg disponible soporta subtítulos (libass). "
-        "Instala ffmpeg-full: brew install ffmpeg-full"
+        _("Ningún ffmpeg disponible soporta subtítulos (libass). "
+          "Instala ffmpeg-full: brew install ffmpeg-full")
     )
 
 
@@ -128,20 +133,22 @@ def extraer_audio(video: Path, wav: Path, sample_rate: int) -> None:
     wav.parent.mkdir(parents=True, exist_ok=True)
     _ejecutar(
         cmd_extraer_audio(_binario("ffmpeg"), video, wav, sample_rate),
-        "Extracción de audio",
+        _("Extracción de audio"),
     )
     if not wav.is_file() or wav.stat().st_size == 0:
-        raise PasoFallido(f"No se generó el WAV: {wav}")
+        raise PasoFallido(_("No se generó el WAV: {wav}").format(wav=wav))
 
 
 def remux(video: Path, audio: Path, salida: Path) -> None:
     salida.parent.mkdir(parents=True, exist_ok=True)
     _ejecutar(
         cmd_remux(_binario("ffmpeg"), video, audio, salida),
-        "Sustitución de la pista de audio",
+        _("Sustitución de la pista de audio"),
     )
     if not salida.is_file() or salida.stat().st_size == 0:
-        raise PasoFallido(f"No se generó el vídeo remuxado: {salida}")
+        raise PasoFallido(
+            _("No se generó el vídeo remuxado: {salida}").format(salida=salida)
+        )
 
 
 def _parsear_progreso(linea: str) -> float | None:
@@ -186,10 +193,12 @@ def cmd_normalizar_video(ffmpeg: str, entrada: Path, salida: Path) -> list[str]:
 def normalizar_video(entrada: Path, salida: Path) -> None:
     _ejecutar(
         cmd_normalizar_video(_binario("ffmpeg"), entrada, salida),
-        "Reencodado del vídeo (h264_videotoolbox)",
+        _("Reencodado del vídeo (h264_videotoolbox)"),
     )
     if not salida.is_file() or salida.stat().st_size == 0:
-        raise PasoFallido(f"No se generó el vídeo reencodado: {salida}")
+        raise PasoFallido(
+            _("No se generó el vídeo reencodado: {salida}").format(salida=salida)
+        )
 
 
 # Firma del bug de auto-editor que se resuelve reencodando la entrada.
@@ -249,9 +258,10 @@ def cortar_silencios(
             normalizar_video(entrada, normalizado)
             if on_aviso is not None:
                 on_aviso(
-                    "auto-editor no aceptó el stream H.264 original "
-                    f"({_ERROR_PAQUETE_AUTO_EDITOR}); el vídeo se ha "
-                    "reencodado con h264_videotoolbox y se ha reintentado."
+                    _("auto-editor no aceptó el stream H.264 original "
+                      "({error}); el vídeo se ha reencodado con "
+                      "h264_videotoolbox y se ha reintentado."
+                      ).format(error=_ERROR_PAQUETE_AUTO_EDITOR)
                 )
             codigo, texto = _ejecutar_auto_editor(
                 normalizado, salida, margen, umbral, silencios, velocidad,
@@ -260,12 +270,18 @@ def cortar_silencios(
         finally:
             normalizado.unlink(missing_ok=True)
     if codigo != 0:
-        mensaje = f"auto-editor falló (código {codigo})"
         if reintentado:
-            mensaje += " incluso tras reencodar la entrada"
+            mensaje = _(
+                "auto-editor falló (código {codigo}) incluso tras reencodar "
+                "la entrada"
+            ).format(codigo=codigo)
+        else:
+            mensaje = _("auto-editor falló (código {codigo})").format(codigo=codigo)
         raise PasoFallido(mensaje, detalle=texto[-4000:])
     if not salida.is_file() or salida.stat().st_size == 0:
-        raise PasoFallido(f"No se generó el vídeo editado: {salida}")
+        raise PasoFallido(
+            _("No se generó el vídeo editado: {salida}").format(salida=salida)
+        )
 
 
 def tiene_pista_audio(video: Path) -> bool:
@@ -310,12 +326,12 @@ def resolucion_video(video: Path) -> tuple[int, int]:
         alto = int(valores["height"])
     except (KeyError, ValueError):
         raise PasoFallido(
-            f"No se pudo leer la resolución del vídeo: {video}",
+            _("No se pudo leer la resolución del vídeo: {video}").format(video=video),
             detalle=(resultado.stderr or resultado.stdout).strip()[-1000:],
         ) from None
     if resultado.returncode != 0:
         raise PasoFallido(
-            f"No se pudo leer la resolución del vídeo: {video}",
+            _("No se pudo leer la resolución del vídeo: {video}").format(video=video),
             detalle=resultado.stderr.strip()[-1000:],
         )
     try:
@@ -366,7 +382,9 @@ def quemar_subtitulos(
     on_percent: Callable[[float], None] | None = None,
 ) -> None:
     if not ass.is_file():
-        raise PasoFallido(f"No existe el archivo de subtítulos: {ass}")
+        raise PasoFallido(
+            _("No existe el archivo de subtítulos: {ass}").format(ass=ass)
+        )
     salida.parent.mkdir(parents=True, exist_ok=True)
     duracion = duracion_video(video)
     cmd = cmd_quemar_subtitulos(ffmpeg_con_ass(), video, ass.name, salida)
@@ -390,11 +408,14 @@ def quemar_subtitulos(
     proceso.wait()
     if proceso.returncode != 0:
         raise PasoFallido(
-            f"El quemado de subtítulos falló (código {proceso.returncode})",
+            _("El quemado de subtítulos falló (código {codigo})").format(
+                codigo=proceso.returncode),
             detalle="".join(lineas).strip()[-4000:],
         )
     if not salida.is_file() or salida.stat().st_size == 0:
-        raise PasoFallido(f"No se generó el vídeo con subtítulos: {salida}")
+        raise PasoFallido(
+            _("No se generó el vídeo con subtítulos: {salida}").format(salida=salida)
+        )
 
 
 def _crear_clearvoice(tarea: str, modelo: str):
@@ -415,4 +436,6 @@ def limpiar_audio(entrada: Path, salida: Path, tarea: str, modelo: str) -> None:
         if s1.is_file():
             shutil.copyfile(s1, salida)
     if not salida.is_file() or salida.stat().st_size == 0:
-        raise PasoFallido(f"ClearVoice no generó el audio limpio: {salida}")
+        raise PasoFallido(
+            _("ClearVoice no generó el audio limpio: {salida}").format(salida=salida)
+        )

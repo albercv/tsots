@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+
+from videopipeline import i18n
 from videopipeline.errores import (
     Diagnostico,
     explicar,
     explicar_codigo_salida,
     limpiar_salida,
 )
+
+
+def _catalogo(tmp_path: Path, idioma: str, pares: dict[str, str]) -> Path:
+    """Compila un catálogo mínimo en tmp_path/<idioma>/LC_MESSAGES/tsots.mo."""
+    carpeta = tmp_path / idioma / "LC_MESSAGES"
+    carpeta.mkdir(parents=True)
+    po = carpeta / "tsots.po"
+    lineas = ['msgid ""', 'msgstr ""', '"Content-Type: text/plain; charset=UTF-8\\n"', ""]
+    for origen, destino in pares.items():
+        lineas += [f'msgid "{origen}"', f'msgstr "{destino}"', ""]
+    po.write_text("\n".join(lineas), encoding="utf-8")
+    subprocess.run(["msgfmt", "-o", str(carpeta / "tsots.mo"), str(po)], check=True)
+    return tmp_path
 
 
 def test_limpiar_salida_quita_ansi_y_progreso_de_auto_editor():
@@ -108,3 +125,20 @@ def test_explicar_ollama_no_responde():
     d = explicar("Ollama no responde en http://localhost:11434 tras 15 s")
     assert d.conocido
     assert "11434" in d.causa or "11434" in d.solucion
+
+
+def test_explicar_reconoce_mensaje_traducido_al_ingles(tmp_path):
+    """Los mensajes que lanza nuestro propio código se traducen al lanzarse;
+    el patrón de Ollama no instalado debe seguir reconociéndolos en inglés."""
+    ruta = _catalogo(tmp_path, "en", {
+        "Ollama no está instalado (no se encuentra 'ollama' en PATH)":
+            "Ollama is not installed ('ollama' not found in PATH)",
+    })
+    try:
+        i18n.instalar("en", dir_locale=ruta)
+        mensaje = i18n._("Ollama no está instalado (no se encuentra 'ollama' en PATH)")
+        assert mensaje == "Ollama is not installed ('ollama' not found in PATH)"
+        d = explicar(mensaje)
+        assert d.conocido is True
+    finally:
+        i18n.instalar("es")

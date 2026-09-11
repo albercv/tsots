@@ -17,6 +17,7 @@ from .subtitles import agrupar, generar_ass, generar_srt, transcribir
 from .caption import escribir_md, texto_plano
 from .caption import generar as generar_caption
 from .errores import explicar
+from .i18n import _
 from .ollama import asegurar_servidor
 from .subtitles import Palabra
 
@@ -52,8 +53,8 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
         )
         _emitir(
             on_progress, paso, total,
-            "Transcribiendo" if en_cache
-            else "Descargando modelo Whisper y transcribiendo",
+            _("Transcribiendo") if en_cache
+            else _("Descargando modelo Whisper y transcribiendo"),
         )
         palabras = transcribir(tmp_final, config.idioma_subs,
                                config.modelo_whisper)
@@ -64,8 +65,8 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         if on_progress is not None:
             on_progress({
-                "warning": f"Subtítulos fallaron: {error}. "
-                           "Vídeo guardado sin subtítulos."
+                "warning": _("Subtítulos fallaron: {error}. "
+                             "Vídeo guardado sin subtítulos.").format(error=error)
             })
         return tmp_final, None
 
@@ -76,11 +77,11 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
         generar_ass(bloques, config.diseno, config.posicion_subs,
                     resolucion_video(tmp_final), ass, tamano=config.tamano_subs)
         tmp_subs.unlink(missing_ok=True)
-        _emitir(on_progress, paso + 1, total, "Quemando subtítulos")
+        _emitir(on_progress, paso + 1, total, _("Quemando subtítulos"))
         quemar_subtitulos(
             tmp_final, ass, tmp_subs,
             on_percent=lambda p: _emitir(
-                on_progress, paso + 1, total, "Quemando subtítulos", p
+                on_progress, paso + 1, total, _("Quemando subtítulos"), p
             ),
         )
         ass.unlink(missing_ok=True)
@@ -91,8 +92,9 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
         tmp_subs.unlink(missing_ok=True)
         if on_progress is not None:
             on_progress({
-                "warning": f"Subtítulos fallaron: {error}. "
-                           "Vídeo guardado sin subtítulos (.srt conservado)."
+                "warning": _("Subtítulos fallaron: {error}. "
+                             "Vídeo guardado sin subtítulos (.srt conservado)."
+                             ).format(error=error)
             })
         return tmp_final, palabras
 
@@ -106,28 +108,34 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
     try:
         ruta_md.unlink(missing_ok=True)  # nunca dejar un caption obsoleto
         if palabras is None:
-            _emitir(on_progress, paso, total, "Transcribiendo")
+            _emitir(on_progress, paso, total, _("Transcribiendo"))
             palabras = transcribir(video_publicable, config.idioma_subs,
                                    config.modelo_whisper)
             paso += 1
-        _emitir(on_progress, paso, total, "Generando caption SEO")
+        _emitir(on_progress, paso, total, _("Generando caption SEO"))
         servidor = asegurar_servidor()
         caption = generar_caption(
-            texto_plano(palabras), config.contexto_marca, config.modelo_caption
+            texto_plano(palabras), config.contexto_marca, config.modelo_caption,
+            idioma=config.idioma_subs if config.idioma_subs in ("es", "en") else "es",
         )
         escribir_md(caption, ruta_md)
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         ruta_md.unlink(missing_ok=True)
         diag = explicar(str(error), getattr(error, "detalle", ""))
-        sugerencia = f" Qué hacer: {diag.solucion}" if diag.conocido else ""
+        sugerencia = (
+            _(" Qué hacer: {solucion}").format(solucion=diag.solucion)
+            if diag.conocido else ""
+        )
         _avisar(on_progress,
-                f"Caption SEO falló: {error}. Vídeo guardado sin caption.{sugerencia}")
+                _("Caption SEO falló: {error}. Vídeo guardado sin caption."
+                  "{sugerencia}").format(error=error, sugerencia=sugerencia))
     finally:
         if servidor is not None:
             try:
                 servidor.cerrar()
             except Exception as error:  # noqa: BLE001
-                _avisar(on_progress, f"No se pudo cerrar ollama serve: {error}")
+                _avisar(on_progress,
+                        _("No se pudo cerrar ollama serve: {error}").format(error=error))
 
 
 def pasos_extra(config: PipelineConfig) -> int:
@@ -158,12 +166,12 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
 
     if config.modo == "solo_silencios":
         total = 1 + extra
-        _emitir(on_progress, 1, total, "Recortando silencios")
+        _emitir(on_progress, 1, total, _("Recortando silencios"))
         cortar_silencios(
             video, tmp_final, config.margen, config.umbral,
             config.silencios, config.velocidad_silencios,
             on_percent=lambda p: _emitir(
-                on_progress, 1, total, "Recortando silencios", p
+                on_progress, 1, total, _("Recortando silencios"), p
             ),
             on_aviso=lambda texto: _avisar(on_progress, texto),
         )
@@ -188,31 +196,31 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     total = (4 if config.modo == "completo" else 3) + extra
     sample_rate = SAMPLE_RATE_POR_MODELO[config.modelo]
 
-    _emitir(on_progress, 1, total, "Extrayendo audio")
+    _emitir(on_progress, 1, total, _("Extrayendo audio"))
     extraer_audio(video, wav_original, sample_rate)
 
     checkpoint = BASE_DIR / "checkpoints" / config.modelo
     etiqueta_limpieza = (
-        "Limpiando audio"
+        _("Limpiando audio")
         if checkpoint.is_dir()
-        else "Descargando modelo y limpiando audio"
+        else _("Descargando modelo y limpiando audio")
     )
     _emitir(on_progress, 2, total, etiqueta_limpieza)
     limpiar_audio(wav_original, wav_limpio, config.tarea, config.modelo)
 
     if config.modo == "solo_audio":
-        _emitir(on_progress, 3, total, "Sustituyendo pista de audio")
+        _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
         remux(video, wav_limpio, tmp_final)
     else:
         video_intermedio = trabajo / f"{nombre}_solo_audio_limpio.mp4"
-        _emitir(on_progress, 3, total, "Sustituyendo pista de audio")
+        _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
         remux(video, wav_limpio, video_intermedio)
-        _emitir(on_progress, 4, total, "Recortando silencios")
+        _emitir(on_progress, 4, total, _("Recortando silencios"))
         cortar_silencios(
             video_intermedio, tmp_final, config.margen, config.umbral,
             config.silencios, config.velocidad_silencios,
             on_percent=lambda p: _emitir(
-                on_progress, 4, total, "Recortando silencios", p
+                on_progress, 4, total, _("Recortando silencios"), p
             ),
             on_aviso=lambda texto: _avisar(on_progress, texto),
         )

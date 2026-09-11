@@ -11,8 +11,10 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
+from . import i18n
 from .config import PipelineConfig
 from .errores import explicar
+from .i18n import _
 from .pipeline import run
 from .steps import BASE_DIR, PasoFallido
 
@@ -70,7 +72,9 @@ def main(argv: list[str] | None = None) -> int:
         if error.code in (None, 0):
             # --help u otra salida "limpia" de argparse: ya se imprimió lo debido.
             return 0
-        _imprimir({"error": "argumentos inválidos: se requiere --config", "step": 0})
+        _imprimir({
+            "error": _("argumentos inválidos: se requiere --config"), "step": 0
+        })
         return 1
 
     # Resolver la ruta de config contra el cwd del llamador ANTES del chdir.
@@ -100,7 +104,10 @@ def main(argv: list[str] | None = None) -> int:
 
     def fallar(mensaje: str, detalle: str) -> int:
         diagnostico = explicar(mensaje, detalle)
-        log.escribir(f"ERROR en paso {ultimo_paso} ({ultima_etiqueta or '?'})")
+        log.escribir(
+            _("ERROR en paso {paso} ({etiqueta})").format(
+                paso=ultimo_paso, etiqueta=ultima_etiqueta or '?')
+        )
         log.escribir(diagnostico.texto())
         log.cerrar()
         _imprimir({
@@ -116,6 +123,7 @@ def main(argv: list[str] | None = None) -> int:
         config = PipelineConfig.from_json(
             config_path.read_text(encoding="utf-8")
         )
+        i18n.instalar(config.idioma_ui)
         log.escribir("config: " + json.dumps(asdict(config), ensure_ascii=False,
                                              default=str))
         salida = run(config, on_progress)

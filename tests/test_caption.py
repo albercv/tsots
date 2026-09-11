@@ -43,6 +43,24 @@ def test_construir_mensajes_con_marca():
     assert "Soy Alberto, tono cercano" in m[0]["content"]
 
 
+def test_construir_mensajes_idioma_ingles():
+    m = cap.construir_mensajes("x", "", idioma="en")
+    assert "hashtags" in m[0]["content"]
+    assert "Respond only with JSON" in m[0]["content"]
+    assert "Transcript:\nx" == m[1]["content"]
+
+
+def test_construir_mensajes_idioma_ingles_con_marca():
+    m = cap.construir_mensajes("x", "Soy Alberto", idioma="en")
+    assert "Brand context" in m[0]["content"]
+    assert "Soy Alberto" in m[0]["content"]
+
+
+def test_construir_mensajes_idioma_desconocido_usa_espanol():
+    m = cap.construir_mensajes("x", "", idioma="fr")
+    assert "Transcripción:\nx" == m[1]["content"]
+
+
 def test_esquema_exige_los_cuatro_campos():
     assert set(cap.ESQUEMA["required"]) == {"titulo", "caption", "hashtags",
                                             "palabras_clave"}

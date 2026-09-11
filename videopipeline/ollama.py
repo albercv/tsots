@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 
+from .i18n import _
 from .steps import PasoFallido
 
 URL = "http://localhost:11434"
@@ -55,7 +56,7 @@ def asegurar_servidor(url: str = URL, espera_max: float = 15.0) -> Servidor:
     binario = shutil.which("ollama")
     if binario is None:
         raise PasoFallido(
-            "Ollama no está instalado (no se encuentra 'ollama' en PATH)"
+            _("Ollama no está instalado (no se encuentra 'ollama' en PATH)")
         )
     proceso = subprocess.Popen(
         [binario, "serve"],
@@ -67,7 +68,10 @@ def asegurar_servidor(url: str = URL, espera_max: float = 15.0) -> Servidor:
             return Servidor(proceso=proceso)
         time.sleep(0.5)
     Servidor(proceso=proceso).cerrar()
-    raise PasoFallido(f"Ollama no responde en {url} tras {espera_max:.0f} s")
+    raise PasoFallido(
+        _("Ollama no responde en {url} tras {segundos:.0f} s").format(
+            url=url, segundos=espera_max)
+    )
 
 
 GB = 1024 ** 3
@@ -155,26 +159,35 @@ def chat_json(
             # El cuerpo no es JSON válido
             detalle = cuerpo_bruto.decode("utf-8", errors="replace")
             raise PasoFallido(
-                "Ollama devolvió una respuesta no válida", detalle=detalle[:2000]
+                _("Ollama devolvió una respuesta no válida"), detalle=detalle[:2000]
             ) from None
     except urllib.error.HTTPError as error:
         detalle = error.read().decode("utf-8", errors="replace")
         if error.code == 404 and "not found" in detalle:
-            raise PasoFallido(f"Modelo no descargado: {modelo}", detalle=detalle) from None
-        raise PasoFallido(f"Ollama devolvió HTTP {error.code}", detalle=detalle) from None
+            raise PasoFallido(
+                _("Modelo no descargado: {modelo}").format(modelo=modelo),
+                detalle=detalle,
+            ) from None
+        raise PasoFallido(
+            _("Ollama devolvió HTTP {codigo}").format(codigo=error.code),
+            detalle=detalle,
+        ) from None
     except (urllib.error.URLError, OSError) as error:
-        raise PasoFallido(f"Ollama no responde en {url}", detalle=str(error)) from None
+        raise PasoFallido(
+            _("Ollama no responde en {url}").format(url=url), detalle=str(error)
+        ) from None
     try:
         contenido = respuesta.get("message", {}).get("content", "")
     except (AttributeError, TypeError):
         # respuesta no es un dict: e.g. JSON array o valor primitivo
         raise PasoFallido(
-            "Ollama devolvió una respuesta no válida",
+            _("Ollama devolvió una respuesta no válida"),
             detalle=json.dumps(respuesta)[:2000]
         ) from None
     try:
         return json.loads(contenido)
     except (json.JSONDecodeError, TypeError):
         raise PasoFallido(
-            "La respuesta del modelo no es JSON válido", detalle=str(contenido)[:2000]
+            _("La respuesta del modelo no es JSON válido"),
+            detalle=str(contenido)[:2000],
         ) from None

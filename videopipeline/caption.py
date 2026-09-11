@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from .i18n import _
 from .ollama import chat_json
 from .steps import PasoFallido
 from .subtitles import Palabra
@@ -19,7 +20,9 @@ MAX_PALABRAS = 3500
 MAX_TITULO = 60
 MIN_HASHTAGS, MAX_HASHTAGS = 8, 15
 
-_SYSTEM = (
+# Prompt del LLM: no es texto de interfaz (no se traduce con gettext). Hay una
+# variante fija por idioma; `construir_mensajes` elige según `idioma`.
+_SYSTEM_ES = (
     "Eres un experto en SEO y copywriting para vídeo corto (Instagram Reels, "
     "TikTok, YouTube Shorts) en español de España. A partir de la transcripción "
     "de un vídeo genera:\n"
@@ -33,6 +36,22 @@ _SYSTEM = (
     "nicho y 2 del tema concreto.\n"
     "- palabras_clave: 5-8 términos de búsqueda en español.\n"
     "No inventes datos que no estén en la transcripción. Responde solo JSON."
+)
+
+_SYSTEM_EN = (
+    "You are an SEO and copywriting expert for short-form video (Instagram "
+    "Reels, TikTok, YouTube Shorts) in English. From a video transcript "
+    "generate:\n"
+    f"- titulo: at most {MAX_TITULO} characters, with the main keyword at the "
+    "start, concrete, without empty clickbait.\n"
+    "- caption: 120-200 words. First line = hook. Development with the video's "
+    "2-3 key ideas. Close with a call to action. Warm and professional tone. "
+    "No hashtags inside the caption.\n"
+    f"- hashtags: between {MIN_HASHTAGS} and {MAX_HASHTAGS}, lowercase, no "
+    "spaces, starting with #. Mix 3 high-volume generic ones, 5 or more niche "
+    "ones and 2 about the specific topic.\n"
+    "- palabras_clave: 5-8 search keywords.\n"
+    "Do not invent data that isn't in the transcript. Respond only with JSON."
 )
 
 ESQUEMA: dict = {
@@ -74,16 +93,25 @@ def recortar(transcripcion: str, max_palabras: int = MAX_PALABRAS) -> str:
     return " ".join(palabras[:max_palabras])
 
 
-def construir_mensajes(transcripcion: str, contexto_marca: str) -> list[dict]:
-    system = _SYSTEM
+def construir_mensajes(transcripcion: str, contexto_marca: str,
+                       idioma: str = "es") -> list[dict]:
+    ingles = idioma == "en"
+    system = _SYSTEM_EN if ingles else _SYSTEM_ES
     if contexto_marca.strip():
-        system += (
-            "\n\nContexto de marca (respétalo en tono, nombre y llamada a la "
-            f"acción):\n{contexto_marca.strip()}"
-        )
+        if ingles:
+            system += (
+                "\n\nBrand context (respect it in tone, name and call to "
+                f"action):\n{contexto_marca.strip()}"
+            )
+        else:
+            system += (
+                "\n\nContexto de marca (respétalo en tono, nombre y llamada a la "
+                f"acción):\n{contexto_marca.strip()}"
+            )
+    etiqueta = "Transcript" if ingles else "Transcripción"
     return [
         {"role": "system", "content": system},
-        {"role": "user", "content": f"Transcripción:\n{recortar(transcripcion)}"},
+        {"role": "user", "content": f"{etiqueta}:\n{recortar(transcripcion)}"},
     ]
 
 
@@ -102,7 +130,8 @@ def _validar(datos: dict) -> Caption:
     )
     if faltan or tipos_mal:
         raise PasoFallido(
-            "La respuesta del modelo no es válida: faltan campos o tipos incorrectos",
+            _("La respuesta del modelo no es válida: faltan campos o tipos "
+              "incorrectos"),
             detalle=json.dumps(datos, ensure_ascii=False)[:2000],
         )
     vistos: list[str] = []
@@ -125,10 +154,15 @@ def generar(
     contexto_marca: str,
     modelo: str,
     cliente: Callable[[str, list[dict], dict], dict] = chat_json,
+    idioma: str = "es",
 ) -> Caption:
     if not transcripcion.strip():
-        raise PasoFallido("La transcripción está vacía; no hay texto para el caption")
-    datos = cliente(modelo, construir_mensajes(transcripcion, contexto_marca), ESQUEMA)
+        raise PasoFallido(
+            _("La transcripción está vacía; no hay texto para el caption")
+        )
+    datos = cliente(
+        modelo, construir_mensajes(transcripcion, contexto_marca, idioma), ESQUEMA
+    )
     return _validar(datos)
 
 

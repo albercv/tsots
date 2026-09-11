@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from videopipeline import runner
+from videopipeline import i18n, runner
 from videopipeline.config import PipelineConfig
 from videopipeline.steps import PasoFallido
+
+
+def _catalogo(tmp_path: Path, idioma: str, pares: dict[str, str]) -> Path:
+    """Compila un catálogo mínimo en tmp_path/<idioma>/LC_MESSAGES/tsots.mo."""
+    carpeta = tmp_path / idioma / "LC_MESSAGES"
+    carpeta.mkdir(parents=True)
+    po = carpeta / "tsots.po"
+    lineas = ['msgid ""', 'msgstr ""', '"Content-Type: text/plain; charset=UTF-8\\n"', ""]
+    for origen, destino in pares.items():
+        lineas += [f'msgid "{origen}"', f'msgstr "{destino}"', ""]
+    po.write_text("\n".join(lineas), encoding="utf-8")
+    subprocess.run(["msgfmt", "-o", str(carpeta / "tsots.mo"), str(po)], check=True)
+    return tmp_path
 
 
 def _config_json(tmp_path: Path, **extra) -> Path:
@@ -161,6 +175,32 @@ def test_exito_tambien_escribe_log(tmp_path, monkeypatch, capsys):
     logs = list((tmp_path / "logs").glob("v_*.log"))
     assert len(logs) == 1
     assert "OK" in logs[0].read_text(encoding="utf-8")
+
+
+def test_main_instala_idioma_ui_de_la_config(tmp_path, monkeypatch, capsys):
+    """config.idioma_ui='en' debe instalar el catálogo inglés antes de correr
+    el pipeline, así que las etiquetas de progreso llegan traducidas."""
+    ruta_locale = _catalogo(tmp_path / "locale", "en", {
+        "Extrayendo audio": "Extracting audio",
+    })
+    monkeypatch.setattr(i18n, "DIR_LOCALE", ruta_locale)
+    ruta = _config_json(tmp_path, idioma_ui="en")
+
+    def falso_run(config, on_progress):
+        from videopipeline.i18n import _
+        on_progress({"step": 1, "total": 1, "label": _("Extrayendo audio"),
+                     "percent": None})
+        return config.ruta_salida_final()
+
+    monkeypatch.setattr(runner, "run", falso_run)
+    monkeypatch.setattr(runner.os, "chdir", lambda ruta_: None)
+    try:
+        codigo = runner.main(["--config", str(ruta)])
+    finally:
+        i18n.instalar("es")
+    assert codigo == 0
+    lineas = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
+    assert lineas[0]["label"] == "Extracting audio"
 
 
 def test_warning_pasa_por_stdout(tmp_path, monkeypatch, capsys):
