@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, QProcess, Signal
 
 from videopipeline.errores import Diagnostico, explicar, explicar_codigo_salida
+from videopipeline.i18n import _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -132,7 +133,7 @@ class EjecutorCola(QObject):
     def _error_proceso(self, error) -> None:
         if error != QProcess.ProcessError.FailedToStart:
             return  # otros errores (p.ej. Crashed) los gestiona `finished`
-        self._error_actual = "No se pudo lanzar el proceso"
+        self._error_actual = _("No se pudo lanzar el proceso")
         self._terminado(-1, None)
 
     def _diagnostico_estructurado(self) -> dict | None:
@@ -153,21 +154,27 @@ class EjecutorCola(QObject):
         Qt en Unix entrega, para CrashExit, el NÚMERO DE SEÑAL en `codigo`.
         """
         if estado == QProcess.ExitStatus.CrashExit:
-            mensaje = f"El proceso murió por una señal (código {codigo})"
+            mensaje = _("El proceso murió por una señal (código {codigo})").format(
+                codigo=codigo
+            )
             senal = explicar_codigo_salida(-codigo)
         else:
-            mensaje = f"El proceso terminó inesperadamente (código {codigo})"
+            mensaje = _(
+                "El proceso terminó inesperadamente (código {codigo})"
+            ).format(codigo=codigo)
             senal = explicar_codigo_salida(codigo)
         if self._ultimo_paso:
-            mensaje += f" en «{self._ultimo_paso}»"
+            mensaje += _(" en «{paso}»").format(paso=self._ultimo_paso)
         partes = []
         if senal:
             partes.append(senal)
         if self._error_actual:
             partes.append(self._error_actual)
         if self._ruido:
-            partes.append("Salida del proceso (últimas líneas):\n"
-                          + "\n".join(self._ruido))
+            partes.append(
+                _("Salida del proceso (últimas líneas):") + "\n"
+                + "\n".join(self._ruido)
+            )
         diag = explicar(mensaje, "\n".join(partes))
         if not diag.conocido and senal:
             diag.causa = senal
@@ -192,7 +199,7 @@ class EjecutorCola(QObject):
         error = self._error_actual
         diagnostico: dict | None = None
         if self._cancelado:
-            error = "Cancelado"
+            error = _("Cancelado")
         elif not ok:
             diagnostico = self._diagnostico_estructurado()
             if diagnostico is None:

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from videopipeline.config import MODELOS_POR_TAREA
+from videopipeline.i18n import N_, _
 from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
 
 # clearvoice/app/widgets/panel_opciones.py → clearvoice/checkpoints
@@ -27,31 +28,29 @@ CHECKPOINTS_DIR = Path(__file__).resolve().parents[2] / "checkpoints"
 
 WHISPER_CACHE_DIR = Path.home() / ".cache" / "huggingface" / "hub"
 
+# Las claves son los msgid (N_ las marca para extracción); el combo se puebla
+# con addItem(_(etiqueta), valor) — texto traducido, dato = valor interno.
 ETIQUETA_TAREA = {
-    "Mejora de voz": "speech_enhancement",
-    "Separación de hablantes": "speech_separation",
-    "Super-resolución": "speech_super_resolution",
+    N_("Mejora de voz"): "speech_enhancement",
+    N_("Separación de hablantes"): "speech_separation",
+    N_("Super-resolución"): "speech_super_resolution",
 }
-TAREA_ETIQUETA = {v: k for k, v in ETIQUETA_TAREA.items()}
 
-ETIQUETA_SILENCIOS = {"Cortar": "cortar", "Acelerar": "acelerar"}
-SILENCIOS_ETIQUETA = {v: k for k, v in ETIQUETA_SILENCIOS.items()}
+ETIQUETA_SILENCIOS = {N_("Cortar"): "cortar", N_("Acelerar"): "acelerar"}
 
 ETIQUETA_DISENO = {
-    "Reels Bold": "reels_bold",
-    "Reels Karaoke": "reels_karaoke",
-    "Caja negra": "caja",
+    N_("Reels Bold"): "reels_bold",
+    N_("Reels Karaoke"): "reels_karaoke",
+    N_("Caja negra"): "caja",
 }
-DISENO_ETIQUETA = {v: k for k, v in ETIQUETA_DISENO.items()}
 
-ETIQUETA_IDIOMA = {"Español": "es", "Autodetectar": "auto", "English": "en"}
-IDIOMA_ETIQUETA = {v: k for k, v in ETIQUETA_IDIOMA.items()}
+# "Español" y "English" son nombres de idioma: no se traducen.
+ETIQUETA_IDIOMA = {"Español": "es", N_("Autodetectar"): "auto", "English": "en"}
 
 ETIQUETA_MODELO_WHISPER = {
-    "small (rápido)": "small",
-    "medium (más preciso)": "medium",
+    N_("small (rápido)"): "small",
+    N_("medium (más preciso)"): "medium",
 }
-MODELO_WHISPER_ETIQUETA = {v: k for k, v in ETIQUETA_MODELO_WHISPER.items()}
 
 
 class PanelOpciones(QWidget):
@@ -64,11 +63,11 @@ class PanelOpciones(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
 
-        grupo_modo = QGroupBox("Modo")
+        grupo_modo = QGroupBox(_("Modo"))
         modo_layout = QVBoxLayout(grupo_modo)
-        self.radio_completo = QRadioButton("Pipeline completo")
-        self.radio_solo_audio = QRadioButton("Solo limpiar audio")
-        self.radio_solo_silencios = QRadioButton("Solo cortar silencios")
+        self.radio_completo = QRadioButton(_("Pipeline completo"))
+        self.radio_solo_audio = QRadioButton(_("Solo limpiar audio"))
+        self.radio_solo_silencios = QRadioButton(_("Solo cortar silencios"))
         self.radio_completo.setChecked(True)
         for radio in (
             self.radio_completo, self.radio_solo_audio, self.radio_solo_silencios
@@ -77,48 +76,51 @@ class PanelOpciones(QWidget):
             radio.toggled.connect(self._actualizar_habilitados)
         layout.addWidget(grupo_modo)
 
-        grupo_audio = QGroupBox("Limpieza de audio")
+        grupo_audio = QGroupBox(_("Limpieza de audio"))
         form_audio = QFormLayout(grupo_audio)
         self.combo_tarea = QComboBox()
-        self.combo_tarea.addItems(list(ETIQUETA_TAREA))
+        for etiqueta, valor in ETIQUETA_TAREA.items():
+            self.combo_tarea.addItem(_(etiqueta), valor)
         self.combo_modelo = QComboBox()
-        self.combo_tarea.currentTextChanged.connect(self._repoblar_modelos)
+        self.combo_tarea.currentIndexChanged.connect(self._repoblar_modelos)
         self.aviso_modelo = QLabel("")
         self.aviso_modelo.setStyleSheet("color: #b8860b;")
         self.aviso_modelo.setWordWrap(True)
         self.combo_modelo.currentTextChanged.connect(
             self._refrescar_aviso_modelo
         )
-        form_audio.addRow("Tarea:", self.combo_tarea)
-        form_audio.addRow("Modelo:", self.combo_modelo)
+        form_audio.addRow(_("Tarea:"), self.combo_tarea)
+        form_audio.addRow(_("Modelo:"), self.combo_modelo)
         form_audio.addRow("", self.aviso_modelo)
         layout.addWidget(grupo_audio)
         self._repoblar_modelos()
         self._refrescar_aviso_modelo()
 
-        grupo_silencios = QGroupBox("Corte de silencios")
+        grupo_silencios = QGroupBox(_("Corte de silencios"))
         form_sil = QFormLayout(grupo_silencios)
         self.campo_margen = QLineEdit("0.2s")
         self.campo_umbral = QLineEdit("4%")
         self.combo_silencios = QComboBox()
-        self.combo_silencios.addItems(list(ETIQUETA_SILENCIOS))
+        for etiqueta, valor in ETIQUETA_SILENCIOS.items():
+            self.combo_silencios.addItem(_(etiqueta), valor)
         self.spin_velocidad = QSpinBox()
         self.spin_velocidad.setRange(2, 99)
         self.spin_velocidad.setValue(4)
-        self.combo_silencios.currentTextChanged.connect(
+        self.combo_silencios.currentIndexChanged.connect(
             self._actualizar_habilitados
         )
-        form_sil.addRow("Margen:", self.campo_margen)
-        form_sil.addRow("Umbral:", self.campo_umbral)
-        form_sil.addRow("Silencios:", self.combo_silencios)
-        form_sil.addRow("Velocidad:", self.spin_velocidad)
+        form_sil.addRow(_("Margen:"), self.campo_margen)
+        form_sil.addRow(_("Umbral:"), self.campo_umbral)
+        form_sil.addRow(_("Silencios:"), self.combo_silencios)
+        form_sil.addRow(_("Velocidad:"), self.spin_velocidad)
         layout.addWidget(grupo_silencios)
 
-        grupo_subs = QGroupBox("Subtítulos")
+        grupo_subs = QGroupBox(_("Subtítulos"))
         form_subs = QFormLayout(grupo_subs)
-        self.check_subtitulos = QCheckBox("Añadir subtítulos")
+        self.check_subtitulos = QCheckBox(_("Añadir subtítulos"))
         self.combo_diseno = QComboBox()
-        self.combo_diseno.addItems(list(ETIQUETA_DISENO))
+        for etiqueta, valor in ETIQUETA_DISENO.items():
+            self.combo_diseno.addItem(_(etiqueta), valor)
         self.spin_posicion = QSpinBox()
         self.spin_posicion.setRange(50, 95)
         self.spin_posicion.setValue(75)
@@ -133,40 +135,44 @@ class PanelOpciones(QWidget):
             lambda v: self.etiqueta_tamano.setText(f"{v} %")
         )
         self.combo_idioma_subs = QComboBox()
-        self.combo_idioma_subs.addItems(list(ETIQUETA_IDIOMA))
+        for etiqueta, valor in ETIQUETA_IDIOMA.items():
+            self.combo_idioma_subs.addItem(_(etiqueta), valor)
         self.combo_modelo_whisper = QComboBox()
-        self.combo_modelo_whisper.addItems(list(ETIQUETA_MODELO_WHISPER))
+        for etiqueta, valor in ETIQUETA_MODELO_WHISPER.items():
+            self.combo_modelo_whisper.addItem(_(etiqueta), valor)
         self.aviso_whisper = QLabel("")
         self.aviso_whisper.setStyleSheet("color: #b8860b;")
         self.aviso_whisper.setWordWrap(True)
         form_subs.addRow(self.check_subtitulos)
-        form_subs.addRow("Diseño:", self.combo_diseno)
-        form_subs.addRow("Posición vertical:", self.spin_posicion)
+        form_subs.addRow(_("Diseño:"), self.combo_diseno)
+        form_subs.addRow(_("Posición vertical:"), self.spin_posicion)
         fila_tamano = QHBoxLayout()
         fila_tamano.addWidget(self.slider_tamano, 1)
         fila_tamano.addWidget(self.etiqueta_tamano)
-        form_subs.addRow("Tamaño:", fila_tamano)
-        form_subs.addRow("Idioma:", self.combo_idioma_subs)
-        form_subs.addRow("Modelo:", self.combo_modelo_whisper)
+        form_subs.addRow(_("Tamaño:"), fila_tamano)
+        form_subs.addRow(_("Idioma:"), self.combo_idioma_subs)
+        form_subs.addRow(_("Modelo:"), self.combo_modelo_whisper)
         form_subs.addRow("", self.aviso_whisper)
         layout.addWidget(grupo_subs)
         self._grupo_subs = grupo_subs
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
-        self.combo_modelo_whisper.currentTextChanged.connect(
+        self.combo_modelo_whisper.currentIndexChanged.connect(
             self._refrescar_aviso_whisper
         )
         self._actualizar_subtitulos()
 
-        grupo_caption = QGroupBox("Caption SEO")
+        grupo_caption = QGroupBox(_("Caption SEO"))
         caption_layout = QVBoxLayout(grupo_caption)
         fila_caption = QHBoxLayout()
-        self.check_caption = QCheckBox("Título, caption y hashtags")
+        self.check_caption = QCheckBox(_("Título, caption y hashtags"))
         self.check_caption.setToolTip(
-            "Genera nombre_limpio.md con un modelo local (Ollama) a partir "
-            "de la transcripción."
+            _(
+                "Genera nombre_limpio.md con un modelo local (Ollama) a partir "
+                "de la transcripción."
+            )
         )
-        self.boton_marca = QPushButton("Marca…")
-        self.boton_marca.setToolTip("Contexto de marca que se añade al prompt.")
+        self.boton_marca = QPushButton(_("Marca…"))
+        self.boton_marca.setToolTip(_("Contexto de marca que se añade al prompt."))
         self.boton_marca.clicked.connect(self.editar_marca)
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
@@ -181,11 +187,11 @@ class PanelOpciones(QWidget):
         self.combo_modelo_caption.setMinimumContentsLength(18)
         self.boton_refrescar_modelos = QPushButton("↻")
         self.boton_refrescar_modelos.setToolTip(
-            "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+            _("Volver a leer los modelos instalados en Ollama (tras un ollama pull).")
         )
         self.boton_refrescar_modelos.setFixedWidth(32)
         self.boton_refrescar_modelos.clicked.connect(self.refrescar_modelos)
-        fila_modelo.addWidget(QLabel("Modelo:"))
+        fila_modelo.addWidget(QLabel(_("Modelo:")))
         fila_modelo.addWidget(self.combo_modelo_caption, 1)
         fila_modelo.addWidget(self.boton_refrescar_modelos)
         caption_layout.addLayout(fila_modelo)
@@ -205,12 +211,12 @@ class PanelOpciones(QWidget):
         self._actualizar_habilitados()
 
         self.check_subtitulos.toggled.connect(self._emitir_cambio_subs)
-        self.combo_diseno.currentTextChanged.connect(self._emitir_cambio_subs)
+        self.combo_diseno.currentIndexChanged.connect(self._emitir_cambio_subs)
         self.spin_posicion.valueChanged.connect(self._emitir_cambio_subs)
         self.slider_tamano.valueChanged.connect(self._emitir_cambio_subs)
 
     def _repoblar_modelos(self) -> None:
-        tarea = ETIQUETA_TAREA[self.combo_tarea.currentText()]
+        tarea = self.combo_tarea.currentData()
         self.combo_modelo.clear()
         self.combo_modelo.addItems(MODELOS_POR_TAREA[tarea])
 
@@ -218,7 +224,7 @@ class PanelOpciones(QWidget):
         modelo = self.combo_modelo.currentText()
         if modelo and not (CHECKPOINTS_DIR / modelo).is_dir():
             self.aviso_modelo.setText(
-                "El modelo se descargará al primer uso."
+                _("El modelo se descargará al primer uso.")
             )
         else:
             self.aviso_modelo.setText("")
@@ -237,10 +243,7 @@ class PanelOpciones(QWidget):
         for hijo in self._grupo_silencios.findChildren(QWidget):
             hijo.setEnabled(modo != "solo_audio")
         if modo != "solo_audio":
-            acelerar = (
-                ETIQUETA_SILENCIOS[self.combo_silencios.currentText()]
-                == "acelerar"
-            )
+            acelerar = self.combo_silencios.currentData() == "acelerar"
             self.spin_velocidad.setEnabled(acelerar)
 
     def _actualizar_subtitulos(self, *args) -> None:
@@ -259,14 +262,14 @@ class PanelOpciones(QWidget):
         if not self.check_subtitulos.isChecked():
             self.aviso_whisper.setText("")
             return
-        modelo = ETIQUETA_MODELO_WHISPER[self.combo_modelo_whisper.currentText()]
+        modelo = self.combo_modelo_whisper.currentData()
         patron = f"models--*faster-whisper-{modelo}*"
         en_cache = WHISPER_CACHE_DIR.is_dir() and any(
             WHISPER_CACHE_DIR.glob(patron)
         )
         self.aviso_whisper.setText(
             "" if en_cache
-            else "El modelo Whisper se descargará al primer uso (~500MB)."
+            else _("El modelo Whisper se descargará al primer uso (~500MB).")
         )
 
     # --- selector de modelo de caption ---
@@ -289,13 +292,18 @@ class PanelOpciones(QWidget):
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
                 item.setToolTip(motivo_no_cabe(modelo, memoria))
         if seleccionado and combo.findData(seleccionado) < 0:
-            combo.insertItem(0, f"{seleccionado} (no instalado)", seleccionado)
+            combo.insertItem(
+                0, _("{modelo} (no instalado)").format(modelo=seleccionado),
+                seleccionado,
+            )
         combo.setCurrentIndex(max(0, combo.findData(seleccionado)))
         combo.blockSignals(False)
         if not modelos:
             self.aviso_modelos.setText(
-                "Ollama no responde: no se pueden listar los modelos. "
-                "Ábrelo y pulsa ↻."
+                _(
+                    "Ollama no responde: no se pueden listar los modelos. "
+                    "Ábrelo y pulsa ↻."
+                )
             )
         else:
             deshabilitados = sum(
@@ -303,7 +311,9 @@ class PanelOpciones(QWidget):
                 if not combo.model().item(i).flags() & Qt.ItemFlag.ItemIsEnabled
             )
             self.aviso_modelos.setText(
-                f"{deshabilitados} modelo(s) no caben en memoria (ver tooltip)."
+                _("{n} modelo(s) no caben en memoria (ver tooltip).").format(
+                    n=deshabilitados
+                )
                 if deshabilitados else ""
             )
 
@@ -318,20 +328,18 @@ class PanelOpciones(QWidget):
     def valores(self) -> dict:
         return {
             "modo": self._modo(),
-            "tarea": ETIQUETA_TAREA[self.combo_tarea.currentText()],
+            "tarea": self.combo_tarea.currentData(),
             "modelo": self.combo_modelo.currentText(),
             "margen": self.campo_margen.text().strip() or "0.2s",
             "umbral": self.campo_umbral.text().strip() or "4%",
-            "silencios": ETIQUETA_SILENCIOS[self.combo_silencios.currentText()],
+            "silencios": self.combo_silencios.currentData(),
             "velocidad_silencios": self.spin_velocidad.value(),
             "subtitulos": self.check_subtitulos.isChecked(),
-            "diseno": ETIQUETA_DISENO[self.combo_diseno.currentText()],
+            "diseno": self.combo_diseno.currentData(),
             "posicion_subs": self.spin_posicion.value(),
             "tamano_subs": self.slider_tamano.value(),
-            "idioma_subs": ETIQUETA_IDIOMA[self.combo_idioma_subs.currentText()],
-            "modelo_whisper": ETIQUETA_MODELO_WHISPER[
-                self.combo_modelo_whisper.currentText()
-            ],
+            "idioma_subs": self.combo_idioma_subs.currentData(),
+            "modelo_whisper": self.combo_modelo_whisper.currentData(),
             "caption_seo": self.check_caption.isChecked(),
         }
 
@@ -341,8 +349,9 @@ class PanelOpciones(QWidget):
          "solo_audio": self.radio_solo_audio,
          "solo_silencios": self.radio_solo_silencios}[modo].setChecked(True)
         tarea = valores.get("tarea", "speech_enhancement")
-        if tarea in TAREA_ETIQUETA:
-            self.combo_tarea.setCurrentText(TAREA_ETIQUETA[tarea])
+        indice = self.combo_tarea.findData(tarea)
+        if indice >= 0:
+            self.combo_tarea.setCurrentIndex(indice)
         modelo = valores.get("modelo")
         if modelo and modelo in MODELOS_POR_TAREA.get(tarea, []):
             self.combo_modelo.setCurrentText(modelo)
@@ -351,8 +360,9 @@ class PanelOpciones(QWidget):
         if valores.get("umbral"):
             self.campo_umbral.setText(str(valores["umbral"]))
         silencios = valores.get("silencios", "cortar")
-        if silencios in SILENCIOS_ETIQUETA:
-            self.combo_silencios.setCurrentText(SILENCIOS_ETIQUETA[silencios])
+        indice = self.combo_silencios.findData(silencios)
+        if indice >= 0:
+            self.combo_silencios.setCurrentIndex(indice)
         if valores.get("velocidad_silencios"):
             self.spin_velocidad.setValue(int(valores["velocidad_silencios"]))
         self.check_subtitulos.setChecked(
@@ -361,20 +371,21 @@ class PanelOpciones(QWidget):
             else valores.get("subtitulos", False)
         )
         diseno = valores.get("diseno", "reels_bold")
-        if diseno in DISENO_ETIQUETA:
-            self.combo_diseno.setCurrentText(DISENO_ETIQUETA[diseno])
+        indice = self.combo_diseno.findData(diseno)
+        if indice >= 0:
+            self.combo_diseno.setCurrentIndex(indice)
         if valores.get("posicion_subs"):
             self.spin_posicion.setValue(int(valores["posicion_subs"]))
         if valores.get("tamano_subs"):
             self.slider_tamano.setValue(int(valores["tamano_subs"]))
         idioma = valores.get("idioma_subs", "es")
-        if idioma in IDIOMA_ETIQUETA:
-            self.combo_idioma_subs.setCurrentText(IDIOMA_ETIQUETA[idioma])
+        indice = self.combo_idioma_subs.findData(idioma)
+        if indice >= 0:
+            self.combo_idioma_subs.setCurrentIndex(indice)
         modelo = valores.get("modelo_whisper", "small")
-        if modelo in MODELO_WHISPER_ETIQUETA:
-            self.combo_modelo_whisper.setCurrentText(
-                MODELO_WHISPER_ETIQUETA[modelo]
-            )
+        indice = self.combo_modelo_whisper.findData(modelo)
+        if indice >= 0:
+            self.combo_modelo_whisper.setCurrentIndex(indice)
         if "caption_seo" in valores:
             valor = valores["caption_seo"]
             self.check_caption.setChecked(

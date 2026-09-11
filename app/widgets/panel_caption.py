@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from videopipeline.caption import Caption
+from videopipeline.i18n import _
 
 
 class PanelCaption(QWidget):
@@ -25,7 +26,7 @@ class PanelCaption(QWidget):
         self._caption: Caption | None = None
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
-        grupo = QGroupBox("Caption SEO")
+        grupo = QGroupBox(_("Caption SEO"))
         layout = QVBoxLayout(grupo)
         self.etiqueta_titulo = QLabel()
         self.etiqueta_titulo.setStyleSheet("font-weight: bold;")
@@ -42,10 +43,10 @@ class PanelCaption(QWidget):
         layout.addWidget(self.texto_caption)
         layout.addWidget(self.etiqueta_hashtags)
         botones = QHBoxLayout()
-        self.boton_copiar_titulo = QPushButton("Copiar título")
-        self.boton_copiar_caption = QPushButton("Copiar caption")
-        self.boton_copiar_hashtags = QPushButton("Copiar hashtags")
-        self.boton_copiar_todo = QPushButton("Copiar todo")
+        self.boton_copiar_titulo = QPushButton(_("Copiar título"))
+        self.boton_copiar_caption = QPushButton(_("Copiar caption"))
+        self.boton_copiar_hashtags = QPushButton(_("Copiar hashtags"))
+        self.boton_copiar_todo = QPushButton(_("Copiar todo"))
         self.boton_copiar_titulo.clicked.connect(
             lambda: self._copiar(lambda c: c.titulo))
         self.boton_copiar_caption.clicked.connect(

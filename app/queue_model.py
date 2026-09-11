@@ -7,13 +7,15 @@ from pathlib import Path
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor
 
+from videopipeline.i18n import N_, _
+
 
 class EstadoTrabajo(Enum):
-    ESPERA = "en espera"
-    PROCESANDO = "procesando"
-    HECHO = "hecho"
-    ERROR = "error"
-    CANCELADO = "cancelado"
+    ESPERA = N_("en espera")
+    PROCESANDO = N_("procesando")
+    HECHO = N_("hecho")
+    ERROR = N_("error")
+    CANCELADO = N_("cancelado")
 
 
 @dataclass
@@ -41,7 +43,7 @@ class ModeloCola(QAbstractListModel):
             return None
         trabajo = self._trabajos[index.row()]
         if role == Qt.ItemDataRole.DisplayRole:
-            partes = [trabajo.ruta.name, "—", trabajo.estado.value]
+            partes = [trabajo.ruta.name, "—", _(trabajo.estado.value)]
             if trabajo.estado == EstadoTrabajo.PROCESANDO:
                 if trabajo.etiqueta:
                     partes.append(f"· {trabajo.etiqueta}")

@@ -333,3 +333,50 @@ def test_ventana_pobla_modelos_y_persiste_seleccion(qtbot, tmp_path, monkeypatch
 def test_ventana_tiene_icono(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     assert not ventana.windowIcon().isNull()
+
+
+def test_selector_idioma_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr("app.main.QMessageBox.information", lambda *a, **k: None)
+    assert ventana.combo_idioma_ui.currentData() == "sistema"
+    ventana.combo_idioma_ui.setCurrentIndex(
+        ventana.combo_idioma_ui.findData("en")
+    )
+    assert ventana.ajustes.idioma_ui == "en"
+
+
+def test_procesar_incluye_idioma_ui_en_config(qtbot, tmp_path, monkeypatch):
+    from videopipeline import i18n
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    capturado = {}
+    monkeypatch.setattr(
+        ventana.ejecutor, "iniciar",
+        lambda trabajos: capturado.setdefault("t", trabajos),
+    )
+    ventana.procesar()
+    config = json.loads(capturado["t"][0][1])
+    assert config["idioma_ui"] == i18n.idioma_actual()
+
+
+def test_ventana_muestra_catalogo_ingles_instalado(qtbot, tmp_path, monkeypatch):
+    """Con idioma_ui="en" guardado, la ventana instala el catálogo al abrirse
+    (VentanaPrincipal.__init__ hace el mismo instalar() que main())."""
+    from videopipeline import i18n
+    from tests.test_i18n import _catalogo
+
+    carpeta_locale = tmp_path / "locale"
+    _catalogo(carpeta_locale, "en", {"Cola": "Queue"})
+    monkeypatch.setattr(i18n, "DIR_LOCALE", carpeta_locale)
+    monkeypatch.setattr("app.main._tiene_pista_audio", lambda ruta: True)
+    ajustes = Ajustes(
+        QSettings(str(tmp_path / "test_en.ini"), QSettings.Format.IniFormat)
+    )
+    ajustes.idioma_ui = "en"
+    try:
+        ventana = VentanaPrincipal(ajustes=ajustes)
+        qtbot.addWidget(ventana)
+        assert ventana.etiqueta_cola.text() == "Queue"
+    finally:
+        i18n.instalar("es")

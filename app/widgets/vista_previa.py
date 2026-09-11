@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
+from videopipeline.i18n import _
 from videopipeline.preview import extraer_frame, renderizar_preview
 
 DEBOUNCE_MS = 300
@@ -58,7 +59,7 @@ class VistaPrevia(QWidget):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self.etiqueta = QLabel("Selecciona un vídeo de la cola")
+        self.etiqueta = QLabel(_("Selecciona un vídeo de la cola"))
         self.etiqueta.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.etiqueta.setMinimumHeight(180)
         self.etiqueta.setMaximumHeight(260)
@@ -86,7 +87,7 @@ class VistaPrevia(QWidget):
         if ruta is None:
             self._generacion += 1
             self.etiqueta.setPixmap(QPixmap())
-            self.etiqueta.setText("Selecciona un vídeo de la cola")
+            self.etiqueta.setText(_("Selecciona un vídeo de la cola"))
             return
         self._timer.start()
 
@@ -115,12 +116,14 @@ class VistaPrevia(QWidget):
         if error:
             self._pixmap_actual = None
             self.etiqueta.setPixmap(QPixmap())
-            self.etiqueta.setText(f"Preview no disponible: {error}")
+            self.etiqueta.setText(
+                _("Preview no disponible: {error}").format(error=error)
+            )
             return
         pixmap = QPixmap(ruta)
         if pixmap.isNull():
             self._pixmap_actual = None
-            self.etiqueta.setText("Preview no disponible")
+            self.etiqueta.setText(_("Preview no disponible"))
             return
         self.etiqueta.setText("")
         self._pixmap_actual = pixmap

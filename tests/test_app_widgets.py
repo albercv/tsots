@@ -355,3 +355,40 @@ def test_panel_modelos_cambio_emite_senal(qtbot):
     assert bloque.args == ["medio:9b"]
     with qtbot.waitSignal(panel.refrescar_modelos, timeout=1000):
         panel.boton_refrescar_modelos.click()
+
+
+def test_panel_combos_funcionan_via_currentdata(qtbot):
+    """Los combos con etiquetas traducibles guardan el valor interno en la
+    `data` del ítem: los lookups deben ir por currentData(), no currentText()."""
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.combo_silencios.setCurrentIndex(
+        panel.combo_silencios.findData("acelerar")
+    )
+    assert panel.valores()["silencios"] == "acelerar"
+    panel.combo_diseno.setCurrentIndex(panel.combo_diseno.findData("caja"))
+    assert panel.valores()["diseno"] == "caja"
+    panel.combo_idioma_subs.setCurrentIndex(
+        panel.combo_idioma_subs.findData("en")
+    )
+    assert panel.valores()["idioma_subs"] == "en"
+    panel.combo_modelo_whisper.setCurrentIndex(
+        panel.combo_modelo_whisper.findData("medium")
+    )
+    assert panel.valores()["modelo_whisper"] == "medium"
+    panel.combo_tarea.setCurrentIndex(
+        panel.combo_tarea.findData("speech_separation")
+    )
+    assert panel.valores()["tarea"] == "speech_separation"
+
+
+def test_estado_trabajo_display_usa_traduccion(qtbot):
+    """El valor mostrado en la cola pasa por _() (los valores del enum están
+    marcados con N_ para su extracción, no traducidos de por sí)."""
+    from PySide6.QtCore import Qt
+    from app.queue_model import EstadoTrabajo, ModeloCola
+
+    m = ModeloCola()
+    m.anadir([Path("/v/a.mp4")])
+    texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
+    assert EstadoTrabajo.ESPERA.value in texto  # español = idioma fuente

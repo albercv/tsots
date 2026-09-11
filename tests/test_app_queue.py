@@ -139,3 +139,11 @@ def test_ajustes_caption_persistidos(tmp_path):
     b = _ajustes(tmp_path)  # misma ruta .ini → mismos datos
     assert b.contexto_marca == "Soy Alberto\ntono cercano"
     assert b.modelo_caption == "qwen3.5:9b-q8_0"
+
+
+def test_ajustes_idioma_ui_defecto_y_persistido(tmp_path):
+    a = _ajustes(tmp_path)
+    assert a.idioma_ui == "sistema"
+    a.idioma_ui = "en"
+    b = _ajustes(tmp_path)  # misma ruta .ini → mismos datos
+    assert b.idioma_ui == "en"

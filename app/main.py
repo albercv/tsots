@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QComboBox,
     QFileDialog,
     QFrame,
     QHBoxLayout,
@@ -22,8 +23,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from videopipeline import i18n
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig
+from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
 from .queue_model import EstadoTrabajo, ModeloCola
@@ -66,9 +69,13 @@ def _tiene_pista_audio(ruta: Path) -> bool:
 class VentanaPrincipal(QMainWindow):
     def __init__(self, ajustes: Ajustes | None = None):
         super().__init__()
+        self.ajustes = ajustes or Ajustes()
+        i18n.instalar(
+            i18n.detectar() if self.ajustes.idioma_ui == "sistema"
+            else self.ajustes.idioma_ui
+        )
         self.setWindowTitle("The Silence of the Shorts")
         self.setWindowIcon(QIcon(str(RUTA_ICONO)))
-        self.ajustes = ajustes or Ajustes()
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)
         self._procesando = False
@@ -85,13 +92,14 @@ class VentanaPrincipal(QMainWindow):
         self.vista_cola = QListView()
         self.vista_cola.setModel(self.modelo_cola)
         self.vista_cola.doubleClicked.connect(self._abrir_resultado)
-        columna_izquierda.addWidget(QLabel("Cola"))
+        self.etiqueta_cola = QLabel(_("Cola"))
+        columna_izquierda.addWidget(self.etiqueta_cola)
         columna_izquierda.addWidget(self.vista_cola, 1)
 
         fila_botones_cola = QHBoxLayout()
-        self.boton_quitar = QPushButton("Quitar")
+        self.boton_quitar = QPushButton(_("Quitar"))
         self.boton_quitar.clicked.connect(self._quitar_seleccionado)
-        self.boton_limpiar = QPushButton("Limpiar hechos")
+        self.boton_limpiar = QPushButton(_("Limpiar hechos"))
         self.boton_limpiar.clicked.connect(self._limpiar_hechos)
         fila_botones_cola.addWidget(self.boton_quitar)
         fila_botones_cola.addWidget(self.boton_limpiar)
@@ -130,11 +138,23 @@ class VentanaPrincipal(QMainWindow):
         fila_inferior = QHBoxLayout()
         self.etiqueta_salida = QLabel()
         self._refrescar_etiqueta_salida()
-        self.boton_carpeta = QPushButton("Cambiar…")
+        self.boton_carpeta = QPushButton(_("Cambiar…"))
         self.boton_carpeta.clicked.connect(self._elegir_carpeta)
-        self.boton_procesar = QPushButton("▶ Procesar")
+        self.boton_procesar = QPushButton()
         self.boton_procesar.clicked.connect(self._procesar_o_cancelar)
-        fila_inferior.addWidget(QLabel("Salida:"))
+        fila_inferior.addWidget(QLabel("🌐"))
+        self.combo_idioma_ui = QComboBox()
+        self.combo_idioma_ui.addItem(_("Sistema"), "sistema")
+        self.combo_idioma_ui.addItem("Español", "es")
+        self.combo_idioma_ui.addItem("English", "en")
+        self.combo_idioma_ui.setCurrentIndex(
+            max(0, self.combo_idioma_ui.findData(self.ajustes.idioma_ui))
+        )
+        self.combo_idioma_ui.currentIndexChanged.connect(
+            self._al_cambiar_idioma_ui
+        )
+        fila_inferior.addWidget(self.combo_idioma_ui)
+        fila_inferior.addWidget(QLabel(_("Salida:")))
         fila_inferior.addWidget(self.etiqueta_salida, 1)
         fila_inferior.addWidget(self.boton_carpeta)
         fila_inferior.addWidget(self.boton_procesar)
@@ -193,8 +213,10 @@ class VentanaPrincipal(QMainWindow):
             nombres = "\n".join(r.name for r in sin_audio)
             QMessageBox.warning(
                 self,
-                "Sin pista de audio",
-                f"Estos vídeos no tienen audio y no se han añadido:\n{nombres}",
+                _("Sin pista de audio"),
+                _(
+                    "Estos vídeos no tienen audio y no se han añadido:\n{nombres}"
+                ).format(nombres=nombres),
             )
         if con_audio:
             self.modelo_cola.anadir(con_audio)
@@ -228,16 +250,18 @@ class VentanaPrincipal(QMainWindow):
         # macOS ignora el windowTitle de QMessageBox: el título va en el cuerpo.
         lineas = [f"<b>{titulo}</b>", trabajo.ruta.name]
         if diag.get("paso"):
-            lineas.append(f"Paso: {diag['paso']}")
+            lineas.append(_("Paso: {paso}").format(paso=diag["paso"]))
         if diag.get("causa"):
-            lineas.append(f"<br>Causa: {diag['causa']}")
+            lineas.append(_("<br>Causa: {causa}").format(causa=diag["causa"]))
         if diag.get("solucion"):
-            lineas.append(f"<br>Qué hacer: {diag['solucion']}")
+            lineas.append(
+                _("<br>Qué hacer: {solucion}").format(solucion=diag["solucion"])
+            )
         if not diag:
             lineas.append(trabajo.error)
         dialogo = QMessageBox(self)
         dialogo.setIcon(QMessageBox.Icon.Critical)
-        dialogo.setWindowTitle(f"Error: {titulo}")
+        dialogo.setWindowTitle(_("Error: {titulo}").format(titulo=titulo))
         dialogo.setText("<br>".join(lineas))
         detalle = diag.get("detalle") or trabajo.error
         if detalle:
@@ -246,7 +270,7 @@ class VentanaPrincipal(QMainWindow):
         log = diag.get("log")
         if log and Path(log).is_file():
             boton_log = dialogo.addButton(
-                "Abrir log", QMessageBox.ButtonRole.ActionRole
+                _("Abrir log"), QMessageBox.ButtonRole.ActionRole
             )
             boton_log.clicked.connect(
                 lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(log))
@@ -288,11 +312,11 @@ class VentanaPrincipal(QMainWindow):
     def _refrescar_etiqueta_salida(self) -> None:
         carpeta = self.ajustes.carpeta_salida
         self.etiqueta_salida.setText(
-            str(carpeta) if carpeta else "Junto al original (_limpio.mp4)"
+            str(carpeta) if carpeta else _("Junto al original (_limpio.mp4)")
         )
 
     def _elegir_carpeta(self) -> None:
-        carpeta = QFileDialog.getExistingDirectory(self, "Carpeta de salida")
+        carpeta = QFileDialog.getExistingDirectory(self, _("Carpeta de salida"))
         if carpeta:
             self.ajustes.carpeta_salida = Path(carpeta)
             self._refrescar_etiqueta_salida()
@@ -328,6 +352,7 @@ class VentanaPrincipal(QMainWindow):
                 video=trabajo.ruta, salida=carpeta,
                 contexto_marca=self.ajustes.contexto_marca,
                 modelo_caption=self.ajustes.modelo_caption,
+                idioma_ui=i18n.idioma_actual(),
                 **valores,
             )
             trabajos.append((fila, config.to_json()))
@@ -372,7 +397,7 @@ class VentanaPrincipal(QMainWindow):
         else:
             estado = (
                 EstadoTrabajo.CANCELADO
-                if error == "Cancelado"
+                if error == _("Cancelado")
                 else EstadoTrabajo.ERROR
             )
             self.modelo_cola.actualizar(
@@ -406,13 +431,26 @@ class VentanaPrincipal(QMainWindow):
 
     def _refrescar_boton(self, *args) -> None:
         if self._procesando:
-            self.boton_procesar.setText("■ Cancelar")
+            self.boton_procesar.setText(_("■ Cancelar"))
             self.boton_procesar.setEnabled(True)
         else:
-            self.boton_procesar.setText("▶ Procesar")
+            self.boton_procesar.setText(_("▶ Procesar"))
             self.boton_procesar.setEnabled(bool(self.modelo_cola.pendientes()))
         self.boton_quitar.setEnabled(not self._procesando)
         self.boton_limpiar.setEnabled(not self._procesando)
+
+    # --- idioma ---
+
+    def _al_cambiar_idioma_ui(self, *args) -> None:
+        codigo = self.combo_idioma_ui.currentData()
+        if not codigo:
+            return
+        self.ajustes.idioma_ui = codigo
+        QMessageBox.information(
+            self,
+            _("Idioma"),
+            _("El idioma se aplicará la próxima vez que abras la app."),
+        )
 
     # --- ciclo de vida ---
 
@@ -420,8 +458,8 @@ class VentanaPrincipal(QMainWindow):
         if self._procesando:
             respuesta = QMessageBox.question(
                 self,
-                "Proceso en curso",
-                "Hay un vídeo procesándose. ¿Cancelar y salir?",
+                _("Proceso en curso"),
+                _("Hay un vídeo procesándose. ¿Cancelar y salir?"),
             )
             if respuesta != QMessageBox.StandardButton.Yes:
                 evento.ignore()
@@ -432,17 +470,23 @@ class VentanaPrincipal(QMainWindow):
 
 
 def main() -> int:
+    ajustes = Ajustes()
+    i18n.instalar(
+        i18n.detectar() if ajustes.idioma_ui == "sistema" else ajustes.idioma_ui
+    )
     app = QApplication(sys.argv)
     faltan = _dependencias_faltantes()
     if faltan:
         QMessageBox.critical(
             None,
-            "Faltan dependencias",
-            "No se encuentran en PATH: " + ", ".join(faltan)
-            + "\nInstálalas y vuelve a abrir la aplicación.",
+            _("Faltan dependencias"),
+            _("No se encuentran en PATH: {faltan}"
+              "\nInstálalas y vuelve a abrir la aplicación.").format(
+                faltan=", ".join(faltan)
+            ),
         )
         return 1
-    ventana = VentanaPrincipal()
+    ventana = VentanaPrincipal(ajustes)
     ventana.resize(900, 560)
     ventana.show()
     return app.exec()

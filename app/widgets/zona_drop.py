@@ -5,6 +5,8 @@ from pathlib import Path
 from PySide6.QtCore import QMimeData, Qt, Signal
 from PySide6.QtWidgets import QFileDialog, QLabel
 
+from videopipeline.i18n import _
+
 EXTENSIONES = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 
 
@@ -13,7 +15,7 @@ class ZonaDrop(QLabel):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setText("Arrastra vídeos aquí\n(o haz clic para abrir)")
+        self.setText(_("Arrastra vídeos aquí\n(o haz clic para abrir)"))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setAcceptDrops(True)
         self.setMinimumHeight(120)
@@ -41,9 +43,11 @@ class ZonaDrop(QLabel):
         evento.acceptProposedAction()
 
     def mousePressEvent(self, evento) -> None:
-        patron = "Vídeos (" + " ".join(f"*{e}" for e in sorted(EXTENSIONES)) + ")"
-        rutas, _ = QFileDialog.getOpenFileNames(
-            self, "Elegir vídeos", "", patron
+        patron = _("Vídeos (") + " ".join(
+            f"*{e}" for e in sorted(EXTENSIONES)
+        ) + ")"
+        rutas, _filtro = QFileDialog.getOpenFileNames(
+            self, _("Elegir vídeos"), "", patron
         )
         if rutas:
             self.archivos_soltados.emit([Path(r) for r in rutas])

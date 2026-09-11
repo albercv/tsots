@@ -37,6 +37,14 @@ class Ajustes:
     def modelo_caption(self, modelo: str) -> None:
         self._q.setValue("caption/modelo", modelo)
 
+    @property
+    def idioma_ui(self) -> str:
+        return str(self._q.value("ui/idioma", "sistema") or "sistema")
+
+    @idioma_ui.setter
+    def idioma_ui(self, idioma: str) -> None:
+        self._q.setValue("ui/idioma", idioma)
+
     def guardar_panel(self, valores: dict) -> None:
         for clave, valor in valores.items():
             self._q.setValue(f"panel/{clave}", valor)
