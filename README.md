@@ -1,131 +1,139 @@
 <p align="center"><img src="docs/img/logo.png" alt="The Silence of the Shorts" width="560"></p>
 
+<p align="center"><b>English</b> · <a href="README.es.md">Español</a></p>
+
 # The Silence of the Shorts
 
-App de escritorio para Mac que deja un vídeo hablado listo para publicar:
-limpia el ruido de la voz, recorta los silencios, quema subtítulos estilo
-Reels y genera título, caption y hashtags con un modelo de IA local. Todo
-en tu Mac, sin subir nada a ningún servicio.
+A Mac desktop app that gets a talking-head video ready to publish: it
+cleans the noise out of the voice, cuts the silences, burns Reels-style
+subtitles and writes an SEO title, caption and hashtags with a local AI
+model. Everything runs on your Mac; nothing is uploaded anywhere.
 
-| Entrada | Salida |
+| Input | Output |
 |---|---|
-| `charla.mov` (cualquier vídeo con voz) | `charla_limpio.mp4` (voz limpia, sin silencios, subtítulos opcionales) |
-| | `charla_limpio.srt` (subtítulos, si los activas) |
-| | `charla_limpio.md` (título SEO, caption y hashtags, si lo activas) |
+| `talk.mov` (any video with speech) | `talk_limpio.mp4` (clean voice, no silences, optional subtitles) |
+| | `talk_limpio.srt` (subtitles, if enabled) |
+| | `talk_limpio.md` (SEO title, caption and hashtags, if enabled) |
 
-## Requisitos
+## Requirements
 
-- Mac con **Apple Silicon** (M1, M2, M3, M4…). Los Mac Intel no están soportados.
-- **macOS 13** Ventura o posterior.
-- **10 GB libres** en disco: entorno Python (2,5 GB), modelos de audio
-  (0,7 GB) y, si quieres el caption SEO, el modelo de lenguaje (6 GB).
-- Conexión a internet durante la instalación (descargas) y la primera vez
-  que uses subtítulos. Después funciona sin conexión.
-- Memoria: 16 GB es suficiente para todo salvo modelos de lenguaje grandes;
-  la app te avisa de cuáles caben en tu Mac.
+- Mac with **Apple Silicon** (M1, M2, M3, M4…). Intel Macs are not supported.
+- **macOS 13** Ventura or later.
+- **10 GB free** on disk: Python environment (2.5 GB), audio models
+  (0.7 GB) and, if you want the SEO caption, the language model (6 GB).
+- Internet during installation (downloads) and the first time you use
+  subtitles. After that it works offline.
+- Memory: 16 GB is enough for everything except large language models;
+  the app tells you which ones fit on your Mac.
 
-El instalador se ocupa de Homebrew, Python, ffmpeg, auto-editor y Ollama.
-No hace falta saber programar.
+The installer takes care of Homebrew, Python, ffmpeg, auto-editor and
+Ollama. No programming knowledge needed.
 
-## Instalación
+## Installation
 
-1. Descarga el proyecto (botón **Code → Download ZIP** en GitHub, o
-   `git clone …`) y descomprímelo donde quieras dejarlo, por ejemplo en
-   `~/Documents`. **No muevas la carpeta después de instalar**; si lo
-   haces, vuelve a ejecutar el instalador.
-2. Doble clic en **`instalar.command`**. Si macOS dice que no se puede
-   abrir porque es de un desarrollador no identificado: clic derecho →
-   **Abrir** → **Abrir**. Se abre una ventana de Terminal.
-3. Sigue lo que diga la Terminal. Pedirá tu contraseña una o dos veces
-   (para Homebrew) y tardará entre 10 y 30 minutos según tu conexión.
-   Cuando termine verás **Instalación completa**.
+1. Download the project (**Code → Download ZIP** on GitHub, or
+   `git clone …`) and unzip it where you want to keep it, for example in
+   `~/Documents`. **Do not move the folder after installing**; if you do,
+   run the installer again.
+2. Double-click **`instalar.command`**. If macOS says it cannot be opened
+   because it is from an unidentified developer: right-click → **Open**
+   → **Open**. A Terminal window opens.
+3. Follow the Terminal. It will ask for your password once or twice (for
+   Homebrew) and take 10 to 30 minutes depending on your connection. When
+   it finishes you will see **Installation complete**.
 
-Al acabar tendrás el icono 🎬 **The Silence of the Shorts** en el Dock.
+You will end up with the 🐑 **The Silence of the Shorts** icon in the Dock.
 
-Si algo falla a mitad, vuelve a ejecutar `instalar.command`: retoma donde
-lo dejó. Para desinstalar: `desinstalar.command`.
+If something fails halfway, run `instalar.command` again: it resumes
+where it stopped. To uninstall: `desinstalar.command`.
 
-Variantes:
-
-```bash
-SIN_OLLAMA=1 ./instalar.command   # sin caption SEO (ahorra 6 GB)
-SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
-```
-
-## Primer arranque
-
-- macOS preguntará si la app puede acceder a **Documentos** (o a la
-  carpeta donde tengas los vídeos). Acepta; si no, no podrá leerlos. Si
-  lo negaste: Ajustes del Sistema → Privacidad y seguridad → Archivos y
-  carpetas → The Silence of the Shorts.
-- La primera vez que actives subtítulos descarga el modelo Whisper
-  (~460 MB). Solo esa vez.
-
-## Cómo funciona
-
-1. **Arrastra** uno o varios vídeos a la zona de la izquierda (o haz clic
-   para elegirlos). Aparecen en la cola.
-2. **Elige opciones** a la derecha:
-   - **Modo**: pipeline completo (limpiar + recortar), solo limpiar audio,
-     o solo cortar silencios.
-   - **Limpieza de audio**: modelo de IA para quitar ruido. El de defecto
-     (MossFormer2 48 kHz) es el mejor para voz.
-   - **Corte de silencios**: margen que se deja alrededor de cada frase y
-     umbral de volumen. "Acelerar" en vez de cortar los silencios los
-     reproduce a la velocidad que indiques.
-   - **Subtítulos**: diseño (Reels bold, karaoke, caja), posición,
-     tamaño, idioma y tamaño del modelo Whisper. La previsualización te
-     enseña cómo quedan sobre un fotograma real del vídeo seleccionado.
-   - **Caption SEO**: genera `nombre_limpio.md` con título, caption y
-     hashtags a partir de lo que se dice en el vídeo. **Marca…** guarda un
-     texto con quién eres, tu tono y tu llamada a la acción para que el
-     texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
-     tu Mac; los que no caben en memoria aparecen deshabilitados y el
-     tooltip dice por qué.
-3. **Salida**: por defecto junto al original como `nombre_limpio.mp4`;
-   con **Cambiar…** eliges otra carpeta.
-4. **▶ Procesar**. La cola avanza de uno en uno mostrando el paso
-   (extrayendo audio, limpiando, recortando, transcribiendo…). Tarda
-   aproximadamente lo que dura el vídeo. Mientras la app esté abierta el
-   Mac no entra en reposo.
-5. Al terminar, **doble clic** en un vídeo hecho lo abre. Si generaste
-   caption, aparece debajo de la previsualización con botones para copiar
-   título, caption, hashtags o todo.
-
-Puedes seguir usando el Mac mientras procesa. Bloquear la pantalla no
-detiene nada; cerrar la tapa sin monitor externo sí.
-
-### Desde la terminal
+Variants:
 
 ```bash
-./TheSilenceOfTheShorts.command                              # la misma app
-.venv-clearvoice/bin/python limpiarVideo.py video.mov        # sin interfaz
-.venv-clearvoice/bin/python limpiarVideo.py video.mov --caption --marca "Soy…"
+SIN_OLLAMA=1 ./instalar.command   # without SEO caption (saves 6 GB)
+SIN_DOCK=1 ./instalar.command     # without the Dock icon
 ```
 
-## Si algo va mal
+## First launch
 
-- Una fila en **rojo** en la cola es un vídeo que ha fallado. **Doble clic**
-  sobre ella: verás la causa, qué hacer y un botón **Abrir log** con todo
-  el detalle. Los logs están en `logs/`.
-- Una fila con **⚠** ha terminado, pero con un aviso (por ejemplo, los
-  subtítulos o el caption fallaron y el vídeo se guardó sin ellos). Pasa
-  el ratón por encima para leerlo.
-- "**Faltan dependencias**" al abrir: vuelve a ejecutar `instalar.command`.
-- El **caption** no se genera: comprueba que la app de Ollama esté abierta
-  (icono en la barra de menú) y pulsa ↻ junto al selector de modelo. Para
-  añadir modelos: `ollama pull nombre` en Terminal y luego ↻.
-- Tras actualizar Homebrew (Python) la app se reconstruye sola al
-  arrancar (tarda unos segundos más esa vez). Si aun así no abre, ejecuta
-  `instalar.command` de nuevo.
+- The app follows your Mac's language (English or Spanish). You can force
+  one with the 🌐 selector at the bottom of the window; it applies the
+  next time you open the app.
+- macOS will ask whether the app may access **Documents** (or wherever
+  your videos are). Accept; otherwise it cannot read them. If you
+  declined: System Settings → Privacy & Security → Files and Folders →
+  The Silence of the Shorts.
+- The first time you enable subtitles it downloads the Whisper model
+  (~460 MB). Only that once.
 
-## Qué usa por dentro
+## How it works
 
-[ClearVoice](https://github.com/modelscope/ClearerVoice-Studio) (limpieza de
-voz, Apache-2.0), [auto-editor](https://auto-editor.com) (silencios),
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (transcripción),
-ffmpeg (vídeo), [Ollama](https://ollama.com) (modelo de lenguaje local),
-PySide6 (interfaz). Documentación técnica en `docs/DESARROLLO.md`.
+1. **Drag** one or more videos onto the area on the left (or click to
+   choose them). They appear in the queue.
+2. **Pick options** on the right:
+   - **Mode**: full pipeline (clean + cut), clean audio only, or cut
+     silences only.
+   - **Audio cleaning**: AI model that removes noise. The default
+     (MossFormer2 48 kHz) is the best for voice.
+   - **Silence cutting**: margin kept around each sentence and volume
+     threshold. "Speed up" plays the silences faster instead of cutting
+     them.
+   - **Subtitles**: style (Reels bold, karaoke, box), position, size,
+     language and Whisper model size. The preview shows how they look on
+     a real frame of the selected video.
+   - **SEO caption**: writes `name_limpio.md` with a title, caption and
+     hashtags from what is said in the video. **Brand…** stores a text
+     about who you are, your tone and your call to action so the copy
+     sounds like you. **Model** lists the Ollama models installed on your
+     Mac; the ones that do not fit in memory appear disabled and the
+     tooltip says why. The caption is written in the subtitle language.
+3. **Output**: next to the original as `name_limpio.mp4` by default;
+   **Change…** picks another folder.
+4. **▶ Process**. The queue advances one video at a time, showing the
+   step (extracting audio, cleaning, cutting, transcribing…). It takes
+   roughly as long as the video lasts. The Mac will not sleep while the
+   app is open.
+5. When done, **double-click** a finished video to open it. If you
+   generated a caption, it appears under the preview with buttons to copy
+   the title, caption, hashtags or everything.
 
-Licencia: Apache-2.0 (ver `LICENSE`). Incluye código de ClearerVoice-Studio,
-© Alibaba, bajo la misma licencia.
+You can keep using the Mac while it processes. Locking the screen does
+not stop anything; closing the lid without an external display does.
+
+### From the terminal
+
+```bash
+./TheSilenceOfTheShorts.command                              # the same app
+.venv-clearvoice/bin/python limpiarVideo.py video.mov        # no GUI
+.venv-clearvoice/bin/python limpiarVideo.py video.mov --caption --marca "I am…"
+TSOTS_LANG=en ./TheSilenceOfTheShorts.command                # force a language
+```
+
+## If something goes wrong
+
+- A **red** row in the queue is a failed video. **Double-click** it: you
+  get the cause, what to do, and an **Open log** button with the full
+  detail. Logs live in `logs/`.
+- A row with **⚠** finished, but with a warning (for example, subtitles
+  or the caption failed and the video was saved without them). Hover to
+  read it.
+- "**Missing dependencies**" on launch: run `instalar.command` again.
+- The **caption** is not generated: check that the Ollama app is open
+  (menu bar icon) and press ↻ next to the model selector. To add models:
+  `ollama pull name` in Terminal, then ↻.
+- After a Homebrew (Python) upgrade the app rebuilds itself on launch (a
+  few seconds longer that one time). If it still does not open, run
+  `instalar.command` again.
+
+## What is inside
+
+[ClearVoice](https://github.com/modelscope/ClearerVoice-Studio) (voice
+cleaning, Apache-2.0), [auto-editor](https://auto-editor.com) (silences),
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+(transcription), ffmpeg (video), [Ollama](https://ollama.com) (local
+language model), PySide6 (interface). Technical docs in
+`docs/DEVELOPMENT.md`; translations live in `locale/` (add a language by
+adding a `.po` file — see the development docs).
+
+License: Apache-2.0 (see `LICENSE`). Includes code from
+ClearerVoice-Studio, © Alibaba, under the same license.

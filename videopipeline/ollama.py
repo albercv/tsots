@@ -123,11 +123,11 @@ def cabe(modelo: Modelo, memoria: int) -> bool:
 
 
 def motivo_no_cabe(modelo: Modelo, memoria: int) -> str:
-    return (
-        f"Necesita ~{_gb(modelo.tamano + MARGEN_CONTEXTO)} GB de memoria "
-        f"({_gb(modelo.tamano)} GB del modelo + contexto) y este Mac deja "
-        f"~{_gb(memoria)} GB para modelos."
-    )
+    return _(
+        "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) "
+        "y este Mac deja ~{memoria} GB para modelos."
+    ).format(total=_gb(modelo.tamano + MARGEN_CONTEXTO), modelo=_gb(modelo.tamano),
+             memoria=_gb(memoria))
 
 
 def chat_json(

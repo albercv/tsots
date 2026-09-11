@@ -1,0 +1,582 @@
+# English translation of The Silence of the Shorts.
+# Spanish is the source language.
+msgid ""
+msgstr ""
+"Project-Id-Version: The Silence of the Shorts\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-11 13:02+0200\n"
+"PO-Revision-Date: 2026-09-11 08:30+0200\n"
+"Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
+"Language-Team: English\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid " Qué hacer: {solucion}"
+msgstr " What to do: {solucion}"
+
+msgid " en «{paso}»"
+msgstr " at “{paso}”"
+
+msgid "<br>Causa: {causa}"
+msgstr "<br>Cause: {causa}"
+
+msgid "<br>Qué hacer: {solucion}"
+msgstr "<br>What to do: {solucion}"
+
+msgid "AVISO: {aviso}"
+msgstr "WARNING: {aviso}"
+
+msgid "Abre el log del trabajo y añade este caso a videopipeline/errores.py para que la próxima vez se explique."
+msgstr "Open the job log and add this case to videopipeline/errores.py so it is explained next time."
+
+msgid "Abrir log"
+msgstr "Open log"
+
+msgid "Acelerar"
+msgstr "Speed up"
+
+msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
+msgstr "System Settings → Privacy & Security → Files and Folders: grant access to Terminal/Python, or choose another output folder."
+
+msgid "Archivo de vídeo incompleto o corrupto"
+msgstr "Incomplete or corrupt video file"
+
+msgid "Arrastra vídeos aquí\n(o haz clic para abrir)"
+msgstr "Drop videos here\n(or click to browse)"
+
+msgid "Autodetectar"
+msgstr "Auto-detect"
+
+msgid "Añadir subtítulos"
+msgstr "Add subtitles"
+
+msgid "Caja negra"
+msgstr "Black box"
+
+msgid "Cambiar…"
+msgstr "Change…"
+
+msgid "Cancelado"
+msgstr "Cancelled"
+
+msgid "Caption SEO"
+msgstr "SEO caption"
+
+msgid "Caption SEO falló: {error}. Vídeo guardado sin caption.{sugerencia}"
+msgstr "SEO caption failed: {error}. Video saved without caption.{sugerencia}"
+
+msgid "Carpeta de salida"
+msgstr "Output folder"
+
+msgid "Causa: {causa}"
+msgstr "Cause: {causa}"
+
+msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
+msgstr "Close other applications, or split the video into shorter parts."
+
+msgid "ClearVoice no generó el audio limpio: {salida}"
+msgstr "ClearVoice did not produce the clean audio: {salida}"
+
+msgid "Cola"
+msgstr "Queue"
+
+msgid "Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en audio_procesado/, bórralo y vuelve a procesar."
+msgstr "Check that the video plays in QuickTime. If it is an intermediate file in audio_procesado/, delete it and process again."
+
+msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
+msgstr "Connect to the internet and process again; models are downloaded only once."
+
+msgid "Contexto de marca"
+msgstr "Brand context"
+
+msgid "Contexto de marca para el caption (quién eres, tono, CTA)."
+msgstr "Brand context for the caption (who you are, tone, CTA)."
+
+msgid "Contexto de marca que se añade al prompt."
+msgstr "Brand context added to the prompt."
+
+msgid "Copiar caption"
+msgstr "Copy caption"
+
+msgid "Copiar hashtags"
+msgstr "Copy hashtags"
+
+msgid "Copiar todo"
+msgstr "Copy all"
+
+msgid "Copiar título"
+msgstr "Copy title"
+
+msgid "Cortar"
+msgstr "Cut"
+
+msgid "Corte de silencios"
+msgstr "Silence cutting"
+
+msgid "Descargando modelo Whisper y transcribiendo"
+msgstr "Downloading Whisper model and transcribing"
+
+msgid "Descargando modelo y limpiando audio"
+msgstr "Downloading model and cleaning audio"
+
+msgid "Detalle técnico:\n{detalle}"
+msgstr "Technical detail:\n{detalle}"
+
+msgid "Diseño:"
+msgstr "Style:"
+
+msgid "ERROR en paso {paso} ({etiqueta})"
+msgstr "ERROR at step {paso} ({etiqueta})"
+
+msgid "ERROR: el vídeo no contiene ninguna pista de audio."
+msgstr "ERROR: the video has no audio track."
+
+msgid "ERROR: faltan dependencias en PATH: {lista}"
+msgstr "ERROR: missing dependencies in PATH: {lista}"
+
+msgid "ERROR: la salida no puede ser el mismo archivo que la entrada."
+msgstr "ERROR: the output cannot be the same file as the input."
+
+msgid "ERROR: no existe el vídeo: {video}"
+msgstr "ERROR: video not found: {video}"
+
+msgid "ERROR: {error}"
+msgstr "ERROR: {error}"
+
+msgid "Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital #iaparapymes"
+msgstr "E.g.: I am Alberto, AI consultant for SMEs (Evolve2Digital). Direct, friendly tone. CTA: follow me for more. Fixed hashtags: #evolve2digital #aiforsmes"
+
+msgid "Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de Ollama. Si el puerto 11434 está ocupado, libéralo."
+msgstr "Run `ollama serve` in a terminal to see the error, or open the Ollama app. If port 11434 is busy, free it."
+
+msgid "El caption SEO se genera con un modelo local servido por Ollama y no se encuentra el ejecutable `ollama` en PATH."
+msgstr "The SEO caption is generated by a local model served by Ollama, and the `ollama` executable was not found in PATH."
+
+msgid "El disco donde se escriben los temporales o la salida está lleno. Los intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del vídeo original."
+msgstr "The disk holding the temporary files or the output is full. The intermediates (48 kHz WAV + remuxed MP4) take several times the size of the original video."
+
+msgid "El idioma se aplicará la próxima vez que abras la app."
+msgstr "The language will apply the next time you open the app."
+
+msgid "El modelo Whisper se descargará al primer uso (~500MB)."
+msgstr "The Whisper model will be downloaded on first use (~500 MB)."
+
+msgid "El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los vídeos largos a 48 kHz cargan el audio completo en memoria."
+msgstr "The cleaning model (ClearVoice) or Whisper ran out of RAM/GPU. Long videos at 48 kHz load the whole audio into memory."
+
+msgid "El modelo se descargará al primer uso."
+msgstr "The model will be downloaded on first use."
+
+msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no se encuentra."
+msgstr "The pipeline runs ffmpeg, ffprobe and auto-editor from PATH and one of them was not found."
+
+msgid "El proceso murió por una señal (código {codigo})"
+msgstr "The process died from a signal (code {codigo})"
+
+msgid "El proceso terminó inesperadamente (código {codigo})"
+msgstr "The process ended unexpectedly (code {codigo})"
+
+msgid "El quemado de subtítulos falló (código {codigo})"
+msgstr "Burning the subtitles failed (code {codigo})"
+
+msgid "Elegir vídeos"
+msgstr "Choose videos"
+
+msgid "Error desconocido: no está en la tabla de errores conocidos."
+msgstr "Unknown error: not in the table of known errors."
+
+msgid "Error: {titulo}"
+msgstr "Error: {titulo}"
+
+msgid "Estos vídeos no tienen audio y no se han añadido:\n{nombres}"
+msgstr "These videos have no audio and were not added:\n{nombres}"
+
+msgid "Extracción de audio"
+msgstr "Audio extraction"
+
+msgid "Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista original y recorta silencios con auto-editor."
+msgstr "Extracts the audio from a video, cleans it with ClearVoice, replaces the original track and cuts silences with auto-editor."
+
+msgid "Extrayendo audio"
+msgstr "Extracting audio"
+
+msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
+msgstr "The model (ClearVoice or Whisper) is not cached and could not be downloaded from HuggingFace."
+
+msgid "Falta una herramienta externa"
+msgstr "An external tool is missing"
+
+msgid "Faltan dependencias"
+msgstr "Missing dependencies"
+
+msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
+msgstr "Writes name_limpio.md with a local model (Ollama) from the transcript."
+
+msgid "Genera título SEO, caption y hashtags (nombre_limpio.md) con Ollama."
+msgstr "Generates an SEO title, caption and hashtags (name_limpio.md) with Ollama."
+
+msgid "Generando caption SEO"
+msgstr "Generating SEO caption"
+
+msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
+msgstr "A video is being processed. Cancel and quit?"
+
+msgid "Idioma"
+msgstr "Language"
+
+msgid "Idioma:"
+msgstr "Language:"
+
+msgid "Junto al original (_limpio.mp4)"
+msgstr "Next to the original (_limpio.mp4)"
+
+msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
+msgstr "The app re-encodes the video with h264_videotoolbox and retries automatically. If it still fails, re-encode by hand: ffmpeg -i input.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy output.mp4"
+
+msgid "La respuesta del modelo no es JSON válido"
+msgstr "The model's response is not valid JSON"
+
+msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
+msgstr "The model's response is not valid: missing fields or wrong types"
+
+msgid "La transcripción está vacía; no hay texto para el caption"
+msgstr "The transcript is empty; there is no text for the caption"
+
+msgid "Libera espacio o vacía audio_procesado/ y vuelve a procesar."
+msgstr "Free up space or empty audio_procesado/ and process again."
+
+msgid "Limpiando audio"
+msgstr "Cleaning audio"
+
+msgid "Limpiar hechos"
+msgstr "Clear finished"
+
+msgid "Limpieza de audio"
+msgstr "Audio cleaning"
+
+msgid "Marca…"
+msgstr "Brand…"
+
+msgid "Margen:"
+msgstr "Margin:"
+
+msgid "Mejora de voz"
+msgstr "Speech enhancement"
+
+msgid "Modelo de Ollama no descargado"
+msgstr "Ollama model not downloaded"
+
+msgid "Modelo no descargado: {modelo}"
+msgstr "Model not downloaded: {modelo}"
+
+msgid "Modelo:"
+msgstr "Model:"
+
+msgid "Modo"
+msgstr "Mode"
+
+msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
+msgstr "Needs ~{total} GB of memory ({modelo} GB for the model + context) and this Mac leaves ~{memoria} GB for models."
+
+msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
+msgstr "No available ffmpeg supports subtitles (libass). Install ffmpeg-full: brew install ffmpeg-full"
+
+msgid "No existe el archivo de subtítulos: {ass}"
+msgstr "Subtitle file not found: {ass}"
+
+msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
+msgstr "There is no server at http://localhost:11434 and `ollama serve` could not be started in time (port busy, Ollama app hung, or a model download in progress)."
+
+msgid "No queda espacio en disco"
+msgstr "No space left on disk"
+
+msgid "No se encuentran en PATH: {faltan}\nInstálalas y vuelve a abrir la aplicación."
+msgstr "Not found in PATH: {faltan}\nInstall them and open the application again."
+
+msgid "No se generó el WAV: {wav}"
+msgstr "The WAV was not produced: {wav}"
+
+msgid "No se generó el vídeo con subtítulos: {salida}"
+msgstr "The subtitled video was not produced: {salida}"
+
+msgid "No se generó el vídeo editado: {salida}"
+msgstr "The edited video was not produced: {salida}"
+
+msgid "No se generó el vídeo reencodado: {salida}"
+msgstr "The re-encoded video was not produced: {salida}"
+
+msgid "No se generó el vídeo remuxado: {salida}"
+msgstr "The remuxed video was not produced: {salida}"
+
+msgid "No se pudo cerrar ollama serve: {error}"
+msgstr "Could not stop ollama serve: {error}"
+
+msgid "No se pudo lanzar el proceso"
+msgstr "Could not launch the process"
+
+msgid "No se pudo leer la resolución del vídeo: {video}"
+msgstr "Could not read the video resolution: {video}"
+
+msgid "Ollama devolvió HTTP {codigo}"
+msgstr "Ollama returned HTTP {codigo}"
+
+msgid "Ollama devolvió una respuesta no válida"
+msgstr "Ollama returned an invalid response"
+
+msgid "Ollama no está instalado"
+msgstr "Ollama is not installed"
+
+msgid "Ollama no está instalado (no se encuentra 'ollama' en PATH)"
+msgstr "Ollama is not installed ('ollama' not found in PATH)"
+
+msgid "Ollama no responde"
+msgstr "Ollama is not responding"
+
+msgid "Ollama no responde en {url}"
+msgstr "Ollama is not responding at {url}"
+
+msgid "Ollama no responde en {url} tras {segundos:.0f} s"
+msgstr "Ollama is not responding at {url} after {segundos:.0f} s"
+
+msgid "Ollama no responde: no se pueden listar los modelos. Ábrelo y pulsa ↻."
+msgstr "Ollama is not responding: the models cannot be listed. Open it and press ↻."
+
+msgid "Ollama responde pero no tiene el modelo pedido en local."
+msgstr "Ollama responds but does not have the requested model locally."
+
+msgid "Paso: {paso}"
+msgstr "Step: {paso}"
+
+msgid "Pipeline completo"
+msgstr "Full pipeline"
+
+msgid "Posición vertical:"
+msgstr "Vertical position:"
+
+msgid "Preview no disponible"
+msgstr "Preview not available"
+
+msgid "Preview no disponible: {error}"
+msgstr "Preview not available: {error}"
+
+msgid "Proceso completado correctamente."
+msgstr "Process completed successfully."
+
+msgid "Proceso en curso"
+msgstr "Process running"
+
+msgid "Quemando subtítulos"
+msgstr "Burning subtitles"
+
+msgid "Quemar subtítulos necesita el filtro `ass`, que solo trae ffmpeg-full."
+msgstr "Burning subtitles needs the `ass` filter, which only ffmpeg-full includes."
+
+msgid "Quitar"
+msgstr "Remove"
+
+msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
+msgstr "Who you are, who you talk to, tone, usual call to action, hashtags you always want. Sent to the model with every video."
+
+msgid "Qué hacer: {solucion}"
+msgstr "What to do: {solucion}"
+
+msgid "Recortando silencios"
+msgstr "Cutting silences"
+
+msgid "Reels Bold"
+msgstr "Reels Bold"
+
+msgid "Reels Karaoke"
+msgstr "Reels Karaoke"
+
+msgid "Reencodado del vídeo (h264_videotoolbox)"
+msgstr "Video re-encoding (h264_videotoolbox)"
+
+msgid "SIGABRT: una librería nativa abortó (aserción fallida)"
+msgstr "SIGABRT: a native library aborted (failed assertion)"
+
+msgid "SIGBUS: acceso a memoria inválido en una librería nativa"
+msgstr "SIGBUS: invalid memory access in a native library"
+
+msgid "SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria (jetsam) o porque se cerró la app"
+msgstr "SIGKILL: the system killed the process, almost always for lack of memory (jetsam) or because the app was closed"
+
+msgid "SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, PyAV)"
+msgstr "SIGSEGV: segmentation fault in a native library (torch, ctranslate2, PyAV)"
+
+msgid "SIGTERM: el proceso fue terminado desde fuera"
+msgstr "SIGTERM: the process was terminated from outside"
+
+msgid "Salida del proceso (últimas líneas):"
+msgstr "Process output (last lines):"
+
+msgid "Salida:"
+msgstr "Output:"
+
+msgid "Selecciona un vídeo de la cola"
+msgstr "Select a video from the queue"
+
+msgid "Separación de hablantes"
+msgstr "Speaker separation"
+
+msgid "Silencios:"
+msgstr "Silences:"
+
+msgid "Sin conexión para descargar un modelo"
+msgstr "No connection to download a model"
+
+msgid "Sin memoria suficiente"
+msgstr "Not enough memory"
+
+msgid "Sin permisos para leer o escribir"
+msgstr "No permission to read or write"
+
+msgid "Sin pista de audio"
+msgstr "No audio track"
+
+msgid "Sistema"
+msgstr "System"
+
+msgid "Solo cortar silencios"
+msgstr "Cut silences only"
+
+msgid "Solo limpiar audio"
+msgstr "Clean audio only"
+
+msgid "Subtítulos"
+msgstr "Subtitles"
+
+msgid "Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt conservado)."
+msgstr "Subtitles failed: {error}. Video saved without subtitles (.srt kept)."
+
+msgid "Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos."
+msgstr "Subtitles failed: {error}. Video saved without subtitles."
+
+msgid "Super-resolución"
+msgstr "Super-resolution"
+
+msgid "Sustitución de la pista de audio"
+msgstr "Audio track replacement"
+
+msgid "Sustituyendo pista de audio"
+msgstr "Replacing audio track"
+
+msgid "Tamaño:"
+msgstr "Size:"
+
+msgid "Tarea:"
+msgstr "Task:"
+
+msgid "Transcribiendo"
+msgstr "Transcribing"
+
+msgid "Título, caption y hashtags"
+msgstr "Title, caption and hashtags"
+
+msgid "Umbral:"
+msgstr "Threshold:"
+
+msgid "Velocidad:"
+msgstr "Speed:"
+
+msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+msgstr "Re-read the models installed in Ollama (after an ollama pull)."
+
+msgid "Vídeo de entrada."
+msgstr "Input video."
+
+msgid "Vídeo final. Por defecto: nombre_limpio.mp4"
+msgstr "Final video. Default: name_limpio.mp4"
+
+msgid "Vídeo final:     {final}"
+msgstr "Final video:     {final}"
+
+msgid "Vídeos ("
+msgstr "Videos ("
+
+msgid "argumentos inválidos: se requiere --config"
+msgstr "invalid arguments: --config is required"
+
+msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
+msgstr "auto-editor (31.5/31.6) does not support the timestamp structure of this video's H.264 stream: when writing the output it produces a non-monotonic DTS and the muxer rejects it. It happens with exports from some editors; the original file is fine."
+
+msgid "auto-editor falló (código {codigo})"
+msgstr "auto-editor failed (code {codigo})"
+
+msgid "auto-editor falló (código {codigo}) incluso tras reencodar la entrada"
+msgstr "auto-editor failed (code {codigo}) even after re-encoding the input"
+
+msgid "auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha reencodado con h264_videotoolbox y se ha reintentado."
+msgstr "auto-editor rejected the original H.264 stream ({error}); the video was re-encoded with h264_videotoolbox and retried."
+
+msgid "auto-editor no pudo escribir el vídeo"
+msgstr "auto-editor could not write the video"
+
+msgid "brew install ffmpeg ffmpeg-full auto-editor"
+msgstr "brew install ffmpeg ffmpeg-full auto-editor"
+
+msgid "brew install ffmpeg-full"
+msgstr "brew install ffmpeg-full"
+
+msgid "brew install ollama   (y luego: ollama pull qwen3.5:9b)"
+msgstr "brew install ollama   (then: ollama pull qwen3.5:9b)"
+
+msgid "cancelado"
+msgstr "cancelled"
+
+msgid "en espera"
+msgstr "waiting"
+
+msgid "error"
+msgstr "error"
+
+msgid "ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso anterior dejó una salida a medias)."
+msgstr "ffmpeg cannot find the header (moov) or does not recognise the data: the file is incomplete or corrupt (truncated, still being written, or a previous step left a half-written output)."
+
+msgid "ffmpeg sin soporte de subtítulos (libass)"
+msgstr "ffmpeg without subtitle support (libass)"
+
+msgid "hecho"
+msgstr "done"
+
+msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
+msgstr "macOS denied access to the video or output folder (Desktop, Documents and external disks require permission)."
+
+msgid "medium (más preciso)"
+msgstr "medium (more accurate)"
+
+msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
+msgstr "ollama pull <model>  (the exact name is in the technical detail)"
+
+msgid "procesando"
+msgstr "processing"
+
+msgid "señal desconocida {numero}"
+msgstr "unknown signal {numero}"
+
+msgid "small (rápido)"
+msgstr "small (fast)"
+
+msgid "{descripcion} falló (código {codigo})"
+msgstr "{descripcion} failed (code {codigo})"
+
+msgid "{modelo} (no instalado)"
+msgstr "{modelo} (not installed)"
+
+msgid "{nombre} no está instalado o no está en PATH"
+msgstr "{nombre} is not installed or not in PATH"
+
+msgid "{nombre}: el proceso murió por una señal"
+msgstr "{nombre}: the process died from a signal"
+
+msgid "{n} modelo(s) no caben en memoria (ver tooltip)."
+msgstr "{n} model(s) do not fit in memory (see tooltip)."
+
+msgid "■ Cancelar"
+msgstr "■ Cancel"
+
+msgid "▶ Procesar"
+msgstr "▶ Process"

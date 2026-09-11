@@ -162,3 +162,10 @@ def test_caption_json_ida_y_vuelta():
 def test_caption_modelo_vacio_invalido():
     with pytest.raises(ValueError, match="modelo_caption"):
         _config_minima(caption_seo=True, modelo_caption="").validar()
+
+
+def test_idioma_ui_por_defecto_y_json():
+    c = _config_minima()
+    assert c.idioma_ui == "es"
+    c2 = PipelineConfig.from_json(_config_minima(idioma_ui="en").to_json())
+    assert c2.idioma_ui == "en"

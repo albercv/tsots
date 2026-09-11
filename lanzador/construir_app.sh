@@ -15,6 +15,8 @@ if [ ! -f "$APP/Contents/Resources/icon.icns" ] || [ docs/img/icon.png -nt "$APP
     iconutil -c icns "$TMP_ICONO/icon.iconset" -o "$APP/Contents/Resources/icon.icns"
     rm -rf "$TMP_ICONO"
 fi
+# Catálogos de traducción compilados (.mo) a partir de los .po del repo.
+lanzador/traducir.sh --solo-mo >/dev/null
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP/Contents/MacOS/python"
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP"
 echo "OK: $APP"

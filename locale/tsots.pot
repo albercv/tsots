@@ -1,0 +1,697 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the The Silence of the Shorts package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: The Silence of the Shorts\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-11 13:02+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#, python-brace-format
+msgid " Qué hacer: {solucion}"
+msgstr ""
+
+#, python-brace-format
+msgid " en «{paso}»"
+msgstr ""
+
+#, python-brace-format
+msgid "<br>Causa: {causa}"
+msgstr ""
+
+#, python-brace-format
+msgid "<br>Qué hacer: {solucion}"
+msgstr ""
+
+#, python-brace-format
+msgid "AVISO: {aviso}"
+msgstr ""
+
+msgid ""
+"Abre el log del trabajo y añade este caso a videopipeline/errores.py para "
+"que la próxima vez se explique."
+msgstr ""
+
+msgid "Abrir log"
+msgstr ""
+
+msgid "Acelerar"
+msgstr ""
+
+msgid ""
+"Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede "
+"acceso a Terminal/Python, o elige otra carpeta de salida."
+msgstr ""
+
+msgid "Archivo de vídeo incompleto o corrupto"
+msgstr ""
+
+msgid ""
+"Arrastra vídeos aquí\n"
+"(o haz clic para abrir)"
+msgstr ""
+
+msgid "Autodetectar"
+msgstr ""
+
+msgid "Añadir subtítulos"
+msgstr ""
+
+msgid "Caja negra"
+msgstr ""
+
+msgid "Cambiar…"
+msgstr ""
+
+msgid "Cancelado"
+msgstr ""
+
+msgid "Caption SEO"
+msgstr ""
+
+#, python-brace-format
+msgid "Caption SEO falló: {error}. Vídeo guardado sin caption.{sugerencia}"
+msgstr ""
+
+msgid "Carpeta de salida"
+msgstr ""
+
+#, python-brace-format
+msgid "Causa: {causa}"
+msgstr ""
+
+msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
+msgstr ""
+
+#, python-brace-format
+msgid "ClearVoice no generó el audio limpio: {salida}"
+msgstr ""
+
+msgid "Cola"
+msgstr ""
+
+msgid ""
+"Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en "
+"audio_procesado/, bórralo y vuelve a procesar."
+msgstr ""
+
+msgid ""
+"Conecta a internet y vuelve a procesar; los modelos se descargan una sola "
+"vez."
+msgstr ""
+
+msgid "Contexto de marca"
+msgstr ""
+
+msgid "Contexto de marca para el caption (quién eres, tono, CTA)."
+msgstr ""
+
+msgid "Contexto de marca que se añade al prompt."
+msgstr ""
+
+msgid "Copiar caption"
+msgstr ""
+
+msgid "Copiar hashtags"
+msgstr ""
+
+msgid "Copiar todo"
+msgstr ""
+
+msgid "Copiar título"
+msgstr ""
+
+msgid "Cortar"
+msgstr ""
+
+msgid "Corte de silencios"
+msgstr ""
+
+msgid "Descargando modelo Whisper y transcribiendo"
+msgstr ""
+
+msgid "Descargando modelo y limpiando audio"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Detalle técnico:\n"
+"{detalle}"
+msgstr ""
+
+msgid "Diseño:"
+msgstr ""
+
+#, python-brace-format
+msgid "ERROR en paso {paso} ({etiqueta})"
+msgstr ""
+
+msgid "ERROR: el vídeo no contiene ninguna pista de audio."
+msgstr ""
+
+#, python-brace-format
+msgid "ERROR: faltan dependencias en PATH: {lista}"
+msgstr ""
+
+msgid "ERROR: la salida no puede ser el mismo archivo que la entrada."
+msgstr ""
+
+#, python-brace-format
+msgid "ERROR: no existe el vídeo: {video}"
+msgstr ""
+
+#, python-brace-format
+msgid "ERROR: {error}"
+msgstr ""
+
+msgid ""
+"Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo "
+"y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital "
+"#iaparapymes"
+msgstr ""
+
+msgid ""
+"Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de "
+"Ollama. Si el puerto 11434 está ocupado, libéralo."
+msgstr ""
+
+msgid ""
+"El caption SEO se genera con un modelo local servido por Ollama y no se "
+"encuentra el ejecutable `ollama` en PATH."
+msgstr ""
+
+msgid ""
+"El disco donde se escriben los temporales o la salida está lleno. Los "
+"intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del "
+"vídeo original."
+msgstr ""
+
+msgid "El idioma se aplicará la próxima vez que abras la app."
+msgstr ""
+
+msgid "El modelo Whisper se descargará al primer uso (~500MB)."
+msgstr ""
+
+msgid ""
+"El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los "
+"vídeos largos a 48 kHz cargan el audio completo en memoria."
+msgstr ""
+
+msgid "El modelo se descargará al primer uso."
+msgstr ""
+
+msgid ""
+"El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no "
+"se encuentra."
+msgstr ""
+
+#, python-brace-format
+msgid "El proceso murió por una señal (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "El proceso terminó inesperadamente (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "El quemado de subtítulos falló (código {codigo})"
+msgstr ""
+
+msgid "Elegir vídeos"
+msgstr ""
+
+msgid "Error desconocido: no está en la tabla de errores conocidos."
+msgstr ""
+
+#, python-brace-format
+msgid "Error: {titulo}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Estos vídeos no tienen audio y no se han añadido:\n"
+"{nombres}"
+msgstr ""
+
+msgid "Extracción de audio"
+msgstr ""
+
+msgid ""
+"Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista "
+"original y recorta silencios con auto-editor."
+msgstr ""
+
+msgid "Extrayendo audio"
+msgstr ""
+
+msgid ""
+"Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar "
+"de HuggingFace."
+msgstr ""
+
+msgid "Falta una herramienta externa"
+msgstr ""
+
+msgid "Faltan dependencias"
+msgstr ""
+
+msgid ""
+"Genera nombre_limpio.md con un modelo local (Ollama) a partir de la "
+"transcripción."
+msgstr ""
+
+msgid "Genera título SEO, caption y hashtags (nombre_limpio.md) con Ollama."
+msgstr ""
+
+msgid "Generando caption SEO"
+msgstr ""
+
+msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
+msgstr ""
+
+msgid "Idioma"
+msgstr ""
+
+msgid "Idioma:"
+msgstr ""
+
+msgid "Junto al original (_limpio.mp4)"
+msgstr ""
+
+msgid ""
+"La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. "
+"Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v "
+"h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
+msgstr ""
+
+msgid "La respuesta del modelo no es JSON válido"
+msgstr ""
+
+msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
+msgstr ""
+
+msgid "La transcripción está vacía; no hay texto para el caption"
+msgstr ""
+
+msgid "Libera espacio o vacía audio_procesado/ y vuelve a procesar."
+msgstr ""
+
+msgid "Limpiando audio"
+msgstr ""
+
+msgid "Limpiar hechos"
+msgstr ""
+
+msgid "Limpieza de audio"
+msgstr ""
+
+msgid "Marca…"
+msgstr ""
+
+msgid "Margen:"
+msgstr ""
+
+msgid "Mejora de voz"
+msgstr ""
+
+msgid "Modelo de Ollama no descargado"
+msgstr ""
+
+#, python-brace-format
+msgid "Modelo no descargado: {modelo}"
+msgstr ""
+
+msgid "Modelo:"
+msgstr ""
+
+msgid "Modo"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este "
+"Mac deja ~{memoria} GB para modelos."
+msgstr ""
+
+msgid ""
+"Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: "
+"brew install ffmpeg-full"
+msgstr ""
+
+#, python-brace-format
+msgid "No existe el archivo de subtítulos: {ass}"
+msgstr ""
+
+msgid ""
+"No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama "
+"serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del "
+"modelo en curso)."
+msgstr ""
+
+msgid "No queda espacio en disco"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"No se encuentran en PATH: {faltan}\n"
+"Instálalas y vuelve a abrir la aplicación."
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el WAV: {wav}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo con subtítulos: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo editado: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo reencodado: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo remuxado: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo cerrar ollama serve: {error}"
+msgstr ""
+
+msgid "No se pudo lanzar el proceso"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer la resolución del vídeo: {video}"
+msgstr ""
+
+#, python-brace-format
+msgid "Ollama devolvió HTTP {codigo}"
+msgstr ""
+
+msgid "Ollama devolvió una respuesta no válida"
+msgstr ""
+
+msgid "Ollama no está instalado"
+msgstr ""
+
+msgid "Ollama no está instalado (no se encuentra 'ollama' en PATH)"
+msgstr ""
+
+msgid "Ollama no responde"
+msgstr ""
+
+#, python-brace-format
+msgid "Ollama no responde en {url}"
+msgstr ""
+
+#, python-brace-format
+msgid "Ollama no responde en {url} tras {segundos:.0f} s"
+msgstr ""
+
+msgid "Ollama no responde: no se pueden listar los modelos. Ábrelo y pulsa ↻."
+msgstr ""
+
+msgid "Ollama responde pero no tiene el modelo pedido en local."
+msgstr ""
+
+#, python-brace-format
+msgid "Paso: {paso}"
+msgstr ""
+
+msgid "Pipeline completo"
+msgstr ""
+
+msgid "Posición vertical:"
+msgstr ""
+
+msgid "Preview no disponible"
+msgstr ""
+
+#, python-brace-format
+msgid "Preview no disponible: {error}"
+msgstr ""
+
+msgid "Proceso completado correctamente."
+msgstr ""
+
+msgid "Proceso en curso"
+msgstr ""
+
+msgid "Quemando subtítulos"
+msgstr ""
+
+msgid "Quemar subtítulos necesita el filtro `ass`, que solo trae ffmpeg-full."
+msgstr ""
+
+msgid "Quitar"
+msgstr ""
+
+msgid ""
+"Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que "
+"quieres siempre. Se envía al modelo con cada vídeo."
+msgstr ""
+
+#, python-brace-format
+msgid "Qué hacer: {solucion}"
+msgstr ""
+
+msgid "Recortando silencios"
+msgstr ""
+
+msgid "Reels Bold"
+msgstr ""
+
+msgid "Reels Karaoke"
+msgstr ""
+
+msgid "Reencodado del vídeo (h264_videotoolbox)"
+msgstr ""
+
+msgid "SIGABRT: una librería nativa abortó (aserción fallida)"
+msgstr ""
+
+msgid "SIGBUS: acceso a memoria inválido en una librería nativa"
+msgstr ""
+
+msgid ""
+"SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria "
+"(jetsam) o porque se cerró la app"
+msgstr ""
+
+msgid ""
+"SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, "
+"PyAV)"
+msgstr ""
+
+msgid "SIGTERM: el proceso fue terminado desde fuera"
+msgstr ""
+
+msgid "Salida del proceso (últimas líneas):"
+msgstr ""
+
+msgid "Salida:"
+msgstr ""
+
+msgid "Selecciona un vídeo de la cola"
+msgstr ""
+
+msgid "Separación de hablantes"
+msgstr ""
+
+msgid "Silencios:"
+msgstr ""
+
+msgid "Sin conexión para descargar un modelo"
+msgstr ""
+
+msgid "Sin memoria suficiente"
+msgstr ""
+
+msgid "Sin permisos para leer o escribir"
+msgstr ""
+
+msgid "Sin pista de audio"
+msgstr ""
+
+msgid "Sistema"
+msgstr ""
+
+msgid "Solo cortar silencios"
+msgstr ""
+
+msgid "Solo limpiar audio"
+msgstr ""
+
+msgid "Subtítulos"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt "
+"conservado)."
+msgstr ""
+
+#, python-brace-format
+msgid "Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos."
+msgstr ""
+
+msgid "Super-resolución"
+msgstr ""
+
+msgid "Sustitución de la pista de audio"
+msgstr ""
+
+msgid "Sustituyendo pista de audio"
+msgstr ""
+
+msgid "Tamaño:"
+msgstr ""
+
+msgid "Tarea:"
+msgstr ""
+
+msgid "Transcribiendo"
+msgstr ""
+
+msgid "Título, caption y hashtags"
+msgstr ""
+
+msgid "Umbral:"
+msgstr ""
+
+msgid "Velocidad:"
+msgstr ""
+
+msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+msgstr ""
+
+msgid "Vídeo de entrada."
+msgstr ""
+
+msgid "Vídeo final. Por defecto: nombre_limpio.mp4"
+msgstr ""
+
+#, python-brace-format
+msgid "Vídeo final:     {final}"
+msgstr ""
+
+msgid "Vídeos ("
+msgstr ""
+
+msgid "argumentos inválidos: se requiere --config"
+msgstr ""
+
+msgid ""
+"auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream "
+"H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el "
+"muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo "
+"original está bien."
+msgstr ""
+
+#, python-brace-format
+msgid "auto-editor falló (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "auto-editor falló (código {codigo}) incluso tras reencodar la entrada"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha "
+"reencodado con h264_videotoolbox y se ha reintentado."
+msgstr ""
+
+msgid "auto-editor no pudo escribir el vídeo"
+msgstr ""
+
+msgid "brew install ffmpeg ffmpeg-full auto-editor"
+msgstr ""
+
+msgid "brew install ffmpeg-full"
+msgstr ""
+
+msgid "brew install ollama   (y luego: ollama pull qwen3.5:9b)"
+msgstr ""
+
+msgid "cancelado"
+msgstr ""
+
+msgid "en espera"
+msgstr ""
+
+msgid "error"
+msgstr ""
+
+msgid ""
+"ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo "
+"está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso "
+"anterior dejó una salida a medias)."
+msgstr ""
+
+msgid "ffmpeg sin soporte de subtítulos (libass)"
+msgstr ""
+
+msgid "hecho"
+msgstr ""
+
+msgid ""
+"macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, "
+"Documentos y discos externos requieren permiso)."
+msgstr ""
+
+msgid "medium (más preciso)"
+msgstr ""
+
+msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
+msgstr ""
+
+msgid "procesando"
+msgstr ""
+
+#, python-brace-format
+msgid "señal desconocida {numero}"
+msgstr ""
+
+msgid "small (rápido)"
+msgstr ""
+
+#, python-brace-format
+msgid "{descripcion} falló (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "{modelo} (no instalado)"
+msgstr ""
+
+#, python-brace-format
+msgid "{nombre} no está instalado o no está en PATH"
+msgstr ""
+
+#, python-brace-format
+msgid "{nombre}: el proceso murió por una señal"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} modelo(s) no caben en memoria (ver tooltip)."
+msgstr ""
+
+msgid "■ Cancelar"
+msgstr ""
+
+msgid "▶ Procesar"
+msgstr ""

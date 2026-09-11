@@ -80,3 +80,14 @@ def logs_en_tmp(tmp_path, monkeypatch):
     from videopipeline import runner
 
     monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+
+
+@pytest.fixture(autouse=True)
+def idioma_fuente():
+    """Los tests comparan cadenas en español (idioma fuente) salvo que un
+    test instale otro idioma explícitamente."""
+    from videopipeline import i18n
+
+    i18n.instalar("es")
+    yield
+    i18n.instalar("es")

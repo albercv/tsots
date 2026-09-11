@@ -51,6 +51,7 @@ class PipelineConfig:
     caption_seo: bool = False
     contexto_marca: str = ""
     modelo_caption: str = "qwen3.5:9b"
+    idioma_ui: str = "es"  # idioma de etiquetas, avisos y diagnósticos del runner
 
     def validar(self) -> None:
         if self.modo not in MODOS:

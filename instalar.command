@@ -13,50 +13,53 @@ cd "$(dirname "$0")"
 PROYECTO="$(pwd)"
 MODELO_OLLAMA="${MODELO_OLLAMA:-qwen3.5:9b}"
 
+# Mensajes en español o inglés según el idioma del sistema (o TSOTS_LANG).
+case "${TSOTS_LANG:-${LC_ALL:-${LANG:-es}}}" in en*) EN=1 ;; *) EN= ;; esac
+t() { if [ -n "$EN" ]; then printf '%s' "$2"; else printf '%s' "$1"; fi; }
+
 paso() { printf '\n\033[1;34m==> %s\033[0m\n' "$*"; }
 ok()   { printf '\033[32m    ✓ %s\033[0m\n' "$*"; }
 fallo() { printf '\n\033[31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------- requisitos
-paso "Comprobando el Mac"
-[ "$(uname -s)" = "Darwin" ] || fallo "Este instalador es solo para macOS."
-[ "$(uname -m)" = "arm64" ] || fallo "Se necesita un Mac con Apple Silicon (M1 o posterior). Este es $(uname -m)."
+paso "$(t "Comprobando el Mac" "Checking the Mac")"
+[ "$(uname -s)" = "Darwin" ] || fallo "$(t "Este instalador es solo para macOS." "This installer is for macOS only.")"
+[ "$(uname -m)" = "arm64" ] || fallo "$(t "Se necesita un Mac con Apple Silicon (M1 o posterior)." "An Apple Silicon Mac (M1 or later) is required.") $(uname -m)"
 VERSION_MACOS="$(sw_vers -productVersion)"
-[ "${VERSION_MACOS%%.*}" -ge 13 ] || fallo "Se necesita macOS 13 o posterior (tienes $VERSION_MACOS)."
+[ "${VERSION_MACOS%%.*}" -ge 13 ] || fallo "$(t "Se necesita macOS 13 o posterior" "macOS 13 or later is required") ($VERSION_MACOS)"
 ok "Apple Silicon, macOS $VERSION_MACOS"
 
-paso "Herramientas de línea de comandos de Xcode"
+paso "$(t "Herramientas de línea de comandos de Xcode" "Xcode Command Line Tools")"
 if ! xcode-select -p >/dev/null 2>&1; then
-    echo "    macOS va a mostrar un diálogo para instalarlas. Acepta, espera a"
-    echo "    que termine y vuelve a ejecutar este instalador."
+    echo "    $(t "macOS va a mostrar un diálogo para instalarlas. Acepta, espera a que termine y vuelve a ejecutar este instalador." "macOS will show a dialog to install them. Accept, wait for it to finish and run this installer again.")"
     xcode-select --install || true
     exit 1
 fi
-ok "instaladas en $(xcode-select -p)"
+ok "$(t "instaladas en" "installed at") $(xcode-select -p)"
 
 paso "Homebrew"
 if [ -x /opt/homebrew/bin/brew ]; then
-    ok "ya instalado"
+    ok "$(t "ya instalado" "already installed")"
 else
-    echo "    Se instala Homebrew (pide tu contraseña de usuario)."
+    echo "    $(t "Se instala Homebrew (pide tu contraseña de usuario)." "Installing Homebrew (asks for your user password).")"
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 fi
 eval "$(/opt/homebrew/bin/brew shellenv)"
 
-paso "Python 3.11, ffmpeg, ffmpeg-full y auto-editor (Homebrew)"
-brew install python@3.11 ffmpeg ffmpeg-full auto-editor
+paso "$(t "Python 3.11, ffmpeg, ffmpeg-full y auto-editor (Homebrew)" "Python 3.11, ffmpeg, ffmpeg-full and auto-editor (Homebrew)")"
+brew install python@3.11 ffmpeg ffmpeg-full auto-editor gettext
 ok "$(/opt/homebrew/opt/python@3.11/bin/python3.11 --version), $(ffmpeg -version | head -1 | cut -d' ' -f1-3), auto-editor $(auto-editor --version)"
 
 if [ -z "${SIN_OLLAMA:-}" ]; then
-    paso "Ollama (modelo local para el caption SEO)"
+    paso "$(t "Ollama (modelo local para el caption SEO)" "Ollama (local model for the SEO caption)")"
     if [ -d /Applications/Ollama.app ] || command -v ollama >/dev/null 2>&1; then
-        ok "ya instalado"
+        ok "$(t "ya instalado" "already installed")"
     else
         brew install --cask ollama-app
     fi
     OLLAMA_BIN="$(command -v ollama || echo /Applications/Ollama.app/Contents/Resources/ollama)"
     if [ ! -x "$OLLAMA_BIN" ]; then
-        echo "    No se encuentra el ejecutable 'ollama'; abre la app de Ollama una vez y vuelve a ejecutar."
+        echo "    $(t "No se encuentra el ejecutable 'ollama'; abre la app de Ollama una vez y vuelve a ejecutar." "The 'ollama' executable was not found; open the Ollama app once and run again.")"
     else
         [ -d /Applications/Ollama.app ] && open -g -a Ollama || true
         # Espera a que el servidor responda (la app tarda unos segundos).
@@ -65,32 +68,32 @@ if [ -z "${SIN_OLLAMA:-}" ]; then
             sleep 1
         done
         if "$OLLAMA_BIN" list 2>/dev/null | awk '{print $1}' | grep -qx "$MODELO_OLLAMA"; then
-            ok "modelo $MODELO_OLLAMA ya descargado"
+            ok "$(t "modelo" "model") $MODELO_OLLAMA $(t "ya descargado" "already downloaded")"
         else
-            echo "    Descargando $MODELO_OLLAMA (~6 GB, una sola vez)…"
+            echo "    $(t "Descargando" "Downloading") $MODELO_OLLAMA (~6 GB, $(t "una sola vez" "one time only"))…"
             "$OLLAMA_BIN" pull "$MODELO_OLLAMA"
         fi
     fi
 fi
 
 # ------------------------------------------------------------- entorno Python
-paso "Entorno Python (.venv-clearvoice)"
+paso "$(t "Entorno Python" "Python environment") (.venv-clearvoice)"
 PY=/opt/homebrew/opt/python@3.11/bin/python3.11
 if [ -x .venv-clearvoice/bin/python ] && .venv-clearvoice/bin/python -c "import PySide6, torch, clearvoice, faster_whisper" 2>/dev/null; then
-    ok "ya creado y completo"
+    ok "$(t "ya creado y completo" "already created and complete")"
 else
     rm -rf .venv-clearvoice
     "$PY" -m venv .venv-clearvoice
     .venv-clearvoice/bin/python -m pip install --quiet --upgrade pip
-    echo "    Instalando dependencias (torch, PySide6, ClearVoice… ~2,5 GB; varios minutos)…"
+    echo "    $(t "Instalando dependencias (torch, PySide6, ClearVoice… ~2,5 GB; varios minutos)…" "Installing dependencies (torch, PySide6, ClearVoice… ~2.5 GB; several minutes)…")"
     .venv-clearvoice/bin/python -m pip install --quiet -r requirements.txt
     .venv-clearvoice/bin/python -m pip install --quiet -e .
-    ok "dependencias instaladas"
+    ok "$(t "dependencias instaladas" "dependencies installed")"
 fi
 
-paso "Modelo de limpieza de audio (MossFormer2_SE_48K, 221 MB)"
+paso "$(t "Modelo de limpieza de audio" "Audio cleaning model") (MossFormer2_SE_48K, 221 MB)"
 if [ -f checkpoints/MossFormer2_SE_48K/last_best_checkpoint.pt ]; then
-    ok "ya descargado"
+    ok "$(t "ya descargado" "already downloaded")"
 else
     .venv-clearvoice/bin/python - <<'EOF'
 from huggingface_hub import snapshot_download
@@ -101,24 +104,24 @@ EOF
 fi
 
 # --------------------------------------------------------------------- la app
-paso "Construyendo TheSilenceOfTheShorts.app"
+paso "$(t "Construyendo" "Building") TheSilenceOfTheShorts.app"
 chmod +x lanzador/construir_app.sh TheSilenceOfTheShorts.command desinstalar.command
 lanzador/construir_app.sh >/dev/null
-ok "app lista en $PROYECTO/TheSilenceOfTheShorts.app"
+ok "$(t "app lista en" "app ready at") $PROYECTO/TheSilenceOfTheShorts.app"
 
 if [ -z "${SIN_DOCK:-}" ]; then
-    paso "Acceso directo en el Dock"
+    paso "$(t "Acceso directo en el Dock" "Dock shortcut")"
     APP_URL="file://$PROYECTO/TheSilenceOfTheShorts.app/"
     if defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "TheSilenceOfTheShorts.app"; then
-        ok "ya estaba en el Dock"
+        ok "$(t "ya estaba en el Dock" "already in the Dock")"
     else
         defaults write com.apple.dock persistent-apps -array-add "<dict><key>tile-data</key><dict><key>file-data</key><dict><key>_CFURLString</key><string>$APP_URL</string><key>_CFURLStringType</key><integer>15</integer></dict></dict><key>tile-type</key><string>file-tile</string></dict>"
         killall Dock
-        ok "añadido"
+        ok "$(t "añadido" "added")"
     fi
 fi
 
-paso "Comprobación final"
+paso "$(t "Comprobación final" "Final check")"
 .venv-clearvoice/bin/python - <<'EOF'
 import shutil
 faltan = [b for b in ("ffmpeg", "ffprobe", "auto-editor") if shutil.which(b) is None]
@@ -128,8 +131,7 @@ print("    todo importa correctamente")
 EOF
 
 echo
-printf '\033[1;32mInstalación completa.\033[0m Abre "The Silence of the Shorts" desde el Dock\n'
-echo "o con doble clic en TheSilenceOfTheShorts.app. Guía de uso: README.md"
+printf '\033[1;32m%s\033[0m %s\n' "$(t "Instalación completa." "Installation complete.")" "$(t "Abre \"The Silence of the Shorts\" desde el Dock o con doble clic en TheSilenceOfTheShorts.app. Guía de uso: README.es.md" "Open \"The Silence of the Shorts\" from the Dock or by double-clicking TheSilenceOfTheShorts.app. User guide: README.md")"
 echo
-echo "La primera vez que actives subtítulos se descargará Whisper (~460 MB)."
-echo "macOS pedirá permiso para acceder a Documentos/Escritorio la primera vez: acepta."
+echo "$(t "La primera vez que actives subtítulos se descargará Whisper (~460 MB)." "The first time you enable subtitles, Whisper (~460 MB) will be downloaded.")"
+echo "$(t "macOS pedirá permiso para acceder a Documentos/Escritorio la primera vez: acepta." "macOS will ask for permission to access Documents/Desktop the first time: accept.")"
