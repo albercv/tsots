@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-11 13:02+0200\n"
+"POT-Creation-Date: 2026-09-11 13:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -194,9 +194,6 @@ msgid ""
 "El disco donde se escriben los temporales o la salida está lleno. Los "
 "intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del "
 "vídeo original."
-msgstr ""
-
-msgid "El idioma se aplicará la próxima vez que abras la app."
 msgstr ""
 
 msgid "El modelo Whisper se descargará al primer uso (~500MB)."
@@ -426,6 +423,11 @@ msgid "Ollama no responde: no se pueden listar los modelos. Ábrelo y pulsa ↻.
 msgstr ""
 
 msgid "Ollama responde pero no tiene el modelo pedido en local."
+msgstr ""
+
+msgid ""
+"Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso "
+"en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
 #, python-brace-format

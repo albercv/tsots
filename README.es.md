@@ -56,6 +56,9 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
 
 ## Primer arranque
 
+- La app sigue el idioma del Mac (español o inglés). Puedes forzarlo con
+  el selector 🌐 de abajo; pide confirmación y se reinicia (cancela
+  cualquier proceso en marcha).
 - macOS preguntará si la app puede acceder a **Documentos** (o a la
   carpeta donde tengas los vídeos). Acepta; si no, no podrá leerlos. Si
   lo negaste: Ajustes del Sistema → Privacidad y seguridad → Archivos y

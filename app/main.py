@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QProcess, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -41,6 +42,11 @@ from .worker import EjecutorCola
 
 # Icono de la ventana (el del Dock lo pone el bundle .app desde el mismo PNG).
 RUTA_ICONO = Path(__file__).resolve().parent / "recursos" / "icon_512.png"
+BASE_DIR = Path(__file__).resolve().parent.parent
+# Lanzador nativo del bundle: relanzar por aquí conserva identidad y caffeinate.
+RUTA_LANZADOR = (
+    BASE_DIR / "TheSilenceOfTheShorts.app" / "Contents" / "MacOS" / "TheSilenceOfTheShorts"
+)
 
 
 def _dependencias_faltantes() -> list[str]:
@@ -79,6 +85,7 @@ class VentanaPrincipal(QMainWindow):
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)
         self._procesando = False
+        self._reiniciando = False
 
         central = QWidget()
         raiz = QVBoxLayout(central)
@@ -443,19 +450,50 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_cambiar_idioma_ui(self, *args) -> None:
         codigo = self.combo_idioma_ui.currentData()
-        if not codigo:
+        if not codigo or codigo == self.ajustes.idioma_ui:
             return
-        self.ajustes.idioma_ui = codigo
-        QMessageBox.information(
+        respuesta = QMessageBox.question(
             self,
             _("Idioma"),
-            _("El idioma se aplicará la próxima vez que abras la app."),
+            _("Para cambiar el idioma la app se reiniciará. Se cancelará "
+              "cualquier proceso en marcha. ¿Reiniciar ahora?"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
         )
+        if respuesta != QMessageBox.StandardButton.Yes:
+            # Revertir el combo sin volver a preguntar.
+            self.combo_idioma_ui.blockSignals(True)
+            self.combo_idioma_ui.setCurrentIndex(
+                max(0, self.combo_idioma_ui.findData(self.ajustes.idioma_ui))
+            )
+            self.combo_idioma_ui.blockSignals(False)
+            return
+        self.ajustes.idioma_ui = codigo
+        self._reiniciar()
+
+    def _reiniciar(self) -> None:
+        """Cancela lo que haya en marcha, relanza la app y cierra esta."""
+        self._reiniciando = True
+        if self._procesando:
+            self.ejecutor.cancelar()
+        self.ajustes.guardar_geometria(bytes(self.saveGeometry()))
+        self._relanzar()
+        QApplication.quit()
+
+    def _comando_relanzar(self) -> list[str]:
+        """Lanzador del bundle si existe (identidad, caffeinate); si no, python -m app."""
+        if RUTA_LANZADOR.is_file() and os.access(RUTA_LANZADOR, os.X_OK):
+            return [str(RUTA_LANZADOR)]
+        return [sys.executable, "-m", "app"]
+
+    def _relanzar(self) -> None:
+        programa, *args = self._comando_relanzar()
+        QProcess.startDetached(programa, args, str(BASE_DIR))
 
     # --- ciclo de vida ---
 
     def closeEvent(self, evento) -> None:
-        if self._procesando:
+        if self._procesando and not self._reiniciando:
             respuesta = QMessageBox.question(
                 self,
                 _("Proceso en curso"),

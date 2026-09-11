@@ -57,8 +57,8 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
 ## First launch
 
 - The app follows your Mac's language (English or Spanish). You can force
-  one with the 🌐 selector at the bottom of the window; it applies the
-  next time you open the app.
+  one with the 🌐 selector at the bottom of the window; the app asks for
+  confirmation and restarts (any process in progress is cancelled).
 - macOS will ask whether the app may access **Documents** (or wherever
   your videos are). Accept; otherwise it cannot read them. If you
   declined: System Settings → Privacy & Security → Files and Folders →

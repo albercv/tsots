@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import sys
+
+import pytest
+
 import json
 from pathlib import Path
 
@@ -335,14 +339,69 @@ def test_ventana_tiene_icono(qtbot, tmp_path, monkeypatch):
     assert not ventana.windowIcon().isNull()
 
 
-def test_selector_idioma_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
+def _cambiar_idioma(ventana, monkeypatch, respuesta):
+    from PySide6.QtWidgets import QMessageBox
+
+    preguntas = []
+
+    def falsa_pregunta(*args, **kwargs):
+        preguntas.append(args[2] if len(args) > 2 else kwargs.get("text", ""))
+        return respuesta
+
+    monkeypatch.setattr("app.main.QMessageBox.question", falsa_pregunta)
+    relanzados = []
+    monkeypatch.setattr(ventana, "_relanzar", lambda: relanzados.append(True))
+    salidas = []
+    monkeypatch.setattr("app.main.QApplication.quit", lambda *a: salidas.append(True))
+    ventana.combo_idioma_ui.setCurrentIndex(ventana.combo_idioma_ui.findData("en"))
+    return preguntas, relanzados, salidas
+
+
+def test_cambiar_idioma_pregunta_y_cancelar_revierte(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    monkeypatch.setattr("app.main.QMessageBox.information", lambda *a, **k: None)
     assert ventana.combo_idioma_ui.currentData() == "sistema"
-    ventana.combo_idioma_ui.setCurrentIndex(
-        ventana.combo_idioma_ui.findData("en")
+    preguntas, relanzados, salidas = _cambiar_idioma(
+        ventana, monkeypatch, QMessageBox.StandardButton.Cancel
     )
+    assert len(preguntas) == 1 and "reinici" in preguntas[0].lower()
+    assert ventana.ajustes.idioma_ui == "sistema"  # no se guarda
+    assert ventana.combo_idioma_ui.currentData() == "sistema"  # combo revertido
+    assert relanzados == [] and salidas == []
+
+
+def test_cambiar_idioma_aceptar_guarda_cancela_y_reinicia(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana._procesando = True
+    cancelados = []
+    monkeypatch.setattr(ventana.ejecutor, "cancelar", lambda: cancelados.append(True))
+    preguntas, relanzados, salidas = _cambiar_idioma(
+        ventana, monkeypatch, QMessageBox.StandardButton.Yes
+    )
+    assert "en marcha" in preguntas[0].lower() or "proceso" in preguntas[0].lower()
     assert ventana.ajustes.idioma_ui == "en"
+    assert cancelados == [True]
+    assert relanzados == [True] and salidas == [True]
+    # Tras aceptar, cerrar la ventana no vuelve a preguntar (bandera de reinicio).
+    monkeypatch.setattr("app.main.QMessageBox.question",
+                        lambda *a, **k: pytest.fail("no debe preguntar otra vez"))
+    ventana.close()
+
+
+def test_comando_relanzar_prefiere_el_lanzador_del_bundle(qtbot, tmp_path, monkeypatch):
+    from app import main as modulo
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    lanzador = tmp_path / "X.app" / "Contents" / "MacOS" / "TheSilenceOfTheShorts"
+    monkeypatch.setattr(modulo, "RUTA_LANZADOR", lanzador)
+    assert ventana._comando_relanzar() == [sys.executable, "-m", "app"]
+    lanzador.parent.mkdir(parents=True)
+    lanzador.write_text("#!/bin/sh\n")
+    lanzador.chmod(0o755)
+    assert ventana._comando_relanzar() == [str(lanzador)]
 
 
 def test_procesar_incluye_idioma_ui_en_config(qtbot, tmp_path, monkeypatch):
