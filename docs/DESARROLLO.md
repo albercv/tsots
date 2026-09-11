@@ -1,4 +1,4 @@
-# The Silence of the Shorts — instalación
+# The Silence of the Shorts — documentación de desarrollo
 
 Aplicación de escritorio (PySide6) que limpia el audio de un vídeo con
 ClearVoice (MossFormer2_SE_48K), recorta silencios con auto-editor y
@@ -45,7 +45,7 @@ rm -rf .venv-clearvoice
 
 ## Modelos
 
-- `checkpoints/MossFormer2_SE_48K/` (221 MB) va incluido en la carpeta.
+- `checkpoints/MossFormer2_SE_48K/` (221 MB) NO va en git: lo descarga `instalar.command`.
   Si falta, ClearVoice lo descarga de HuggingFace al primer uso.
 - Whisper (`Systran/faster-whisper-small`, ~460 MB) vive en la caché
   global `~/.cache/huggingface/hub/`. Se descarga solo la primera vez

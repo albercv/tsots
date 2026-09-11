@@ -10,7 +10,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$PY_APP" "$APP/Contents/MacOS/python"
 clang -O2 -Wall -o "$APP/Contents/MacOS/TheSilenceOfTheShorts" lanzador/lanzador.c
 if [ ! -f "$APP/Contents/Resources/icon.icns" ]; then
-    echo "Falta icon.icns: genera icon_1024.png y usa iconutil (ver SETUP.md)" >&2
+    echo "Falta icon.icns: genera icon_1024.png y usa iconutil (ver docs/DESARROLLO.md)" >&2
 fi
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP/Contents/MacOS/python"
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP"
