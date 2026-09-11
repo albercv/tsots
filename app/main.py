@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
@@ -36,6 +36,10 @@ from .widgets.zona_drop import ZonaDrop
 from .worker import EjecutorCola
 
 
+# Icono de la ventana (el del Dock lo pone el bundle .app desde el mismo PNG).
+RUTA_ICONO = Path(__file__).resolve().parent / "recursos" / "icon_512.png"
+
+
 def _dependencias_faltantes() -> list[str]:
     return [
         nombre
@@ -63,6 +67,7 @@ class VentanaPrincipal(QMainWindow):
     def __init__(self, ajustes: Ajustes | None = None):
         super().__init__()
         self.setWindowTitle("The Silence of the Shorts")
+        self.setWindowIcon(QIcon(str(RUTA_ICONO)))
         self.ajustes = ajustes or Ajustes()
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)

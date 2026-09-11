@@ -9,8 +9,11 @@ PY_APP="$(dirname "$(dirname "$PY_REAL")")/Resources/Python.app/Contents/MacOS/P
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$PY_APP" "$APP/Contents/MacOS/python"
 clang -O2 -Wall -o "$APP/Contents/MacOS/TheSilenceOfTheShorts" lanzador/lanzador.c
-if [ ! -f "$APP/Contents/Resources/icon.icns" ]; then
-    echo "Falta icon.icns: genera icon_1024.png y usa iconutil (ver docs/DESARROLLO.md)" >&2
+if [ ! -f "$APP/Contents/Resources/icon.icns" ] || [ docs/img/icon.png -nt "$APP/Contents/Resources/icon.icns" ]; then
+    TMP_ICONO="$(mktemp -d)"
+    .venv-clearvoice/bin/python lanzador/generar_icono.py docs/img/icon.png "$TMP_ICONO" >/dev/null
+    iconutil -c icns "$TMP_ICONO/icon.iconset" -o "$APP/Contents/Resources/icon.icns"
+    rm -rf "$TMP_ICONO"
 fi
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP/Contents/MacOS/python"
 codesign --force -s - -i com.albercv.thesilenceoftheshorts "$APP"

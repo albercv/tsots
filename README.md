@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/img/logo.png" alt="The Silence of the Shorts" width="560"></p>
+
 # The Silence of the Shorts
 
 App de escritorio para Mac que deja un vídeo hablado listo para publicar:

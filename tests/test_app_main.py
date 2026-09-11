@@ -328,3 +328,8 @@ def test_ventana_pobla_modelos_y_persiste_seleccion(qtbot, tmp_path, monkeypatch
                         lambda trabajos: capturado.setdefault("t", trabajos))
     ventana.procesar()
     assert json.loads(capturado["t"][0][1])["modelo_caption"] == "b:2"
+
+
+def test_ventana_tiene_icono(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    assert not ventana.windowIcon().isNull()
