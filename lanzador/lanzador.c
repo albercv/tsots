@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -24,6 +25,18 @@ extern char **environ;
 static void fallo(const char *que) {
     fprintf(stderr, "lanzador: %s: %s\n", que, strerror(errno));
     exit(1);
+}
+
+/* ¿Arranca `interprete -c pass` y sale con 0? Un fallo de dyld termina por
+ * señal (no "exited"), así que también se detecta. */
+static int interprete_funciona(const char *interprete) {
+    char *argv_t[] = {(char *)interprete, "-c", "pass", NULL};
+    pid_t hijo;
+    if (posix_spawn(&hijo, interprete, NULL, NULL, argv_t, environ) != 0)
+        return 0;
+    int estado = 0;
+    if (waitpid(hijo, &estado, 0) < 0) return 0;
+    return WIFEXITED(estado) && WEXITSTATUS(estado) == 0;
 }
 
 int main(int argc, char **argv) {
@@ -94,6 +107,16 @@ int main(int argc, char **argv) {
         argv_py[k++] = "app";
     }
     argv_py[k] = NULL;
+    /* Auto-reparación: la copia del intérprete enlaza el framework de Python
+     * por ruta absoluta (…/Cellar/python@3.11/<versión>/…). Tras un
+     * `brew upgrade python@3.11` esa ruta desaparece y el binario muere en
+     * dyld. Si no arranca, se reconstruye el bundle antes de lanzar. */
+    if (!interprete_funciona(interprete)) {
+        fprintf(stderr, "lanzador: el Python embebido no arranca; "
+                        "reconstruyendo TheSilenceOfTheShorts.app\n");
+        if (system("lanzador/construir_app.sh") != 0 || !interprete_funciona(interprete))
+            fallo("no se pudo reconstruir la app (ejecuta instalar.command)");
+    }
     execv(interprete, argv_py);
     fallo("exec python");  /* solo si execv falla */
     return 1;

@@ -113,8 +113,9 @@ detiene nada; cerrar la tapa sin monitor externo sí.
 - El **caption** no se genera: comprueba que la app de Ollama esté abierta
   (icono en la barra de menú) y pulsa ↻ junto al selector de modelo. Para
   añadir modelos: `ollama pull nombre` en Terminal y luego ↻.
-- Tras actualizar macOS o Homebrew la app no arranca: ejecuta
-  `instalar.command` de nuevo (reconstruye el entorno).
+- Tras actualizar Homebrew (Python) la app se reconstruye sola al
+  arrancar (tarda unos segundos más esa vez). Si aun así no abre, ejecuta
+  `instalar.command` de nuevo.
 
 ## Qué usa por dentro
 

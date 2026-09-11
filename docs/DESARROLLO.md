@@ -71,7 +71,9 @@ permisos de macOS (Documentos, Escritorio) a nombre de "The Silence of the Short
 - Se lanza sin Terminal. Lo que escriban python/Qt va a `logs/lanzador.log`.
 - El ejecutable principal NO puede ser un script: macOS lo atribuye a
   `/bin/bash` y deniega Documentos sin preguntar.
-- Tras `brew upgrade python@3.11` (o si no arranca): `lanzador/construir_app.sh`.
+- Tras `brew upgrade python@3.11` el binario embebido deja de cargar (enlaza
+  el Cellar por ruta absoluta); el lanzador lo detecta (`interprete_funciona`)
+  y ejecuta `lanzador/construir_app.sh` él solo antes de lanzar.
 - Para arrastrarlo al Dock otra vez: Finder → arrastrar `TheSilenceOfTheShorts.app`
   a la parte izquierda del Dock.
 
