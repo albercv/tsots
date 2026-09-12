@@ -61,6 +61,23 @@ rm -rf .venv-clearvoice
   from `GET /api/tags` and disables the ones that exceed the GPU memory
   budget (75 % of RAM minus 1.5 GB of context, see `videopipeline/ollama.py`).
 
+## Branches and releases
+
+- `main`: stable. Only receives fast-forward merges from `develop` once
+  the full test suite passes and the app has been smoke-tested. Every
+  release is an annotated tag `vX.Y.Z` on `main`. Users install from here.
+- `develop`: integration branch. Day-to-day work lands here.
+- `feature/*`: short-lived branches off `develop`, merged back with
+  `--no-ff`.
+
+To cut a release:
+
+```bash
+git checkout main && git merge --ff-only develop
+git tag -a vX.Y.Z -m "vX.Y.Z: summary"
+git push origin main develop --follow-tags
+```
+
 ## Tests
 
 ```bash

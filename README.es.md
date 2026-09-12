@@ -31,10 +31,12 @@ No hace falta saber programar.
 
 ## Instalación
 
-1. Descarga el proyecto (botón **Code → Download ZIP** en GitHub, o
-   `git clone …`) y descomprímelo donde quieras dejarlo, por ejemplo en
-   `~/Documents`. **No muevas la carpeta después de instalar**; si lo
-   haces, vuelve a ejecutar el instalador.
+1. Descarga el proyecto desde la rama **`main`**, que es la versión
+   estable (botón **Code → Download ZIP** en GitHub, la última entrada en
+   **Releases**, o `git clone -b main …`) y descomprímelo donde quieras
+   dejarlo, por ejemplo en `~/Documents`. La rama `develop` es trabajo en
+   curso y puede no funcionar. **No muevas la carpeta después de
+   instalar**; si lo haces, vuelve a ejecutar el instalador.
 2. Doble clic en **`instalar.command`**. Si macOS dice que no se puede
    abrir porque es de un desarrollador no identificado: clic derecho →
    **Abrir** → **Abrir**. Se abre una ventana de Terminal.

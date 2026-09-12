@@ -31,10 +31,12 @@ Ollama. No programming knowledge needed.
 
 ## Installation
 
-1. Download the project (**Code → Download ZIP** on GitHub, or
-   `git clone …`) and unzip it where you want to keep it, for example in
-   `~/Documents`. **Do not move the folder after installing**; if you do,
-   run the installer again.
+1. Download the project from the **`main`** branch, which is the stable
+   version (**Code → Download ZIP** on GitHub, the latest entry under
+   **Releases**, or `git clone -b main …`) and unzip it where you want to
+   keep it, for example in `~/Documents`. The `develop` branch is work in
+   progress and may not work. **Do not move the folder after
+   installing**; if you do, run the installer again.
 2. Double-click **`instalar.command`**. If macOS says it cannot be opened
    because it is from an unidentified developer: right-click → **Open**
    → **Open**. A Terminal window opens.
