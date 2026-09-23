@@ -10,12 +10,17 @@ import pytest
 
 from videopipeline.redes import publicador, upload_post
 from videopipeline.redes.modelo import (
+    Cuenta,
+    ModoFacebook,
     ModoInstagram,
     ModoTikTok,
     Opciones,
+    Pagina,
     Plataforma,
     Publicacion,
 )
+from videopipeline.redes.proveedor import ErrorConsulta
+from videopipeline.redes.textos import longitud_x
 
 CLAVE = "clave-secreta-123"
 
@@ -80,10 +85,11 @@ def _pub(video: Path) -> Publicacion:
                        palabras_clave=("ia", "pymes", "automatización"))
 
 
-def _proveedor(servidor: Servidor, esperas=None, perfil="mi_perfil"):
+def _proveedor(servidor: Servidor, esperas=None, perfil="mi_perfil", pagina="1234567890"):
     return upload_post.ProveedorUploadPost(
         CLAVE, perfil, http=servidor.cliente(),
-        espera=(esperas.append if esperas is not None else (lambda s: None)))
+        espera=(esperas.append if esperas is not None else (lambda s: None)),
+        pagina_facebook=pagina)
 
 
 def test_tiktok_borrador_campos_cabecera_y_video(video):
@@ -318,13 +324,14 @@ def test_error_401_en_youtube_no_impide_instagram(video):
     resultados = publicador.publicar(
         _proveedor(servidor), _pub(video), Opciones(), list(Plataforma), registrar=False)
     assert [p for p in resultados] == [Plataforma.TIKTOK, Plataforma.YOUTUBE,
-                                       Plataforma.INSTAGRAM]
+                                       Plataforma.INSTAGRAM, Plataforma.X,
+                                       Plataforma.FACEBOOK]
     assert resultados[Plataforma.TIKTOK].ok
     assert not resultados[Plataforma.YOUTUBE].ok
     assert "401" in resultados[Plataforma.YOUTUBE].error
     assert resultados[Plataforma.INSTAGRAM].ok
     assert [f["platform[]"][0] for f in servidor.formularios] == [
-        "tiktok", "youtube", "instagram"]
+        "tiktok", "youtube", "instagram", "x", "facebook"]
 
 
 def test_error_de_red_no_lanza(video):
@@ -654,3 +661,280 @@ def test_exito_sin_resultado_de_la_plataforma_queda_por_confirmar(video):
         "success": True, "results": {"youtube": {"success": True, "url": "https://y/1"}}}))
     r = _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
     assert not r.ok and r.pendiente and "antes de volver a publicar" in r.error
+
+
+# --- X ---
+
+
+def test_x_campos_con_texto_corto(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.X, _pub(video), Opciones())
+    assert r.ok and r.url == "https://x.example/v/1"
+    campos = servidor.formularios[0]
+    assert campos["platform[]"] == ["x"]
+    assert campos["x_title"] == ["Cómo usar IA en tu pyme\n\n#ia #pymes"]
+    assert campos["x_long_text_as_post"] == ["false"]
+    assert campos["made_with_ai"] == ["false"]
+    assert campos["async_upload"] == ["true"]
+    # Nada de subtítulos por URL pública ni campos que no se usan.
+    for campo in ("x_subtitles_url", "reply_settings", "nullcast", "community_id",
+                  "x_paid_partnership", "x_alt_text"):
+        assert campo not in campos
+
+
+def test_x_texto_propio_largo_sin_premium_se_recorta_a_280(video):
+    servidor = Servidor(_ok_sync)
+    pub = Publicacion(video=video, titulo="t", caption="c", texto_x="frase " * 80)
+    _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
+    campos = servidor.formularios[0]
+    assert longitud_x(campos["x_title"][0]) <= 280
+    assert campos["x_long_text_as_post"] == ["false"]
+
+
+def test_x_con_premium_y_texto_largo_va_en_un_solo_post(video):
+    servidor = Servidor(_ok_sync)
+    largo = "frase " * 80
+    pub = Publicacion(video=video, titulo="t", caption="c", texto_x=largo)
+    _proveedor(servidor).publicar(Plataforma.X, pub, Opciones(x_premium=True))
+    campos = servidor.formularios[0]
+    assert campos["x_title"] == [largo.strip()]
+    assert campos["x_long_text_as_post"] == ["true"]
+
+
+def test_x_con_premium_y_texto_corto_no_pide_post_largo(video):
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.X, _pub(video), Opciones(x_premium=True))
+    assert servidor.formularios[0]["x_long_text_as_post"] == ["false"]
+
+
+def test_x_resultado_como_twitter_tambien_vale(video):
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "results": {"twitter": {"success": True,
+                                                 "url": "https://x.com/yo/status/1"}}}))
+    r = _proveedor(servidor).publicar(Plataforma.X, _pub(video), Opciones())
+    assert r.ok and r.url == "https://x.com/yo/status/1"
+
+
+def test_x_fuera_del_plan_se_lee(video):
+    servidor = Servidor(lambda req, s: httpx.Response(403, json={
+        "success": False, "message": "X is not available on the free plan"}))
+    r = _proveedor(servidor).publicar(Plataforma.X, _pub(video), Opciones())
+    assert not r.ok and not r.pendiente
+    assert "403" in r.error and "free plan" in r.error
+
+
+def test_x_asincrono_se_sondea(video):
+    def responder(request, servidor):
+        if request.method == "POST":
+            return httpx.Response(200, json={"success": True, "request_id": "req-x"})
+        return httpx.Response(200, json={"status": "completed", "results": [
+            {"platform": "x", "success": True, "url": "https://x.com/yo/status/2"}]})
+    servidor = Servidor(responder)
+    resultados = publicador.publicar(
+        _proveedor(servidor), _pub(video), Opciones(), [Plataforma.X],
+        registrar=False, espera=lambda s: None)
+    assert resultados[Plataforma.X].ok
+    assert resultados[Plataforma.X].url == "https://x.com/yo/status/2"
+
+
+# --- Facebook ---
+
+
+@pytest.mark.parametrize("modo, tipo, estado", [
+    (ModoFacebook.REEL, "REELS", "PUBLISHED"),
+    (ModoFacebook.VIDEO, "VIDEO", "PUBLISHED"),
+    (ModoFacebook.BORRADOR, "REELS", "DRAFT"),
+])
+def test_facebook_campos_por_modo(video, modo, tipo, estado):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.FACEBOOK, _pub(video),
+                                      Opciones(facebook_modo=modo))
+    assert r.ok
+    campos = servidor.formularios[0]
+    assert campos["platform[]"] == ["facebook"]
+    assert campos["facebook_page_id"] == ["1234567890"]
+    assert campos["facebook_title"] == ["Cómo usar IA en tu pyme"]
+    assert campos["facebook_description"] == ["Tres ideas clave.\n\n#ia #pymes"]
+    assert campos["facebook_media_type"] == [tipo]
+    assert campos["video_state"] == [estado]
+    assert campos["facebook_is_ai_generated"] == ["false"]
+
+
+def test_facebook_por_defecto_es_reel_publicado(video):
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.FACEBOOK, _pub(video), Opciones())
+    campos = servidor.formularios[0]
+    assert campos["facebook_media_type"] == ["REELS"]
+    assert campos["video_state"] == ["PUBLISHED"]
+
+
+def test_facebook_sin_pagina_no_envia_nada(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor, pagina=" ").publicar(Plataforma.FACEBOOK, _pub(video), Opciones())
+    assert not r.ok and not r.pendiente
+    assert "página de Facebook" in r.error
+    assert servidor.peticiones == []
+    # Las demás plataformas no la necesitan.
+    r = _proveedor(servidor, pagina="").publicar(Plataforma.TIKTOK, _pub(video), Opciones())
+    assert r.ok
+
+
+def test_crear_lee_la_pagina_de_los_ajustes_neutros(video):
+    servidor = Servidor(_ok_sync)
+    proveedor = upload_post.crear(CLAVE, {"perfil": "yo", "pagina_facebook": " 987 "},
+                                  http=servidor.cliente())
+    proveedor.publicar(Plataforma.FACEBOOK, _pub(video), Opciones())
+    assert servidor.formularios[0]["facebook_page_id"] == ["987"]
+
+
+def test_facebook_error_de_la_plataforma(video):
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "results": {"facebook": {
+            "success": False, "error": {"message": "(#200) Page publishing not allowed"}}}}))
+    r = _proveedor(servidor).publicar(Plataforma.FACEBOOK, _pub(video), Opciones())
+    assert not r.ok and "Page publishing not allowed" in r.error
+
+
+# --- cuentas conectadas y páginas de Facebook ---
+
+
+def _cuentas_json(**cuentas):
+    base = {"tiktok": None, "youtube": "", "instagram": None, "x": None, "facebook": None}
+    base.update(cuentas)
+    return base
+
+
+def _responder_json(cuerpo, codigo=200):
+    return lambda request, servidor: httpx.Response(codigo, json=cuerpo)
+
+
+@pytest.mark.parametrize("envoltorio", [
+    lambda sa: {"success": True, "profile": {"username": "mi_perfil", "social_accounts": sa}},
+    lambda sa: {"username": "mi_perfil", "social_accounts": sa},
+    lambda sa: {"success": True, "data": {"profile": {"social_accounts": sa}}},
+])
+def test_cuentas_formas_de_respuesta(envoltorio):
+    sa = _cuentas_json(
+        tiktok={"display_name": "Mi TikTok", "handle": "@yo_tt", "username": "yo_tt",
+                "social_images": "https://img", "reauth_required": False,
+                "capabilities": ["video"]},
+        instagram={"display_name": "Insta", "username": "yo_ig", "reauth_required": True},
+        x={"display_name": "Yo en X", "handle": "yo_x", "reauth_required": "false",
+           "capabilities": ["post", "long_video_upload"]},
+        facebook={"display_name": "Mi página", "reauth_required": False})
+    servidor = Servidor(_responder_json(envoltorio(sa)))
+    cuentas = _proveedor(servidor).cuentas()
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert str(peticion.url) == "https://api.upload-post.com/api/uploadposts/users/mi_perfil"
+    assert peticion.headers["authorization"] == f"Apikey {CLAVE}"
+    assert set(cuentas) == set(Plataforma)
+    assert cuentas[Plataforma.TIKTOK] == Cuenta(
+        Plataforma.TIKTOK, nombre="Mi TikTok", usuario="yo_tt", capacidades=("video",))
+    assert cuentas[Plataforma.YOUTUBE] is None  # "" = no conectada
+    assert cuentas[Plataforma.INSTAGRAM].reconectar is True
+    assert cuentas[Plataforma.INSTAGRAM].visible == "@yo_ig"
+    assert cuentas[Plataforma.X].reconectar is False
+    assert cuentas[Plataforma.X].premium is True  # capacidad de vídeo largo
+    assert cuentas[Plataforma.FACEBOOK].visible == "Mi página"
+    assert cuentas[Plataforma.FACEBOOK].premium is None
+
+
+def test_cuentas_x_sin_capacidad_clara_no_decide_premium():
+    sa = _cuentas_json(x={"handle": "yo", "capabilities": ["post", "video"]})
+    cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()
+    assert cuentas[Plataforma.X].premium is None
+
+
+def test_cuentas_twitter_como_x_y_plataformas_ausentes():
+    cuerpo = {"profile": {"social_accounts": {"twitter": {"username": "yo"}}}}
+    cuentas = _proveedor(Servidor(_responder_json(cuerpo))).cuentas()
+    assert cuentas[Plataforma.X].usuario == "yo"
+    assert cuentas[Plataforma.TIKTOK] is None and cuentas[Plataforma.FACEBOOK] is None
+
+
+def test_cuentas_perfil_con_caracteres_raros_va_codificado():
+    servidor = Servidor(_responder_json({"social_accounts": {}}))
+    _proveedor(servidor, perfil="mi perfil/1").cuentas()
+    assert servidor.peticiones[0].url.raw_path.endswith(b"/users/mi%20perfil%2F1")
+
+
+@pytest.mark.parametrize("codigo, cuerpo, texto", [
+    (401, {"message": "Invalid API key"}, "API key"),
+    (404, {"message": "User not found"}, "Manage Users"),
+    (500, {"message": f"boom {CLAVE}"}, "500"),
+    (200, {"success": True}, "inesperada"),
+])
+def test_cuentas_errores_legibles_y_sin_clave(codigo, cuerpo, texto):
+    servidor = Servidor(_responder_json(cuerpo, codigo))
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(servidor).cuentas()
+    assert texto in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+def test_cuentas_sin_red_o_sin_perfil():
+    def sin_red(request, servidor):
+        raise httpx.ConnectError("sin red", request=request)
+    with pytest.raises(ErrorConsulta):
+        _proveedor(Servidor(sin_red)).cuentas()
+    servidor = Servidor(_responder_json({}))
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(servidor, perfil="").cuentas()
+    assert "perfil" in str(error.value)
+    assert servidor.peticiones == []
+
+
+@pytest.mark.parametrize("cuerpo", [
+    [{"page_id": "111", "page_name": "Uno", "profile": "mi_perfil"},
+     {"page_id": "222", "page_name": "Dos", "profile": "mi_perfil"}],
+    {"pages": [{"page_id": "111", "page_name": "Uno"}, {"id": 222, "name": "Dos"}]},
+    {"success": True, "profile": "mi_perfil",
+     "pages": [{"page_id": "111", "page_name": "Uno"}, {"page_id": "222", "page_name": "Dos"}]},
+    {"data": [{"page_id": "111", "page_name": "Uno"}, {"page_id": "222", "page_name": "Dos"},
+              {"page_name": "sin id"}]},
+])
+def test_paginas_facebook_formas_de_respuesta(cuerpo):
+    servidor = Servidor(_responder_json(cuerpo))
+    paginas = _proveedor(servidor).paginas_facebook()
+    assert paginas == [Pagina("111", "Uno"), Pagina("222", "Dos")]
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert peticion.url.path == "/api/uploadposts/facebook/pages"
+    assert peticion.url.params["profile"] == "mi_perfil"
+
+
+def test_paginas_de_otro_perfil_se_descartan():
+    cuerpo = [{"page_id": "1", "page_name": "Mía", "profile": "mi_perfil"},
+              {"page_id": "2", "page_name": "Ajena", "profile": "otro"}]
+    paginas = _proveedor(Servidor(_responder_json(cuerpo))).paginas_facebook()
+    assert paginas == [Pagina("1", "Mía")]
+
+
+@pytest.mark.parametrize("codigo, cuerpo", [(500, {"error": "x"}), (200, {"raro": 1}),
+                                            (403, {"message": "Not in your plan"})])
+def test_paginas_errores(codigo, cuerpo):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, codigo))).paginas_facebook()
+    assert CLAVE not in str(error.value)
+
+
+def test_consultas_quedan_en_el_registro_sin_la_clave_ni_el_perfil(tmp_path, monkeypatch):
+    from videopipeline.redes import diario
+
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
+    sa = _cuentas_json(x={"handle": "yo_x"})
+    servidor = Servidor(lambda req, s: httpx.Response(
+        200, json={"social_accounts": sa} if "users" in req.url.path
+        else [{"page_id": "1", "page_name": "P"}]))
+    d = diario.Diario(tmp_path / "v.mp4")
+    d.ocultar(CLAVE)
+    proveedor = _proveedor(servidor, perfil="perfil_secreto")
+    proveedor.cuentas()
+    proveedor.paginas_facebook()
+    d.cerrar()
+    texto = d.ruta.read_text(encoding="utf-8")
+    assert "uploadposts/users" in texto and "facebook/pages" in texto
+    assert "HTTP 200" in texto
+    assert CLAVE not in texto
+    assert "perfil_secreto" not in texto.split("cuerpo:")[0]

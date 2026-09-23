@@ -7,32 +7,52 @@ import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QLineEdit, QMessageBox
 
-from app import credenciales
+from app import credenciales, segundo_plano
 from app.settings import Ajustes
 from app.widgets import dialogo_publicar
 from app.widgets.dialogo_publicar import DialogoPublicar
 from app.widgets.dialogo_redes import DialogoRedes
-from tests.redes_falsos import ProveedorFalso
+from tests.redes_falsos import ProveedorFalso, todas_conectadas
 from videopipeline.caption import Caption
 from videopipeline.redes import publicador, registro
 from videopipeline.redes.modelo import (
     ORDEN,
+    Cuenta,
+    ModoFacebook,
     ModoInstagram,
     ModoTikTok,
+    Pagina,
     Plataforma,
     Resultado,
 )
-from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO
+from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO, ErrorConsulta
+from videopipeline.redes.textos import longitud_x
 
 T, Y, I = Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM
+X, F = Plataforma.X, Plataforma.FACEBOOK
 CLAVE = "clave-de-prueba-42"
+MB = 1024 * 1024
 
 
 @pytest.fixture(autouse=True)
 def sin_hilos_colgando(qtbot):
-    """Ningún test acaba con una publicación en marcha."""
+    """Ningún test acaba con una publicación ni una consulta en marcha."""
     yield
     qtbot.waitUntil(lambda: dialogo_publicar.hilos_vivos() == 0, timeout=10000)
+    qtbot.waitUntil(lambda: segundo_plano.vivas() == 0, timeout=10000)
+
+
+@pytest.fixture(autouse=True)
+def duracion_falsa(monkeypatch):
+    """Sin ffprobe: el vídeo de los tests dura 30 s salvo que el test diga otra cosa."""
+    medidas: list = []
+
+    def medir(video):
+        medidas.append(video)
+        return 30.0
+
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", medir)
+    return medidas
 
 
 @pytest.fixture
@@ -57,6 +77,10 @@ def _listo(ajustes, llavero_falso):
     credenciales.guardar(PROVEEDOR_POR_DEFECTO, CLAVE)
 
 
+def _esperar_consultas(qtbot):
+    qtbot.waitUntil(lambda: segundo_plano.vivas() == 0, timeout=5000)
+
+
 # --- ajustes ---
 
 
@@ -66,7 +90,12 @@ def test_ajustes_redes_por_defecto(ajustes):
     assert ajustes.youtube_categoria == "22"
     assert ajustes.tiktok_modo == ModoTikTok.BORRADOR
     assert ajustes.instagram_modo == ModoInstagram.PRUEBA
-    assert ajustes.plataformas_redes == list(ORDEN)
+    # X y Facebook se activan a mano la primera vez.
+    assert ajustes.plataformas_redes == [T, Y, I]
+    assert ajustes.x_premium is False
+    assert ajustes.facebook_modo == ModoFacebook.REEL
+    assert ajustes.pagina_facebook is None
+    assert ajustes.cuentas_guardadas() is None
 
 
 def test_ajustes_redes_persisten(tmp_path):
@@ -77,10 +106,16 @@ def test_ajustes_redes_persisten(tmp_path):
     a.tiktok_modo = ModoTikTok.PUBLICO
     a.instagram_modo = ModoInstagram.NORMAL
     a.plataformas_redes = [I, T]
+    a.x_premium = True
+    a.facebook_modo = ModoFacebook.VIDEO
+    a.pagina_facebook = Pagina("111", "Mi página")
     a._q.sync()
     b = Ajustes(QSettings(ruta, QSettings.Format.IniFormat))
     assert b.perfil_redes == "yo"
-    assert b.ajustes_proveedor() == {"perfil": "yo"}
+    assert b.ajustes_proveedor() == {"perfil": "yo", "pagina_facebook": "111"}
+    assert b.x_premium is True
+    assert b.facebook_modo == ModoFacebook.VIDEO
+    assert b.pagina_facebook == Pagina("111", "Mi página")
     assert b.youtube_categoria == "28"
     assert b.tiktok_modo == ModoTikTok.PUBLICO
     assert b.instagram_modo == ModoInstagram.NORMAL
@@ -93,9 +128,55 @@ def test_ajustes_valores_corruptos_vuelven_al_defecto(ajustes):
     ajustes._q.setValue("redes/proveedor", "desconocido")
     ajustes._q.setValue("redes/tiktok_modo", "raro")
     ajustes._q.setValue("redes/instagram_modo", "raro")
+    ajustes._q.setValue("redes/facebook_modo", "raro")
+    ajustes._q.setValue("redes/x_premium", "quizá")
     assert ajustes.proveedor_redes == PROVEEDOR_POR_DEFECTO
     assert ajustes.tiktok_modo == ModoTikTok.BORRADOR
     assert ajustes.instagram_modo == ModoInstagram.PRUEBA
+    assert ajustes.facebook_modo == ModoFacebook.REEL
+    assert ajustes.x_premium is False
+
+
+@pytest.mark.parametrize("valor, esperado", [("true", True), ("false", False), (True, True),
+                                             ("1", True), ("0", False)])
+def test_ajustes_x_premium_tolera_formatos(ajustes, valor, esperado):
+    ajustes._q.setValue("redes/x_premium", valor)
+    assert ajustes.x_premium is esperado
+
+
+def test_eleccion_guardada_sin_x_ni_facebook_sigue_valiendo(ajustes):
+    """Usuarios con la elección de antes: X y Facebook quedan desmarcadas."""
+    ajustes._q.setValue("redes/plataformas", "tiktok,instagram")
+    assert ajustes.plataformas_redes == [T, I]
+    ajustes._q.setValue("redes/plataformas", ["youtube"])  # formato lista de QSettings
+    assert ajustes.plataformas_redes == [Y]
+    ajustes.plataformas_redes = [F, X, T]
+    assert ajustes.plataformas_redes == [T, X, F]
+    assert ajustes._q.value("redes/plataformas") == "tiktok,x,facebook"
+
+
+def test_pagina_de_facebook_por_proveedor_y_borrable(ajustes):
+    ajustes.pagina_facebook = Pagina("111", "Mía")
+    assert ajustes.pagina_facebook_de(PROVEEDOR_POR_DEFECTO) == Pagina("111", "Mía")
+    assert ajustes.pagina_facebook_de("otro") is None
+    ajustes.pagina_facebook = None
+    assert ajustes.pagina_facebook is None
+    assert ajustes.ajustes_proveedor()["pagina_facebook"] == ""
+
+
+def test_cuentas_guardadas_ida_y_vuelta_y_ligadas_al_perfil(ajustes):
+    ajustes.perfil_redes = "yo"
+    cuentas = {T: Cuenta(T, "Tik", "yo_tt", capacidades=("video",)), Y: None,
+               X: Cuenta(X, usuario="yo_x", reconectar=True, premium=True)}
+    ajustes.guardar_cuentas(cuentas)
+    guardadas = ajustes.cuentas_guardadas()
+    assert guardadas.cuentas == cuentas  # I y F: no se sabe (no están)
+    assert guardadas.fecha
+    ajustes.perfil_redes = "otro"  # otro perfil, otras cuentas
+    assert ajustes.cuentas_guardadas() is None
+    ajustes.perfil_redes = "yo"
+    ajustes._q.setValue(f"redes/cuentas/{PROVEEDOR_POR_DEFECTO}", "{no es json")
+    assert ajustes.cuentas_guardadas() is None
 
 
 def test_la_clave_nunca_va_a_qsettings(qtbot, ajustes, llavero_falso, tmp_path):
@@ -132,6 +213,149 @@ def test_dialogo_redes_guarda_clave_en_llavero_y_perfil(qtbot, ajustes, llavero_
     assert ajustes.tiktok_modo == ModoTikTok.PUBLICO
     assert ajustes.instagram_modo == ModoInstagram.NORMAL
     assert ajustes.youtube_categoria == "27"
+    assert ajustes.x_premium is False
+    assert ajustes.facebook_modo == ModoFacebook.REEL
+
+
+def test_dialogo_redes_premium_de_x_y_modo_de_facebook(qtbot, ajustes, llavero_falso):
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    assert not dialogo.casilla_x_premium.isChecked()
+    assert "2:20" in dialogo.ayuda_x.text() and "280" in dialogo.ayuda_x.text()
+    dialogo.casilla_x_premium.setChecked(True)
+    dialogo.combo_facebook.setCurrentIndex(dialogo.combo_facebook.findData("borrador"))
+    dialogo.accept()
+    assert ajustes.x_premium is True
+    assert ajustes.facebook_modo == ModoFacebook.BORRADOR
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    assert dialogo.casilla_x_premium.isChecked()
+
+
+def _redes(qtbot, ajustes, proveedor, capturado=None):
+    def fabrica(nombre, clave, datos):
+        if capturado is not None:
+            capturado.update(nombre=nombre, clave=clave, datos=datos)
+        return proveedor
+
+    dialogo = DialogoRedes(ajustes, fabrica=fabrica)
+    qtbot.addWidget(dialogo)
+    return dialogo
+
+
+def _cuentas_variadas():
+    return {T: Cuenta(T, "Mi TikTok", "yo_tt"), Y: None,
+            I: Cuenta(I, "Insta", "yo_ig", reconectar=True),
+            X: Cuenta(X, "Yo", "yo_x", premium=True), F: Cuenta(F, "Mi página")}
+
+
+def test_dialogo_redes_comprobar_conexion(qtbot, ajustes, llavero_falso):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorFalso(cuentas_conectadas=_cuentas_variadas(),
+                               paginas=[Pagina("111", "Mi página")])
+    capturado: dict = {}
+    dialogo = _redes(qtbot, ajustes, proveedor, capturado)
+    assert "Sin comprobar" in dialogo.etiqueta_consulta.text()
+    assert dialogo.combo_pagina.currentData() in (None, "")
+    assert dialogo.campo_pagina_manual.isHidden()
+    dialogo.boton_comprobar.click()
+    assert not dialogo.boton_comprobar.isEnabled()
+    _esperar_consultas(qtbot)
+    assert dialogo.boton_comprobar.isEnabled()
+    assert capturado["clave"] == CLAVE and capturado["datos"]["perfil"] == "mi_perfil"
+    textos = {p: e.text() for p, e in dialogo.etiquetas_cuentas.items()}
+    assert "@yo_tt" in textos[T]
+    assert "No conectada en Upload-Post" in textos[Y]
+    assert "Reconecta" in textos[I] and "Upload-Post" in textos[I]
+    assert "@yo_x" in textos[X]
+    assert "Mi página" in textos[F]
+    # Una sola página: se elige sola. Premium detectado en X: se marca.
+    assert dialogo.combo_pagina.currentData() == "111"
+    assert dialogo.casilla_x_premium.isChecked()
+    assert "detect" in dialogo.nota_x_premium.text().lower()
+    dialogo.accept()
+    assert ajustes.pagina_facebook == Pagina("111", "Mi página")
+    assert ajustes.x_premium is True
+    assert ajustes.cuentas_guardadas().cuentas == _cuentas_variadas()
+    # Al volver a abrir, lo último comprobado sigue a la vista.
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    assert "@yo_tt" in dialogo.etiquetas_cuentas[T].text()
+    assert "Última comprobación" in dialogo.etiqueta_consulta.text()
+    assert dialogo.combo_pagina.currentData() == "111"
+
+
+def test_dialogo_redes_varias_paginas_no_elige_sola_salvo_la_guardada(qtbot, ajustes,
+                                                                      llavero_falso):
+    _listo(ajustes, llavero_falso)
+    paginas = [Pagina("111", "Una"), Pagina("222", "Otra")]
+    proveedor = ProveedorFalso(paginas=paginas)
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert dialogo.combo_pagina.currentData() in (None, "")
+    assert dialogo.combo_pagina.count() == 3  # «sin elegir» + dos
+    dialogo.combo_pagina.setCurrentIndex(dialogo.combo_pagina.findData("222"))
+    dialogo.accept()
+    assert ajustes.pagina_facebook == Pagina("222", "Otra")
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert dialogo.combo_pagina.currentData() == "222"
+
+
+def test_dialogo_redes_sin_lista_de_paginas_permite_escribir_el_id(qtbot, ajustes,
+                                                                   llavero_falso):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorFalso(paginas=ErrorConsulta("Error 500 del servicio."))
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert not dialogo.campo_pagina_manual.isHidden()
+    assert "500" in dialogo.aviso_pagina.text()
+    dialogo.campo_pagina_manual.setText(" 987654 ")
+    dialogo.accept()
+    assert ajustes.pagina_facebook == Pagina("987654")
+
+
+def test_dialogo_redes_facebook_sin_conectar_no_pide_paginas(qtbot, ajustes, llavero_falso):
+    _listo(ajustes, llavero_falso)
+    cuentas = todas_conectadas()
+    cuentas[F] = None
+    proveedor = ProveedorFalso(cuentas_conectadas=cuentas)
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert proveedor.consultas == ["cuentas"]
+    assert "No conectada" in dialogo.etiquetas_cuentas[F].text()
+
+
+def test_dialogo_redes_comprobar_con_la_clave_recien_escrita(qtbot, ajustes, llavero_falso):
+    proveedor = ProveedorFalso()
+    capturado: dict = {}
+    dialogo = _redes(qtbot, ajustes, proveedor, capturado)
+    dialogo.campo_perfil.setText("nuevo")
+    dialogo.campo_clave.setText(f" {CLAVE} ")
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert capturado["clave"] == CLAVE and capturado["datos"]["perfil"] == "nuevo"
+    assert credenciales.leer(PROVEEDOR_POR_DEFECTO) is None  # aún sin guardar
+    assert dialogo.campo_clave.text() == f" {CLAVE} "
+
+
+def test_dialogo_redes_comprobar_sin_clave_o_con_error(qtbot, ajustes, llavero_falso):
+    proveedor = ProveedorFalso(cuentas_conectadas=ErrorConsulta(
+        "La API key no es válida o ha caducado (401)."))
+    dialogo = _redes(qtbot, ajustes, proveedor)
+    dialogo.campo_perfil.setText("yo")
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert "API key" in dialogo.etiqueta_consulta.text()
+    assert proveedor.consultas == []
+    credenciales.guardar(PROVEEDOR_POR_DEFECTO, CLAVE)
+    dialogo.boton_comprobar.click()
+    _esperar_consultas(qtbot)
+    assert "401" in dialogo.etiqueta_consulta.text()
+    assert CLAVE not in dialogo.etiqueta_consulta.text()
 
 
 def test_dialogo_redes_muestra_guardada_sin_revelarla(qtbot, ajustes, llavero_falso):
@@ -241,13 +465,17 @@ def test_textos_precargados_y_editables(qtbot, video, ajustes, llavero_falso):
 
 def test_casillas_en_orden_y_modos_por_defecto(qtbot, video, ajustes, llavero_falso):
     ajustes.tiktok_modo = ModoTikTok.PUBLICO
+    ajustes.facebook_modo = ModoFacebook.VIDEO
     dialogo, _p = _dialogo(qtbot, video, ajustes)
-    assert list(dialogo.casillas) == [T, Y, I]
-    assert [c.text() for c in dialogo.casillas.values()] == ["TikTok", "YouTube", "Instagram"]
-    assert all(c.isChecked() for c in dialogo.casillas.values())
+    assert list(dialogo.casillas) == [T, Y, I, X, F]
+    assert [c.text() for c in dialogo.casillas.values()] == [
+        "TikTok", "YouTube", "Instagram", "X", "Facebook"]
+    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [T, Y, I]
     opciones = dialogo.opciones()
     assert opciones.tiktok_modo == ModoTikTok.PUBLICO
     assert opciones.instagram_modo == ModoInstagram.PRUEBA
+    assert opciones.facebook_modo == ModoFacebook.VIDEO
+    assert opciones.x_premium is False
     # La rejilla respeta el orden visual.
     ys = [c.mapTo(dialogo, c.rect().topLeft()).y() for c in dialogo.casillas.values()]
     assert ys == sorted(ys)
@@ -319,7 +547,7 @@ def test_publicar_muestra_resultados_y_enlaces(qtbot, video, ajustes, llavero_fa
         assert not dialogo.boton_publicar.isEnabled()
     assert "Ya publicado antes en: YouTube" in preguntas[0]
     assert capturado == {"nombre": PROVEEDOR_POR_DEFECTO, "clave": CLAVE,
-                         "datos": {"perfil": "mi_perfil"}}
+                         "datos": {"perfil": "mi_perfil", "pagina_facebook": ""}}
     resultados = senal.args[0]
     assert list(resultados) == [T, Y, I]
     assert [c[1] for c in proveedor.llamadas] == [T, Y, I]
@@ -402,7 +630,7 @@ def test_estado_visible_desde_el_primer_clic(qtbot, video, ajustes, llavero_fals
     # Nada más aceptar: cola, barra en marcha y línea de estado.
     assert dialogo.estados[T].text() == "En cola"
     assert dialogo.estados[Y].text() == "En cola"
-    assert dialogo.estados[I].text() == ""
+    assert dialogo.estados[I].text() not in ("En cola", "Subiendo…")  # sin marcar
     assert dialogo.barra.isVisible() and dialogo.barra.height() >= 8
     assert dialogo.barra.minimum() == dialogo.barra.maximum() == 0  # indeterminada
     assert dialogo.etiqueta_estado.isVisible() and dialogo.etiqueta_estado.text()
@@ -544,7 +772,7 @@ def test_llavero_sin_clave_o_con_error_lo_dice(qtbot, video, ajustes, monkeypatc
     assert dialogo.etiqueta_estado.isVisible()
     assert proveedor.llamadas == []
     assert not dialogo.publicando and dialogo.boton_cerrar.isEnabled()
-    for p in ORDEN:
+    for p in (T, Y, I):
         assert "✗" in dialogo.estados[p].text()
     assert esperado.split(" (")[0] in _log(dialogo) or type(lectura).__name__ in _log(dialogo)
     assert not dialogo.boton_registro.isHidden()
@@ -705,3 +933,255 @@ def test_confirmacion_avisa_de_lo_que_quedo_sin_confirmar(qtbot, video, ajustes,
     assert "Ya publicado antes en: YouTube." in preguntas[0]
     assert "Sin confirmar en: Instagram" in preguntas[0]
     assert "compruébalo" in preguntas[0]
+
+
+# --- X y Facebook en el diálogo Publicar ---
+
+
+def _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor=None, capturado=None,
+                   marcadas=(T, Y, I, X, F), pagina=Pagina("111", "Mi página")):
+    _listo(ajustes, llavero_falso)
+    ajustes.plataformas_redes = list(marcadas)
+    if pagina is not None:
+        ajustes.pagina_facebook = pagina
+    dialogo, proveedor = _dialogo(qtbot, video, ajustes, proveedor, capturado)
+    _esperar_consultas(qtbot)
+    return dialogo, proveedor
+
+
+def test_texto_de_x_precargado_con_contador_y_regenerado(qtbot, video, ajustes,
+                                                         llavero_falso):
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    assert dialogo.campo_x.toPlainText() == "Título X\n\n#ia #pymes"
+    assert dialogo.contador_x.text() == "20/280"
+    # Mientras no se toca, sigue al título y a los hashtags.
+    dialogo.campo_titulo.setText("Otro")
+    dialogo.campo_hashtags.setText("#uno")
+    assert dialogo.campo_x.toPlainText() == "Otro\n\n#uno"
+    assert dialogo.contador_x.text() == "10/280"
+    assert dialogo.publicacion().texto_x == "Otro\n\n#uno"
+    # Editado a mano, ya no se pisa.
+    dialogo.campo_x.setPlainText("Mi post 👍 https://example.com/una/ruta/larga")
+    assert dialogo.contador_x.text() == f"{longitud_x(dialogo.campo_x.toPlainText())}/280"
+    dialogo.campo_titulo.setText("Otro más")
+    assert dialogo.campo_x.toPlainText().startswith("Mi post")
+    assert dialogo.publicacion().texto_x.startswith("Mi post")
+    # Vacío: vuelve a seguir al título.
+    dialogo.campo_x.setPlainText("")
+    dialogo.campo_titulo.setText("Tercero")
+    assert dialogo.campo_x.toPlainText() == "Tercero\n\n#uno"
+
+
+def test_texto_de_x_largo_sin_premium_bloquea_y_con_premium_no(qtbot, video, ajustes,
+                                                              llavero_falso):
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso)
+    assert dialogo.boton_publicar.isEnabled()
+    dialogo.campo_x.setPlainText("palabra " * 40)
+    assert dialogo.contador_x.text() == "319/280"
+    assert "color" in dialogo.contador_x.styleSheet()
+    assert not dialogo.boton_publicar.isEnabled()
+    assert "280" in dialogo.estados[X].text()
+    # Sin X marcada, el texto de X no importa.
+    dialogo.casillas[X].setChecked(False)
+    assert dialogo.boton_publicar.isEnabled()
+    dialogo.casillas[X].setChecked(True)
+    ajustes.x_premium = True
+    dialogo.refrescar_servicio()
+    _esperar_consultas(qtbot)
+    assert dialogo.boton_publicar.isEnabled()
+    assert dialogo.contador_x.styleSheet() == ""
+    assert dialogo.opciones().x_premium is True
+
+
+def test_x_deshabilitada_por_duracion_sin_premium(qtbot, video, ajustes, llavero_falso,
+                                                   monkeypatch):
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", lambda v: 167.4)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso)
+    qtbot.waitUntil(lambda: dialogo.duracion is not None, timeout=3000)
+    assert not dialogo.casillas[X].isEnabled()
+    assert not dialogo.casillas[X].isChecked()
+    assert dialogo.estados[X].text() == (
+        "X sin Premium admite vídeos de hasta 2:20; este dura 2:48.")
+    assert X not in dialogo.plataformas()
+    assert dialogo.boton_publicar.isEnabled()  # las demás siguen
+    # Con Premium vuelve, y marcada como estaba.
+    ajustes.x_premium = True
+    dialogo.refrescar_servicio()
+    _esperar_consultas(qtbot)
+    assert dialogo.casillas[X].isEnabled() and dialogo.casillas[X].isChecked()
+    assert "2:20" not in dialogo.estados[X].text()
+
+
+def test_x_deshabilitada_por_tamano_sin_premium(qtbot, tmp_path, ajustes, llavero_falso):
+    grande = tmp_path / "grande_limpio.mp4"
+    with grande.open("wb") as f:
+        f.truncate(600 * MB)  # disperso: no ocupa disco de verdad
+    dialogo, _p = _dialogo_listo(qtbot, grande, ajustes, llavero_falso)
+    qtbot.waitUntil(lambda: dialogo.duracion is not None, timeout=3000)
+    assert not dialogo.casillas[X].isEnabled()
+    assert "512 MB" in dialogo.estados[X].text() and "600 MB" in dialogo.estados[X].text()
+
+
+def test_x_espera_a_la_duracion_sin_bloquear_la_ventana(qtbot, video, ajustes, llavero_falso,
+                                                        monkeypatch):
+    import threading
+    import time
+
+    soltar = threading.Event()
+
+    def lenta(v):
+        soltar.wait(5)
+        return 20.0
+
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", lenta)
+    _listo(ajustes, llavero_falso)
+    ajustes.plataformas_redes = [X]
+    inicio = time.monotonic()
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    assert time.monotonic() - inicio < 1.0  # ffprobe no bloquea la ventana
+    assert dialogo.duracion is None
+    assert not dialogo.casillas[X].isEnabled()
+    assert "Comprobando" in dialogo.estados[X].text()
+    assert not dialogo.boton_publicar.isEnabled()
+    soltar.set()
+    qtbot.waitUntil(lambda: dialogo.duracion == 20.0, timeout=3000)
+    assert dialogo.casillas[X].isEnabled() and dialogo.casillas[X].isChecked()
+    _esperar_consultas(qtbot)
+    assert dialogo.boton_publicar.isEnabled()
+
+
+def test_facebook_sin_pagina_lo_explica_y_no_publica(qtbot, video, ajustes, llavero_falso):
+    proveedor = ProveedorFalso(paginas=[Pagina("1", "Una"), Pagina("2", "Otra")])
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor,
+                                 marcadas=(T, F), pagina=None)
+    assert dialogo.casillas[F].isChecked()
+    assert "página de Facebook" in dialogo.estados[F].text()
+    assert "Redes" in dialogo.estados[F].text()
+    assert not dialogo.boton_publicar.isEnabled()
+    dialogo.casillas[F].setChecked(False)
+    assert dialogo.boton_publicar.isEnabled()
+    dialogo.casillas[F].setChecked(True)
+    ajustes.pagina_facebook = Pagina("2", "Otra")
+    dialogo.refrescar_servicio()
+    _esperar_consultas(qtbot)
+    assert dialogo.boton_publicar.isEnabled()
+
+
+def test_una_sola_pagina_de_facebook_se_elige_sola(qtbot, video, ajustes, llavero_falso):
+    proveedor = ProveedorFalso(paginas=[Pagina("555", "La única")])
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor,
+                                 marcadas=(F,), pagina=None)
+    assert ajustes.pagina_facebook == Pagina("555", "La única")
+    assert dialogo.boton_publicar.isEnabled()
+    assert "página de Facebook" not in dialogo.estados[F].text()
+
+
+def test_x_y_facebook_llegan_al_proveedor_con_sus_opciones(qtbot, video, ajustes,
+                                                          llavero_falso, monkeypatch):
+    capturado: dict = {}
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso,
+                                        capturado=capturado, marcadas=(Y, X, F))
+    dialogo.campo_x.setPlainText("Post propio para X")
+    dialogo.combo_facebook.setCurrentIndex(dialogo.combo_facebook.findData("video"))
+    preguntas = _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000) as senal:
+        dialogo.boton_publicar.click()
+    assert "X: Post público" in preguntas[0]
+    assert "Facebook: Vídeo normal" in preguntas[0]
+    assert list(senal.args[0]) == [Y, X, F]
+    publicaciones = [c for c in proveedor.llamadas if c[0] == "publicar"]
+    assert [c[1] for c in publicaciones] == [Y, X, F]
+    pub, opciones = publicaciones[1][2], publicaciones[1][3]
+    assert pub.texto_x == "Post propio para X"
+    assert opciones.facebook_modo == ModoFacebook.VIDEO and opciones.x_premium is False
+    assert capturado["datos"] == {"perfil": "mi_perfil", "pagina_facebook": "111"}
+    assert ajustes.plataformas_redes == [Y, X, F]
+    assert ajustes.facebook_modo == ModoFacebook.VIDEO
+    log = _log(dialogo)
+    assert "Texto de X" in log and "Página de Facebook: sí" in log
+
+
+def test_borrador_de_facebook_se_explica_y_se_anota(qtbot, video, ajustes, llavero_falso,
+                                                    monkeypatch):
+    proveedor = ProveedorFalso(respuestas={F: Resultado(F, ok=True)})
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor,
+                                 marcadas=(F,))
+    dialogo.combo_facebook.setCurrentIndex(dialogo.combo_facebook.findData("borrador"))
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert "Facebook" in dialogo.estados[F].text() and "borrador" in dialogo.estados[F].text()
+    assert "Facebook (borrador)" in dialogo.aviso_publicado.text()
+
+
+# --- cuentas conectadas en el diálogo Publicar ---
+
+
+def test_cuentas_no_conectadas_se_deshabilitan_y_las_demas_muestran_la_cuenta(
+        qtbot, video, ajustes, llavero_falso):
+    proveedor = ProveedorFalso(cuentas_conectadas=_cuentas_variadas())
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor)
+    assert proveedor.consultas and proveedor.consultas[0] == "cuentas"
+    assert not dialogo.casillas[Y].isEnabled() and not dialogo.casillas[Y].isChecked()
+    assert dialogo.estados[Y].text() == "No conectada en Upload-Post"
+    assert dialogo.casillas[I].isEnabled() and dialogo.casillas[I].isChecked()
+    assert "Reconecta" in dialogo.estados[I].text()
+    assert dialogo.estados[T].text() == "@yo_tt"
+    assert dialogo.boton_publicar.isEnabled()
+    # Se guardan para la próxima vez (p. ej. sin conexión).
+    assert ajustes.cuentas_guardadas().cuentas == _cuentas_variadas()
+
+
+def test_sin_conexion_se_usa_lo_ultimo_que_se_supo(qtbot, video, ajustes, llavero_falso):
+    _listo(ajustes, llavero_falso)
+    ajustes.guardar_cuentas(_cuentas_variadas())
+    proveedor = ProveedorFalso(cuentas_conectadas=ErrorConsulta(
+        "No se pudo conectar con el servicio (ConnectError)."))
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor)
+    assert not dialogo.casillas[Y].isEnabled()
+    assert "Reconecta" in dialogo.estados[I].text()
+    assert "comprobar las cuentas" in dialogo.etiqueta_servicio.text()
+    assert dialogo.boton_publicar.isEnabled()
+
+
+def test_sin_conexion_ni_nada_guardado_todo_sigue_usable(qtbot, video, ajustes,
+                                                         llavero_falso):
+    proveedor = ProveedorFalso(cuentas_conectadas=ErrorConsulta("sin red"))
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor)
+    assert all(c.isEnabled() for c in dialogo.casillas.values())
+    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == list(ORDEN)
+    assert dialogo.boton_publicar.isEnabled()
+
+
+def test_sin_clave_no_se_consultan_las_cuentas(qtbot, video, ajustes, llavero_falso):
+    dialogo, proveedor = _dialogo(qtbot, video, ajustes)
+    _esperar_consultas(qtbot)
+    assert proveedor.consultas == []
+
+
+def test_el_registro_de_la_publicacion_anota_las_cuentas(qtbot, video, ajustes,
+                                                         llavero_falso, monkeypatch):
+    proveedor = ProveedorFalso(cuentas_conectadas=_cuentas_variadas())
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor,
+                                 marcadas=(T,))
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    log = _log(dialogo)
+    assert "Cuentas (comprobadas" in log
+    assert "TikTok @yo_tt" in log and "YouTube no conectada" in log
+    assert "Instagram @yo_ig (reconectar)" in log
+    assert CLAVE not in log and "mi_perfil" not in log
+
+
+def test_los_resultados_no_se_pisan_con_la_consulta_de_cuentas(qtbot, video, ajustes,
+                                                                llavero_falso, monkeypatch):
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(T,))
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert "Publicado" in dialogo.estados[T].text()
+    dialogo.refrescar_servicio()  # p. ej. al volver de Redes…
+    _esperar_consultas(qtbot)
+    assert "Publicado" in dialogo.estados[T].text()
+    assert dialogo.estados[Y].text() == "@yo_youtube"

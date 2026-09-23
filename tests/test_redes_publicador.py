@@ -8,6 +8,7 @@ import pytest
 from tests.redes_falsos import ProveedorFalso
 from videopipeline.redes import publicador, registro
 from videopipeline.redes.modelo import (
+    ModoFacebook,
     ModoInstagram,
     ModoTikTok,
     Opciones,
@@ -18,6 +19,7 @@ from videopipeline.redes.modelo import (
 from videopipeline.redes.publicador import Estado
 
 T, Y, I = Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM
+X, F = Plataforma.X, Plataforma.FACEBOOK
 
 
 @pytest.fixture
@@ -184,3 +186,18 @@ def test_pendiente_sin_referencia_no_se_sondea_y_se_anota_sin_confirmar(pub):
     ultimas = registro.ultimas(pub.video)
     assert ultimas[I].sin_confirmar and not ultimas[Y].sin_confirmar
     assert registro.ya_publicado(pub.video) == {Y, I}
+
+
+def test_orden_con_x_y_facebook(pub):
+    proveedor = ProveedorFalso()
+    resultados, _ = _publicar(proveedor, pub, [F, X, I, T, Y])
+    assert list(resultados) == [T, Y, I, X, F]
+    assert [c[1] for c in proveedor.llamadas] == [T, Y, I, X, F]
+
+
+@pytest.mark.parametrize("modo", list(ModoFacebook))
+def test_modo_de_x_y_facebook_en_el_registro(pub, modo):
+    publicador.publicar(ProveedorFalso(), pub, Opciones(facebook_modo=modo), [X, F],
+                        nombre_proveedor="falso", espera=lambda s: None)
+    modos = {e.plataforma: e.modo for e in registro.leer(pub.video)}
+    assert modos == {X: "publico", F: modo.value}

@@ -15,11 +15,19 @@ import httpx
 import pytest
 
 from videopipeline.redes import proveedor as registro_proveedores
-from videopipeline.redes.modelo import ORDEN, Opciones, Plataforma, Publicacion, Resultado
-from videopipeline.redes.proveedor import PROVEEDORES, Proveedor
+from videopipeline.redes.modelo import (
+    ORDEN,
+    Opciones,
+    Plataforma,
+    Publicacion,
+    Resultado,
+)
+from videopipeline.redes.proveedor import PROVEEDORES, ErrorConsulta, Proveedor
 
 RAIZ = Path(__file__).resolve().parent.parent
 CLAVE = "clave-contrato-XYZ"
+# Datos no secretos que la app pasa a `crear` (ver `Ajustes.ajustes_proveedor`).
+AJUSTES = {"perfil": "perfil", "pagina_facebook": "123"}
 
 
 # --- contrato ---
@@ -63,7 +71,7 @@ def test_modulo_expone_la_interfaz(nombre):
 
 
 def test_crear_devuelve_un_proveedor_que_no_muestra_la_clave(nombre):
-    p = registro_proveedores.crear(nombre, CLAVE, {"perfil": "perfil"},
+    p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(_error_500, []))
     assert isinstance(p, Proveedor)
     assert isinstance(p.nombre, str) and p.nombre
@@ -81,7 +89,7 @@ def test_por_defecto_esta_registrado():
 
 def test_video_ausente_no_envia_nada(nombre, tmp_path):
     peticiones: list = []
-    p = registro_proveedores.crear(nombre, CLAVE, {"perfil": "perfil"},
+    p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(_error_500, peticiones))
     for plataforma in ORDEN:
         r = p.publicar(plataforma, _pub(tmp_path / "falta.mp4"), Opciones())
@@ -95,7 +103,7 @@ def test_fallos_del_servicio_no_lanzan_ni_filtran_la_clave(nombre, tmp_path, res
     video = tmp_path / "v.mp4"
     video.write_bytes(b"MP4")
     peticiones: list = []
-    p = registro_proveedores.crear(nombre, CLAVE, {"perfil": "perfil"},
+    p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(responder, peticiones))
     for plataforma in ORDEN:
         r = p.publicar(plataforma, _pub(video), Opciones())
@@ -108,6 +116,27 @@ def test_fallos_del_servicio_no_lanzan_ni_filtran_la_clave(nombre, tmp_path, res
         assert not e.ok and CLAVE not in e.error
     assert peticiones, "el proveedor debe usar el cliente HTTP inyectado"
     assert all(req.url.scheme == "https" for req in peticiones)
+    # Todas las plataformas llegan al servicio (Facebook, con su página).
+    assert len([r for r in peticiones if r.method == "POST"]) == len(ORDEN)
+
+
+@pytest.mark.parametrize("responder", [_error_500, _sin_red, _basura])
+def test_consultas_fallidas_lanzan_error_consulta_sin_la_clave(nombre, responder):
+    peticiones: list = []
+    p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
+                                   http=_cliente(responder, peticiones))
+    for consulta in (p.cuentas, p.paginas_facebook):
+        with pytest.raises(ErrorConsulta) as error:
+            consulta()
+        assert str(error.value)
+        assert CLAVE not in str(error.value)
+    assert peticiones and all(req.url.scheme == "https" for req in peticiones)
+    assert all(req.method == "GET" for req in peticiones)
+
+
+def test_error_consulta_es_una_excepcion_neutra():
+    assert issubclass(ErrorConsulta, Exception)
+    assert ErrorConsulta.__module__ == "videopipeline.redes.proveedor"
 
 
 # --- desacoplamiento ---
@@ -120,7 +149,10 @@ PROHIBIDAS = re.compile(
     r"upload[-_ ]?post|api\.upload|Apikey|post_mode|share_mode|share_to_feed|"
     r"privacyStatus|privacy_level|categoryId|containsSyntheticMedia|is_aigc|"
     r"is_ai_generated|tiktok_title|youtube_title|youtube_description|instagram_title|"
-    r"MEDIA_UPLOAD|DIRECT_POST|PUBLIC_TO_EVERYONE|TRIAL_REELS|uploadposts",
+    r"MEDIA_UPLOAD|DIRECT_POST|PUBLIC_TO_EVERYONE|TRIAL_REELS|uploadposts|"
+    r"x_title|x_long_text_as_post|made_with_ai|facebook_page_id|facebook_title|"
+    r"facebook_description|facebook_media_type|facebook_is_ai_generated|video_state|"
+    r"social_accounts|reauth_required|display_name|page_id|page_name",
     re.IGNORECASE,
 )
 
@@ -170,12 +202,14 @@ def test_el_modulo_del_proveedor_contiene_lo_especifico():
     """Si alguien mueve los campos a otro sitio, este test lo detecta."""
     texto = MODULO_PROVEEDOR.read_text(encoding="utf-8")
     for cadena in ("api.upload-post.com", "Apikey", "post_mode", "share_mode",
-                   "privacyStatus"):
+                   "privacyStatus", "x_title", "x_long_text_as_post", "facebook_page_id",
+                   "facebook_media_type", "video_state", "social_accounts",
+                   "reauth_required", "facebook/pages"):
         assert cadena in texto
 
 
 def test_plataformas_neutras():
-    assert {p.value for p in Plataforma} == {"tiktok", "youtube", "instagram"}
+    assert {p.value for p in Plataforma} == {"tiktok", "youtube", "instagram", "x", "facebook"}
 
 
 def test_ayuda_del_perfil_es_texto(nombre):

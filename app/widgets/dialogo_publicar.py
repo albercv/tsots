@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import logging
 import platform as plataforma_sistema
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
@@ -28,11 +29,14 @@ from PySide6.QtWidgets import (
 from videopipeline.caption import Caption
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes import diario, publicador, registro
+from videopipeline.redes import diario, limites, publicador, registro
 from videopipeline.redes.modelo import (
+    ETIQUETAS_FACEBOOK,
     ETIQUETAS_INSTAGRAM,
     ETIQUETAS_TIKTOK,
     ORDEN,
+    Cuenta,
+    ModoFacebook,
     ModoInstagram,
     ModoTikTok,
     Opciones,
@@ -41,14 +45,22 @@ from videopipeline.redes.modelo import (
     Resultado,
 )
 from videopipeline.redes.publicador import Estado
-from videopipeline.redes.textos import MAX_TITULO_YOUTUBE
+from videopipeline.redes.textos import (
+    MAX_TEXTO_X,
+    MAX_TITULO_YOUTUBE,
+    longitud_x,
+    texto_x_por_defecto,
+)
+from videopipeline.steps import duracion_video
 
-from .. import credenciales
+from .. import credenciales, segundo_plano
+from .. import cuentas as consulta_cuentas
+from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
 
-COLOR_OK = "#43a047"
-COLOR_ERROR = "#e53935"
-COLOR_AVISO = "#b8860b"
+# Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
+# tests la sustituyen.
+medir_duracion = duracion_video
 
 # Lo que escriben el diálogo y su hilo va al registro de la publicación
 # (`logs/publicacion_<vídeo>_<fecha>.log`) mientras hay un `Diario` abierto.
@@ -161,13 +173,37 @@ class DialogoPublicar(QDialog):
     configurar_redes = Signal()
 
     def __init__(self, video: Path, caption: Caption, ajustes: Ajustes,
-                 llavero=credenciales, fabrica: Fabrica | None = None, parent=None):
+                 llavero=credenciales, fabrica: Fabrica | None = None,
+                 medir: Callable[[Path], float] | None = None, parent=None):
         super().__init__(parent)
         self.video = Path(video)
         self.ajustes = ajustes
         self.llavero = llavero
         self.fabrica = fabrica or (lambda nombre, clave, datos: proveedores.crear(
             nombre, clave, datos))
+        self._medir = medir or medir_duracion
+        # Duración (None mientras ffprobe la mide; 0 si no se pudo leer) y tamaño.
+        self.duracion: float | None = None
+        try:
+            self.tamano: int | None = self.video.stat().st_size
+        except OSError:
+            self.tamano = None
+        # Cuentas conectadas: lo último guardado y, en cuanto llega, la
+        # consulta en vivo. Una plataforma ausente es desconocida.
+        self._cuentas: dict[Plataforma, Cuenta | None] = {}
+        self._cuentas_en_vivo = False
+        self._fecha_cuentas = ""
+        self._error_cuentas = ""
+        self._consulta_n = 0
+        # Lo que el usuario quiere marcado; las casillas deshabilitadas
+        # (cuenta no conectada, vídeo largo para X…) se desmarcan sin olvidarlo.
+        self._deseadas: set[Plataforma] = set(ajustes.plataformas_redes)
+        self._aplicando = False
+        # Filas que muestran el progreso o el resultado de un intento: la
+        # información de la cuenta no las pisa.
+        self._con_resultado: set[Plataforma] = set()
+        self._x_editado = False
+        self._rellenando_x = False
         self._hilo: HiloPublicacion | None = None
         self._diario: diario.Diario | None = None
         self.ruta_log: Path | None = None
@@ -204,6 +240,17 @@ class DialogoPublicar(QDialog):
         self.campo_hashtags.setCursorPosition(0)
         formulario.addRow(_("Hashtags:"), self.campo_hashtags)
         self._palabras_clave = tuple(caption.palabras_clave)
+        self.campo_x = QPlainTextEdit()
+        self.campo_x.setFixedHeight(64)
+        self.campo_x.setToolTip(_(
+            "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un "
+            "emoji, 2. Mientras no lo cambies, se rellena con el título y los "
+            "hashtags.").format(maximo=MAX_TEXTO_X))
+        self.contador_x = QLabel()
+        fila_x = QHBoxLayout()
+        fila_x.addWidget(self.campo_x, 1)
+        fila_x.addWidget(self.contador_x, 0, Qt.AlignmentFlag.AlignTop)
+        formulario.addRow(_("Texto para X:"), fila_x)
         raiz.addWidget(grupo_textos)
 
         grupo_plataformas = QGroupBox(_("Plataformas (en este orden)"))
@@ -211,7 +258,6 @@ class DialogoPublicar(QDialog):
         rejilla.setColumnStretch(2, 1)
         self.casillas: dict[Plataforma, QCheckBox] = {}
         self.estados: dict[Plataforma, QLabel] = {}
-        marcadas = set(ajustes.plataformas_redes)
         self.combo_tiktok = QComboBox()
         for modo in ModoTikTok:
             self.combo_tiktok.addItem(_(ETIQUETAS_TIKTOK[modo]), modo.value)
@@ -221,15 +267,23 @@ class DialogoPublicar(QDialog):
             self.combo_instagram.addItem(_(ETIQUETAS_INSTAGRAM[modo]), modo.value)
         self.combo_instagram.setCurrentIndex(
             self.combo_instagram.findData(ajustes.instagram_modo.value))
+        self.combo_facebook = QComboBox()
+        for modo in ModoFacebook:
+            self.combo_facebook.addItem(_(ETIQUETAS_FACEBOOK[modo]), modo.value)
+        self.combo_facebook.setCurrentIndex(
+            self.combo_facebook.findData(ajustes.facebook_modo.value))
         modo_por_plataforma = {
             Plataforma.TIKTOK: self.combo_tiktok,
             Plataforma.YOUTUBE: QLabel(_("Short público")),
             Plataforma.INSTAGRAM: self.combo_instagram,
+            Plataforma.X: QLabel(_("Post público")),
+            Plataforma.FACEBOOK: self.combo_facebook,
         }
         for fila, plataforma in enumerate(ORDEN):
             casilla = QCheckBox(plataforma.nombre)
-            casilla.setChecked(plataforma in marcadas)
-            casilla.toggled.connect(self._refrescar)
+            casilla.setChecked(plataforma in self._deseadas)
+            casilla.toggled.connect(
+                lambda marcada, p=plataforma: self._al_marcar(p, marcada))
             estado = QLabel()
             estado.setOpenExternalLinks(True)
             estado.setWordWrap(True)
@@ -288,9 +342,13 @@ class DialogoPublicar(QDialog):
         botones.addWidget(self.boton_publicar)
         raiz.addLayout(botones)
 
-        self.campo_titulo.textChanged.connect(self._refrescar)
+        self.campo_titulo.textChanged.connect(self._al_cambiar_textos)
+        self.campo_hashtags.textChanged.connect(self._al_cambiar_textos)
+        self.campo_x.textChanged.connect(self._al_editar_x)
+        self._rellenar_x()
         self.refrescar_servicio()
         self._refrescar_aviso()
+        self._medir_video()
 
     # --- estado ---
 
@@ -306,6 +364,8 @@ class DialogoPublicar(QDialog):
             tiktok_modo=ModoTikTok(self.combo_tiktok.currentData()),
             instagram_modo=ModoInstagram(self.combo_instagram.currentData()),
             youtube_categoria=self.ajustes.youtube_categoria,
+            x_premium=self.ajustes.x_premium,
+            facebook_modo=ModoFacebook(self.combo_facebook.currentData()),
         )
 
     def publicacion(self) -> Publicacion:
@@ -315,7 +375,148 @@ class DialogoPublicar(QDialog):
             caption=self.campo_caption.toPlainText().strip(),
             hashtags=tuple(self.campo_hashtags.text().split()),
             palabras_clave=self._palabras_clave,
+            texto_x=self.campo_x.toPlainText().strip(),
         )
+
+    # --- texto de X ---
+
+    def _rellenar_x(self) -> None:
+        """Mientras el usuario no lo edite, el texto de X sigue al título y
+        a los hashtags."""
+        if self._x_editado:
+            return
+        self._rellenando_x = True
+        try:
+            self.campo_x.setPlainText(texto_x_por_defecto(replace(self.publicacion(), texto_x="")))
+        finally:
+            self._rellenando_x = False
+
+    def _al_cambiar_textos(self, *args) -> None:
+        self._rellenar_x()
+        self._refrescar()
+
+    def _al_editar_x(self) -> None:
+        if self._rellenando_x:
+            return
+        # Vaciarlo devuelve el texto automático en el siguiente cambio.
+        self._x_editado = bool(self.campo_x.toPlainText().strip())
+        self._refrescar()
+
+    # --- duración del vídeo y cuentas (en segundo plano) ---
+
+    def _medir_video(self) -> None:
+        medir, video = self._medir, self.video
+        segundo_plano.en_segundo_plano(lambda: float(medir(video) or 0.0), self._al_medir,
+                                       "tsots-ffprobe")
+
+    def _al_medir(self, resultado) -> None:
+        self.duracion = resultado if isinstance(resultado, float) else 0.0
+        self._refrescar()
+
+    def _consultar_cuentas(self) -> None:
+        """Pide al servicio las cuentas conectadas (y, si hace falta elegir
+        la página de Facebook, sus páginas). Sin clave o sin perfil, nada."""
+        self._consulta_n += 1
+        listo, _motivo = self._listo()
+        if not listo:
+            return
+        numero = self._consulta_n
+        llavero, fabrica = self.llavero, self.fabrica
+        nombre = self.ajustes.proveedor_redes
+        datos = self.ajustes.ajustes_proveedor()
+        paginas = None if self.ajustes.pagina_facebook is None else False
+
+        def trabajo():
+            return numero, consulta_cuentas.consultar(llavero, fabrica, nombre, datos,
+                                                      paginas=paginas)
+
+        segundo_plano.en_segundo_plano(trabajo, self._al_consultar, "tsots-cuentas")
+
+    def _al_consultar(self, resultado) -> None:
+        if isinstance(resultado, BaseException):  # `consultar` no lanza; por si acaso
+            resultado = (self._consulta_n,
+                         consulta_cuentas.Consulta(error=type(resultado).__name__))
+        numero, consulta = resultado
+        if numero != self._consulta_n:
+            return  # llegó tarde: ya hay otra consulta en marcha
+        if consulta.cuentas is not None:
+            self._cuentas = dict(consulta.cuentas)
+            self._cuentas_en_vivo = True
+            self._fecha_cuentas = datetime.now().strftime("%H:%M")
+            self._error_cuentas = ""
+            self.ajustes.guardar_cuentas(consulta.cuentas)
+        else:
+            self._error_cuentas = consulta.error
+        # Una sola página de Facebook: no hay nada que elegir.
+        if consulta.paginas is not None and len(consulta.paginas) == 1 \
+                and self.ajustes.pagina_facebook is None:
+            self.ajustes.pagina_facebook = consulta.paginas[0]
+        self._refrescar_etiqueta_servicio()
+        self._refrescar()
+
+    # --- estado de cada plataforma ---
+
+    def _al_marcar(self, plataforma: Plataforma, marcada: bool) -> None:
+        if self._aplicando:
+            return
+        if marcada:
+            self._deseadas.add(plataforma)
+        else:
+            self._deseadas.discard(plataforma)
+        self._con_resultado.discard(plataforma)
+        self._refrescar()
+
+    def _estado_plataforma(self, plataforma: Plataforma) -> tuple[bool, str, str, str]:
+        """(habilitada, motivo que impide publicar si está marcada, texto
+        informativo, color del texto)."""
+        servicio = proveedores.nombre_visible(self.ajustes.proveedor_redes)
+        cuenta = self._cuentas.get(plataforma)
+        if plataforma in self._cuentas and cuenta is None:
+            texto, color = consulta_cuentas.describir(plataforma, None, servicio)
+            return False, "", texto, color
+        bloqueo = ""
+        if plataforma == Plataforma.X and not self.ajustes.x_premium:
+            if self.duracion is None:
+                return False, "", _("Comprobando la duración del vídeo…"), COLOR_SECUNDARIO
+            motivo = limites.motivo_no_admite_x(self.duracion, self.tamano, False)
+            if motivo:
+                return False, "", motivo, COLOR_AVISO
+            if longitud_x(self.campo_x.toPlainText().strip()) > MAX_TEXTO_X:
+                bloqueo = _("Texto para X de más de {maximo} caracteres: acórtalo (o marca "
+                            "Premium en Redes…)").format(maximo=MAX_TEXTO_X)
+        if plataforma == Plataforma.FACEBOOK and self.ajustes.pagina_facebook is None:
+            bloqueo = _("Falta la página de Facebook: elígela en Redes…")
+        texto, color = (consulta_cuentas.describir(plataforma, cuenta, servicio)
+                        if cuenta is not None else ("", ""))
+        return True, bloqueo, texto, color
+
+    def _refrescar_plataformas(self) -> list[str]:
+        """Aplica el estado de cada fila. Devuelve los motivos que impiden
+        publicar lo marcado."""
+        if self.publicando:
+            return []
+        bloqueos: list[str] = []
+        self._aplicando = True
+        try:
+            for plataforma in ORDEN:
+                casilla = self.casillas[plataforma]
+                habilitada, bloqueo, texto, color = self._estado_plataforma(plataforma)
+                casilla.setEnabled(habilitada)
+                marcada = habilitada and plataforma in self._deseadas
+                if casilla.isChecked() != marcada:
+                    casilla.setChecked(marcada)
+                if marcada and bloqueo:
+                    bloqueos.append(bloqueo)
+                    texto, color = bloqueo, COLOR_AVISO
+                if plataforma in self._con_resultado:
+                    continue
+                etiqueta = self.estados[plataforma]
+                etiqueta.setText(html.escape(texto))
+                etiqueta.setToolTip(texto if len(texto) > 40 else "")
+                etiqueta.setStyleSheet(f"color: {color};" if color else "")
+        finally:
+            self._aplicando = False
+        return bloqueos
 
     def _listo(self) -> tuple[bool, str]:
         nombre = self.ajustes.proveedor_redes
@@ -326,9 +527,21 @@ class DialogoPublicar(QDialog):
         return True, ""
 
     def refrescar_servicio(self) -> None:
-        """Vuelve a leer ajustes y Llavero (tras cerrar el diálogo Redes…)."""
+        """Vuelve a leer ajustes y Llavero (tras cerrar el diálogo Redes…) y
+        vuelve a consultar las cuentas conectadas."""
         nombre = self.ajustes.proveedor_redes
         self._hay_clave = self.llavero.hay_clave(nombre)
+        guardadas = self.ajustes.cuentas_guardadas()
+        self._cuentas = dict(guardadas.cuentas) if guardadas else {}
+        self._cuentas_en_vivo = False
+        self._fecha_cuentas = guardadas.fecha if guardadas else ""
+        self._error_cuentas = ""
+        self._refrescar_etiqueta_servicio()
+        self._consultar_cuentas()
+        self._refrescar()
+
+    def _refrescar_etiqueta_servicio(self) -> None:
+        nombre = self.ajustes.proveedor_redes
         listo, motivo = self._listo()
         if listo:
             perfil = self.ajustes.perfil_redes
@@ -340,21 +553,32 @@ class DialogoPublicar(QDialog):
                 self.etiqueta_servicio.setStyleSheet(f"color: {COLOR_AVISO};")
             else:
                 self.etiqueta_servicio.setStyleSheet("")
+            if self._error_cuentas:
+                texto += " · " + (_("No se pudieron comprobar las cuentas; se usa lo último "
+                                    "que se supo.") if self._cuentas
+                                  else _("No se pudieron comprobar las cuentas."))
             self.etiqueta_servicio.setText(texto)
+            self.etiqueta_servicio.setToolTip(self._error_cuentas)
         else:
             self.etiqueta_servicio.setText(motivo)
+            self.etiqueta_servicio.setToolTip("")
             self.etiqueta_servicio.setStyleSheet(f"color: {COLOR_AVISO};")
-        self._refrescar()
 
     def _refrescar(self, *args) -> None:
         largo = len(self.campo_titulo.text().strip())
         self.contador_titulo.setText(f"{largo}/{MAX_TITULO_YOUTUBE}")
         self.contador_titulo.setStyleSheet(
             f"color: {COLOR_AVISO};" if largo > MAX_TITULO_YOUTUBE else "")
+        largo_x = longitud_x(self.campo_x.toPlainText().strip())
+        self.contador_x.setText(f"{largo_x}/{MAX_TEXTO_X}")
+        self.contador_x.setStyleSheet(
+            f"color: {COLOR_AVISO};" if largo_x > MAX_TEXTO_X and not self.ajustes.x_premium
+            else "")
+        bloqueos = self._refrescar_plataformas()
         listo, _motivo = self._listo()
         self.boton_publicar.setEnabled(
             listo and not self.publicando and bool(self.plataformas())
-            and bool(self.campo_titulo.text().strip()))
+            and bool(self.campo_titulo.text().strip()) and not bloqueos)
 
     def _refrescar_aviso(self) -> None:
         ultimas = registro.ultimas(self.video)
@@ -373,7 +597,9 @@ class DialogoPublicar(QDialog):
             nombre = plataforma.nombre
             if entrada.sin_confirmar:
                 nombre = _("{plataforma} (sin confirmar)").format(plataforma=nombre)
-            elif plataforma == Plataforma.TIKTOK and entrada.modo == ModoTikTok.BORRADOR.value:
+            elif ((plataforma == Plataforma.TIKTOK and entrada.modo == ModoTikTok.BORRADOR.value)
+                  or (plataforma == Plataforma.FACEBOOK
+                      and entrada.modo == ModoFacebook.BORRADOR.value)):
                 nombre = _("{plataforma} (borrador)").format(plataforma=nombre)
             partes.append(f"{nombre} {fecha}")
         self.aviso_publicado.setText(
@@ -463,9 +689,12 @@ class DialogoPublicar(QDialog):
             return
         finally:
             del clave
-        self.ajustes.plataformas_redes = plataformas
+        # Lo que el usuario quiere marcado, también lo que hoy no se puede
+        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
+        self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
         self.ajustes.tiktok_modo = opciones.tiktok_modo
         self.ajustes.instagram_modo = opciones.instagram_modo
+        self.ajustes.facebook_modo = opciones.facebook_modo
         self._hilo = HiloPublicacion(proveedor, self.publicacion(), opciones,
                                      plataformas, nombre, self._diario)
         self._hilo.progreso.connect(self._al_progresar)
@@ -486,11 +715,13 @@ class DialogoPublicar(QDialog):
         self._procesando = set()
         self.resumen.clear()
         self.resumen.hide()
-        for plataforma in ORDEN:
+        self._con_resultado = set(plataformas)
+        for plataforma in plataformas:
             etiqueta = self.estados[plataforma]
-            etiqueta.setText(_("En cola") if plataforma in plataformas else "")
+            etiqueta.setText(_("En cola"))
             etiqueta.setToolTip("")
             etiqueta.setStyleSheet("")
+        self._refrescar()  # las demás filas vuelven a mostrar su cuenta
         self._diario = diario.Diario(self.video)
         self.ruta_log = self._diario.ruta
         self.boton_registro.setVisible(self.ruta_log is not None)
@@ -515,6 +746,22 @@ class DialogoPublicar(QDialog):
         publicacion = self.publicacion()
         log.info("Título: %r · caption: %d caracteres · hashtags: %s",
                  publicacion.titulo, len(publicacion.caption), " ".join(publicacion.hashtags))
+        if Plataforma.X in plataformas:
+            log.info("Texto de X: %d caracteres según X · Premium: %s · vídeo: %s, %s bytes",
+                     longitud_x(publicacion.texto_x), "sí" if opciones.x_premium else "no",
+                     limites.duracion_legible(self.duracion) if self.duracion else "duración ?",
+                     self.tamano if self.tamano is not None else "?")
+        if Plataforma.FACEBOOK in plataformas:
+            log.info("Página de Facebook: %s", "sí" if self.ajustes.pagina_facebook else "no")
+        if self._cuentas_en_vivo:
+            log.info("Cuentas (comprobadas a las %s): %s", self._fecha_cuentas,
+                     consulta_cuentas.resumen(self._cuentas))
+        elif self._cuentas:
+            log.info("Cuentas (guardadas del %s; consulta en vivo: %s): %s", self._fecha_cuentas,
+                     self._error_cuentas or "sin respuesta aún",
+                     consulta_cuentas.resumen(self._cuentas))
+        else:
+            log.info("Cuentas: sin comprobar (%s)", self._error_cuentas or "sin respuesta aún")
 
     def _poner_estado(self, texto: str, color: str = "") -> None:
         self.etiqueta_estado.setText(texto)
@@ -525,6 +772,8 @@ class DialogoPublicar(QDialog):
                              marcar: bool = True) -> None:
         """Final de un intento que no llegó a enviar nada: siempre se ve."""
         log.warning("Sin enviar: %s", texto)
+        if not marcar:  # esas filas vuelven a mostrar su cuenta
+            self._con_resultado -= set(self._en_curso)
         for plataforma in ORDEN:
             etiqueta = self.estados[plataforma]
             if marcar and plataforma in self._en_curso:
@@ -552,12 +801,17 @@ class DialogoPublicar(QDialog):
             return _(ETIQUETAS_TIKTOK[opciones.tiktok_modo])
         if plataforma == Plataforma.INSTAGRAM:
             return _(ETIQUETAS_INSTAGRAM[opciones.instagram_modo])
+        if plataforma == Plataforma.FACEBOOK:
+            return _(ETIQUETAS_FACEBOOK[opciones.facebook_modo])
+        if plataforma == Plataforma.X:
+            return _("Post público")
         return _("Short público")
 
     def _bloquear(self, bloqueado: bool) -> None:
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
-                       self.combo_tiktok, self.combo_instagram, self.boton_redes,
-                       self.boton_cerrar, *self.casillas.values()):
+                       self.campo_x, self.combo_tiktok, self.combo_instagram,
+                       self.combo_facebook, self.boton_redes, self.boton_cerrar,
+                       *self.casillas.values()):
             widget.setEnabled(not bloqueado)
         self.barra.setVisible(bloqueado)
         self._refrescar()
@@ -595,6 +849,9 @@ class DialogoPublicar(QDialog):
             elif (plataforma == Plataforma.TIKTOK
                   and self._opciones_en_curso.tiktok_modo == ModoTikTok.BORRADOR):
                 texto = html.escape(_("✓ En borradores: termínalo en la app de TikTok"))
+            elif (plataforma == Plataforma.FACEBOOK
+                  and self._opciones_en_curso.facebook_modo == ModoFacebook.BORRADOR):
+                texto = html.escape(_("✓ En borradores: termínalo en Facebook"))
             else:
                 texto = html.escape(_("✓ Publicado"))
             return texto, COLOR_OK
@@ -640,7 +897,12 @@ class DialogoPublicar(QDialog):
                               f'<span style="color: {color};">{texto}</span>')
                 # Lo que salió, o pudo salir, no se vuelve a marcar: evita duplicados.
                 if resultado.ok or resultado.pendiente:
-                    self.casillas[plataforma].setChecked(False)
+                    self._deseadas.discard(plataforma)
+                    self._aplicando = True
+                    try:
+                        self.casillas[plataforma].setChecked(False)
+                    finally:
+                        self._aplicando = False
             self.resumen.setText("<br>".join(lineas))
             self.resumen.show()
             texto, color = self._texto_final()

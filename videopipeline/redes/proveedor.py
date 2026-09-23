@@ -6,8 +6,9 @@ Un proveedor es un módulo de este paquete que expone:
 - `USA_PERFIL: bool`: si necesita un perfil o cuenta dentro del servicio.
 - `AYUDA_PERFIL: str` (opcional, marcado con `N_`): qué escribir como perfil.
 - `crear(clave, ajustes, http=None) -> Proveedor`: `clave` es la API key
-  (sale del Llavero), `ajustes` los datos no secretos (hoy, `perfil`) y
-  `http` un `httpx.Client` opcional que los tests sustituyen por uno falso.
+  (sale del Llavero), `ajustes` los datos no secretos (`perfil` y
+  `pagina_facebook`, el ID de la página de Facebook elegida) y `http` un
+  `httpx.Client` opcional que los tests sustituyen por uno falso.
 
 Añadir un proveedor = un módulo nuevo + una línea en `PROVEEDORES`.
 """
@@ -19,7 +20,12 @@ from types import ModuleType
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..i18n import _
-from .modelo import Opciones, Plataforma, Publicacion, Resultado
+from .modelo import Cuenta, Opciones, Pagina, Plataforma, Publicacion, Resultado
+
+
+class ErrorConsulta(Exception):
+    """No se pudo consultar al proveedor (cuentas o páginas). El mensaje es
+    legible, está traducido y nunca contiene la clave."""
 
 
 @runtime_checkable
@@ -36,6 +42,16 @@ class Proveedor(Protocol):
 
     def estado(self, plataforma: Plataforma, referencia: str) -> Resultado:
         """Consulta una publicación pendiente. Misma regla: no lanza."""
+        ...
+
+    def cuentas(self) -> dict[Plataforma, Cuenta | None]:
+        """Cuentas conectadas en el servicio: una entrada por cada
+        `Plataforma`, `None` si no está conectada. Lanza `ErrorConsulta`
+        (y ninguna otra excepción) si no se puede consultar."""
+        ...
+
+    def paginas_facebook(self) -> list[Pagina]:
+        """Páginas de Facebook a las que puede publicar. Lanza `ErrorConsulta`."""
         ...
 
 
