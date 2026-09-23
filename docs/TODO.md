@@ -25,11 +25,6 @@ Pending work, most urgent first. Remove an item when it is merged into
       Fallback if CLI auth fails: a scheduled task in the Claude desktop app,
       which already has the e2d connector (not verified).
 
-- [ ] **Header with the app logo.** Show the logo in the main window: a
-      nice header at the top with the logo (`docs/img/logo.png`), and the
-      drop zone and the queue moved below it. Keep the minimum window size
-      within the small-screen test limits (`test_ventana_cabe_en_pantallas_pequenas`).
-
 - [ ] **Publish to TikTok, YouTube and Instagram, in that order.**
       Findings from 2026-09-23:
       - TikTok's API is not an option for us: unaudited apps only post

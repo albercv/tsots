@@ -36,31 +36,40 @@
 
 ### Task 1: widget `Cabecera`
 
-- [ ] Tests en `tests/test_app_widgets.py`:
+- [x] Tests en `tests/test_app_widgets.py`:
   - `test_cabecera_carga_logo`: pixmap no nulo, logo visible, tamaño lógico `LADO_LOGO`.
   - `test_pixmap_logo_escala_con_dpr`: con `dpr=2` el pixmap mide `2 × lado` píxeles y tiene `devicePixelRatio() == 2`.
   - `test_cabecera_muestra_nombre_y_lema`.
   - `test_cabecera_sin_logo_no_falla`: ruta inexistente → logo oculto, título visible, `grab()` no nulo.
   - `test_cabecera_sigue_la_paleta`: con una paleta oscura (texto blanco), el título se pinta claro; sin hojas de estilo en la cabecera.
   - `test_cabecera_lema_traducible`: con un catálogo `en` mínimo, el lema sale en inglés.
-- [ ] Implementar `app/widgets/cabecera.py`.
-- [ ] Commit `feat(gui): header widget with the app logo, name and tagline`.
+- [x] Implementar `app/widgets/cabecera.py`.
+- [x] Commit `feat(gui): header widget with the app logo, name and tagline`.
 
 ### Task 2: cabecera en la ventana principal
 
-- [ ] Test en `tests/test_app_main.py`: `test_cabecera_encima_de_zona_drop_y_cola` (la parte inferior de la cabecera queda por encima de la zona de soltar, la cola y el panel derecho; ocupa el ancho de las dos columnas).
-- [ ] Añadir la cabecera en `VentanaPrincipal` antes de `fila_superior`.
-- [ ] Commit `feat(gui): show the header above the drop zone and the queue`.
+- [x] Test en `tests/test_app_main.py`: `test_cabecera_encima_de_zona_drop_y_cola` (la parte inferior de la cabecera queda por encima de la zona de soltar, la cola y el panel derecho; ocupa el ancho de las dos columnas).
+- [x] Añadir la cabecera en `VentanaPrincipal` antes de `fila_superior`.
+- [x] Commit `feat(gui): show the header above the drop zone and the queue`.
 
 ### Task 3: traducciones, revisión visual y documentación
 
-- [ ] `lanzador/traducir.sh`, traducir en `tsots.po`, sin fuzzy.
-- [ ] Capturas offscreen de la ventana en paleta clara y oscura, y al tamaño mínimo. Ajustar márgenes y tamaños hasta que se vea bien.
-- [ ] README: solo si describe la disposición de la ventana (dice "la zona de la izquierda", que sigue siendo cierto: sin cambios).
-- [ ] Quitar el punto de `docs/TODO.md`.
-- [ ] Commit `docs: header plan results; remove it from TODO`.
+- [x] `lanzador/traducir.sh`, traducir en `tsots.po`, sin fuzzy.
+- [x] Capturas offscreen de la ventana en paleta clara y oscura, y al tamaño mínimo. Ajustar márgenes y tamaños hasta que se vea bien.
+- [x] README: solo si describe la disposición de la ventana (dice "la zona de la izquierda", que sigue siendo cierto: sin cambios).
+- [x] Quitar el punto de `docs/TODO.md`.
+- [x] Commit `docs: header plan results; remove it from TODO`.
 
 ## Riesgos
 
-- **Altura mínima:** la cabecera resta alto útil a la cola en pantallas pequeñas. Se mantiene compacta (logo de 44 px) y se comprueba el mínimo con el test existente.
+- **Altura mínima:** la cabecera resta alto útil a la cola en pantallas pequeñas. Se mantiene compacta (logo de 40 px, cabecera de 50 px) y se comprueba el mínimo con el test existente.
 - **`PlaceholderText` en temas antiguos:** en algunos estilos puede tener poco contraste. En macOS es el gris secundario del sistema.
+
+## Resultado (2026-09-23)
+
+Implementado en `feature/cabecera-logo`.
+
+- Cabecera de 50 px lógicos: marca de la oveja de 40 px, "The Silence of the Shorts" en negrita (1,45 × la fuente del sistema), el lema en el gris secundario de la paleta y un separador fino.
+- El icono lleva un 10 % de margen transparente (el que deja `generar_icono.py`); la cabecera lo recorta para que el cuadrado ocupe los 40 px y quede alineado con el borde de la zona de soltar.
+- Mínimo de la ventana con el estilo nativo de macOS (Retina, dpr 2): 645 × 415 (antes ~645 × 365). Con la plataforma `offscreen` de los tests: 567 × 377.
+- Capturas revisadas con la plataforma `cocoa` en claro y oscuro (`styleHints().setColorScheme`), a 900 × 560, al tamaño mínimo y en inglés.
