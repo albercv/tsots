@@ -25,18 +25,26 @@ Pending work, most urgent first. Remove an item when it is merged into
       Fallback if CLI auth fails: a scheduled task in the Claude desktop app,
       which already has the e2d connector (not verified).
 
-## Local models and Ollama
+- [ ] **Glossary of terms for transcription.** Plan ready:
+      `docs/superpowers/plans/2026-09-23-glosario.md`. Fixes brand names
+      such as "Claude Code" being transcribed as "Cloud Code".
 
-Findings from 2026-09-23. Local pulls are still free and need no account;
-paid plans only cover cloud models.
+## Improvements
 
-- [ ] **Fix the Ollama CLI.** `ollama` on the PATH is Homebrew's 0.19.0,
-      older than the app's server (0.33.2). Old clients get
-      `412: The model you are attempting to pull requires a newer version of
-      Ollama`. Fix: `brew uninstall ollama`, then restart Ollama.app so it
-      installs the pending 0.34.3 update. The installer (`instalar.command`)
-      installs the cask `ollama-app`; check it never adds the formula too.
-- [ ] **Try newer models** within the app's memory budget on a 36 GB Mac
-      (25.5 GB): `qwen3.8:27b` (quality, dense, send `think: false`) and
-      `gemma4:26b` (MoE with 3.8B active, fast). Compare them with
-      `qwen3.5:9b` on the same transcript before changing the default.
+- [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
+      `videopipeline/steps.py` encodes with `libx264` on the CPU. Try
+      `h264_videotoolbox` (already used for re-encoding) with `-q:v` around
+      60-65 and compare size, quality and time.
+- [ ] **Version check script.** `lanzador/revisar_versiones.sh`: print
+      outdated Homebrew formulas (ffmpeg, auto-editor), outdated pip packages
+      in the venv, the Ollama version and new upstream commits in
+      ClearerVoice-Studio.
+- [ ] **Monthly research task.** Scheduled Claude task that looks for new
+      local LLMs, Whisper successors and voice-cleaning models, and adds
+      findings to this file.
+
+## Local models
+
+- [ ] **Compare `qwen3.8:27b`** with `gemma4:26b` (installed and tested on
+      2026-09-23: better titles and hooks than `qwen3.5:9b`, 24 s vs 11 s).
+      Send `think: false`. Decide the default caption model.
