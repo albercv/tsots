@@ -91,7 +91,7 @@ def test_defectos_subtitulos():
     assert c.diseno == "reels_bold"
     assert c.posicion_subs == 75
     assert c.idioma_subs == "es"
-    assert c.modelo_whisper == "small"
+    assert c.modelo_whisper == "turbo"
 
 
 def test_json_incluye_subtitulos():
@@ -122,9 +122,13 @@ def test_validar_idioma_y_modelo_whisper():
 def test_tablas_subtitulos():
     from videopipeline.config import DISENOS, IDIOMAS_SUBS, MODELOS_WHISPER
 
-    assert DISENOS == ("reels_bold", "reels_karaoke", "caja")
+    from videopipeline.subtitles import PRESETS
+
+    assert DISENOS == ("reels_bold", "reels_karaoke", "caja", "impacto",
+                       "amarillo", "karaoke_verde", "minimal", "caja_blanca")
+    assert set(DISENOS) == set(PRESETS)
     assert IDIOMAS_SUBS == ("es", "auto", "en")
-    assert MODELOS_WHISPER == ("small", "medium")
+    assert MODELOS_WHISPER == ("small", "medium", "turbo")
 
 
 def test_defecto_tamano_subs():
@@ -169,3 +173,10 @@ def test_idioma_ui_por_defecto_y_json():
     assert c.idioma_ui == "es"
     c2 = PipelineConfig.from_json(_config_minima(idioma_ui="en").to_json())
     assert c2.idioma_ui == "en"
+
+
+def test_glosario_por_defecto_vacio_y_viaja_en_json():
+    c = _config_minima()
+    assert c.glosario == ""
+    c = _config_minima(glosario="Claude Code = Cloud Code\nAnthropic")
+    assert PipelineConfig.from_json(c.to_json()).glosario == c.glosario

@@ -91,3 +91,95 @@ def idioma_fuente():
     i18n.instalar("es")
     yield
     i18n.instalar("es")
+
+
+@pytest.fixture(autouse=True)
+def sin_red_ni_llavero(request, monkeypatch):
+    """Red de seguridad: ningún test sale a Internet con httpx ni ejecuta
+    `security` (el Llavero real). Solo los tests `lenta` quedan fuera; los
+    `slow` usan modelos reales y pueden hablar con Hugging Face (descarga o
+    comprobación del modelo de Whisper), y con nada más."""
+    if request.node.get_closest_marker("lenta"):
+        yield
+        return
+    import httpx
+
+    from tests.redes_falsos import LlaveroFalso
+
+    modelos_reales = request.node.get_closest_marker("slow") is not None
+
+    def de_hugging_face(host: str) -> bool:
+        return host in ("huggingface.co", "hf.co") or host.endswith(
+            (".huggingface.co", ".hf.co")
+        )
+
+    def bloquear(self, peticion):
+        host = peticion.url.host
+        if host in ("localhost", "127.0.0.1") or (
+            modelos_reales and de_hugging_face(host)
+        ):
+            return original_http(self, peticion)
+        raise RuntimeError(f"Red bloqueada en tests: {peticion.url.host}")
+
+    original_http = httpx.HTTPTransport.handle_request
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", bloquear)
+
+    falso = LlaveroFalso()
+    original_run = subprocess.run
+
+    def run(args, *a, **kw):
+        if args and Path(str(list(args)[0])).name == "security":
+            return falso(args, *a, **kw)
+        return original_run(args, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    yield falso
+
+
+@pytest.fixture
+def llavero_falso(sin_red_ni_llavero):
+    """El Llavero en memoria que ya usan todos los tests."""
+    return sin_red_ni_llavero
+
+
+@pytest.fixture(autouse=True)
+def sin_dialogos_modales(monkeypatch):
+    """Red de seguridad: un diálogo modal real (`exec()` o los estáticos de
+    QMessageBox/QFileDialog/QInputDialog) bloquearía la suite para siempre
+    con QT_QPA_PLATFORM=offscreen, porque nadie puede cerrarlo. Aquí falla al
+    momento con un error que dice qué diálogo se abrió. Los tests que
+    necesitan uno lo sustituyen con monkeypatch (tiene prioridad)."""
+    from PySide6.QtWidgets import (
+        QDialog,
+        QFileDialog,
+        QInputDialog,
+        QMessageBox,
+    )
+
+    def prohibido(nombre):
+        def abrir(*args, **kwargs):
+            raise RuntimeError(
+                f"Diálogo modal real en un test: {nombre}. Sustitúyelo con "
+                "monkeypatch; con offscreen bloquearía la suite."
+            )
+
+        return abrir
+
+    for clase in (QDialog, QMessageBox, QFileDialog, QInputDialog):
+        monkeypatch.setattr(clase, "exec", prohibido(f"{clase.__name__}.exec"))
+    for estatico in ("question", "warning", "critical", "information", "about"):
+        monkeypatch.setattr(
+            QMessageBox, estatico, prohibido(f"QMessageBox.{estatico}")
+        )
+    for estatico in (
+        "getOpenFileName", "getOpenFileNames", "getSaveFileName",
+        "getExistingDirectory",
+    ):
+        monkeypatch.setattr(
+            QFileDialog, estatico, prohibido(f"QFileDialog.{estatico}")
+        )
+    for estatico in ("getText", "getInt", "getDouble", "getItem",
+                     "getMultiLineText"):
+        monkeypatch.setattr(
+            QInputDialog, estatico, prohibido(f"QInputDialog.{estatico}")
+        )

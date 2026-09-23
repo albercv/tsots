@@ -32,7 +32,11 @@ from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
 from .queue_model import EstadoTrabajo, ModeloCola
 from .settings import Ajustes
+from .widgets.cabecera import Cabecera
+from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
+from .widgets.dialogo_publicar import DialogoPublicar
+from .widgets.dialogo_redes import DialogoRedes
 from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
 from .widgets.vista_previa import VistaPrevia
@@ -89,6 +93,10 @@ class VentanaPrincipal(QMainWindow):
 
         central = QWidget()
         raiz = QVBoxLayout(central)
+        # Cabecera con el logo a todo el ancho; zona de soltar, cola y
+        # opciones debajo.
+        self.cabecera = Cabecera(RUTA_ICONO)
+        raiz.addWidget(self.cabecera)
         fila_superior = QHBoxLayout()
 
         columna_izquierda = QVBoxLayout()
@@ -126,6 +134,7 @@ class VentanaPrincipal(QMainWindow):
         self.vista_previa = VistaPrevia()
         columna_derecha.addWidget(self.vista_previa)
         self.panel_caption = PanelCaption()
+        self.panel_caption.publicar.connect(self._publicar)
         columna_derecha.addWidget(self.panel_caption)
         columna_derecha.addStretch(1)
         self.scroll_derecha = QScrollArea()
@@ -161,6 +170,13 @@ class VentanaPrincipal(QMainWindow):
             self._al_cambiar_idioma_ui
         )
         fila_inferior.addWidget(self.combo_idioma_ui)
+        # Ajustes de la app (no de un vídeo): junto al idioma, siempre visibles.
+        self.boton_redes = QPushButton(_("Redes…"))
+        self.boton_redes.setToolTip(_("Servicio, perfil y API key para publicar"))
+        # Método ligado, no lambda: una lambda con `self` mantiene viva la
+        # ventana después de soltarla (el botón es su hijo y guarda la lambda).
+        self.boton_redes.clicked.connect(self._abrir_redes)
+        fila_inferior.addWidget(self.boton_redes)
         fila_inferior.addWidget(QLabel(_("Salida:")))
         fila_inferior.addWidget(self.etiqueta_salida, 1)
         fila_inferior.addWidget(self.boton_carpeta)
@@ -182,6 +198,7 @@ class VentanaPrincipal(QMainWindow):
 
         self.panel.opciones_subs_cambiadas.connect(self._refrescar_preview)
         self.panel.editar_marca.connect(self._editar_marca)
+        self.panel.editar_glosario.connect(self._editar_glosario)
         self.panel.modelo_caption_cambiado.connect(self._al_cambiar_modelo_caption)
         self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
         self._cargar_modelos_ollama()
@@ -297,10 +314,14 @@ class VentanaPrincipal(QMainWindow):
             trabajo = self.modelo_cola.trabajo(indice.row())
             self.vista_previa.establecer_video(trabajo.ruta)
             self._refrescar_preview()
-            self.panel_caption.mostrar(self._caption_de(trabajo))
+            self._mostrar_caption(trabajo)
         else:
             self.vista_previa.establecer_video(None)
             self.panel_caption.mostrar(None)
+
+    def _mostrar_caption(self, trabajo) -> None:
+        caption = self._caption_de(trabajo)
+        self.panel_caption.mostrar(caption, trabajo.salida if caption else None)
 
     def _caption_de(self, trabajo) -> Caption | None:
         if trabajo.estado != EstadoTrabajo.HECHO or not trabajo.salida:
@@ -343,6 +364,36 @@ class VentanaPrincipal(QMainWindow):
         if dialogo.exec():
             self.ajustes.contexto_marca = dialogo.texto()
 
+    def _editar_glosario(self) -> None:
+        dialogo = DialogoGlosario(self.ajustes.glosario, self)
+        if dialogo.exec():
+            self.ajustes.glosario = dialogo.texto()
+
+    # --- redes ---
+
+    def _publicar(self) -> None:
+        caption, video = self.panel_caption.caption, self.panel_caption.video
+        if caption is None or video is None:
+            return
+        if not video.is_file():
+            QMessageBox.warning(
+                self, _("Publicar en redes"),
+                _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
+            return
+        dialogo = DialogoPublicar(video, caption, self.ajustes, parent=self)
+        dialogo.configurar_redes.connect(
+            lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
+        dialogo.exec()
+
+    def _abrir_redes(self) -> None:
+        """Botón de la barra inferior: sin `checked` ni callback."""
+        self._configurar_redes()
+
+    def _configurar_redes(self, al_guardar=None, padre=None) -> None:
+        dialogo = DialogoRedes(self.ajustes, parent=padre or self)
+        if dialogo.exec() and al_guardar is not None:
+            al_guardar()
+
     # --- procesado ---
 
     def procesar(self) -> None:
@@ -358,6 +409,7 @@ class VentanaPrincipal(QMainWindow):
             config = PipelineConfig(
                 video=trabajo.ruta, salida=carpeta,
                 contexto_marca=self.ajustes.contexto_marca,
+                glosario=self.ajustes.glosario,
                 modelo_caption=self.ajustes.modelo_caption,
                 idioma_ui=i18n.idioma_actual(),
                 **valores,
@@ -398,9 +450,7 @@ class VentanaPrincipal(QMainWindow):
             )
             actual = self.vista_cola.currentIndex()
             if actual.isValid() and actual.row() == fila:
-                self.panel_caption.mostrar(
-                    self._caption_de(self.modelo_cola.trabajo(fila))
-                )
+                self._mostrar_caption(self.modelo_cola.trabajo(fila))
         else:
             estado = (
                 EstadoTrabajo.CANCELADO

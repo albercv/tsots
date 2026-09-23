@@ -95,7 +95,7 @@ def test_panel_subtitulos_defecto_off_y_deshabilitado(qtbot):
     assert valores["diseno"] == "reels_bold"
     assert valores["posicion_subs"] == 75
     assert valores["idioma_subs"] == "es"
-    assert valores["modelo_whisper"] == "small"
+    assert valores["modelo_whisper"] == "turbo"
     assert not panel.combo_diseno.isEnabled()
     assert not panel.spin_posicion.isEnabled()
 
@@ -147,13 +147,16 @@ def test_panel_subtitulos_cargar_tolera_claves_ausentes(qtbot):
 def test_panel_aviso_whisper(qtbot, tmp_path, monkeypatch):
     from app.widgets import panel_opciones
 
+    from videopipeline import subtitles
+
     monkeypatch.setattr(panel_opciones, "WHISPER_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     panel.check_subtitulos.setChecked(True)
     panel._refrescar_aviso_whisper()
-    assert panel.aviso_whisper.text() != ""
-    (tmp_path / "models--Systran--faster-whisper-small").mkdir()
+    assert "1,6 GB" in panel.aviso_whisper.text()  # turbo por defecto
+    (tmp_path / "models--mlx-community--whisper-large-v3-turbo").mkdir()
     panel._refrescar_aviso_whisper()
     assert panel.aviso_whisper.text() == ""
 
@@ -392,3 +395,184 @@ def test_estado_trabajo_display_usa_traduccion(qtbot):
     m.anadir([Path("/v/a.mp4")])
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert EstadoTrabajo.ESPERA.value in texto  # español = idioma fuente
+
+
+def test_combo_diseno_ofrece_todos_los_estilos(qtbot):
+    from videopipeline.config import DISENOS
+
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    datos = [panel.combo_diseno.itemData(i) for i in range(panel.combo_diseno.count())]
+    assert datos == list(DISENOS)
+
+
+def test_etiquetas_de_estilo_traducidas_al_ingles():
+    """Cada estilo tiene traducción en el catálogo inglés (puede coincidir)."""
+    import re
+
+    from app.widgets.panel_opciones import ETIQUETA_DISENO
+
+    po = (Path(__file__).parent.parent / "locale/en/LC_MESSAGES/tsots.po").read_text(
+        encoding="utf-8")
+    traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
+    assert [e for e in ETIQUETA_DISENO if e not in traducidas] == []
+
+
+def test_combo_whisper_ofrece_turbo_primero(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    datos = [panel.combo_modelo_whisper.itemData(i)
+             for i in range(panel.combo_modelo_whisper.count())]
+    assert datos[0] == "turbo"
+    assert set(datos) == {"turbo", "small", "medium"}
+
+
+# --- glosario de términos ----------------------------------------------------------
+
+def test_dialogo_glosario_devuelve_texto_y_resumen(qtbot):
+    from app.widgets.dialogo_glosario import DialogoGlosario
+
+    d = DialogoGlosario("Claude Code = Cloud Code, Claus Code\nAnthropic")
+    qtbot.addWidget(d)
+    assert d.texto() == "Claude Code = Cloud Code, Claus Code\nAnthropic"
+    assert "2" in d.resumen.text() and "2" in d.resumen.text().split("·")[1]
+    d.editor.setPlainText("  TSOTS  ")
+    assert d.texto() == "TSOTS"
+    assert "1" in d.resumen.text()
+    assert d.aviso.text() == ""
+
+
+def test_dialogo_glosario_avisa_si_no_cabe_en_la_pista(qtbot):
+    from app.widgets.dialogo_glosario import DialogoGlosario
+
+    d = DialogoGlosario("\n".join(f"termino{i:03d}" for i in range(200)))
+    qtbot.addWidget(d)
+    assert d.aviso.text() != ""
+
+
+def test_panel_boton_glosario_emite_senal(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_subtitulos.setChecked(True)
+    with qtbot.waitSignal(panel.editar_glosario, timeout=1000):
+        panel.boton_glosario.click()
+
+
+def test_panel_boton_glosario_activo_con_subtitulos_o_caption(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_subtitulos.setChecked(False)
+    panel.check_caption.setChecked(False)
+    assert not panel.boton_glosario.isEnabled()
+    panel.check_subtitulos.setChecked(True)
+    assert panel.boton_glosario.isEnabled()
+    panel.check_subtitulos.setChecked(False)
+    panel.check_caption.setChecked(True)
+    assert panel.boton_glosario.isEnabled()
+
+
+# --- cabecera ---
+
+
+def test_cabecera_carga_logo(qtbot):
+    from app.widgets.cabecera import LADO_LOGO, Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    cabecera.show()
+    pixmap = cabecera.logo.pixmap()
+    assert not pixmap.isNull()
+    assert cabecera.logo.isVisible()
+    assert cabecera.logo.size().width() == LADO_LOGO
+    assert cabecera.logo.size().height() == LADO_LOGO
+    # Sin el margen transparente del icono: el cuadrado llega al borde.
+    imagen = pixmap.toImage()
+    assert imagen.pixelColor(1, imagen.height() // 2).alpha() == 255
+
+
+def test_pixmap_logo_escala_con_dpr():
+    from PySide6.QtGui import QImage
+
+    from app.main import RUTA_ICONO
+    from app.widgets.cabecera import pixmap_logo
+
+    imagen = QImage(str(RUTA_ICONO))
+    pixmap = pixmap_logo(imagen, 44, 2.0)
+    assert pixmap.width() == 88 and pixmap.height() == 88
+    assert pixmap.devicePixelRatio() == 2.0
+    assert pixmap_logo(imagen, 44, 1.0).width() == 44
+
+
+def test_cabecera_muestra_nombre_y_lema(qtbot):
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.titulo.text() == "The Silence of the Shorts"
+    assert cabecera.lema.text() == "Edita en silencio. Crea a lo grande."
+
+
+def test_cabecera_sin_logo_no_falla(qtbot, tmp_path):
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera(ruta_logo=tmp_path / "no_existe.png")
+    qtbot.addWidget(cabecera)
+    cabecera.show()
+    assert not cabecera.logo.isVisible()
+    assert cabecera.titulo.isVisible()
+    assert not cabecera.grab().isNull()
+
+
+def test_cabecera_sigue_la_paleta(qtbot):
+    """Sin colores fijos: el título se pinta con el WindowText de la paleta,
+    así el modo oscuro de macOS funciona."""
+    from PySide6.QtGui import QColor, QPalette
+
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.styleSheet() == ""
+    assert all(
+        not hijo.styleSheet() for hijo in (cabecera.titulo, cabecera.lema)
+    )
+    oscura = QPalette(cabecera.palette())
+    for grupo in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive):
+        oscura.setColor(grupo, QPalette.ColorRole.Window, QColor("#1e1e1e"))
+        oscura.setColor(grupo, QPalette.ColorRole.WindowText, QColor("#ffffff"))
+    cabecera.setPalette(oscura)
+    cabecera.titulo.setAutoFillBackground(True)
+    cabecera.show()
+    imagen = cabecera.titulo.grab().toImage()
+    mas_clara = max(
+        QColor(imagen.pixel(x, y)).lightness()
+        for x in range(imagen.width())
+        for y in range(imagen.height())
+    )
+    assert mas_clara > 200
+
+
+def test_cabecera_lema_traducible(qtbot, tmp_path):
+    import subprocess
+
+    from videopipeline import i18n
+
+    from app.widgets.cabecera import Cabecera
+
+    carpeta = tmp_path / "en" / "LC_MESSAGES"
+    carpeta.mkdir(parents=True)
+    po = carpeta / "tsots.po"
+    po.write_text(
+        'msgid ""\nmsgstr ""\n"Content-Type: text/plain; charset=UTF-8\\n"\n\n'
+        'msgid "Edita en silencio. Crea a lo grande."\n'
+        'msgstr "Edit quieter. Create louder."\n',
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["msgfmt", "-o", str(carpeta / "tsots.mo"), str(po)], check=True
+    )
+    i18n.instalar("en", dir_locale=tmp_path)
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.lema.text() == "Edit quieter. Create louder."
+    assert cabecera.titulo.text() == "The Silence of the Shorts"

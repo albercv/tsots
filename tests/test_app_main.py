@@ -439,3 +439,152 @@ def test_ventana_muestra_catalogo_ingles_instalado(qtbot, tmp_path, monkeypatch)
         assert ventana.etiqueta_cola.text() == "Queue"
     finally:
         i18n.instalar("es")
+
+
+def test_editar_glosario_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.glosario = "antes"
+    visto = {}
+
+    class DialogoFalso:
+        def __init__(self, texto_inicial="", parent=None):
+            visto["inicial"] = texto_inicial
+
+        def exec(self):
+            return 1
+
+        def texto(self):
+            return "Claude Code = Cloud Code"
+
+    monkeypatch.setattr("app.main.DialogoGlosario", DialogoFalso)
+    ventana.panel.editar_glosario.emit()
+    assert visto["inicial"] == "antes"
+    assert ventana.ajustes.glosario == "Claude Code = Cloud Code"
+
+
+def test_procesar_incluye_glosario(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.glosario = "Anthropic"
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    capturado = {}
+    monkeypatch.setattr(ventana.ejecutor, "iniciar",
+                        lambda trabajos: capturado.setdefault("t", trabajos))
+    ventana.procesar()
+    assert json.loads(capturado["t"][0][1])["glosario"] == "Anthropic"
+
+
+def test_cabecera_encima_de_zona_drop_y_cola(qtbot, tmp_path, monkeypatch):
+    """La cabecera con el logo va arriba, a todo el ancho; la zona de soltar,
+    la cola y el panel de opciones quedan debajo."""
+    from PySide6.QtCore import QPoint, QRect
+
+    from app.widgets.cabecera import Cabecera
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(900, 560)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    assert isinstance(ventana.cabecera, Cabecera)
+    central = ventana.centralWidget()
+
+    def rect(widget):
+        return QRect(widget.mapTo(central, QPoint(0, 0)), widget.size())
+
+    cabecera = rect(ventana.cabecera)
+    for widget in (ventana.zona_drop, ventana.vista_cola, ventana.scroll_derecha):
+        assert cabecera.bottom() < rect(widget).top()
+    assert cabecera.left() <= rect(ventana.zona_drop).left()
+    assert cabecera.right() >= rect(ventana.scroll_derecha).right()
+
+
+class _DialogoFalso:
+    """Sustituye a DialogoPublicar / DialogoRedes y registra con qué se abrió."""
+
+    abiertos: list = []
+
+    def __init__(self, *args, parent=None, **kwargs):
+        type(self).abiertos.append(args)
+        self.configurar_redes = type("S", (), {"connect": lambda s, f: None})()
+
+    def exec(self):
+        return 0
+
+
+def _hecho_con_caption(ventana, tmp_path):
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    salida = tmp_path / "a_limpio.mp4"
+    salida.write_bytes(b"MP4")
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(salida), "")
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    return salida
+
+
+def test_boton_publicar_activo_con_caption_del_video_terminado(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+    assert ventana.panel_caption.boton_publicar.isEnabled()
+    # Redes es configuración de la app, no del vídeo: no vive en este panel.
+    assert not hasattr(ventana.panel_caption, "boton_redes")
+    assert ventana.panel_caption.video == salida
+    ventana.panel_caption.mostrar(None)
+    assert not ventana.panel_caption.boton_publicar.isEnabled()
+
+
+def test_publicar_abre_dialogo_con_video_y_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    [(video, caption, ajustes)] = Falso.abiertos
+    assert video == salida
+    assert caption.titulo == "Título X"
+    assert ajustes is ventana.ajustes
+
+
+def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+    salida.unlink()
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.warning", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.DialogoPublicar",
+                        lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
+    ventana.panel_caption.boton_publicar.click()
+    assert len(avisos) == 1
+
+
+def _layout_de(layout, widget):
+    """El layout (anidado o no) que contiene directamente a `widget`."""
+    if layout.indexOf(widget) >= 0:
+        return layout
+    for i in range(layout.count()):
+        hijo = layout.itemAt(i).layout()
+        if hijo is not None and (encontrado := _layout_de(hijo, widget)):
+            return encontrado
+    return None
+
+
+def test_boton_redes_visible_sin_videos_junto_al_idioma(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.show()
+    assert ventana.boton_redes.isVisible()
+    assert ventana.boton_redes.isEnabled()
+    fila = _layout_de(ventana.centralWidget().layout(), ventana.combo_idioma_ui)
+    assert fila is not None
+    assert fila.indexOf(ventana.boton_redes) == fila.indexOf(ventana.combo_idioma_ui) + 1
+
+
+def test_boton_redes_abre_configuracion(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    ventana.boton_redes.click()
+    assert Falso.abiertos == [(ventana.ajustes,)]

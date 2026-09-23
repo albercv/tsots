@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from videopipeline import subtitles
 from videopipeline.config import MODELOS_POR_TAREA
 from videopipeline.i18n import N_, _
 from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
@@ -42,12 +43,18 @@ ETIQUETA_DISENO = {
     N_("Reels Bold"): "reels_bold",
     N_("Reels Karaoke"): "reels_karaoke",
     N_("Caja negra"): "caja",
+    N_("Impacto"): "impacto",
+    N_("Amarillo"): "amarillo",
+    N_("Karaoke verde"): "karaoke_verde",
+    N_("Minimalista"): "minimal",
+    N_("Caja blanca"): "caja_blanca",
 }
 
 # "Español" y "English" son nombres de idioma: no se traducen.
 ETIQUETA_IDIOMA = {"Español": "es", N_("Autodetectar"): "auto", "English": "en"}
 
 ETIQUETA_MODELO_WHISPER = {
+    N_("turbo (recomendado)"): "turbo",
     N_("small (rápido)"): "small",
     N_("medium (más preciso)"): "medium",
 }
@@ -56,6 +63,7 @@ ETIQUETA_MODELO_WHISPER = {
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
     editar_marca = Signal()
+    editar_glosario = Signal()
     modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
     refrescar_modelos = Signal()
 
@@ -151,8 +159,15 @@ class PanelOpciones(QWidget):
         fila_tamano.addWidget(self.etiqueta_tamano)
         form_subs.addRow(_("Tamaño:"), fila_tamano)
         form_subs.addRow(_("Idioma:"), self.combo_idioma_subs)
+        self.boton_glosario = QPushButton(_("Términos…"))
+        self.boton_glosario.setToolTip(
+            _("Marcas y nombres propios que Whisper debe escribir bien.")
+        )
+        self.boton_glosario.clicked.connect(self.editar_glosario)
         form_subs.addRow(_("Modelo:"), self.combo_modelo_whisper)
         form_subs.addRow("", self.aviso_whisper)
+        # Fila propia: junto al combo ensancharía la columna de opciones.
+        form_subs.addRow("", self.boton_glosario)
         layout.addWidget(grupo_subs)
         self._grupo_subs = grupo_subs
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
@@ -177,6 +192,10 @@ class PanelOpciones(QWidget):
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
         caption_layout.addLayout(fila_caption)
+        # El glosario sirve a subtítulos y caption: activo si hay alguno.
+        self.check_subtitulos.toggled.connect(self._actualizar_glosario)
+        self.check_caption.toggled.connect(self._actualizar_glosario)
+        self._actualizar_glosario()
         # Selector de modelo: se rellena con los modelos instalados en Ollama
         # (poblar_modelos); los que no caben en memoria quedan deshabilitados.
         fila_modelo = QHBoxLayout()
@@ -255,6 +274,11 @@ class PanelOpciones(QWidget):
             control.setEnabled(activo)
         self._refrescar_aviso_whisper()
 
+    def _actualizar_glosario(self, *args) -> None:
+        self.boton_glosario.setEnabled(
+            self.check_subtitulos.isChecked() or self.check_caption.isChecked()
+        )
+
     def _emitir_cambio_subs(self, *args) -> None:
         self.opciones_subs_cambiadas.emit()
 
@@ -263,13 +287,10 @@ class PanelOpciones(QWidget):
             self.aviso_whisper.setText("")
             return
         modelo = self.combo_modelo_whisper.currentData()
-        patron = f"models--*faster-whisper-{modelo}*"
-        en_cache = WHISPER_CACHE_DIR.is_dir() and any(
-            WHISPER_CACHE_DIR.glob(patron)
-        )
         self.aviso_whisper.setText(
-            "" if en_cache
-            else _("El modelo Whisper se descargará al primer uso (~500MB).")
+            "" if subtitles.modelo_en_cache(modelo, WHISPER_CACHE_DIR)
+            else _("El modelo Whisper se descargará al primer uso ({tamano}).").format(
+                tamano=subtitles.TAMANO_DESCARGA[modelo])
         )
 
     # --- selector de modelo de caption ---
@@ -382,7 +403,7 @@ class PanelOpciones(QWidget):
         indice = self.combo_idioma_subs.findData(idioma)
         if indice >= 0:
             self.combo_idioma_subs.setCurrentIndex(indice)
-        modelo = valores.get("modelo_whisper", "small")
+        modelo = valores.get("modelo_whisper", "turbo")
         indice = self.combo_modelo_whisper.findData(modelo)
         if indice >= 0:
             self.combo_modelo_whisper.setCurrentIndex(indice)

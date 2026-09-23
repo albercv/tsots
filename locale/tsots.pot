@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-11 13:13+0200\n"
+"POT-Creation-Date: 2026-09-23 13:46+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -33,13 +33,14 @@ msgstr ""
 msgid "<br>Qué hacer: {solucion}"
 msgstr ""
 
+msgid "API key:"
+msgstr ""
+
 #, python-brace-format
 msgid "AVISO: {aviso}"
 msgstr ""
 
-msgid ""
-"Abre el log del trabajo y añade este caso a videopipeline/errores.py para "
-"que la próxima vez se explique."
+msgid "Abre el log del trabajo y añade este caso a videopipeline/errores.py para que la próxima vez se explique."
 msgstr ""
 
 msgid "Abrir log"
@@ -48,9 +49,13 @@ msgstr ""
 msgid "Acelerar"
 msgstr ""
 
-msgid ""
-"Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede "
-"acceso a Terminal/Python, o elige otra carpeta de salida."
+msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
+msgstr ""
+
+msgid "Al publicar, por defecto"
+msgstr ""
+
+msgid "Amarillo"
 msgstr ""
 
 msgid "Archivo de vídeo incompleto o corrupto"
@@ -67,6 +72,12 @@ msgstr ""
 msgid "Añadir subtítulos"
 msgstr ""
 
+msgid "Borrador (lo terminas en la app)"
+msgstr ""
+
+msgid "Caja blanca"
+msgstr ""
+
 msgid "Caja negra"
 msgstr ""
 
@@ -76,6 +87,9 @@ msgstr ""
 msgid "Cancelado"
 msgstr ""
 
+msgid "Cancelar"
+msgstr ""
+
 msgid "Caption SEO"
 msgstr ""
 
@@ -83,11 +97,23 @@ msgstr ""
 msgid "Caption SEO falló: {error}. Vídeo guardado sin caption.{sugerencia}"
 msgstr ""
 
+msgid "Caption:"
+msgstr ""
+
 msgid "Carpeta de salida"
+msgstr ""
+
+msgid "Categoría de YouTube:"
 msgstr ""
 
 #, python-brace-format
 msgid "Causa: {causa}"
+msgstr ""
+
+msgid "Cerrar"
+msgstr ""
+
+msgid "Ciencia y tecnología"
 msgstr ""
 
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
@@ -100,14 +126,13 @@ msgstr ""
 msgid "Cola"
 msgstr ""
 
-msgid ""
-"Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en "
-"audio_procesado/, bórralo y vuelve a procesar."
+msgid "Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en audio_procesado/, bórralo y vuelve a procesar."
 msgstr ""
 
-msgid ""
-"Conecta a internet y vuelve a procesar; los modelos se descargan una sola "
-"vez."
+msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
+msgstr ""
+
+msgid "Consejos y estilo"
 msgstr ""
 
 msgid "Contexto de marca"
@@ -135,6 +160,12 @@ msgid "Cortar"
 msgstr ""
 
 msgid "Corte de silencios"
+msgstr ""
+
+msgid "Cuenta"
+msgstr ""
+
+msgid "Deportes"
 msgstr ""
 
 msgid "Descargando modelo Whisper y transcribiendo"
@@ -171,45 +202,49 @@ msgid "ERROR: no existe el vídeo: {video}"
 msgstr ""
 
 #, python-brace-format
+msgid "ERROR: no se puede leer el glosario: {ruta}"
+msgstr ""
+
+#, python-brace-format
 msgid "ERROR: {error}"
 msgstr ""
 
-msgid ""
-"Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo "
-"y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital "
-"#iaparapymes"
+msgid "Edita en silencio. Crea a lo grande."
 msgstr ""
 
-msgid ""
-"Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de "
-"Ollama. Si el puerto 11434 está ocupado, libéralo."
+msgid "Educación"
 msgstr ""
 
-msgid ""
-"El caption SEO se genera con un modelo local servido por Ollama y no se "
-"encuentra el ejecutable `ollama` en PATH."
+msgid "Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital #iaparapymes"
 msgstr ""
 
-msgid ""
-"El disco donde se escriben los temporales o la salida está lleno. Los "
-"intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del "
-"vídeo original."
+msgid "Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de Ollama. Si el puerto 11434 está ocupado, libéralo."
 msgstr ""
 
-msgid "El modelo Whisper se descargará al primer uso (~500MB)."
+msgid "El caption SEO se genera con un modelo local servido por Ollama y no se encuentra el ejecutable `ollama` en PATH."
 msgstr ""
 
-msgid ""
-"El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los "
-"vídeos largos a 48 kHz cargan el audio completo en memoria."
+msgid "El disco donde se escriben los temporales o la salida está lleno. Los intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del vídeo original."
+msgstr ""
+
+#, python-brace-format
+msgid "El glosario de términos falló: {error}. Se usa la transcripción sin corregir."
+msgstr ""
+
+#, python-brace-format
+msgid "El modelo Whisper se descargará al primer uso ({tamano})."
+msgstr ""
+
+msgid "El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los vídeos largos a 48 kHz cargan el audio completo en memoria."
 msgstr ""
 
 msgid "El modelo se descargará al primer uso."
 msgstr ""
 
-msgid ""
-"El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no "
-"se encuentra."
+msgid "El perfil del servicio donde conectaste TikTok, YouTube e Instagram."
+msgstr ""
+
+msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no se encuentra."
 msgstr ""
 
 #, python-brace-format
@@ -224,10 +259,34 @@ msgstr ""
 msgid "El quemado de subtítulos falló (código {codigo})"
 msgstr ""
 
+msgid "El servicio rechazó la publicación."
+msgstr ""
+
+#, python-brace-format
+msgid "El servicio terminó sin resultado para {plataforma}."
+msgstr ""
+
 msgid "Elegir vídeos"
 msgstr ""
 
+msgid "En cola"
+msgstr ""
+
+msgid "Entretenimiento"
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
 msgid "Error desconocido: no está en la tabla de errores conocidos."
+msgstr ""
+
+#, python-brace-format
+msgid "Error inesperado ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "Error {codigo} del servicio."
 msgstr ""
 
 #, python-brace-format
@@ -243,17 +302,25 @@ msgstr ""
 msgid "Extracción de audio"
 msgstr ""
 
-msgid ""
-"Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista "
-"original y recorta silencios con auto-editor."
+msgid "Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista original y recorta silencios con auto-editor."
 msgstr ""
 
 msgid "Extrayendo audio"
 msgstr ""
 
-msgid ""
-"Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar "
-"de HuggingFace."
+msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
+msgstr ""
+
+msgid "Falta el perfil del servicio: escríbelo en Redes…"
+msgstr ""
+
+msgid "Falta el perfil. Escríbelo en Redes…"
+msgstr ""
+
+msgid "Falta la API key del servicio: guárdala en Redes…"
+msgstr ""
+
+msgid "Falta la API key. Guárdala en Redes…"
 msgstr ""
 
 msgid "Falta una herramienta externa"
@@ -262,9 +329,10 @@ msgstr ""
 msgid "Faltan dependencias"
 msgstr ""
 
-msgid ""
-"Genera nombre_limpio.md con un modelo local (Ollama) a partir de la "
-"transcripción."
+msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
+msgstr ""
+
+msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
 msgid "Genera título SEO, caption y hashtags (nombre_limpio.md) con Ollama."
@@ -273,7 +341,16 @@ msgstr ""
 msgid "Generando caption SEO"
 msgstr ""
 
+msgid "Guardar"
+msgstr ""
+
+msgid "Hashtags:"
+msgstr ""
+
 msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
+msgstr ""
+
+msgid "Humor"
 msgstr ""
 
 msgid "Idioma"
@@ -282,13 +359,22 @@ msgstr ""
 msgid "Idioma:"
 msgstr ""
 
+msgid "Impacto"
+msgstr ""
+
 msgid "Junto al original (_limpio.mp4)"
 msgstr ""
 
-msgid ""
-"La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. "
-"Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v "
-"h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
+msgid "Karaoke verde"
+msgstr ""
+
+msgid "La API key no es válida o ha caducado (401). Revísala en Redes…"
+msgstr ""
+
+msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
+msgstr ""
+
+msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr ""
 
 msgid "La respuesta del modelo no es JSON válido"
@@ -312,6 +398,23 @@ msgstr ""
 msgid "Limpieza de audio"
 msgstr ""
 
+msgid "Llavero"
+msgstr ""
+
+#, python-brace-format
+msgid "Logo de {app}"
+msgstr ""
+
+#, python-brace-format
+msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
+msgstr ""
+
+msgid "Límite de subidas del plan alcanzado (429)."
+msgstr ""
+
+msgid "Marcas y nombres propios que Whisper debe escribir bien."
+msgstr ""
+
 msgid "Marca…"
 msgstr ""
 
@@ -319,6 +422,9 @@ msgid "Margen:"
 msgstr ""
 
 msgid "Mejora de voz"
+msgstr ""
+
+msgid "Minimalista"
 msgstr ""
 
 msgid "Modelo de Ollama no descargado"
@@ -334,28 +440,34 @@ msgstr ""
 msgid "Modo"
 msgstr ""
 
-#, python-brace-format
-msgid ""
-"Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este "
-"Mac deja ~{memoria} GB para modelos."
+msgid "Música"
 msgstr ""
 
-msgid ""
-"Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: "
-"brew install ffmpeg-full"
+#, python-brace-format
+msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
+msgstr ""
+
+msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
 msgstr ""
 
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr ""
 
-msgid ""
-"No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama "
-"serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del "
-"modelo en curso)."
+msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
 msgstr ""
 
 msgid "No queda espacio en disco"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"No se encuentra el vídeo terminado:\n"
+"{ruta}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se encuentra el vídeo: {nombre}"
 msgstr ""
 
 #, python-brace-format
@@ -385,14 +497,43 @@ msgid "No se generó el vídeo remuxado: {salida}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo borrar la clave del Llavero (código {codigo})."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo cerrar ollama serve: {error}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo conectar con el servicio ({tipo})."
+msgstr ""
+
+msgid "No se pudo guardar la clave en el Llavero."
 msgstr ""
 
 msgid "No se pudo lanzar el proceso"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo leer el vídeo ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer la clave del Llavero (código {codigo})."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo leer la resolución del vídeo: {video}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo usar el Llavero ({tipo})."
+msgstr ""
+
+msgid "Nombre del perfil en el servicio"
+msgstr ""
+
+msgid "Noticias y política"
 msgstr ""
 
 #, python-brace-format
@@ -425,16 +566,29 @@ msgstr ""
 msgid "Ollama responde pero no tiene el modelo pedido en local."
 msgstr ""
 
-msgid ""
-"Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso "
-"en marcha. ¿Reiniciar ahora?"
+msgid "Olvidar clave"
+msgstr ""
+
+msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
 #, python-brace-format
 msgid "Paso: {paso}"
 msgstr ""
 
+msgid "Pega la API key para guardarla"
+msgstr ""
+
+msgid "Perfil:"
+msgstr ""
+
+msgid "Personas y blogs"
+msgstr ""
+
 msgid "Pipeline completo"
+msgstr ""
+
+msgid "Plataformas (en este orden)"
 msgstr ""
 
 msgid "Posición vertical:"
@@ -447,10 +601,31 @@ msgstr ""
 msgid "Preview no disponible: {error}"
 msgstr ""
 
+msgid "Procesando en el servicio…"
+msgstr ""
+
 msgid "Proceso completado correctamente."
 msgstr ""
 
 msgid "Proceso en curso"
+msgstr ""
+
+msgid "Publicación sin referencia para consultar."
+msgstr ""
+
+msgid "Publicar"
+msgstr ""
+
+msgid "Publicar en TikTok, YouTube e Instagram"
+msgstr ""
+
+msgid "Publicar en redes"
+msgstr ""
+
+msgid "Publicar…"
+msgstr ""
+
+msgid "Público"
 msgstr ""
 
 msgid "Quemando subtítulos"
@@ -462,9 +637,7 @@ msgstr ""
 msgid "Quitar"
 msgstr ""
 
-msgid ""
-"Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que "
-"quieres siempre. Se envía al modelo con cada vídeo."
+msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
 msgstr ""
 
 #, python-brace-format
@@ -472,6 +645,18 @@ msgid "Qué hacer: {solucion}"
 msgstr ""
 
 msgid "Recortando silencios"
+msgstr ""
+
+msgid "Redes sociales"
+msgstr ""
+
+msgid "Redes…"
+msgstr ""
+
+msgid "Reel de prueba (a seguidores si funciona)"
+msgstr ""
+
+msgid "Reel normal"
 msgstr ""
 
 msgid "Reels Bold"
@@ -483,20 +668,19 @@ msgstr ""
 msgid "Reencodado del vídeo (h264_videotoolbox)"
 msgstr ""
 
+msgid "Respuesta inesperada del servicio."
+msgstr ""
+
 msgid "SIGABRT: una librería nativa abortó (aserción fallida)"
 msgstr ""
 
 msgid "SIGBUS: acceso a memoria inválido en una librería nativa"
 msgstr ""
 
-msgid ""
-"SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria "
-"(jetsam) o porque se cerró la app"
+msgid "SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria (jetsam) o porque se cerró la app"
 msgstr ""
 
-msgid ""
-"SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, "
-"PyAV)"
+msgid "SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, PyAV)"
 msgstr ""
 
 msgid "SIGTERM: el proceso fue terminado desde fuera"
@@ -508,19 +692,48 @@ msgstr ""
 msgid "Salida:"
 msgstr ""
 
+#, python-brace-format
+msgid ""
+"Se publicará «{titulo}» en:\n"
+"\n"
+"{resumen}"
+msgstr ""
+
 msgid "Selecciona un vídeo de la cola"
 msgstr ""
 
 msgid "Separación de hablantes"
 msgstr ""
 
+msgid "Servicio no disponible (503). Prueba más tarde."
+msgstr ""
+
+msgid "Servicio, perfil y API key para publicar"
+msgstr ""
+
+msgid "Servicio:"
+msgstr ""
+
+msgid "Short público"
+msgstr ""
+
+#, python-brace-format
+msgid "Sigue procesándose en el servicio. Revisa {plataforma} en unos minutos."
+msgstr ""
+
 msgid "Silencios:"
+msgstr ""
+
+msgid "Sin clave guardada"
 msgstr ""
 
 msgid "Sin conexión para descargar un modelo"
 msgstr ""
 
 msgid "Sin memoria suficiente"
+msgstr ""
+
+msgid "Sin permiso o fuera del plan contratado (403)."
 msgstr ""
 
 msgid "Sin permisos para leer o escribir"
@@ -538,13 +751,14 @@ msgstr ""
 msgid "Solo limpiar audio"
 msgstr ""
 
+msgid "Subiendo…"
+msgstr ""
+
 msgid "Subtítulos"
 msgstr ""
 
 #, python-brace-format
-msgid ""
-"Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt "
-"conservado)."
+msgid "Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt conservado)."
 msgstr ""
 
 #, python-brace-format
@@ -560,25 +774,54 @@ msgstr ""
 msgid "Sustituyendo pista de audio"
 msgstr ""
 
+msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube e Instagram. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
+msgstr ""
+
 msgid "Tamaño:"
 msgstr ""
 
 msgid "Tarea:"
 msgstr ""
 
+msgid "Textos"
+msgstr ""
+
 msgid "Transcribiendo"
+msgstr ""
+
+msgid "Términos"
+msgstr ""
+
+#, python-brace-format
+msgid "Términos: {terminos} · Correcciones: {correcciones}"
+msgstr ""
+
+msgid "Términos…"
 msgstr ""
 
 msgid "Título, caption y hashtags"
 msgstr ""
 
+msgid "Título:"
+msgstr ""
+
 msgid "Umbral:"
+msgstr ""
+
+msgid "Una línea por término: marcas, productos, nombres propios. Whisper los recibe como pista y el caption respeta su ortografía. Después de «=», las formas en que Whisper se equivoca, separadas por comas: se corrigen al transcribir. Las líneas con # son comentarios."
 msgstr ""
 
 msgid "Velocidad:"
 msgstr ""
 
+msgid "Viajes y eventos"
+msgstr ""
+
 msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+msgstr ""
+
+#, python-brace-format
+msgid "Vía {servicio}"
 msgstr ""
 
 msgid "Vídeo de entrada."
@@ -594,14 +837,14 @@ msgstr ""
 msgid "Vídeos ("
 msgstr ""
 
+#, python-brace-format
+msgid "Ya publicado antes en: {lista}."
+msgstr ""
+
 msgid "argumentos inválidos: se requiere --config"
 msgstr ""
 
-msgid ""
-"auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream "
-"H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el "
-"muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo "
-"original está bien."
+msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
 msgstr ""
 
 #, python-brace-format
@@ -613,9 +856,7 @@ msgid "auto-editor falló (código {codigo}) incluso tras reencodar la entrada"
 msgstr ""
 
 #, python-brace-format
-msgid ""
-"auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha "
-"reencodado con h264_videotoolbox y se ha reintentado."
+msgid "auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha reencodado con h264_videotoolbox y se ha reintentado."
 msgstr ""
 
 msgid "auto-editor no pudo escribir el vídeo"
@@ -639,10 +880,7 @@ msgstr ""
 msgid "error"
 msgstr ""
 
-msgid ""
-"ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo "
-"está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso "
-"anterior dejó una salida a medias)."
+msgid "ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso anterior dejó una salida a medias)."
 msgstr ""
 
 msgid "ffmpeg sin soporte de subtítulos (libass)"
@@ -651,15 +889,17 @@ msgstr ""
 msgid "hecho"
 msgstr ""
 
-msgid ""
-"macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, "
-"Documentos y discos externos requieren permiso)."
+msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
 msgstr ""
 
 msgid "medium (más preciso)"
 msgstr ""
 
 msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
+msgstr ""
+
+#, python-brace-format
+msgid "perfil «{perfil}»"
 msgstr ""
 
 msgid "procesando"
@@ -670,6 +910,9 @@ msgid "señal desconocida {numero}"
 msgstr ""
 
 msgid "small (rápido)"
+msgstr ""
+
+msgid "turbo (recomendado)"
 msgstr ""
 
 #, python-brace-format
@@ -692,8 +935,36 @@ msgstr ""
 msgid "{n} modelo(s) no caben en memoria (ver tooltip)."
 msgstr ""
 
+#, python-brace-format
+msgid "{plataforma} (borrador)"
+msgstr ""
+
+#, python-brace-format
+msgid "{plataforma} rechazó la publicación."
+msgstr ""
+
+msgid "¿Publicar ahora?"
+msgstr ""
+
 msgid "■ Cancelar"
 msgstr ""
 
 msgid "▶ Procesar"
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá repetido."
+msgstr ""
+
+msgid "✓ En borradores: termínalo en la app de TikTok"
+msgstr ""
+
+msgid "✓ Guardada en el Llavero"
+msgstr ""
+
+msgid "✓ Publicado"
+msgstr ""
+
+#, python-brace-format
+msgid "✓ Publicado · <a href=\"{url}\">Abrir</a>"
 msgstr ""

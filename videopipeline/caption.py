@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -18,7 +19,16 @@ from .subtitles import Palabra
 
 MAX_PALABRAS = 3500
 MAX_TITULO = 60
-MIN_HASHTAGS, MAX_HASHTAGS = 8, 15
+NUM_HASHTAGS = 5
+
+# Etiquetas de relleno que no describen el vídeo: se descartan siempre.
+HASHTAGS_GENERICOS = frozenset({
+    "#viral", "#fyp", "#foryou", "#foryoupage", "#parati", "#paratii",
+    "#trending", "#tendencia", "#explore", "#explorar", "#reels", "#reel",
+    "#reelsinstagram", "#instagood", "#instagram", "#tiktok", "#shorts",
+    "#youtubeshorts", "#video", "#videos", "#followme", "#like", "#love",
+    "#xyzbca", "#fy", "#viralvideo", "#virales",
+})
 
 # Prompt del LLM: no es texto de interfaz (no se traduce con gettext). Hay una
 # variante fija por idioma; `construir_mensajes` elige según `idioma`.
@@ -31,10 +41,14 @@ _SYSTEM_ES = (
     "- caption: 120-200 palabras. Primera línea = gancho. Desarrollo con las 2-3 "
     "ideas clave del vídeo. Cierra con una llamada a la acción. Tono cercano y "
     "profesional. Sin hashtags dentro del caption.\n"
-    f"- hashtags: entre {MIN_HASHTAGS} y {MAX_HASHTAGS}, en minúsculas, sin "
-    "espacios, empezando por #. Mezcla 3 genéricos de alto volumen, 5 o más de "
-    "nicho y 2 del tema concreto.\n"
-    "- palabras_clave: 5-8 términos de búsqueda en español.\n"
+    "- palabras_clave: 5-8 términos de búsqueda en español que describan el "
+    "tema concreto del vídeo.\n"
+    f"- hashtags: exactamente {NUM_HASHTAGS}, ordenados del más al menos "
+    "relevante. Cada uno debe nombrar algo que aparece en el vídeo: sácalos de "
+    "las palabras_clave y del caption. El primero, el tema principal; luego el "
+    "nicho y los subtemas. En minúsculas, sin espacios, sin tildes, empezando "
+    "por #. Prohibidos los de relleno que no describen el contenido (#viral, "
+    "#fyp, #parati, #foryou, #reels, #trending, #explore).\n"
     "No inventes datos que no estén en la transcripción. Responde solo JSON."
 )
 
@@ -47,10 +61,14 @@ _SYSTEM_EN = (
     "- caption: 120-200 words. First line = hook. Development with the video's "
     "2-3 key ideas. Close with a call to action. Warm and professional tone. "
     "No hashtags inside the caption.\n"
-    f"- hashtags: between {MIN_HASHTAGS} and {MAX_HASHTAGS}, lowercase, no "
-    "spaces, starting with #. Mix 3 high-volume generic ones, 5 or more niche "
-    "ones and 2 about the specific topic.\n"
-    "- palabras_clave: 5-8 search keywords.\n"
+    "- palabras_clave: 5-8 search keywords describing the video's specific "
+    "topic.\n"
+    f"- hashtags: exactly {NUM_HASHTAGS}, ordered from most to least "
+    "relevant. Each one must name something that appears in the video: take "
+    "them from palabras_clave and the caption. First the main topic, then the "
+    "niche and subtopics. Lowercase, no spaces, no accents, starting with #. "
+    "Filler tags that don't describe the content are forbidden (#viral, #fyp, "
+    "#parati, #foryou, #reels, #trending, #explore).\n"
     "Do not invent data that isn't in the transcript. Respond only with JSON."
 )
 
@@ -59,9 +77,11 @@ ESQUEMA: dict = {
     "properties": {
         "titulo": {"type": "string"},
         "caption": {"type": "string"},
-        "hashtags": {"type": "array", "items": {"type": "string"},
-                     "minItems": MIN_HASHTAGS, "maxItems": MAX_HASHTAGS},
+        # Orden importante: Ollama genera los campos en este orden, así los
+        # hashtags salen después del caption y las palabras clave.
         "palabras_clave": {"type": "array", "items": {"type": "string"}},
+        "hashtags": {"type": "array", "items": {"type": "string"},
+                     "minItems": NUM_HASHTAGS, "maxItems": NUM_HASHTAGS},
     },
     "required": ["titulo", "caption", "hashtags", "palabras_clave"],
 }
@@ -94,7 +114,8 @@ def recortar(transcripcion: str, max_palabras: int = MAX_PALABRAS) -> str:
 
 
 def construir_mensajes(transcripcion: str, contexto_marca: str,
-                       idioma: str = "es") -> list[dict]:
+                       idioma: str = "es",
+                       terminos: tuple[str, ...] = ()) -> list[dict]:
     ingles = idioma == "en"
     system = _SYSTEM_EN if ingles else _SYSTEM_ES
     if contexto_marca.strip():
@@ -108,6 +129,18 @@ def construir_mensajes(transcripcion: str, contexto_marca: str,
                 "\n\nContexto de marca (respétalo en tono, nombre y llamada a la "
                 f"acción):\n{contexto_marca.strip()}"
             )
+    if terminos:
+        lista = ", ".join(terminos)
+        if ingles:
+            system += (
+                "\n\nThe user's own terms. Spell them exactly like this in the "
+                f"title, caption, keywords and hashtags: {lista}."
+            )
+        else:
+            system += (
+                "\n\nTérminos propios del usuario. Escríbelos exactamente así en "
+                f"título, caption, palabras clave y hashtags: {lista}."
+            )
     etiqueta = "Transcript" if ingles else "Transcripción"
     return [
         {"role": "system", "content": system},
@@ -115,9 +148,40 @@ def construir_mensajes(transcripcion: str, contexto_marca: str,
     ]
 
 
+def _sin_tildes(texto: str) -> str:
+    """Quita tildes y diéresis pero conserva la ñ."""
+    partes = []
+    for c in texto:
+        if c in "ñÑ":
+            partes.append(c)
+        else:
+            partes.append("".join(
+                d for d in unicodedata.normalize("NFD", c)
+                if unicodedata.category(d) != "Mn"
+            ))
+    return "".join(partes)
+
+
 def _normalizar_hashtag(texto: str) -> str:
-    limpio = re.sub(r"\s+", "", texto.strip().lstrip("#")).lower()
+    limpio = _sin_tildes(texto.strip().lstrip("#")).lower()
+    limpio = re.sub(r"[^\w]", "", limpio)
     return f"#{limpio}" if limpio else ""
+
+
+def _elegir_hashtags(propuestos: list, palabras_clave: list[str]) -> list[str]:
+    """Los `NUM_HASHTAGS` más relevantes, sin relleno ni repetidos.
+
+    Si el modelo propone menos de los necesarios tras filtrar, se completan
+    con las palabras clave convertidas en hashtag.
+    """
+    elegidos: list[str] = []
+    for candidato in [*map(str, propuestos), *palabras_clave]:
+        h = _normalizar_hashtag(candidato)
+        if h and h not in elegidos and h not in HASHTAGS_GENERICOS:
+            elegidos.append(h)
+        if len(elegidos) == NUM_HASHTAGS:
+            break
+    return elegidos
 
 
 def _validar(datos: dict) -> Caption:
@@ -134,18 +198,14 @@ def _validar(datos: dict) -> Caption:
               "incorrectos"),
             detalle=json.dumps(datos, ensure_ascii=False)[:2000],
         )
-    vistos: list[str] = []
-    for h in datos["hashtags"]:
-        n = _normalizar_hashtag(str(h))
-        if n and n not in vistos:
-            vistos.append(n)
+    palabras_clave = [
+        " ".join(str(p).split()) for p in datos["palabras_clave"] if str(p).strip()
+    ]
     return Caption(
         titulo=" ".join(datos["titulo"].split())[:MAX_TITULO],
         caption=datos["caption"].strip(),
-        hashtags=vistos,
-        palabras_clave=[
-            " ".join(str(p).split()) for p in datos["palabras_clave"] if str(p).strip()
-        ],
+        hashtags=_elegir_hashtags(datos["hashtags"], palabras_clave),
+        palabras_clave=palabras_clave,
     )
 
 
@@ -155,13 +215,15 @@ def generar(
     modelo: str,
     cliente: Callable[[str, list[dict], dict], dict] = chat_json,
     idioma: str = "es",
+    terminos: tuple[str, ...] = (),
 ) -> Caption:
     if not transcripcion.strip():
         raise PasoFallido(
             _("La transcripción está vacía; no hay texto para el caption")
         )
     datos = cliente(
-        modelo, construir_mensajes(transcripcion, contexto_marca, idioma), ESQUEMA
+        modelo, construir_mensajes(transcripcion, contexto_marca, idioma, terminos),
+        ESQUEMA
     )
     return _validar(datos)
 

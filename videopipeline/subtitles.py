@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,6 +66,37 @@ PRESETS: dict[str, EstiloPreset] = {
         fuente="Helvetica", tamano_rel=0.045,
         primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H59000000",
         negrita=0, borde_estilo=3, grosor_contorno=1, sombra=0,
+        mayusculas=False, tipo="frases", resaltado=None,
+    ),
+    # Colores en formato ASS: &HAABBGGRR (alfa, azul, verde, rojo).
+    "impacto": EstiloPreset(
+        fuente="Impact", tamano_rel=0.08,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=0, borde_estilo=1, grosor_contorno=5, sombra=0,
+        mayusculas=True, tipo="palabras", resaltado=None,
+    ),
+    "amarillo": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.072,
+        primario="&H0000D4FF", contorno_color="&H00000000", fondo="&H80000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=4, sombra=3,
+        mayusculas=True, tipo="palabras", resaltado=None,
+    ),
+    "karaoke_verde": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.07,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=3, sombra=2,
+        mayusculas=True, tipo="palabras", resaltado="&H006BE62E",
+    ),
+    "minimal": EstiloPreset(
+        fuente="Avenir Next", tamano_rel=0.042,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H80000000",
+        negrita=0, borde_estilo=1, grosor_contorno=1, sombra=1,
+        mayusculas=False, tipo="frases", resaltado=None,
+    ),
+    "caja_blanca": EstiloPreset(
+        fuente="Helvetica", tamano_rel=0.045,
+        primario="&H00000000", contorno_color="&H00FFFFFF", fondo="&H00FFFFFF",
+        negrita=-1, borde_estilo=3, grosor_contorno=1, sombra=0,
         mayusculas=False, tipo="frases", resaltado=None,
     ),
 }
@@ -234,6 +266,57 @@ def generar_ass(bloques: list[Bloque], preset_id: str, posicion: int,
     ruta.write_text("\n".join(cabecera + eventos) + "\n", encoding="utf-8")
 
 
+# --- Transcripción ------------------------------------------------------------
+#
+# Dos motores con los mismos nombres de modelo ("small", "medium", "turbo"):
+# - mlx-whisper: usa la GPU de Apple Silicon (unas 10 veces más rápido). Necesita
+#   macOS 14 o posterior.
+# - faster-whisper: respaldo en CPU para macOS 13, donde mlx no se instala.
+
+CACHE_HF = Path.home() / ".cache" / "huggingface" / "hub"
+
+MODELOS_MLX = {
+    "small": "mlx-community/whisper-small-mlx",
+    "medium": "mlx-community/whisper-medium-mlx",
+    "turbo": "mlx-community/whisper-large-v3-turbo",
+}
+MODELOS_FASTER = {"small": "small", "medium": "medium", "turbo": "large-v3-turbo"}
+TAMANO_DESCARGA = {"small": "~500 MB", "medium": "~1,5 GB", "turbo": "~1,6 GB"}
+
+# Segundos de silencio a partir de los cuales mlx-whisper descarta texto
+# inventado (sustituye al filtro VAD de faster-whisper).
+SILENCIO_ALUCINACION = 2.0
+
+
+def usa_mlx() -> bool:
+    return importlib.util.find_spec("mlx_whisper") is not None
+
+
+def modelo_en_cache(modelo: str, cache_dir: Path = CACHE_HF) -> bool:
+    """True si el modelo ya está descargado para el motor que se va a usar."""
+    if not cache_dir.is_dir():
+        return False
+    if usa_mlx():
+        carpeta = "models--" + MODELOS_MLX[modelo].replace("/", "--")
+        return (cache_dir / carpeta).is_dir()
+    return any(cache_dir.glob(f"models--*faster-whisper-{MODELOS_FASTER[modelo]}"))
+
+
+def _cargar_audio(video: Path):
+    # PyAV (vía faster-whisper): no depende del ffmpeg del PATH, que dentro de
+    # la app no siempre es el de Homebrew.
+    from faster_whisper.audio import decode_audio
+
+    return decode_audio(str(video), sampling_rate=16000)
+
+
+def _mlx_transcribe(audio, **kwargs) -> dict:
+    # Import perezoso: mlx solo se carga en el subproceso del runner.
+    import mlx_whisper
+
+    return mlx_whisper.transcribe(audio, **kwargs)
+
+
 def _crear_whisper(modelo: str):
     # Import perezoso: faster-whisper solo se carga en el subproceso del runner.
     from faster_whisper import WhisperModel
@@ -241,13 +324,46 @@ def _crear_whisper(modelo: str):
     return WhisperModel(modelo, device="auto", compute_type="auto")
 
 
-def transcribir(video: Path, idioma: str, modelo: str) -> list[Palabra]:
-    whisper = _crear_whisper(modelo)
+def transcribir(video: Path, idioma: str, modelo: str,
+                prompt: str | None = None) -> list[Palabra]:
+    """`prompt`: pista con términos propios (ver `glosario.prompt_whisper`)."""
+    lengua = None if idioma == "auto" else idioma
+    if usa_mlx():
+        return _transcribir_mlx(video, lengua, modelo, prompt)
+    return _transcribir_faster(video, lengua, modelo, prompt)
+
+
+def _transcribir_mlx(video: Path, lengua: str | None, modelo: str,
+                     prompt: str | None) -> list[Palabra]:
+    resultado = _mlx_transcribe(
+        _cargar_audio(video),
+        path_or_hf_repo=MODELOS_MLX[modelo],
+        language=lengua,
+        word_timestamps=True,
+        initial_prompt=prompt,
+        hallucination_silence_threshold=SILENCIO_ALUCINACION,
+        verbose=None,
+    )
+    palabras: list[Palabra] = []
+    for segmento in resultado.get("segments", []):
+        for palabra in segmento.get("words") or []:
+            texto = palabra["word"].strip()
+            if texto:
+                palabras.append(
+                    Palabra(texto=texto, inicio=palabra["start"], fin=palabra["end"])
+                )
+    return palabras
+
+
+def _transcribir_faster(video: Path, lengua: str | None, modelo: str,
+                        prompt: str | None) -> list[Palabra]:
+    whisper = _crear_whisper(MODELOS_FASTER[modelo])
     segmentos, _info = whisper.transcribe(
         str(video),
-        language=None if idioma == "auto" else idioma,
+        language=lengua,
         word_timestamps=True,
         vad_filter=True,
+        initial_prompt=prompt,
     )
     palabras: list[Palabra] = []
     for segmento in segmentos:

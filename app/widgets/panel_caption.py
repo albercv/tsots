@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QApplication,
     QGroupBox,
@@ -19,11 +20,15 @@ from videopipeline.i18n import _
 
 
 class PanelCaption(QWidget):
-    """Muestra el caption SEO del trabajo seleccionado y lo copia por bloques."""
+    """Muestra el caption SEO del trabajo seleccionado, lo copia por bloques y
+    da paso a publicarlo en redes."""
+
+    publicar = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._caption: Caption | None = None
+        self._video: Path | None = None
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
         grupo = QGroupBox(_("Caption SEO"))
@@ -59,11 +64,28 @@ class PanelCaption(QWidget):
                       self.boton_copiar_hashtags, self.boton_copiar_todo):
             botones.addWidget(boton)
         layout.addLayout(botones)
+        fila_redes = QHBoxLayout()
+        fila_redes.addStretch(1)
+        self.boton_publicar = QPushButton(_("Publicar…"))
+        self.boton_publicar.setToolTip(_("Publicar en TikTok, YouTube e Instagram"))
+        self.boton_publicar.clicked.connect(self.publicar)
+        fila_redes.addWidget(self.boton_publicar)
+        layout.addLayout(fila_redes)
         raiz.addWidget(grupo)
         self.hide()
 
-    def mostrar(self, caption: Caption | None) -> None:
+    @property
+    def caption(self) -> Caption | None:
+        return self._caption
+
+    @property
+    def video(self) -> Path | None:
+        return self._video
+
+    def mostrar(self, caption: Caption | None, video: Path | None = None) -> None:
         self._caption = caption
+        self._video = Path(video) if video else None
+        self.boton_publicar.setEnabled(caption is not None and self._video is not None)
         if caption is None:
             self.hide()
             return

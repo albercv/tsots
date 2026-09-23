@@ -178,3 +178,35 @@ def test_cli_on_progress_no_revienta_con_warning(tmp_path, monkeypatch, capsys):
     salida = capsys.readouterr()
     assert "Proceso completado" in salida.out
     assert "AVISO: algo" in salida.err
+
+
+def _cli_capturando(tmp_path, monkeypatch):
+    video = tmp_path / "v.mp4"
+    video.write_bytes(b"VID")
+    capturado = {}
+
+    def falso_run(config, on_progress=None):
+        capturado["config"] = config
+        return config.ruta_salida_final()
+
+    monkeypatch.setattr(limpiarVideo, "run", falso_run)
+    monkeypatch.setattr(limpiarVideo, "comprobar_dependencias", lambda: [])
+    monkeypatch.setattr(limpiarVideo, "tiene_pista_audio", lambda v: True)
+    return video, capturado
+
+
+def test_cli_glosario_desde_fichero(tmp_path, monkeypatch):
+    video, capturado = _cli_capturando(tmp_path, monkeypatch)
+    fichero = tmp_path / "terminos.txt"
+    fichero.write_text("Claude Code = Cloud Code\n", encoding="utf-8")
+    limpiarVideo.main([str(video), "--glosario", str(fichero)])
+    assert capturado["config"].glosario == "Claude Code = Cloud Code\n"
+
+
+def test_cli_glosario_inexistente_sale_1(tmp_path, monkeypatch, capsys):
+    video, capturado = _cli_capturando(tmp_path, monkeypatch)
+    with pytest.raises(SystemExit) as salida:
+        limpiarVideo.main([str(video), "--glosario", str(tmp_path / "no.txt")])
+    assert salida.value.code == 1
+    assert "no.txt" in capsys.readouterr().err
+    assert "config" not in capturado

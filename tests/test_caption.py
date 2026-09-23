@@ -11,8 +11,8 @@ def _respuesta_ok() -> dict:
     return {
         "titulo": "Chat GPT Ads: segundo día y validación",
         "caption": "Hoy toca ser honestos.\n\n¿Y tú?",
-        "hashtags": ["#marketingdigital", "#chatgptads", "#ia", "#negocios",
-                     "#seo", "#reels", "#emprender", "#ads"],
+        "hashtags": ["#chatgptads", "#marketingdigital", "#ia", "#negocios",
+                     "#emprender"],
         "palabras_clave": ["chat gpt ads", "validación perfil"],
     }
 
@@ -170,3 +170,87 @@ def test_md_ida_y_vuelta_con_cabeceras_reales_dentro_del_caption(tmp_path):
     ruta = tmp_path / "v_limpio.md"
     cap.escribir_md(c, ruta)
     assert cap.leer_md(ruta) == c
+
+
+# --- hashtags: 5, relevantes, derivados de la descripción -------------------
+
+def test_esquema_pide_exactamente_cinco_hashtags():
+    h = cap.ESQUEMA["properties"]["hashtags"]
+    assert cap.NUM_HASHTAGS == 5
+    assert h["minItems"] == h["maxItems"] == 5
+
+
+def test_hashtags_se_generan_despues_de_caption_y_palabras_clave():
+    # Ollama genera en el orden del esquema: los hashtags deben salir cuando el
+    # modelo ya ha escrito el caption y las palabras clave, para basarse en ellos.
+    orden = list(cap.ESQUEMA["properties"])
+    assert orden.index("hashtags") > orden.index("caption")
+    assert orden.index("hashtags") > orden.index("palabras_clave")
+
+
+@pytest.mark.parametrize("idioma", ["es", "en"])
+def test_prompt_pide_cinco_hashtags_relevantes_sin_genericos(idioma):
+    system = cap.construir_mensajes("t", "", idioma)[0]["content"]
+    assert "5" in system
+    assert "#viral" in system and "#fyp" in system
+    clave = "palabras_clave"
+    assert clave in system.split("hashtags", 1)[1]
+
+
+def test_generar_recorta_a_cinco_manteniendo_orden():
+    r = _respuesta_ok()
+    r["hashtags"] = ["#a1", "#a2", "#a3", "#a4", "#a5", "#a6", "#a7"]
+    c = cap.generar("t", "", "m", cliente=lambda *a: r)
+    assert c.hashtags == ["#a1", "#a2", "#a3", "#a4", "#a5"]
+
+
+def test_generar_descarta_hashtags_genericos():
+    r = _respuesta_ok()
+    r["hashtags"] = ["#viral", "#FYP", "#chatgptads", "#parati", "#reels",
+                     "#ia", "#foryou", "#trending", "#explore", "#negocios",
+                     "#seo", "#ads"]
+    c = cap.generar("t", "", "m", cliente=lambda *a: r)
+    assert c.hashtags == ["#chatgptads", "#ia", "#negocios", "#seo", "#ads"]
+
+
+def test_generar_completa_con_palabras_clave_si_faltan():
+    r = _respuesta_ok()
+    r["hashtags"] = ["#viral", "#chatgptads", "#fyp"]
+    r["palabras_clave"] = ["chat gpt ads", "validación de perfil", "anuncios IA",
+                           "meta ads", "presupuesto"]
+    c = cap.generar("t", "", "m", cliente=lambda *a: r)
+    assert c.hashtags == ["#chatgptads", "#validaciondeperfil", "#anunciosia",
+                          "#metaads", "#presupuesto"]
+
+
+def test_normaliza_puntuacion_y_acentos_pero_conserva_la_enie():
+    r = _respuesta_ok()
+    r["hashtags"] = ["#IA-Generativa!", "#Educación", "#España", "#año_2026", "#ok"]
+    c = cap.generar("t", "", "m", cliente=lambda *a: r)
+    assert c.hashtags == ["#iagenerativa", "#educacion", "#españa", "#año_2026", "#ok"]
+
+
+# --- términos del glosario ---------------------------------------------------------
+
+@pytest.mark.parametrize("idioma", ["es", "en"])
+def test_prompt_incluye_terminos_del_glosario(idioma):
+    system = cap.construir_mensajes("t", "", idioma,
+                                    terminos=("Claude Code", "Anthropic"))[0]["content"]
+    assert "Claude Code, Anthropic" in system
+
+
+def test_prompt_sin_terminos_no_menciona_glosario():
+    con = cap.construir_mensajes("t", "", "es", terminos=("X",))[0]["content"]
+    sin = cap.construir_mensajes("t", "", "es")[0]["content"]
+    assert len(con) > len(sin) and "X" not in sin
+
+
+def test_generar_pasa_terminos_al_prompt():
+    vistos = []
+
+    def cliente(modelo, mensajes, esquema):
+        vistos.append(mensajes[0]["content"])
+        return _respuesta_ok()
+
+    cap.generar("t", "", "m", cliente=cliente, terminos=("Claude Code",))
+    assert "Claude Code" in vistos[0]
