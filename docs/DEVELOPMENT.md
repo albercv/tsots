@@ -144,6 +144,15 @@ locale/              gettext catalogs (see Translations)
 tests/               pytest + pytest-qt
 ```
 
+Main window (`app/main.py`): header on top; drop zone and queue on the
+left; on the right, the option sections (`PanelOpciones`, one
+`SeccionPlegable` per group from `app/widgets/seccion_plegable.py`, joined
+by an `Acordeon` that keeps exactly one open) inside a `QScrollArea`, and
+below it, outside the scroll and with a fixed height, a `QTabWidget` with
+`VistaPrevia` and `PanelCaption`. Controls live in each section's
+`contenido`, so enable/disable logic never touches the headers, and
+`valores()` does not depend on which section is open.
+
 The GUI never runs the pipeline in-process: `app/worker.py` launches
 `python -m videopipeline.runner --config <json>` and parses JSON progress
 lines (`step/total/label/percent`, `warning`, `error` + `diagnostico`,
