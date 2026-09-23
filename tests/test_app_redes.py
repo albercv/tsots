@@ -469,8 +469,11 @@ def test_pendiente_cuenta_aparte(qtbot, video, ajustes, llavero_falso, monkeypat
     _confirmar(monkeypatch)
     with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
         dialogo.boton_publicar.click()
-    assert dialogo.etiqueta_estado.text() == "Publicado en 2 de 3 · 1 sigue procesándose"
+    assert dialogo.etiqueta_estado.text() == "Publicado en 2 de 3 · 1 por confirmar"
     assert "⏳" in dialogo.resumen.text()
+    # Por confirmar: no se deja marcada para no publicarla dos veces sin querer.
+    assert not dialogo.casillas[I].isChecked()
+    assert "Instagram (sin confirmar)" in dialogo.aviso_publicado.text()
 
 
 def test_fallo_inesperado_del_hilo_da_error_a_cada_plataforma(qtbot, video, ajustes,
@@ -688,3 +691,17 @@ def test_no_se_cierra_con_done_mientras_publica(qtbot, video, ajustes, llavero_f
     dialogo.accept()
     assert dialogo.isVisible()
     dialogo._hilo = None
+
+
+def test_confirmacion_avisa_de_lo_que_quedo_sin_confirmar(qtbot, video, ajustes,
+                                                           llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+    registro.anotar(video, I, "", "prov", "prueba", sin_confirmar=True)
+    registro.anotar(video, Y, "https://yt/0", "prov")
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    assert "Instagram (sin confirmar)" in dialogo.aviso_publicado.text()
+    preguntas = _confirmar(monkeypatch, QMessageBox.StandardButton.Cancel)
+    dialogo.boton_publicar.click()
+    assert "Ya publicado antes en: YouTube." in preguntas[0]
+    assert "Sin confirmar en: Instagram" in preguntas[0]
+    assert "compruébalo" in preguntas[0]

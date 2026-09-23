@@ -17,16 +17,28 @@ API (docs y openapi.json consultados el 2026-09-23):
 
 Cada petición, su código HTTP, su cuerpo (limpio y acotado) y cada sondeo
 se anotan con `logging` en el registro de la publicación (`diario`).
+
+La subida (`POST /upload`) nunca se repite sola: un 5xx o una respuesta que
+no llega después de enviar el vídeo pueden ocurrir cuando el servicio ya lo
+aceptó, y repetir el POST lo publicaría varias veces. Esos casos quedan «por
+confirmar» (pendiente sin referencia): la app pide revisarlo antes de volver
+a publicar. Solo la consulta de estado (GET, idempotente) se reintenta. Se
+pide `async_upload=true` para que la subida devuelva enseguida un
+`request_id` que se consulta después, y cada intento lleva un `external_id`
+propio que queda en el registro para rastrear duplicados.
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import logging
 import re
 import time
 import traceback
+import uuid
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
@@ -55,9 +67,12 @@ URL_API = "https://api.upload-post.com/api"
 URL_SUBIDA = f"{URL_API}/upload"
 URL_ESTADO = f"{URL_API}/uploadposts/status"
 
-# Solo el 503 (servicio no disponible) se reintenta: el resto de errores no
-# cambian al repetir y un reintento tras un 429 gastaría cuota.
+# Solo la consulta de estado (GET) reintenta un 503. La subida, nunca.
 ESPERAS_503 = (2.0, 5.0)
+_CODIGOS_SERVIDOR = (500, 502, 503, 504)
+# Fallos de red en los que el vídeo no llegó entero: es seguro reintentar a mano.
+_SIN_ENVIAR = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout,
+               httpx.WriteError, httpx.WriteTimeout)
 
 # httpx aplica cada límite a cada operación (conectar, enviar un trozo, leer),
 # no a la petición entera; aun así, un vídeo de cientos de MB por una conexión
@@ -75,7 +90,17 @@ _PLATAFORMAS = {
     Plataforma.YOUTUBE: "youtube",
     Plataforma.INSTAGRAM: "instagram",
 }
-_ESTADOS_TERMINADOS = {"completed", "complete", "finished", "done", "success", "failed", "error"}
+# Estados (de la petición o de una plataforma) que da el servicio.
+_ESTADOS_EN_CURSO = {"pending", "processing", "in_progress", "in progress", "queued",
+                     "scheduled", "uploading", "started", "submitted", "running", "waiting"}
+_ESTADOS_FALLIDOS = {"failed", "failure", "error", "rejected", "cancelled", "canceled"}
+_ESTADOS_HECHOS = {"completed", "complete", "finished", "done", "success", "succeeded",
+                   "published"}
+_RE_EN_CURSO = re.compile(
+    r"\b(processing|in progress|pending|queued|being processed|scheduled|uploading)\b",
+    re.IGNORECASE)
+# Campos que, si traen texto, indican un fallo explícito de la plataforma.
+_CAMPOS_ERROR = ("error", "error_message", "errors", "error_user_msg", "reason")
 _RE_URL = re.compile(r"https?://\S+")
 _RE_ETIQUETA = re.compile(r"<[^>]+>")
 _RE_SCRIPT = re.compile(r"<(script|style)\b.*?</\1>", re.IGNORECASE | re.DOTALL)
@@ -107,6 +132,9 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
     datos: dict[str, str | list[str]] = {
         "user": perfil,
         "platform[]": [_PLATAFORMAS[plataforma]],
+        # Responde enseguida con un request_id: sin petición larga que pueda
+        # cortarse después de que el servicio ya aceptó el vídeo.
+        "async_upload": "true",
         # Obligatorio para YouTube; las demás usan su título propio.
         "title": titulo_para(Plataforma.YOUTUBE, publicacion),
     }
@@ -167,15 +195,19 @@ class ProveedorUploadPost:
                 nombre=video.name))
         datos = campos(plataforma, publicacion, opciones, self._perfil)
         try:
-            tamano = video.stat().st_size
+            estado_video = video.stat()
+            tamano = estado_video.st_size
         except OSError:
-            tamano = 0
+            estado_video, tamano = None, 0
+        datos["external_id"] = identificador_externo(
+            plataforma, video, tamano, estado_video.st_mtime if estado_video else 0.0)
         limites = tiempos(tamano)
         # El perfil (`user`) no va al registro.
-        log.info("%s: POST %s · vídeo %s (%d bytes) · campos %s · esperas máx.: "
+        log.info("%s: POST %s (un único intento) · external_id %s · vídeo %s (%d bytes) · "
+                 "campos %s · esperas máx.: "
                  "conexión %.0f s, escritura %.0f s, lectura %.0f s",
-                 plataforma.nombre, URL_SUBIDA, video, tamano,
-                 {k: v for k, v in datos.items() if k != "user"},
+                 plataforma.nombre, URL_SUBIDA, datos["external_id"], video, tamano,
+                 {k: v for k, v in datos.items() if k not in ("user", "external_id")},
                  limites.connect, limites.write, limites.read)
 
         def enviar(http: httpx.Client) -> httpx.Response:
@@ -188,12 +220,21 @@ class ProveedorUploadPost:
 
         inicio = time.monotonic()
         try:
-            respuesta = self._con_reintentos(enviar)
-        except httpx.HTTPError as e:
-            log.warning("%s: la subida falló tras %.1f s: %s", plataforma.nombre,
-                        time.monotonic() - inicio, self._traza(e))
+            with self._cliente() as http:
+                respuesta = enviar(http)  # sin reintentos: ver el docstring del módulo
+        except _SIN_ENVIAR as e:
+            log.warning("%s: el vídeo no llegó a enviarse entero tras %.1f s: %s",
+                        plataforma.nombre, time.monotonic() - inicio, self._traza(e))
             return self._error(plataforma, _("No se pudo conectar con el servicio ({tipo}).").format(
                 tipo=type(e).__name__))
+        except httpx.HTTPError as e:
+            log.warning("%s: sin respuesta tras enviar el vídeo (%.1f s): %s",
+                        plataforma.nombre, time.monotonic() - inicio, self._traza(e))
+            resultado = self._por_confirmar(plataforma, _(
+                "El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).").format(
+                tipo=type(e).__name__))
+            self._registrar_resultado(resultado)
+            return resultado
         except OSError as e:
             log.warning("%s: no se pudo leer el vídeo: %s", plataforma.nombre, self._traza(e))
             return self._error(plataforma, _("No se pudo leer el vídeo ({tipo}).").format(
@@ -205,7 +246,7 @@ class ProveedorUploadPost:
 
     def estado(self, plataforma: Plataforma, referencia: str) -> Resultado:
         if not referencia:
-            return self._error(plataforma, _("Publicación sin referencia para consultar."))
+            return self._por_confirmar(plataforma, _("Publicación sin referencia para consultar."))
         log.info("%s: GET %s request_id=%s", plataforma.nombre, URL_ESTADO, referencia)
         inicio = time.monotonic()
         try:
@@ -226,18 +267,24 @@ class ProveedorUploadPost:
     def _interpretar_estado(self, plataforma: Plataforma, referencia: str,
                             respuesta: httpx.Response) -> Resultado:
         if respuesta.status_code >= 400:
-            if respuesta.status_code in (500, 502, 503, 504):
+            if respuesta.status_code in _CODIGOS_SERVIDOR:
                 return Resultado(plataforma, ok=False, pendiente=True, referencia=referencia)
-            return self._error(plataforma, self._mensaje_http(respuesta, plataforma))
+            # La consulta falló, no la publicación: no se sabe cómo acabó.
+            return self._por_confirmar(plataforma, self._mensaje_http(respuesta, plataforma))
         cuerpo = self._json(respuesta)
         if not isinstance(cuerpo, dict):
             return Resultado(plataforma, ok=False, pendiente=True, referencia=referencia)
         propio = self._resultado_de(cuerpo.get("results"), plataforma)
-        if propio is not None and "success" in propio:
-            return self._resultado_plataforma(plataforma, propio)
+        if propio is not None:
+            return self._resultado_plataforma(plataforma, propio, referencia)
         estado = str(cuerpo.get("status", "")).strip().lower()
-        if estado in _ESTADOS_TERMINADOS:
-            return self._error(plataforma, _("El servicio terminó sin resultado para {plataforma}.").format(
+        if estado in _ESTADOS_FALLIDOS:
+            return self._error(plataforma, self._legible(
+                self._texto(cuerpo) or _("{plataforma} rechazó la publicación.").format(
+                    plataforma=plataforma.nombre)))
+        if estado in _ESTADOS_HECHOS:
+            return self._por_confirmar(plataforma, _(
+                "El servicio terminó sin dar el resultado de {plataforma}.").format(
                 plataforma=plataforma.nombre))
         return Resultado(plataforma, ok=False, pendiente=True, referencia=referencia)
 
@@ -282,19 +329,23 @@ class ProveedorUploadPost:
             log.warning("%s: error: %s", nombre, resultado.error)
 
     def _interpretar_subida(self, plataforma: Plataforma, respuesta: httpx.Response) -> Resultado:
+        if respuesta.status_code in _CODIGOS_SERVIDOR:
+            # Tras enviar el vídeo, un 5xx no dice si el servicio lo aceptó.
+            return self._por_confirmar(plataforma, self._mensaje_http(respuesta, plataforma))
         if respuesta.status_code >= 400:
             return self._error(plataforma, self._mensaje_http(respuesta, plataforma))
         cuerpo = self._json(respuesta)
         if not isinstance(cuerpo, dict):
             texto = self._texto_plano(respuesta.text)
-            return self._error(plataforma, _("Respuesta inesperada del servicio (HTTP {codigo}).").format(
+            return self._por_confirmar(plataforma, _(
+                "Respuesta inesperada del servicio (HTTP {codigo}).").format(
                 codigo=respuesta.status_code) + (f" {texto}" if texto else ""))
         extra = self._uso(cuerpo)
         propio = self._resultado_de(cuerpo.get("results"), plataforma)
         if propio is not None:
-            resultado = self._resultado_plataforma(plataforma, propio)
-            return Resultado(resultado.plataforma, resultado.ok, resultado.url,
-                             resultado.error, extra=extra)
+            resultado = self._resultado_plataforma(
+                plataforma, propio, str(cuerpo.get("request_id") or ""))
+            return replace(resultado, extra=extra)
         if cuerpo.get("request_id"):
             return Resultado(plataforma, ok=False, pendiente=True,
                              referencia=str(cuerpo["request_id"]), extra=extra)
@@ -303,10 +354,10 @@ class ProveedorUploadPost:
                 self._texto(cuerpo) or _("El servicio rechazó la publicación.")))
         motivo = self._texto(cuerpo)
         if motivo:
-            return self._error(plataforma, _(
+            return self._por_confirmar(plataforma, _(
                 "El servicio no devolvió resultado para {plataforma}: {motivo}").format(
                 plataforma=plataforma.nombre, motivo=motivo))
-        return self._error(plataforma, _(
+        return self._por_confirmar(plataforma, _(
             "Respuesta inesperada del servicio: no trae resultado para {plataforma}.").format(
             plataforma=plataforma.nombre))
 
@@ -325,14 +376,40 @@ class ProveedorUploadPost:
                     return valor
         return None
 
-    def _resultado_plataforma(self, plataforma: Plataforma, datos: dict) -> Resultado:
+    def _resultado_plataforma(self, plataforma: Plataforma, datos: dict,
+                              referencia: str = "") -> Resultado:
+        """Clasifica el resultado de una plataforma en publicado, en curso o
+        fallido. Solo es fallo lo explícito (texto de error o estado fallido);
+        lo ambiguo nunca se muestra como error: queda por confirmar."""
         log.info("%s: resultado del servicio: %s", plataforma.nombre, diario.cuerpo(
             json.dumps(datos, ensure_ascii=False, default=str), [self._clave]))
-        if datos.get("success") is True or str(datos.get("success")).lower() == "true":
+        exito = datos.get("success")
+        if exito is True or str(exito).lower() == "true":
             return Resultado(plataforma, ok=True, url=self._url(datos))
-        return self._error(plataforma, self._legible(
-            self._texto(datos) or _("{plataforma} rechazó la publicación.").format(
-                plataforma=plataforma.nombre)))
+        estado = str(datos.get("status") or "").strip().lower()
+        propia = str(datos.get("request_id") or datos.get("job_id") or "") or referencia
+        texto = self._texto(datos)
+        texto_error = self._texto({c: datos[c] for c in _CAMPOS_ERROR if c in datos})
+        if estado in _ESTADOS_FALLIDOS or texto_error:
+            return self._error(plataforma, self._legible(texto or _(
+                "{plataforma} rechazó la publicación.").format(plataforma=plataforma.nombre)))
+        if estado in _ESTADOS_EN_CURSO or _RE_EN_CURSO.search(texto):
+            if propia:
+                return Resultado(plataforma, ok=False, pendiente=True, referencia=propia)
+            return self._por_confirmar(plataforma, texto)
+        if estado in _ESTADOS_HECHOS:
+            return Resultado(plataforma, ok=True, url=self._url(datos))
+        if (exito is False or str(exito).lower() == "false") and texto:
+            return self._error(plataforma, self._legible(texto))
+        return self._por_confirmar(plataforma, texto)
+
+    def _por_confirmar(self, plataforma: Plataforma, motivo: str = "") -> Resultado:
+        """Puede que se haya publicado: nada de reintentar a ciegas."""
+        texto = _("No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver "
+                  "a publicar.").format(plataforma=plataforma.nombre)
+        if motivo:
+            texto = f"{texto} ({motivo})"
+        return Resultado(plataforma, ok=False, pendiente=True, error=self._limpiar(texto))
 
     def _perfil_desconocido(self) -> str:
         return _("El perfil «{perfil}» no existe en Upload-Post. Usa el nombre del "
@@ -449,6 +526,15 @@ class ProveedorUploadPost:
 
     def _error(self, plataforma: Plataforma, texto: str) -> Resultado:
         return Resultado(plataforma, ok=False, error=self._limpiar(texto))
+
+
+def identificador_externo(plataforma: Plataforma, video: Path, tamano: int,
+                          modificado: float) -> str:
+    """`external_id` de un intento: huella del vídeo + plataforma + momento.
+    Queda en el registro para relacionar un duplicado con su intento."""
+    huella = hashlib.sha256(f"{video.name}|{tamano}|{modificado}".encode()).hexdigest()[:12]
+    return (f"tsots-{_PLATAFORMAS[plataforma]}-{huella}-"
+            f"{time.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}")
 
 
 def crear(clave: str, ajustes: dict, http: httpx.Client | None = None) -> ProveedorUploadPost:

@@ -84,10 +84,13 @@ def publicar(
     def terminar(plataforma: Plataforma, resultado: Resultado) -> None:
         resultados[plataforma] = resultado
         log.info("%s: resultado final: %s", plataforma.nombre, _describir(resultado))
-        if resultado.ok and registrar:
+        # Lo que quedó sin confirmar puede estar publicado: también se anota,
+        # para avisar antes de repetirlo.
+        if (resultado.ok or resultado.pendiente) and registrar:
             try:
                 registro.anotar(publicacion.video, plataforma, resultado.url,
-                                nombre_proveedor, modo_de(plataforma, opciones))
+                                nombre_proveedor, modo_de(plataforma, opciones),
+                                sin_confirmar=not resultado.ok)
             except OSError:
                 # El vídeo ya está publicado; perder la nota no es grave.
                 log.warning("%s: no se pudo anotar en el registro local", plataforma.nombre,
@@ -109,10 +112,10 @@ def publicar(
             resultado = _fallo(plataforma, e)
         log.info("%s: envío terminado en %.1f s: %s", plataforma.nombre, reloj() - inicio,
                  _describir(resultado))
-        if resultado.pendiente:
+        if resultado.pendiente and resultado.referencia:
             pendientes[plataforma] = resultado
             avisar(plataforma, Estado.PROCESANDO, resultado)
-        else:
+        else:  # también un pendiente sin referencia: no hay nada que consultar
             terminar(plataforma, resultado)
 
     inicio = reloj()
@@ -129,7 +132,7 @@ def publicar(
                 continue  # se reintenta en la siguiente vuelta
             log.info("%s: consulta %d (referencia %s): %s", plataforma.nombre, vuelta,
                      anterior.referencia, _describir(nuevo))
-            if not nuevo.pendiente:
+            if not nuevo.pendiente or not nuevo.referencia:
                 del pendientes[plataforma]
                 terminar(plataforma, nuevo)
 

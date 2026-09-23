@@ -197,11 +197,20 @@ def test_estado_resultados_como_diccionario_y_fallo(video):
     assert not r.ok and not r.pendiente and "quota" in r.error
 
 
-def test_estado_completado_sin_resultado_es_error():
+def test_estado_completado_sin_resultado_queda_por_confirmar():
+    """Sin resultado no hay fallo explícito: nunca un error rotundo."""
     servidor = Servidor(lambda req, s: httpx.Response(200, json={"status": "completed",
                                                                  "results": []}))
     r = _proveedor(servidor).estado(Plataforma.INSTAGRAM, "req-9")
-    assert not r.ok and not r.pendiente and "Instagram" in r.error
+    assert not r.ok and r.pendiente and r.referencia == ""  # nada más que consultar
+    assert "Instagram" in r.error and "antes de volver a publicar" in r.error
+
+
+def test_estado_fallido_sin_resultados_es_error():
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "status": "failed", "message": "Upload rejected by platform"}))
+    r = _proveedor(servidor).estado(Plataforma.INSTAGRAM, "req-9")
+    assert not r.ok and not r.pendiente and "Upload rejected by platform" in r.error
 
 
 def test_estado_forma_desconocida_sigue_pendiente():
@@ -222,26 +231,80 @@ def test_errores_http_no_llevan_la_clave(video, codigo, texto):
     assert len(servidor.peticiones) == 1  # sin reintentos
 
 
-def test_503_se_reintenta_y_luego_falla(video):
+# --- la subida NUNCA se repite sola: un clic, un POST ---
+
+
+@pytest.mark.parametrize("codigo", [500, 502, 503, 504])
+def test_5xx_en_la_subida_no_reintenta_y_queda_por_confirmar(video, codigo):
+    """Un 5xx tras enviar 287 MB puede llegar cuando el servicio ya aceptó el
+    vídeo: repetir el POST lo publicaría dos o tres veces."""
     esperas: list[float] = []
-    servidor = Servidor(lambda req, s: httpx.Response(503, text="down"))
+    servidor = Servidor(lambda req, s: httpx.Response(codigo, text="gateway timeout"))
     r = _proveedor(servidor, esperas).publicar(Plataforma.TIKTOK, _pub(video), Opciones())
-    assert not r.ok and "503" in r.error
-    assert len(servidor.peticiones) == 3
-    assert esperas == list(upload_post.ESPERAS_503)
+    assert len([p for p in servidor.peticiones if p.method == "POST"]) == 1
+    assert len(servidor.peticiones) == 1 and esperas == []
+    assert not r.ok and r.pendiente and r.referencia == ""
+    assert str(codigo) in r.error
+    assert "Revisa TikTok antes de volver a publicar" in r.error
 
 
-def test_503_y_luego_bien(video):
-    respuestas = iter([httpx.Response(503)])
-
+@pytest.mark.parametrize("excepcion", [httpx.ReadTimeout, httpx.ReadError,
+                                       httpx.RemoteProtocolError])
+def test_sin_respuesta_tras_enviar_no_reintenta_y_queda_por_confirmar(video, excepcion):
     def responder(request, servidor):
-        return next(respuestas, None) or _ok_sync(request, servidor)
+        raise excepcion("sin respuesta", request=request)
 
     servidor = Servidor(responder)
-    r = _proveedor(servidor, []).publicar(Plataforma.TIKTOK, _pub(video), Opciones())
+    r = _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
+    assert len(servidor.peticiones) == 1
+    assert not r.ok and r.pendiente and excepcion.__name__ in r.error
+    assert "Revisa Instagram antes de volver a publicar" in r.error
+
+
+@pytest.mark.parametrize("excepcion", [httpx.ConnectError, httpx.ConnectTimeout,
+                                       httpx.WriteTimeout, httpx.WriteError])
+def test_si_el_video_no_llego_entero_es_error(video, excepcion):
+    def responder(request, servidor):
+        raise excepcion("cortado", request=request)
+
+    servidor = Servidor(responder)
+    r = _proveedor(servidor).publicar(Plataforma.YOUTUBE, _pub(video), Opciones())
+    assert len(servidor.peticiones) == 1
+    assert not r.ok and not r.pendiente and excepcion.__name__ in r.error
+
+
+def test_la_consulta_de_estado_si_reintenta_el_503():
+    respuestas = iter([httpx.Response(503), httpx.Response(200, json={
+        "status": "completed", "results": [{"platform": "tiktok", "success": True,
+                                            "url": "https://tt/1"}]})])
+    esperas: list[float] = []
+    servidor = Servidor(lambda req, s: next(respuestas))
+    r = _proveedor(servidor, esperas).estado(Plataforma.TIKTOK, "req-1")
     assert r.ok and len(servidor.peticiones) == 2
-    # Cada reintento vuelve a enviar el vídeo completo.
-    assert servidor.ficheros[1]["video"][1] == b"MP4DATA"
+    assert all(p.method == "GET" for p in servidor.peticiones)
+    assert esperas == [upload_post.ESPERAS_503[0]]
+
+
+def test_subida_asincrona_con_external_id_registrado(video, tmp_path, monkeypatch):
+    from videopipeline.redes import diario
+
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "request_id": "req-1"}))
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
+    d = diario.Diario(video)
+    try:
+        r = _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
+    finally:
+        d.cerrar()
+    campos = servidor.formularios[0]
+    assert campos["async_upload"] == ["true"]
+    [externo] = campos["external_id"]
+    assert externo.startswith("tsots-instagram-")
+    assert r.pendiente and r.referencia == "req-1"
+    assert externo in d.ruta.read_text(encoding="utf-8")
+    # Otro intento lleva otro identificador.
+    _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
+    assert servidor.formularios[1]["external_id"] != [externo]
 
 
 def test_error_401_en_youtube_no_impide_instagram(video):
@@ -526,3 +589,68 @@ def test_el_resultado_crudo_de_la_plataforma_va_al_registro(video, tmp_path, mon
     assert "Instagram: resultado del servicio:" in texto
     assert "fbtrace_id" in texto and "352" in texto
     assert CLAVE not in texto
+
+
+# --- resultados en curso o ambiguos: nunca un falso «rechazó» ---
+
+
+def _publicar_instagram(video, cuerpo):
+    servidor = Servidor(lambda req, s: httpx.Response(200, json=cuerpo))
+    return _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
+
+
+@pytest.mark.parametrize("propio", [
+    {"success": False, "status": "IN_PROGRESS"},
+    {"success": None, "status": "processing"},
+    {"status": "queued"},
+    {"success": False, "message": "Your reel is being processed"},
+])
+def test_instagram_en_curso_con_request_id_se_consulta(video, propio):
+    r = _publicar_instagram(video, {"success": True, "request_id": "req-5",
+                                    "results": {"instagram": propio}})
+    assert not r.ok and r.pendiente and r.referencia == "req-5"
+    assert "rechazó" not in r.error
+
+
+def test_instagram_en_curso_con_id_propio(video):
+    r = _publicar_instagram(video, {"results": {"instagram": {
+        "success": False, "status": "pending", "job_id": "job-1"}}})
+    assert r.pendiente and r.referencia == "job-1"
+
+
+@pytest.mark.parametrize("propio", [
+    {"success": False},
+    {"success": None},
+    {},
+    {"status": "unknown_state"},
+])
+def test_instagram_ambiguo_sin_referencia_queda_por_confirmar(video, propio):
+    r = _publicar_instagram(video, {"success": True, "results": {"instagram": propio}})
+    assert not r.ok and r.pendiente and r.referencia == ""
+    assert "rechazó" not in r.error
+    assert "Revisa Instagram" in r.error and "antes de volver a publicar" in r.error
+
+
+@pytest.mark.parametrize("propio, texto", [
+    ({"success": False, "status": "failed", "error": "Media fetch failed"}, "Media fetch failed"),
+    ({"success": False, "error": "Invalid access token"}, "Invalid access token"),
+    ({"status": "error", "message": "Container status ERROR"}, "Container status ERROR"),
+])
+def test_instagram_fallo_explicito_es_error(video, propio, texto):
+    r = _publicar_instagram(video, {"success": False, "results": {"instagram": propio}})
+    assert not r.ok and not r.pendiente and texto in r.error
+
+
+def test_estado_instagram_aun_procesando_sigue_pendiente():
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "status": "completed", "results": [
+            {"platform": "instagram", "success": False, "status": "processing"}]}))
+    r = _proveedor(servidor).estado(Plataforma.INSTAGRAM, "req-9")
+    assert r.pendiente and r.referencia == "req-9"
+
+
+def test_exito_sin_resultado_de_la_plataforma_queda_por_confirmar(video):
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "results": {"youtube": {"success": True, "url": "https://y/1"}}}))
+    r = _proveedor(servidor).publicar(Plataforma.INSTAGRAM, _pub(video), Opciones())
+    assert not r.ok and r.pendiente and "antes de volver a publicar" in r.error

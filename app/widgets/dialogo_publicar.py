@@ -371,7 +371,9 @@ class DialogoPublicar(QDialog):
             except ValueError:
                 fecha = entrada.fecha
             nombre = plataforma.nombre
-            if plataforma == Plataforma.TIKTOK and entrada.modo == ModoTikTok.BORRADOR.value:
+            if entrada.sin_confirmar:
+                nombre = _("{plataforma} (sin confirmar)").format(plataforma=nombre)
+            elif plataforma == Plataforma.TIKTOK and entrada.modo == ModoTikTok.BORRADOR.value:
                 nombre = _("{plataforma} (borrador)").format(plataforma=nombre)
             partes.append(f"{nombre} {fecha}")
         self.aviso_publicado.setText(
@@ -387,12 +389,20 @@ class DialogoPublicar(QDialog):
                          for p in self.plataformas())
 
     def _confirmar(self) -> bool:
-        repetidas = registro.ya_publicado(self.video) & set(self.plataformas())
+        elegidas = set(self.plataformas())
+        ultimas = {p: e for p, e in registro.ultimas(self.video).items() if p in elegidas}
+        confirmadas = [p.nombre for p in ORDEN if p in ultimas and not ultimas[p].sin_confirmar]
+        dudosas = [p.nombre for p in ORDEN if p in ultimas and ultimas[p].sin_confirmar]
         texto = _("Se publicará «{titulo}» en:\n\n{resumen}").format(
             titulo=self.campo_titulo.text().strip(), resumen=self._resumen())
-        if repetidas:
+        if confirmadas:
             texto += "\n\n" + _("Ya publicado antes en: {lista}.").format(
-                lista=", ".join(p.nombre for p in ORDEN if p in repetidas))
+                lista=", ".join(confirmadas))
+        if dudosas:
+            texto += "\n\n" + _(
+                "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: "
+                "compruébalo en la app antes de publicar otra vez.").format(
+                lista=", ".join(dudosas))
         texto += "\n\n" + _("¿Publicar ahora?")
         respuesta = QMessageBox.question(
             self, _("Publicar en redes"), texto,
@@ -599,7 +609,7 @@ class DialogoPublicar(QDialog):
         etiqueta = self.estados[plataforma]
         texto, color = self._texto_resultado(plataforma, resultado)
         if corto and not resultado.ok:
-            texto = html.escape("⏳ " + _("Pendiente") if resultado.pendiente
+            texto = html.escape("⏳ " + _("Por confirmar") if resultado.pendiente
                                 else "✗ " + _("Error: ver el resumen"))
         etiqueta.setText(texto)
         etiqueta.setToolTip(resultado.error)
@@ -612,10 +622,8 @@ class DialogoPublicar(QDialog):
         if ok == 0 and pendientes == 0:
             return _("Falló en todas"), COLOR_ERROR
         texto = _("Publicado en {ok} de {total}").format(ok=ok, total=total)
-        if pendientes == 1:
-            texto += " · " + _("1 sigue procesándose")
-        elif pendientes > 1:
-            texto += " · " + _("{n} siguen procesándose").format(n=pendientes)
+        if pendientes:
+            texto += " · " + _("{n} por confirmar").format(n=pendientes)
         return texto, (COLOR_OK if ok == total else COLOR_AVISO)
 
     def _al_terminar(self, resultados: dict) -> None:
@@ -630,7 +638,8 @@ class DialogoPublicar(QDialog):
                 texto, color = self._texto_resultado(plataforma, resultado)
                 lineas.append(f'<b>{html.escape(plataforma.nombre)}</b>: '
                               f'<span style="color: {color};">{texto}</span>')
-                if resultado.ok:  # lo que ya salió no se vuelve a marcar
+                # Lo que salió, o pudo salir, no se vuelve a marcar: evita duplicados.
+                if resultado.ok or resultado.pendiente:
                     self.casillas[plataforma].setChecked(False)
             self.resumen.setText("<br>".join(lineas))
             self.resumen.show()
