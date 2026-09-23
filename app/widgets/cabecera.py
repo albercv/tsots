@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
@@ -14,7 +14,11 @@ from videopipeline.i18n import _
 # nombre en tinta oscura, que desaparece en modo oscuro.
 RUTA_LOGO = Path(__file__).resolve().parent.parent / "recursos" / "icon_512.png"
 NOMBRE_APP = "The Silence of the Shorts"
-LADO_LOGO = 44  # px lógicos
+LADO_LOGO = 40  # px lógicos
+# Margen transparente que lanzador/generar_icono.py deja alrededor del icono
+# (convención de iconos de macOS). En la cabecera se recorta para que el
+# cuadrado del logo ocupe todo su hueco y se alinee con la zona de soltar.
+MARGEN_ICONO = 0.10
 # Tamaños relativos a la fuente del sistema (13 pt en macOS).
 ESCALA_TITULO = 1.45
 ESCALA_LEMA = 0.92
@@ -36,11 +40,21 @@ def pixmap_logo(imagen: QImage, lado: int, dpr: float) -> QPixmap:
     return pixmap
 
 
+def _sin_margen(imagen: QImage) -> QImage:
+    if imagen.isNull():
+        return imagen
+    dx = round(imagen.width() * MARGEN_ICONO)
+    dy = round(imagen.height() * MARGEN_ICONO)
+    return imagen.copy(
+        QRect(dx, dy, imagen.width() - 2 * dx, imagen.height() - 2 * dy)
+    )
+
+
 class Cabecera(QWidget):
     def __init__(self, ruta_logo: Path = RUTA_LOGO, parent=None):
         super().__init__(parent)
         # Un PNG ausente o corrupto da una QImage nula: la cabecera sigue sin logo.
-        self._imagen = QImage(str(ruta_logo))
+        self._imagen = _sin_margen(QImage(str(ruta_logo)))
         self._dpr_logo = 0.0
 
         self.logo = QLabel()
@@ -71,7 +85,7 @@ class Cabecera(QWidget):
         textos.addStretch(1)
 
         fila = QHBoxLayout(self)
-        fila.setContentsMargins(2, 0, 2, 10)
+        fila.setContentsMargins(0, 0, 0, 10)
         fila.setSpacing(12)
         fila.addWidget(self.logo)
         fila.addLayout(textos, 1)

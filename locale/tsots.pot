@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 11:46+0200\n"
+"POT-Creation-Date: 2026-09-23 13:13+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -176,6 +176,9 @@ msgstr ""
 msgid "ERROR: {error}"
 msgstr ""
 
+msgid "Edita en silencio. Crea a lo grande."
+msgstr ""
+
 msgid "Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital #iaparapymes"
 msgstr ""
 
@@ -303,6 +306,10 @@ msgid "Limpiar hechos"
 msgstr ""
 
 msgid "Limpieza de audio"
+msgstr ""
+
+#, python-brace-format
+msgid "Logo de {app}"
 msgstr ""
 
 #, python-brace-format

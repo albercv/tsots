@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 11:46+0200\n"
+"POT-Creation-Date: 2026-09-23 13:13+0200\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -177,6 +177,9 @@ msgstr "ERROR: cannot read the glossary: {ruta}"
 msgid "ERROR: {error}"
 msgstr "ERROR: {error}"
 
+msgid "Edita en silencio. Crea a lo grande."
+msgstr "Edit quieter. Create louder."
+
 msgid "Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital #iaparapymes"
 msgstr "E.g.: I am Alberto, AI consultant for SMEs (Evolve2Digital). Direct, friendly tone. CTA: follow me for more. Fixed hashtags: #evolve2digital #aiforsmes"
 
@@ -307,6 +310,10 @@ msgstr "Clear finished"
 
 msgid "Limpieza de audio"
 msgstr "Audio cleaning"
+
+#, python-brace-format
+msgid "Logo de {app}"
+msgstr "{app} logo"
 
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."

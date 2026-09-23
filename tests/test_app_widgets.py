@@ -485,6 +485,9 @@ def test_cabecera_carga_logo(qtbot):
     assert cabecera.logo.isVisible()
     assert cabecera.logo.size().width() == LADO_LOGO
     assert cabecera.logo.size().height() == LADO_LOGO
+    # Sin el margen transparente del icono: el cuadrado llega al borde.
+    imagen = pixmap.toImage()
+    assert imagen.pixelColor(1, imagen.height() // 2).alpha() == 255
 
 
 def test_pixmap_logo_escala_con_dpr():
