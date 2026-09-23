@@ -70,22 +70,22 @@ Resto de la app:
 ## Tareas
 
 ### Task 1: `modelo.py` y `textos.py` — tipos neutros y límites de plataforma
-- [ ] Tests: `ORDEN` es TikTok, YouTube, Instagram; título de YouTube recortado a 100; texto = caption + hashtags ≤ 2200 recortando el caption y nunca los hashtags; máximo 30 hashtags en Instagram.
-- [ ] Implementar los tipos neutros y `texto_para(plataforma, publicacion)`.
+- [x] Tests: `ORDEN` es TikTok, YouTube, Instagram; título de YouTube recortado a 100; texto = caption + hashtags ≤ 2200 recortando el caption y nunca los hashtags; máximo 30 hashtags en Instagram.
+- [x] Implementar los tipos neutros y `texto_para(plataforma, publicacion)`.
 
 ### Task 2: `proveedor.py`, `upload_post.py` y `publicador.py`
-- [ ] Tests de `upload_post.py` con `httpx.MockTransport`: campos por plataforma (TikTok borrador `MEDIA_UPLOAD` / público `DIRECT_POST` + `PUBLIC_TO_EVERYONE`; YouTube `public`, tags, categoría; Instagram `REELS` con `TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED` o `CUSTOM` + `share_to_feed`); cabecera `Authorization: Apikey …`; respuesta síncrona con URL; respuesta asíncrona con `request_id` y sondeo de estado hasta terminar; error 401/429/503 en YouTube no impide Instagram; resultado por plataforma (`ok`, `url`, `error`).
-- [ ] Test de contrato común para todo `Proveedor` registrado y test de desacoplamiento (cadenas de Upload-Post solo en su módulo).
-- [ ] Tests de `publicador.py` con `ProveedorFalso`: orden, fallo que no corta, pendientes que se sondean, progreso.
-- [ ] Implementar, con reintentos solo en 503 y tiempo máximo de sondeo.
+- [x] Tests de `upload_post.py` con `httpx.MockTransport`: campos por plataforma (TikTok borrador `MEDIA_UPLOAD` / público `DIRECT_POST` + `PUBLIC_TO_EVERYONE`; YouTube `public`, tags, categoría; Instagram `REELS` con `TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED` o `CUSTOM` + `share_to_feed`); cabecera `Authorization: Apikey …`; respuesta síncrona con URL; respuesta asíncrona con `request_id` y sondeo de estado hasta terminar; error 401/429/503 en YouTube no impide Instagram; resultado por plataforma (`ok`, `url`, `error`).
+- [x] Test de contrato común para todo `Proveedor` registrado y test de desacoplamiento (cadenas de Upload-Post solo en su módulo).
+- [x] Tests de `publicador.py` con `ProveedorFalso`: orden, fallo que no corta, pendientes que se sondean, progreso.
+- [x] Implementar, con reintentos solo en 503 y tiempo máximo de sondeo.
 
 ### Task 3: `registro.py`
-- [ ] Tests: escribir y leer `nombre_limpio.publicado.json` (incluye el nombre del proveedor); fusionar publicaciones sucesivas; `ya_publicado(video) -> set[Plataforma]`.
-- [ ] Implementar.
+- [x] Tests: escribir y leer `nombre_limpio.publicado.json` (incluye el nombre del proveedor); fusionar publicaciones sucesivas; `ya_publicado(video) -> set[Plataforma]`.
+- [x] Implementar.
 
 ### Task 4: Llavero
-- [ ] Tests con `subprocess.run` falso: guardar usa `security add-generic-password -U -s tsots-<proveedor> -a api-key -w`; leer usa `find-generic-password -w`; clave ausente devuelve `None`; borrar.
-- [ ] Implementar `app/credenciales.py`.
+- [x] Tests con `subprocess.run` falso: guardar usa `security add-generic-password -U -s tsots-<proveedor> -a api-key -w`; leer usa `find-generic-password -w`; clave ausente devuelve `None`; borrar.
+- [x] Implementar `app/credenciales.py`.
 
 ### Task 5: configuración de redes
 - [ ] `Ajustes`: `proveedor_redes` (por defecto `upload_post`), `perfil_redes`, `youtube_categoria`, modo por defecto de TikTok e Instagram. Tests de persistencia.

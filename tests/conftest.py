@@ -91,3 +91,40 @@ def idioma_fuente():
     i18n.instalar("es")
     yield
     i18n.instalar("es")
+
+
+@pytest.fixture(autouse=True)
+def sin_red_ni_llavero(request, monkeypatch):
+    """Red de seguridad: ningún test sale a Internet con httpx ni ejecuta
+    `security` (el Llavero real). Solo los tests `lenta` quedan fuera."""
+    if request.node.get_closest_marker("lenta"):
+        yield
+        return
+    import httpx
+
+    from tests.redes_falsos import LlaveroFalso
+
+    def bloquear(self, peticion):
+        if peticion.url.host in ("localhost", "127.0.0.1"):
+            return original_http(self, peticion)
+        raise RuntimeError(f"Red bloqueada en tests: {peticion.url.host}")
+
+    original_http = httpx.HTTPTransport.handle_request
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", bloquear)
+
+    falso = LlaveroFalso()
+    original_run = subprocess.run
+
+    def run(args, *a, **kw):
+        if args and Path(str(list(args)[0])).name == "security":
+            return falso(args, *a, **kw)
+        return original_run(args, *a, **kw)
+
+    monkeypatch.setattr(subprocess, "run", run)
+    yield falso
+
+
+@pytest.fixture
+def llavero_falso(sin_red_ni_llavero):
+    """El Llavero en memoria que ya usan todos los tests."""
+    return sin_red_ni_llavero
