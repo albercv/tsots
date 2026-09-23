@@ -72,7 +72,10 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
 
 1. **Drag** one or more videos onto the area on the left (or click to
    choose them). They appear in the queue.
-2. **Pick options** on the right:
+2. **Pick options** on the right. Each group is a collapsible section:
+   click its title to open it and the open one closes (**Mode** at
+   startup). If they do not fit, only the options scroll; below them,
+   always visible, sit the **Preview** and **Caption** tabs.
    - **Mode**: full pipeline (clean + cut), clean audio only, or cut
      silences only.
    - **Audio cleaning**: AI model that removes noise. The default
@@ -82,8 +85,8 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      them.
    - **Subtitles**: style (8 to choose from: Reels bold, karaoke, green
      karaoke, Impact, yellow, minimal, black box and white box), position,
-     size, language and Whisper model size. The preview shows how they look on
-     a real frame of the selected video.
+     size, language and Whisper model size. The **Preview** tab shows how they
+     look on a real frame of the selected video.
    - **SEO caption**: writes `name_limpio.md` with a title, caption and
      the 5 hashtags that best describe what is said in the video. **Brand…** stores a text
      about who you are, your tone and your call to action so the copy
@@ -105,8 +108,9 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
    roughly as long as the video lasts. The Mac will not sleep while the
    app is open.
 5. When done, **double-click** a finished video to open it. If you
-   generated a caption, it appears under the preview with buttons to copy
-   the title, caption, hashtags or everything, and **Publish…** (see
+   generated a caption, selecting the video opens the **Caption** tab with
+   buttons to copy the title, caption, hashtags or everything, and
+   **Publish…** (see
    [Publish to social networks](#publish-to-social-networks)).
 
 You can keep using the Mac while it processes. Locking the screen does

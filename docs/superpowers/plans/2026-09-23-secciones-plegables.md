@@ -20,15 +20,15 @@ columna derecha
     └── "Caption"          → PanelCaption (marcador si no hay caption)
 ```
 
-- Widget nuevo `SeccionPlegable` en `app/widgets/seccion_plegable.py`: cabecera `QToolButton` (flecha de despliegue + título, a todo el ancho, checkable) y un `contenido` (`QWidget`) donde cada grupo monta su layout como antes lo hacía en el `QGroupBox`. Su `minimumSizeHint`/`sizeHint` de ancho cuentan el contenido aunque esté plegado, para que el ancho de la columna no salte al abrir una sección.
-- `Acordeon` (mismo fichero): agrupa las cabeceras en un `QButtonGroup` exclusivo; abrir una cierra la otra.
+- Widget nuevo `SeccionPlegable` en `app/widgets/seccion_plegable.py`: cabecera `QToolButton` (flecha de despliegue + título, a todo el ancho) y un `contenido` (`QWidget`) donde cada grupo monta su layout como antes lo hacía en el `QGroupBox`. Su `minimumSizeHint`/`sizeHint` de ancho cuentan el contenido aunque esté plegado, para que el ancho de la columna no salte al abrir una sección.
+- `Acordeon` (mismo fichero): abrir una sección cierra la otra; pulsar la abierta no hace nada. Las cabeceras no son checkables: un `QToolButton` marcado se pinta hundido en algunos estilos.
 - `PanelOpciones` sustituye los `QGroupBox` por secciones. La lógica de habilitados recorre `seccion.contenido`, no la sección entera, para no deshabilitar nunca una cabecera.
 - `VentanaPrincipal`: el `QScrollArea` solo contiene el panel de opciones; la vista previa y el caption van a un `QTabWidget` debajo, con alto fijo calculado para que quepan la previsualización a tamaño completo (260 px) y el caption.
 - `PanelCaption`: cambio mínimo (otra rama está moviendo el botón **Redes…** fuera de este panel). Deja de ocultarse: un `QStackedLayout` alterna entre el marcador vacío y el contenido, y el alto no cambia. El `QGroupBox` "Caption SEO" pasa a ser un `QWidget` simple porque la pestaña ya pone el título y el marco.
 
 **Decisiones tomadas sin consultar (revisables):**
 
-1. **Pulsar la cabecera de la sección abierta no la pliega.** El acordeón mantiene siempre exactamente una sección abierta. Plegarlo todo no gana nada (la previsualización ya está fija y visible) y dejaría la columna como una lista de títulos sin contenido. Técnicamente es el comportamiento del `QButtonGroup` exclusivo.
+1. **Pulsar la cabecera de la sección abierta no la pliega.** El acordeón mantiene siempre exactamente una sección abierta. Plegarlo todo no gana nada (la previsualización ya está fija y visible) y dejaría la columna como una lista de títulos sin contenido.
 2. **Cambio automático de pestaña.** Al seleccionar en la cola un vídeo terminado con caption, o cuando el vídeo seleccionado termina y genera caption, se muestra la pestaña Caption: es el siguiente paso (copiar, publicar). Al seleccionar cualquier otro vídeo, o al tocar las opciones de subtítulos (diseño, posición, tamaño, activar), vuelve a Previsualización para ver el efecto. Los cambios de selección y de opciones son acciones del usuario, así que no le quita la pestaña por sorpresa.
 3. **Tamaño inicial de la ventana 960 × 720** (antes 900 × 560), recortado al área útil de la pantalla. Con la zona de pestañas fija, a 560 px de alto casi solo quedaban a la vista las cabeceras de las secciones.
 
@@ -62,41 +62,52 @@ columna derecha
 
 ### Task 1: `SeccionPlegable` y `Acordeon`
 
-- [ ] Tests en `tests/test_app_widgets.py`:
+- [x] Tests en `tests/test_app_widgets.py`:
   - `test_seccion_plegable_abre_y_cierra`: `expandir(True/False)` muestra/oculta el contenido y cambia la flecha.
   - `test_seccion_plegable_ancho_cuenta_contenido_plegado`.
   - `test_acordeon_solo_una_abierta`: abrir otra cierra la anterior; pulsar la abierta la deja abierta.
-- [ ] Implementar `app/widgets/seccion_plegable.py`.
+- [x] Implementar `app/widgets/seccion_plegable.py`.
 
 ### Task 2: secciones en `PanelOpciones`
 
-- [ ] Tests:
+- [x] Tests:
   - `test_panel_secciones_en_orden_y_modo_abierto`.
   - `test_panel_clic_en_otra_seccion_cambia_la_abierta` (con `qtbot.mouseClick` en la cabecera).
   - `test_panel_valores_no_dependen_de_la_seccion_abierta`.
   - `test_panel_habilitados_no_tocan_cabeceras` (modo "solo silencios" deshabilita el contenido de audio, no su cabecera).
-- [ ] Sustituir los `QGroupBox` por secciones.
-- [ ] Commit `feat(gui): collapsible option sections in an accordion`.
+- [x] Sustituir los `QGroupBox` por secciones.
+- [x] Commit `feat(gui): collapsible option sections in an accordion`.
 
 ### Task 3: pestañas fijas en la ventana
 
-- [ ] Tests en `tests/test_app_main.py`:
+- [x] Tests en `tests/test_app_main.py`:
   - `test_pestanas_fijas_fuera_del_scroll`: `vista_previa` y `panel_caption` no descienden de `scroll_derecha`; la zona de pestañas queda debajo del scroll.
   - `test_pestanas_siempre_presentes_con_marcador`: dos pestañas, marcadores sin vídeo ni caption, mismo alto con y sin caption.
   - `test_seleccion_cambia_de_pestana_segun_caption`, `test_terminar_con_caption_muestra_pestana_caption`, `test_opciones_subs_vuelven_a_previsualizacion`.
   - Adaptar los tests que miraban `panel_caption.isHidden()`.
-- [ ] `PanelCaption` con marcador; ventana con pestañas.
-- [ ] Commit `feat(gui): fixed preview and caption tabs below the options`.
+- [x] `PanelCaption` con marcador; ventana con pestañas.
+- [x] Commit `feat(gui): fixed preview and caption tabs below the options`.
 
 ### Task 4: traducciones, revisión visual y documentación
 
-- [ ] `lanzador/traducir.sh`, traducir en `tsots.po`, sin fuzzy.
-- [ ] Capturas offscreen (`grab()`) a tamaño por defecto y mínimo, paleta clara y oscura, y con caption. Ajustar hasta que se vea nativo.
-- [ ] README (es/en): la sección "Cómo funciona" describe las opciones y dónde aparece el caption. `docs/DEVELOPMENT.md`: disposición de la ventana.
-- [ ] Commit `docs: collapsible sections and fixed preview tabs`.
+- [x] `lanzador/traducir.sh`, traducir en `tsots.po`, sin fuzzy.
+- [x] Capturas offscreen (`grab()`) a tamaño por defecto y mínimo, paleta clara y oscura, y con caption. Ajustar hasta que se vea nativo.
+- [x] README (es/en): la sección "Cómo funciona" describe las opciones y dónde aparece el caption. `docs/DEVELOPMENT.md`: disposición de la ventana.
+- [x] Commit `docs: collapsible sections and fixed preview tabs`.
 
 ## Riesgos
 
 - **Alto mínimo:** la zona fija resta alto a las secciones. A 600 px quedan unas pocas filas visibles y el resto hace scroll; es lo pedido.
 - **Ancho de la pestaña Caption:** los cuatro botones de copiar suman ~450 px y ahora cuentan en el mínimo de la ventana (antes el panel estaba oculto al calcularlo). Se mide contra el test de 700 px.
 - **Conflicto con `fix/redes-ajustes-app`:** ambos tocan `panel_caption.py` y `tests/test_app_main.py`. Los cambios aquí quedan al principio y al final de `__init__` y en `mostrar`, lejos de la fila de botones de redes.
+
+## Resultado (2026-09-23)
+
+Implementado en `feature/secciones-plegables`.
+
+- Cabecera de sección: `QToolButton` sin relieve a todo el ancho, flecha ▸/▾ y título en seminegrita; separador fino derivado de `WindowText` (claro y oscuro). Contenido sangrado 22 px para alinearse con el título.
+- Zona de pestañas con `documentMode` y alto fijo de 295 px con la plataforma `offscreen` (previsualización de 260 px + barra de pestañas). El caption cabe en el mismo hueco sin tocar su `QTextEdit` de 110 px.
+- Extra no pedido: al abrir una sección, el scroll la desplaza para que se vea entera (o desde su cabecera si no cabe). Sin esto, en ventanas bajas la sección abierta podía quedar por debajo del borde.
+- Mínimo de la ventana con `offscreen`: 654 × 496 (el test pide ≤ 700 × 600). A 700 × 600 quedan ~190 px para las secciones.
+- Una lambda con `self` conectada a una señal mantenía viva la ventana tras el test, y el cierre de pytest-qt abría el diálogo modal "Proceso en curso" y se colgaba. Se usa un método (`_mostrar_pestana_preview`).
+- Capturas offscreen (estilo Fusion) revisadas en claro y oscuro: tamaño inicial, mínimo, 700 × 600 con la pestaña Caption vacía, previsualización con subtítulos y caption de un vídeo terminado.
