@@ -4,6 +4,9 @@
   request: branch off `develop`, push the branch, open a PR against
   `develop`. Releases are a PR from `develop` to `main`. Details in
   `docs/DEVELOPMENT.md` → "Branches and releases".
+- **No documentation-only PRs.** Docs, TODO updates and plans travel in
+  the branch of the feature they belong to and reach `develop` when that
+  branch is merged.
 - Commits and PR descriptions carry no AI attribution (no `Co-Authored-By`
   trailer, no "Generated with" line). Commit messages in English.
 - Run the tests before committing and commit only if they pass:
