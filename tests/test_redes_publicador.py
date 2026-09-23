@@ -144,3 +144,28 @@ def test_cancelado_detiene_las_siguientes(pub):
 
     resultados, _ = _publicar(proveedor, pub, [T, Y, I], cancelado=cancelado)
     assert list(resultados) == [T]
+
+
+def test_registro_de_diagnostico_con_traceback_y_sondeos(pub, tmp_path, monkeypatch):
+    from videopipeline.redes import diario
+
+    clave = "clave-que-no-debe-salir-1234"
+    proveedor = ProveedorFalso(
+        respuestas={T: RuntimeError(f"explota con {clave}"),
+                    Y: Resultado(Y, ok=False, pendiente=True, referencia="ref-9")},
+        estados={Y: [Resultado(Y, ok=True, url="https://yt/9")]},
+    )
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
+    d = diario.Diario(pub.video)
+    d.ocultar(clave)
+    try:
+        resultados, _ = _publicar(proveedor, pub, [T, Y], registrar=False)
+    finally:
+        d.cerrar()
+    assert "registro" in resultados[T].error  # remite al log
+    texto = d.ruta.read_text(encoding="utf-8")
+    assert "Traceback" in texto and "RuntimeError" in texto
+    assert clave not in texto
+    assert "ref-9" in texto  # referencia del pendiente y su sondeo
+    assert "https://yt/9" in texto
+    assert "TikTok" in texto and "YouTube" in texto

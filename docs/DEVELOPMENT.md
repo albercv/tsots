@@ -324,6 +324,14 @@ patterns carry both the Spanish and the English wording.
 - In the queue, a failed row shows the problem title. Double-click opens
   a dialog with cause, solution, technical detail and an "Open log"
   button.
+- Each publishing attempt writes `logs/publicacion_<video>_<date>.log`
+  (`videopipeline/redes/diario.py`): settings (profile present yes/no,
+  never its value), every request with its HTTP status and sanitized
+  body, async request ids and each status poll, per-platform results and
+  full tracebacks. The `videopipeline.redes` logger never propagates to
+  the console, and every line goes through `diario.limpiar`, so the API
+  key never reaches disk. The Publish dialog's "Show log" button reveals
+  the file in the Finder.
 - Known errors are translated into diagnoses in `videopipeline/errores.py`
   (`_CONOCIDOS` table). An error that shows up as "unknown" is a
   candidate for that table.

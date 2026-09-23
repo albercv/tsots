@@ -176,3 +176,15 @@ def test_el_modulo_del_proveedor_contiene_lo_especifico():
 
 def test_plataformas_neutras():
     assert {p.value for p in Plataforma} == {"tiktok", "youtube", "instagram"}
+
+
+def test_ayuda_del_perfil_es_texto(nombre):
+    assert isinstance(registro_proveedores.ayuda_perfil(nombre), str)
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("yo@example.com", True), (" yo@dominio.es ", True),
+    ("mi_perfil", False), ("", False), ("@yo", False),
+])
+def test_parece_email(texto, esperado):
+    assert registro_proveedores.parece_email(texto) is esperado

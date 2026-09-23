@@ -509,8 +509,13 @@ class _DialogoFalso:
         type(self).abiertos.append(args)
         self.configurar_redes = type("S", (), {"connect": lambda s, f: None})()
 
+    publicando = False
+
     def exec(self):
         return 0
+
+    def deleteLater(self):
+        pass
 
 
 def _hecho_con_caption(ventana, tmp_path):
@@ -559,6 +564,30 @@ def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
                         lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
     ventana.panel_caption.boton_publicar.click()
     assert len(avisos) == 1
+
+
+def test_publicar_sin_caption_avisa(qtbot, tmp_path, monkeypatch):
+    """Si la señal llega sin vídeo o sin caption, se dice (no vuelve en silencio)."""
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.warning", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.DialogoPublicar",
+                        lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
+    ventana._publicar()
+    assert len(avisos) == 1 and "caption" in avisos[0][2]
+
+
+def test_no_sale_mientras_se_publica(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.information", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.dialogo_publicar.hilos_vivos", lambda: 1)
+    ventana.show()
+    ventana.close()
+    assert ventana.isVisible() and len(avisos) == 1
+    monkeypatch.setattr("app.main.dialogo_publicar.hilos_vivos", lambda: 0)
+    ventana.close()
+    assert not ventana.isVisible()
 
 
 def _layout_de(layout, widget):

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import html
+import logging
+import platform as plataforma_sistema
 from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QProcess, Qt, QThread, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -26,7 +28,7 @@ from PySide6.QtWidgets import (
 from videopipeline.caption import Caption
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes import publicador, registro
+from videopipeline.redes import diario, publicador, registro
 from videopipeline.redes.modelo import (
     ETIQUETAS_INSTAGRAM,
     ETIQUETAS_TIKTOK,
@@ -48,7 +50,57 @@ COLOR_OK = "#43a047"
 COLOR_ERROR = "#e53935"
 COLOR_AVISO = "#b8860b"
 
+# Lo que escriben el diálogo y su hilo va al registro de la publicación
+# (`logs/publicacion_<vídeo>_<fecha>.log`) mientras hay un `Diario` abierto.
+log = logging.getLogger(diario.NOMBRE_LOGGER + ".publicacion")
+
 Fabrica = Callable[[str, str, dict], proveedores.Proveedor]
+
+
+def revelar_en_finder(ruta: Path) -> None:
+    """Muestra el fichero seleccionado en una ventana del Finder."""
+    QProcess.startDetached("/usr/bin/open", ["-R", str(ruta)])
+
+
+# Hilos de publicación en marcha. No cuelgan del diálogo: si el diálogo se
+# destruyera con una subida en curso, Qt abortaría la app («QThread:
+# Destroyed while thread is still running»). Se sueltan al terminar.
+_HILOS_VIVOS: set["HiloPublicacion"] = set()
+
+
+def _retener(hilo: "HiloPublicacion") -> None:
+    _HILOS_VIVOS.add(hilo)
+    hilo.finished.connect(lambda: _soltar(hilo))
+
+
+def _soltar(hilo: "HiloPublicacion") -> None:
+    hilo.wait()  # `finished` llega justo antes de que el hilo salga del todo
+    if hilo.diario is not None and hilo.diario.abierto:
+        # El diálogo no llegó a cerrarlo (p. ej. se destruyó antes): lo cierra el hilo.
+        log.info("Fin (hilo terminado sin diálogo)")
+        hilo.diario.cerrar()
+    _HILOS_VIVOS.discard(hilo)
+    hilo.deleteLater()
+
+
+def hilos_vivos() -> int:
+    return len(_HILOS_VIVOS)
+
+
+def esperar_hilos(milisegundos: int = 5000) -> None:
+    """Al salir de la app: pide parar a los hilos y los espera. Una subida no
+    se puede cortar a medias; si no acaba a tiempo se termina a la fuerza
+    antes de que Qt aborte al destruirlo en marcha."""
+    for hilo in list(_HILOS_VIVOS):
+        hilo.requestInterruption()
+    for hilo in list(_HILOS_VIVOS):
+        if not hilo.wait(milisegundos):
+            log.warning("Salida de la app con la publicación en marcha: se corta.")
+            hilo.terminate()
+            hilo.wait()
+        if hilo.diario is not None:
+            hilo.diario.cerrar()
+        _HILOS_VIVOS.discard(hilo)
 
 
 class HiloPublicacion(QThread):
@@ -58,28 +110,48 @@ class HiloPublicacion(QThread):
     terminado = Signal(object)  # dict[Plataforma, Resultado]
 
     def __init__(self, proveedor, publicacion: Publicacion, opciones: Opciones,
-                 plataformas: list[Plataforma], nombre_proveedor: str, parent=None):
-        super().__init__(parent)
+                 plataformas: list[Plataforma], nombre_proveedor: str,
+                 diario_publicacion: diario.Diario | None = None):
+        super().__init__()  # sin padre: ver `_HILOS_VIVOS`
         self._proveedor = proveedor
         self._publicacion = publicacion
         self._opciones = opciones
         self._plataformas = plataformas
         self._nombre_proveedor = nombre_proveedor
+        self.diario = diario_publicacion
+        self._ruta_log = diario_publicacion.ruta if diario_publicacion else None
+
+    def start(self, *args) -> None:
+        _retener(self)
+        super().start(*args)
 
     def run(self) -> None:
-        resultados: dict = {}
+        vistos: dict[Plataforma, Resultado] = {}
+
+        def avisar(plataforma: Plataforma, estado: Estado, resultado) -> None:
+            if estado in (Estado.HECHO, Estado.ERROR) and resultado is not None:
+                vistos[plataforma] = resultado
+            self.progreso.emit(plataforma.value, estado.value, resultado)
+
         try:
             resultados = publicador.publicar(
                 self._proveedor, self._publicacion, self._opciones, self._plataformas,
-                progreso=lambda p, e, r: self.progreso.emit(p.value, e.value, r),
+                progreso=avisar,
                 nombre_proveedor=self._nombre_proveedor,
                 cancelado=self.isInterruptionRequested,
             )
-        except Exception:  # publicador aísla los fallos; esto es solo un seguro
-            resultados = {}
+        except BaseException as e:  # publicador aísla los fallos; esto es el último seguro
+            log.exception("Fallo inesperado en el hilo de publicación")
+            resultados = dict(vistos)
+            fichero = self._ruta_log.name if self._ruta_log else _("no disponible")
+            for plataforma in self._plataformas:
+                if plataforma not in resultados:
+                    resultados[plataforma] = Resultado(plataforma, ok=False, error=_(
+                        "Error inesperado ({tipo}). Detalles en el registro: {fichero}").format(
+                        tipo=type(e).__name__, fichero=fichero))
         finally:
             self._proveedor = None  # suelta la clave que guarda el proveedor
-        self.terminado.emit(resultados)
+        self.terminado.emit({p: resultados[p] for p in ORDEN if p in resultados})
 
 
 class DialogoPublicar(QDialog):
@@ -97,6 +169,11 @@ class DialogoPublicar(QDialog):
         self.fabrica = fabrica or (lambda nombre, clave, datos: proveedores.crear(
             nombre, clave, datos))
         self._hilo: HiloPublicacion | None = None
+        self._diario: diario.Diario | None = None
+        self.ruta_log: Path | None = None
+        self._en_curso: list[Plataforma] = []
+        self._opciones_en_curso = Opciones()
+        self._procesando: set[Plataforma] = set()
         self.resultados: dict[Plataforma, Resultado] = {}
         self.setWindowTitle(_("Publicar en redes"))
         self.setMinimumWidth(640)
@@ -163,12 +240,33 @@ class DialogoPublicar(QDialog):
             rejilla.addWidget(estado, fila, 2)
         raiz.addWidget(grupo_plataformas)
 
+        # Indeterminada mientras se publica. Sin altura máxima: con el estilo de
+        # macOS una barra de 6 px no se dibuja.
         self.barra = QProgressBar()
         self.barra.setRange(0, 0)
         self.barra.setTextVisible(False)
-        self.barra.setMaximumHeight(6)
         self.barra.hide()
         raiz.addWidget(self.barra)
+
+        fila_estado = QHBoxLayout()
+        self.etiqueta_estado = QLabel()
+        self.etiqueta_estado.setWordWrap(True)
+        self.etiqueta_estado.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.etiqueta_estado.hide()
+        self.boton_registro = QPushButton(_("Ver registro"))
+        self.boton_registro.setToolTip(_("Muestra en el Finder el registro de esta publicación"))
+        self.boton_registro.clicked.connect(self._ver_registro)
+        self.boton_registro.hide()
+        fila_estado.addWidget(self.etiqueta_estado, 1)
+        fila_estado.addWidget(self.boton_registro)
+        raiz.addLayout(fila_estado)
+
+        self.resumen = QLabel()
+        self.resumen.setWordWrap(True)
+        self.resumen.setOpenExternalLinks(True)
+        self.resumen.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        self.resumen.hide()
+        raiz.addWidget(self.resumen)
 
         fila_servicio = QHBoxLayout()
         self.etiqueta_servicio = QLabel()
@@ -237,8 +335,12 @@ class DialogoPublicar(QDialog):
             texto = _("Vía {servicio}").format(servicio=proveedores.nombre_visible(nombre))
             if perfil:
                 texto += " · " + _("perfil «{perfil}»").format(perfil=perfil)
+            if proveedores.usa_perfil(nombre) and proveedores.parece_email(perfil):
+                texto += " · " + _("⚠ el perfil parece un email: revísalo en Redes…")
+                self.etiqueta_servicio.setStyleSheet(f"color: {COLOR_AVISO};")
+            else:
+                self.etiqueta_servicio.setStyleSheet("")
             self.etiqueta_servicio.setText(texto)
-            self.etiqueta_servicio.setStyleSheet("")
         else:
             self.etiqueta_servicio.setText(motivo)
             self.etiqueta_servicio.setStyleSheet(f"color: {COLOR_AVISO};")
@@ -281,16 +383,8 @@ class DialogoPublicar(QDialog):
 
     def _resumen(self) -> str:
         opciones = self.opciones()
-        lineas = []
-        for plataforma in self.plataformas():
-            if plataforma == Plataforma.TIKTOK:
-                modo = _(ETIQUETAS_TIKTOK[opciones.tiktok_modo])
-            elif plataforma == Plataforma.INSTAGRAM:
-                modo = _(ETIQUETAS_INSTAGRAM[opciones.instagram_modo])
-            else:
-                modo = _("Short público")
-            lineas.append(f"• {plataforma.nombre}: {modo}")
-        return "\n".join(lineas)
+        return "\n".join(f"• {p.nombre}: {self._modo_visible(p, opciones)}"
+                         for p in self.plataformas())
 
     def _confirmar(self) -> bool:
         repetidas = registro.ya_publicado(self.video) & set(self.plataformas())
@@ -308,34 +402,147 @@ class DialogoPublicar(QDialog):
         return respuesta == QMessageBox.StandardButton.Yes
 
     def publicar(self) -> None:
-        if self.publicando or not self.boton_publicar.isEnabled():
+        if self.publicando:
             return
-        if not self._confirmar():
+        if not self.boton_publicar.isEnabled():
+            _listo, motivo = self._listo()
+            self._poner_estado(motivo or _(
+                "Marca al menos una plataforma y escribe un título."), COLOR_AVISO)
             return
         nombre = self.ajustes.proveedor_redes
+        plataformas = self.plataformas()
+        opciones = self.opciones()
+        self._preparar(plataformas, opciones)
+        self._registrar_inicio(nombre, plataformas, opciones)
+        self._poner_estado(_("Esperando confirmación…"))
+        if not self._confirmar():
+            log.info("Cancelado por el usuario en la confirmación: no se envía nada.")
+            self._terminar_sin_enviar(_("Publicación cancelada: no se ha enviado nada."),
+                                      COLOR_AVISO, marcar=False)
+            return
+        log.info("Confirmado por el usuario.")
+        self._poner_estado(_("Leyendo la API key del Llavero…"))
+        self.etiqueta_estado.repaint()
         try:
             clave = self.llavero.leer(nombre)
         except credenciales.ErrorLlavero as e:
-            QMessageBox.warning(self, _("Llavero"), str(e))
+            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero: {motivo}").format(
+                motivo=str(e)))
+            return
+        except Exception as e:
+            log.exception("Llavero: excepción inesperada al leer la clave")
+            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero ({tipo}).").format(
+                tipo=type(e).__name__))
             return
         if not clave:
+            log.warning("Llavero: la entrada existe pero la lectura no devolvió ninguna clave.")
             self.refrescar_servicio()
+            self._terminar_sin_enviar(_(
+                "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"))
             return
-        proveedor = self.fabrica(nombre, clave, self.ajustes.ajustes_proveedor())
-        del clave
-        plataformas = self.plataformas()
+        if self._diario is not None:
+            self._diario.ocultar(clave)
+        log.info("Llavero: clave leída.")
+        try:
+            proveedor = self.fabrica(nombre, clave, self.ajustes.ajustes_proveedor())
+        except Exception as e:
+            log.exception("No se pudo crear el proveedor")
+            self._terminar_sin_enviar(_(
+                "No se pudo preparar el servicio ({tipo}). Detalles en el registro.").format(
+                tipo=type(e).__name__))
+            return
+        finally:
+            del clave
         self.ajustes.plataformas_redes = plataformas
-        self.ajustes.tiktok_modo = ModoTikTok(self.combo_tiktok.currentData())
-        self.ajustes.instagram_modo = ModoInstagram(self.combo_instagram.currentData())
-        for plataforma in ORDEN:
-            self.estados[plataforma].setText(_("En cola") if plataforma in plataformas else "")
-            self.estados[plataforma].setStyleSheet("")
-        self._hilo = HiloPublicacion(proveedor, self.publicacion(), self.opciones(),
-                                     plataformas, nombre, self)
+        self.ajustes.tiktok_modo = opciones.tiktok_modo
+        self.ajustes.instagram_modo = opciones.instagram_modo
+        self._hilo = HiloPublicacion(proveedor, self.publicacion(), opciones,
+                                     plataformas, nombre, self._diario)
         self._hilo.progreso.connect(self._al_progresar)
         self._hilo.terminado.connect(self._al_terminar)
         self._bloquear(True)
+        self._poner_estado(_("Publicando: {lista}…").format(
+            lista=", ".join(p.nombre for p in plataformas)))
+        log.info("Hilo de publicación en marcha.")
         self._hilo.start()
+
+    # --- estado y registro ---
+
+    def _preparar(self, plataformas: list[Plataforma], opciones: Opciones) -> None:
+        """Deja el diálogo listo para un intento nuevo y abre su registro."""
+        self._cerrar_diario()
+        self._en_curso = list(plataformas)
+        self._opciones_en_curso = opciones
+        self._procesando = set()
+        self.resumen.clear()
+        self.resumen.hide()
+        for plataforma in ORDEN:
+            etiqueta = self.estados[plataforma]
+            etiqueta.setText(_("En cola") if plataforma in plataformas else "")
+            etiqueta.setToolTip("")
+            etiqueta.setStyleSheet("")
+        self._diario = diario.Diario(self.video)
+        self.ruta_log = self._diario.ruta
+        self.boton_registro.setVisible(self.ruta_log is not None)
+        self.boton_registro.setEnabled(self.ruta_log is not None)
+
+    def _registrar_inicio(self, nombre: str, plataformas: list[Plataforma],
+                          opciones: Opciones) -> None:
+        log.info("Inicio de la publicación · %s · Python %s",
+                 plataforma_sistema.platform(), plataforma_sistema.python_version())
+        try:
+            tamano = f"{self.video.stat().st_size} bytes"
+        except OSError as e:
+            tamano = f"no se puede leer: {type(e).__name__}"
+        log.info("Vídeo: %s (%s)", self.video, tamano)
+        log.info("Proveedor: %s (%s) · API key en el Llavero: %s · perfil: %s",
+                 proveedores.nombre_visible(nombre), nombre,
+                 "sí" if self._hay_clave else "no",
+                 "sí" if self.ajustes.perfil_redes else "no")
+        log.info("Plataformas y modos: %s", ", ".join(
+            f"{p.nombre} [{publicador.modo_de(p, opciones)}: {self._modo_visible(p, opciones)}]"
+            for p in plataformas))
+        publicacion = self.publicacion()
+        log.info("Título: %r · caption: %d caracteres · hashtags: %s",
+                 publicacion.titulo, len(publicacion.caption), " ".join(publicacion.hashtags))
+
+    def _poner_estado(self, texto: str, color: str = "") -> None:
+        self.etiqueta_estado.setText(texto)
+        self.etiqueta_estado.setStyleSheet(f"color: {color};" if color else "")
+        self.etiqueta_estado.setVisible(bool(texto))
+
+    def _terminar_sin_enviar(self, texto: str, color: str = COLOR_ERROR,
+                             marcar: bool = True) -> None:
+        """Final de un intento que no llegó a enviar nada: siempre se ve."""
+        log.warning("Sin enviar: %s", texto)
+        for plataforma in ORDEN:
+            etiqueta = self.estados[plataforma]
+            if marcar and plataforma in self._en_curso:
+                etiqueta.setText(html.escape("✗ " + _("No enviado")))
+                etiqueta.setToolTip(texto)
+                etiqueta.setStyleSheet(f"color: {COLOR_ERROR};")
+            else:
+                etiqueta.setText("")
+        self._poner_estado(texto, color)
+        log.info("Fin: no se ha enviado nada.")
+        self._cerrar_diario()
+        self._refrescar()
+
+    def _cerrar_diario(self) -> None:
+        if self._diario is not None:
+            self._diario.cerrar()
+            self._diario = None
+
+    def _ver_registro(self) -> None:
+        if self.ruta_log is not None:
+            revelar_en_finder(self.ruta_log)
+
+    def _modo_visible(self, plataforma: Plataforma, opciones: Opciones) -> str:
+        if plataforma == Plataforma.TIKTOK:
+            return _(ETIQUETAS_TIKTOK[opciones.tiktok_modo])
+        if plataforma == Plataforma.INSTAGRAM:
+            return _(ETIQUETAS_INSTAGRAM[opciones.instagram_modo])
+        return _("Short público")
 
     def _bloquear(self, bloqueado: bool) -> None:
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
@@ -352,44 +559,97 @@ class DialogoPublicar(QDialog):
         if estado == Estado.SUBIENDO:
             etiqueta.setText(_("Subiendo…"))
             etiqueta.setStyleSheet("")
+            numero = self._en_curso.index(plataforma) + 1 if plataforma in self._en_curso else 0
+            self._poner_estado(_("Subiendo a {plataforma} ({n} de {total})…").format(
+                plataforma=plataforma.nombre, n=numero, total=len(self._en_curso)))
         elif estado == Estado.PROCESANDO:
             etiqueta.setText(_("Procesando en el servicio…"))
             etiqueta.setStyleSheet("")
+            self._procesando.add(plataforma)
         else:
+            self._procesando.discard(plataforma)
             self._mostrar_resultado(plataforma, resultado)
+        # Todo enviado y alguna sigue en el servicio: se dice qué se espera.
+        en_marcha = (_("En cola"), _("Subiendo…"))
+        if self._procesando and not any(
+                self.estados[p].text() in en_marcha for p in self._en_curso):
+            self._poner_estado(_("Esperando a que el servicio termine: {lista}…").format(
+                lista=", ".join(p.nombre for p in ORDEN if p in self._procesando)))
 
-    def _mostrar_resultado(self, plataforma: Plataforma, resultado: Resultado) -> None:
-        etiqueta = self.estados[plataforma]
+    def _texto_resultado(self, plataforma: Plataforma, resultado: Resultado) -> tuple[str, str]:
+        """HTML (escapado) y color con que se muestra un resultado."""
         if resultado.ok:
             if resultado.url:
                 texto = _('✓ Publicado · <a href="{url}">Abrir</a>').format(
                     url=html.escape(resultado.url, quote=True))
             elif (plataforma == Plataforma.TIKTOK
-                  and self.opciones().tiktok_modo == ModoTikTok.BORRADOR):
+                  and self._opciones_en_curso.tiktok_modo == ModoTikTok.BORRADOR):
                 texto = html.escape(_("✓ En borradores: termínalo en la app de TikTok"))
             else:
                 texto = html.escape(_("✓ Publicado"))
-            color = COLOR_OK
-        elif resultado.pendiente:
-            texto, color = html.escape("⏳ " + resultado.error), COLOR_AVISO
-        else:
-            texto, color = html.escape("✗ " + (resultado.error or _("Error"))), COLOR_ERROR
+            return texto, COLOR_OK
+        if resultado.pendiente:
+            return html.escape("⏳ " + (resultado.error or _("Sigue procesándose"))), COLOR_AVISO
+        return html.escape("✗ " + (resultado.error or _("Error"))), COLOR_ERROR
+
+    def _mostrar_resultado(self, plataforma: Plataforma, resultado: Resultado,
+                           corto: bool = False) -> None:
+        """`corto`: al final, el motivo completo va en el resumen de abajo y
+        aquí queda solo la marca (el motivo sigue en el tooltip)."""
+        etiqueta = self.estados[plataforma]
+        texto, color = self._texto_resultado(plataforma, resultado)
+        if corto and not resultado.ok:
+            texto = html.escape("⏳ " + _("Pendiente") if resultado.pendiente
+                                else "✗ " + _("Error: ver el resumen"))
         etiqueta.setText(texto)
         etiqueta.setToolTip(resultado.error)
         etiqueta.setStyleSheet(f"color: {color};")
 
+    def _texto_final(self) -> tuple[str, str]:
+        total = len(self.resultados)
+        ok = sum(1 for r in self.resultados.values() if r.ok)
+        pendientes = sum(1 for r in self.resultados.values() if not r.ok and r.pendiente)
+        if ok == 0 and pendientes == 0:
+            return _("Falló en todas"), COLOR_ERROR
+        texto = _("Publicado en {ok} de {total}").format(ok=ok, total=total)
+        if pendientes == 1:
+            texto += " · " + _("1 sigue procesándose")
+        elif pendientes > 1:
+            texto += " · " + _("{n} siguen procesándose").format(n=pendientes)
+        return texto, (COLOR_OK if ok == total else COLOR_AVISO)
+
     def _al_terminar(self, resultados: dict) -> None:
-        hilo, self._hilo = self._hilo, None
-        if hilo is not None:
-            hilo.wait()
-            hilo.deleteLater()
-        self.resultados = dict(resultados)
-        for plataforma, resultado in self.resultados.items():
-            self._mostrar_resultado(plataforma, resultado)
-            if resultado.ok:  # lo que ya salió no se vuelve a marcar
-                self.casillas[plataforma].setChecked(False)
-        self._bloquear(False)
-        self._refrescar_aviso()
+        self._hilo = None  # lo suelta `_soltar` cuando acaba del todo
+        try:
+            self.resultados = {
+                p: resultados.get(p) or Resultado(p, ok=False, error=_("No se llegó a enviar."))
+                for p in self._en_curso}
+            lineas = []
+            for plataforma, resultado in self.resultados.items():
+                self._mostrar_resultado(plataforma, resultado, corto=True)
+                texto, color = self._texto_resultado(plataforma, resultado)
+                lineas.append(f'<b>{html.escape(plataforma.nombre)}</b>: '
+                              f'<span style="color: {color};">{texto}</span>')
+                if resultado.ok:  # lo que ya salió no se vuelve a marcar
+                    self.casillas[plataforma].setChecked(False)
+            self.resumen.setText("<br>".join(lineas))
+            self.resumen.show()
+            texto, color = self._texto_final()
+            self._poner_estado(texto, color)
+            log.info("Resumen: %s", texto)
+            for plataforma, resultado in self.resultados.items():
+                log.info("  %s: %s", plataforma.nombre, "OK " + (resultado.url or "")
+                         if resultado.ok else ("pendiente: " if resultado.pendiente
+                                               else "error: ") + resultado.error)
+        except Exception as e:
+            log.exception("Fallo al mostrar el resultado")
+            self._poner_estado(_("Terminó, pero no se pudo mostrar el resultado ({tipo}). "
+                                 "Mira el registro.").format(tipo=type(e).__name__), COLOR_ERROR)
+        finally:
+            log.info("Fin")
+            self._cerrar_diario()
+            self._bloquear(False)
+            self._refrescar_aviso()
         self.publicacion_terminada.emit(self.resultados)
 
     # --- cierre ---
@@ -398,6 +658,11 @@ class DialogoPublicar(QDialog):
         if self.publicando:
             return  # la subida sigue: no se abandona a medias
         super().reject()
+
+    def done(self, resultado: int) -> None:
+        if self.publicando:
+            return  # tampoco por accept() ni por otra vía
+        super().done(resultado)
 
     def closeEvent(self, evento) -> None:
         if self.publicando:

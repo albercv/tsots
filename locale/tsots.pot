@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 14:57+0200\n"
+"POT-Creation-Date: 2026-09-23 15:46+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,9 @@ msgstr ""
 
 #, python-brace-format
 msgid " en «{paso}»"
+msgstr ""
+
+msgid "1 sigue procesándose"
 msgstr ""
 
 #, python-brace-format
@@ -247,6 +250,10 @@ msgstr ""
 msgid "El perfil del servicio donde conectaste TikTok, YouTube e Instagram."
 msgstr ""
 
+#, python-brace-format
+msgid "El perfil «{perfil}» no existe en Upload-Post. Usa el nombre del perfil que aparece en Manage Users, no el email de tu cuenta."
+msgstr ""
+
 msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no se encuentra."
 msgstr ""
 
@@ -262,6 +269,10 @@ msgstr ""
 msgid "El quemado de subtítulos falló (código {codigo})"
 msgstr ""
 
+#, python-brace-format
+msgid "El servicio no devolvió resultado para {plataforma}: {motivo}"
+msgstr ""
+
 msgid "El servicio rechazó la publicación."
 msgstr ""
 
@@ -269,7 +280,16 @@ msgstr ""
 msgid "El servicio terminó sin resultado para {plataforma}."
 msgstr ""
 
+msgid "El vídeo es demasiado grande para el servicio (413)."
+msgstr ""
+
 msgid "Elegir vídeos"
+msgstr ""
+
+msgid "Elige en la cola un vídeo terminado que tenga caption."
+msgstr ""
+
+msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.upload-post.com/manage-users), donde conectaste tus redes. No es el email de tu cuenta."
 msgstr ""
 
 msgid "En cola"
@@ -285,15 +305,29 @@ msgid "Error desconocido: no está en la tabla de errores conocidos."
 msgstr ""
 
 #, python-brace-format
-msgid "Error inesperado ({tipo})."
+msgid "Error inesperado ({tipo}). Detalles en el registro de la publicación."
+msgstr ""
+
+#, python-brace-format
+msgid "Error inesperado ({tipo}). Detalles en el registro: {fichero}"
 msgstr ""
 
 #, python-brace-format
 msgid "Error {codigo} del servicio."
 msgstr ""
 
+msgid "Error: ver el resumen"
+msgstr ""
+
 #, python-brace-format
 msgid "Error: {titulo}"
+msgstr ""
+
+#, python-brace-format
+msgid "Esperando a que el servicio termine: {lista}…"
+msgstr ""
+
+msgid "Esperando confirmación…"
 msgstr ""
 
 #, python-brace-format
@@ -309,6 +343,9 @@ msgid "Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pist
 msgstr ""
 
 msgid "Extrayendo audio"
+msgstr ""
+
+msgid "Falló en todas"
 msgstr ""
 
 msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
@@ -389,6 +426,9 @@ msgstr ""
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr ""
 
+msgid "Leyendo la API key del Llavero…"
+msgstr ""
+
 msgid "Libera espacio o vacía audio_procesado/ y vuelve a procesar."
 msgstr ""
 
@@ -413,6 +453,9 @@ msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen u
 msgstr ""
 
 msgid "Límite de subidas del plan alcanzado (429)."
+msgstr ""
+
+msgid "Marca al menos una plataforma y escribe un título."
 msgstr ""
 
 msgid "Marcas y nombres propios que Whisper debe escribir bien."
@@ -443,6 +486,9 @@ msgstr ""
 msgid "Modo"
 msgstr ""
 
+msgid "Muestra en el Finder el registro de esta publicación"
+msgstr ""
+
 msgid "Música"
 msgstr ""
 
@@ -453,6 +499,9 @@ msgstr ""
 msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
 msgstr ""
 
+msgid "No enviado"
+msgstr ""
+
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr ""
@@ -461,6 +510,9 @@ msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama s
 msgstr ""
 
 msgid "No queda espacio en disco"
+msgstr ""
+
+msgid "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"
 msgstr ""
 
 #, python-brace-format
@@ -499,6 +551,9 @@ msgstr ""
 msgid "No se generó el vídeo remuxado: {salida}"
 msgstr ""
 
+msgid "No se llegó a enviar."
+msgstr ""
+
 #, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr ""
@@ -522,11 +577,23 @@ msgid "No se pudo leer el vídeo ({tipo})."
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo leer la API key del Llavero ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer la API key del Llavero: {motivo}"
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo leer la clave del Llavero (código {codigo})."
 msgstr ""
 
 #, python-brace-format
 msgid "No se pudo leer la resolución del vídeo: {video}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo preparar el servicio ({tipo}). Detalles en el registro."
 msgstr ""
 
 #, python-brace-format
@@ -582,6 +649,9 @@ msgstr ""
 msgid "Pega la API key para guardarla"
 msgstr ""
 
+msgid "Pendiente"
+msgstr ""
+
 msgid "Perfil:"
 msgstr ""
 
@@ -616,7 +686,18 @@ msgstr ""
 msgid "Proceso en curso"
 msgstr ""
 
+msgid "Publicación cancelada: no se ha enviado nada."
+msgstr ""
+
 msgid "Publicación sin referencia para consultar."
+msgstr ""
+
+#, python-brace-format
+msgid "Publicado en {ok} de {total}"
+msgstr ""
+
+#, python-brace-format
+msgid "Publicando: {lista}…"
 msgstr ""
 
 msgid "Publicar"
@@ -674,7 +755,12 @@ msgstr ""
 msgid "Reencodado del vídeo (h264_videotoolbox)"
 msgstr ""
 
-msgid "Respuesta inesperada del servicio."
+#, python-brace-format
+msgid "Respuesta inesperada del servicio (HTTP {codigo})."
+msgstr ""
+
+#, python-brace-format
+msgid "Respuesta inesperada del servicio: no trae resultado para {plataforma}."
 msgstr ""
 
 msgid "SIGABRT: una librería nativa abortó (aserción fallida)"
@@ -696,6 +782,9 @@ msgid "Salida del proceso (últimas líneas):"
 msgstr ""
 
 msgid "Salida:"
+msgstr ""
+
+msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr ""
 
 #, python-brace-format
@@ -724,6 +813,9 @@ msgid "Servicio:"
 msgstr ""
 
 msgid "Short público"
+msgstr ""
+
+msgid "Sigue procesándose"
 msgstr ""
 
 #, python-brace-format
@@ -760,6 +852,10 @@ msgstr ""
 msgid "Solo limpiar audio"
 msgstr ""
 
+#, python-brace-format
+msgid "Subiendo a {plataforma} ({n} de {total})…"
+msgstr ""
+
 msgid "Subiendo…"
 msgstr ""
 
@@ -792,6 +888,10 @@ msgstr ""
 msgid "Tarea:"
 msgstr ""
 
+#, python-brace-format
+msgid "Terminó, pero no se pudo mostrar el resultado ({tipo}). Mira el registro."
+msgstr ""
+
 msgid "Textos"
 msgstr ""
 
@@ -821,6 +921,9 @@ msgid "Una línea por término: marcas, productos, nombres propios. Whisper los 
 msgstr ""
 
 msgid "Velocidad:"
+msgstr ""
+
+msgid "Ver registro"
 msgstr ""
 
 msgid "Viajes y eventos"
@@ -904,6 +1007,9 @@ msgstr ""
 msgid "medium (más preciso)"
 msgstr ""
 
+msgid "no disponible"
+msgstr ""
+
 msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
 msgstr ""
 
@@ -945,6 +1051,10 @@ msgid "{n} modelo(s) no caben en memoria (ver tooltip)."
 msgstr ""
 
 #, python-brace-format
+msgid "{n} siguen procesándose"
+msgstr ""
+
+#, python-brace-format
 msgid "{plataforma} (borrador)"
 msgstr ""
 
@@ -961,8 +1071,14 @@ msgstr ""
 msgid "▶ Procesar"
 msgstr ""
 
+msgid "⚠ Eso parece un email. El perfil no es el email de tu cuenta: es el nombre del perfil dentro del servicio."
+msgstr ""
+
 #, python-brace-format
 msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá repetido."
+msgstr ""
+
+msgid "⚠ el perfil parece un email: revísalo en Redes…"
 msgstr ""
 
 msgid "✓ En borradores: termínalo en la app de TikTok"
