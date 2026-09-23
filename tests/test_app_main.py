@@ -471,3 +471,27 @@ def test_procesar_incluye_glosario(qtbot, tmp_path, monkeypatch):
                         lambda trabajos: capturado.setdefault("t", trabajos))
     ventana.procesar()
     assert json.loads(capturado["t"][0][1])["glosario"] == "Anthropic"
+
+
+def test_cabecera_encima_de_zona_drop_y_cola(qtbot, tmp_path, monkeypatch):
+    """La cabecera con el logo va arriba, a todo el ancho; la zona de soltar,
+    la cola y el panel de opciones quedan debajo."""
+    from PySide6.QtCore import QPoint, QRect
+
+    from app.widgets.cabecera import Cabecera
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(900, 560)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    assert isinstance(ventana.cabecera, Cabecera)
+    central = ventana.centralWidget()
+
+    def rect(widget):
+        return QRect(widget.mapTo(central, QPoint(0, 0)), widget.size())
+
+    cabecera = rect(ventana.cabecera)
+    for widget in (ventana.zona_drop, ventana.vista_cola, ventana.scroll_derecha):
+        assert cabecera.bottom() < rect(widget).top()
+    assert cabecera.left() <= rect(ventana.zona_drop).left()
+    assert cabecera.right() >= rect(ventana.scroll_derecha).right()

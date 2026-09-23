@@ -32,6 +32,7 @@ from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
 from .queue_model import EstadoTrabajo, ModeloCola
 from .settings import Ajustes
+from .widgets.cabecera import Cabecera
 from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
 from .widgets.panel_caption import PanelCaption
@@ -90,6 +91,10 @@ class VentanaPrincipal(QMainWindow):
 
         central = QWidget()
         raiz = QVBoxLayout(central)
+        # Cabecera con el logo a todo el ancho; zona de soltar, cola y
+        # opciones debajo.
+        self.cabecera = Cabecera(RUTA_ICONO)
+        raiz.addWidget(self.cabecera)
         fila_superior = QHBoxLayout()
 
         columna_izquierda = QVBoxLayout()

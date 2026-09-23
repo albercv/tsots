@@ -25,6 +25,21 @@ Pending work, most urgent first. Remove an item when it is merged into
       Fallback if CLI auth fails: a scheduled task in the Claude desktop app,
       which already has the e2d connector (not verified).
 
+- [ ] **Publish to TikTok, YouTube and Instagram, in that order.**
+      Findings from 2026-09-23:
+      - TikTok's API is not an option for us: unaudited apps only post
+        privately, and its guidelines reject "a utility tool to help upload
+        contents to the account(s) you or your team manages".
+      - YouTube: uploads from an unaudited API project stay private and
+        can't be made public. Needs the API audit.
+      - Instagram: works now with "Instagram API with Instagram Login",
+        Standard Access, no App Review, resumable upload (no public URL).
+      - Self-hosted Postiz doesn't avoid this: it uses your own TikTok and
+        Google apps (same audits) and needs a public HTTPS domain.
+      - Realistic path: a service with approved apps and an API, such as
+        Upload-Post (free tier 10 uploads/month) or Blotato. Try it with 2-3
+        videos first. The API key goes in the macOS Keychain.
+
 ## Improvements
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in

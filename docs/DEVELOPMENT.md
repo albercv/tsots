@@ -68,19 +68,42 @@ rm -rf .venv-clearvoice
 
 ## Branches and releases
 
-- `main`: stable. Only receives fast-forward merges from `develop` once
-  the full test suite passes and the app has been smoke-tested. Every
-  release is an annotated tag `vX.Y.Z` on `main`. Users install from here.
-- `develop`: integration branch. Day-to-day work lands here.
-- `feature/*`: short-lived branches off `develop`, merged back with
-  `--no-ff`.
+**Nobody pushes to `develop` or `main`. Every change goes in through a
+pull request.** The repository ruleset requires it; as an admin GitHub lets
+you bypass it and warns "Bypassed rule violations". Treat that warning as a
+mistake, never as a shortcut.
+
+- `main`: stable. Only receives PRs from `develop`, once the full test suite
+  passes and the app has been smoke-tested. Every release is an annotated tag
+  `vX.Y.Z` on `main`. Users install from here. A PR opened against `main`
+  from any other branch is moved to `develop` automatically
+  (`.github/workflows/retarget-pr.yml`).
+- `develop`: integration branch and GitHub default. Receives PRs from
+  short-lived branches.
+- `feature/*`, `fix/*`, `docs/*`: branches off `develop`, one per change.
+
+Day to day:
+
+```bash
+git checkout develop && git pull
+git checkout -b feature/my-change
+# ...commits...
+git push -u origin feature/my-change
+gh pr create --base develop --fill
+```
+
+Merge the PR on GitHub with **Create a merge commit**, then delete the
+branch.
 
 To cut a release:
 
 ```bash
-git checkout main && git merge --ff-only develop
+gh pr create --base main --head develop --title "Release vX.Y.Z" --body "..."
+# after merging it on GitHub:
+git checkout main && git pull
 git tag -a vX.Y.Z -m "vX.Y.Z: summary"
-git push origin main develop --follow-tags
+git push origin vX.Y.Z
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "..."
 ```
 
 ## Tests
