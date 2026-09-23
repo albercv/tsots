@@ -55,6 +55,11 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Local models
 
-- [ ] **Compare `qwen3.8:27b`** with `gemma4:26b` (installed and tested on
-      2026-09-23: better titles and hooks than `qwen3.5:9b`, 24 s vs 11 s).
-      Send `think: false`. Decide the default caption model.
+- [ ] **Pick a lighter default caption model.** `gemma4:26b` (18 GB) gives
+      better titles and hooks than `qwen3.5:9b` (24 s vs 11 s, tested on
+      2026-09-23) but slows a 36 GB Mac down while ClearVoice and Whisper run;
+      the panel now flags it as heavy. Benchmark `gemma4:12b-mlx` (7.7 GB, MLX
+      backend) and `gemma4:12b` (7.6 GB) against it on a real transcript
+      (time, `ollama ps` memory, title/hook quality) and set the default in
+      `videopipeline/config.py`, `app/settings.py` and `videopipeline/errores.py`.
+      `qwen3.8:27b` would be as heavy as `gemma4:26b`.

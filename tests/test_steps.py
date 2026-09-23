@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 import stat
+import subprocess
 import wave
 from pathlib import Path
 
@@ -28,6 +30,10 @@ def test_cmd_extraer_audio():
     assert cmd[-1] == "a.wav"
     assert "-ac" in cmd and cmd[cmd.index("-ac") + 1] == "1"
     assert "pcm_s16le" in cmd
+    # Huecos y arranque tardío del audio se rellenan con silencio.
+    assert cmd[cmd.index("-af") + 1] == (
+        "aresample=async=1:min_hard_comp=0.01:first_pts=0"
+    )
 
 
 def test_cmd_remux():
@@ -35,6 +41,31 @@ def test_cmd_remux():
     assert "copy" in cmd  # vídeo copiado
     assert "aac" in cmd and "192k" in cmd
     assert "+faststart" in cmd
+
+
+def test_extraer_audio_rellena_arranque_tardio_y_huecos(tmp_path):
+    """El iPhone graba audio que empieza tarde y con cortes entre paquetes.
+    El WAV debe conservar esos silencios; si los colapsa, la voz se adelanta
+    al vídeo cada vez más (gptDown.MOV: 0,31 s al final). El hueco es menor
+    que el umbral por defecto de aresample (0,1 s), como los reales."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg no disponible")
+    video = tmp_path / "huecos.mp4"
+    subprocess.run(
+        [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "lavfi", "-i", "color=c=black:s=160x120:d=3:r=30",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+         # Audio desde 0,3 s y con un salto de 0,08 s en el segundo 1.
+         "-af", "asetpts='PTS+0.3/TB+if(gte(T,1),0.08/TB,0)'",
+         "-c:v", "libx264", "-c:a", "aac", str(video)],
+        check=True,
+    )
+    wav = tmp_path / "a.wav"
+    extraer_audio(video, wav, 16000)
+    with wave.open(str(wav)) as w:
+        duracion = w.getnframes() / w.getframerate()
+    assert duracion == pytest.approx(2.38, abs=0.025)  # sin relleno: 2,0 s
 
 
 def test_cmd_cortar_silencios_cortar():

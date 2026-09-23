@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 18:02+0200\n"
+"POT-Creation-Date: 2026-09-23 18:46+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -695,6 +695,10 @@ msgid "Nombre del perfil en el servicio"
 msgstr ""
 
 msgid "Noticias y política"
+msgstr ""
+
+#, python-brace-format
+msgid "Ocupa ~{total} GB, más de la mitad de los ~{memoria} GB que este Mac deja para modelos: puede ralentizar el equipo. Mejor uno más ligero."
 msgstr ""
 
 #, python-brace-format

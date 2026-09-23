@@ -41,6 +41,11 @@ def cmd_extraer_audio(
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video),
         "-map", "0:a:0", "-vn",
+        # El iPhone graba audio que arranca tarde y con cortes entre paquetes
+        # (hasta 0,3 s por vídeo). Sin rellenarlos con silencio el WAV los
+        # colapsa y la voz se adelanta al vídeo, cada vez más hacia el final.
+        # min_hard_comp baja el umbral de relleno de 0,1 s (defecto) a 10 ms.
+        "-af", "aresample=async=1:min_hard_comp=0.01:first_pts=0",
         "-ac", "1", "-ar", str(sample_rate),
         "-c:a", "pcm_s16le",
         str(wav),
