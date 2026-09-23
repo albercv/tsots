@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 11:28+0200\n"
+"POT-Creation-Date: 2026-09-23 11:46+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -169,6 +169,10 @@ msgid "ERROR: no existe el vídeo: {video}"
 msgstr ""
 
 #, python-brace-format
+msgid "ERROR: no se puede leer el glosario: {ruta}"
+msgstr ""
+
+#, python-brace-format
 msgid "ERROR: {error}"
 msgstr ""
 
@@ -182,6 +186,10 @@ msgid "El caption SEO se genera con un modelo local servido por Ollama y no se e
 msgstr ""
 
 msgid "El disco donde se escriben los temporales o la salida está lleno. Los intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del vídeo original."
+msgstr ""
+
+#, python-brace-format
+msgid "El glosario de términos falló: {error}. Se usa la transcripción sin corregir."
 msgstr ""
 
 #, python-brace-format
@@ -243,6 +251,9 @@ msgstr ""
 msgid "Faltan dependencias"
 msgstr ""
 
+msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
+msgstr ""
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
@@ -292,6 +303,13 @@ msgid "Limpiar hechos"
 msgstr ""
 
 msgid "Limpieza de audio"
+msgstr ""
+
+#, python-brace-format
+msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
+msgstr ""
+
+msgid "Marcas y nombres propios que Whisper debe escribir bien."
 msgstr ""
 
 msgid "Marca…"
@@ -537,10 +555,23 @@ msgstr ""
 msgid "Transcribiendo"
 msgstr ""
 
+msgid "Términos"
+msgstr ""
+
+#, python-brace-format
+msgid "Términos: {terminos} · Correcciones: {correcciones}"
+msgstr ""
+
+msgid "Términos…"
+msgstr ""
+
 msgid "Título, caption y hashtags"
 msgstr ""
 
 msgid "Umbral:"
+msgstr ""
+
+msgid "Una línea por término: marcas, productos, nombres propios. Whisper los recibe como pista y el caption respeta su ortografía. Después de «=», las formas en que Whisper se equivoca, separadas por comas: se corrigen al transcribir. Las líneas con # son comentarios."
 msgstr ""
 
 msgid "Velocidad:"
