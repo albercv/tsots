@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 15:47+0200\n"
+"POT-Creation-Date: 2026-09-23 18:02+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,12 @@ msgstr ""
 
 #, python-brace-format
 msgid " en «{paso}»"
+msgstr ""
+
+msgid "(detectado en tu cuenta)"
+msgstr ""
+
+msgid "(sin elegir)"
 msgstr ""
 
 #, python-brace-format
@@ -52,7 +58,7 @@ msgstr ""
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
 msgstr ""
 
-msgid "Al publicar, por defecto"
+msgid "Al publicar"
 msgstr ""
 
 msgid "Amarillo"
@@ -70,6 +76,9 @@ msgid "Autodetectar"
 msgstr ""
 
 msgid "Añadir subtítulos"
+msgstr ""
+
+msgid "Borrador (lo terminas en Facebook)"
 msgstr ""
 
 msgid "Borrador (lo terminas en la app)"
@@ -129,10 +138,28 @@ msgstr ""
 msgid "Cola"
 msgstr ""
 
+msgid "Comprobado ahora."
+msgstr ""
+
+msgid "Comprobando la duración del vídeo…"
+msgstr ""
+
+msgid "Comprobando…"
+msgstr ""
+
+msgid "Comprobar conexión"
+msgstr ""
+
 msgid "Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en audio_procesado/, bórralo y vuelve a procesar."
 msgstr ""
 
+msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un solo post."
+msgstr ""
+
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
+msgstr ""
+
+msgid "Conectada"
 msgstr ""
 
 msgid "Consejos y estilo"
@@ -166,6 +193,9 @@ msgid "Corte de silencios"
 msgstr ""
 
 msgid "Cuenta"
+msgstr ""
+
+msgid "Cuentas conectadas"
 msgstr ""
 
 msgid "Deportes"
@@ -244,7 +274,7 @@ msgstr ""
 msgid "El modelo se descargará al primer uso."
 msgstr ""
 
-msgid "El perfil del servicio donde conectaste TikTok, YouTube e Instagram."
+msgid "El perfil del servicio donde conectaste tus redes."
 msgstr ""
 
 #, python-brace-format
@@ -252,6 +282,10 @@ msgid "El perfil «{perfil}» no existe en Upload-Post. Usa el nombre del perfil
 msgstr ""
 
 msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no se encuentra."
+msgstr ""
+
+#, python-brace-format
+msgid "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un emoji, 2. Mientras no lo cambies, se rellena con el título y los hashtags."
 msgstr ""
 
 #, python-brace-format
@@ -314,6 +348,14 @@ msgid "Error inesperado ({tipo}). Detalles en el registro: {fichero}"
 msgstr ""
 
 #, python-brace-format
+msgid "Error inesperado al consultar las cuentas ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "Error inesperado al consultar las páginas ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "Error {codigo} del servicio."
 msgstr ""
 
@@ -322,6 +364,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Error: {titulo}"
+msgstr ""
+
+msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr ""
 
 #, python-brace-format
@@ -346,6 +391,10 @@ msgstr ""
 msgid "Extrayendo audio"
 msgstr ""
 
+#, python-brace-format
+msgid "Facebook no está conectada en {servicio}."
+msgstr ""
+
 msgid "Falló en todas"
 msgstr ""
 
@@ -362,6 +411,12 @@ msgid "Falta la API key del servicio: guárdala en Redes…"
 msgstr ""
 
 msgid "Falta la API key. Guárdala en Redes…"
+msgstr ""
+
+msgid "Falta la página de Facebook. Elígela en Redes…"
+msgstr ""
+
+msgid "Falta la página de Facebook: elígela en Redes…"
 msgstr ""
 
 msgid "Falta una herramienta externa"
@@ -392,6 +447,9 @@ msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
 msgstr ""
 
 msgid "Humor"
+msgstr ""
+
+msgid "ID de la página (un número)"
 msgstr ""
 
 msgid "Idioma"
@@ -471,6 +529,12 @@ msgstr ""
 msgid "Mejora de voz"
 msgstr ""
 
+msgid "Meta solo deja publicar en páginas, no en perfiles personales."
+msgstr ""
+
+msgid "Mi cuenta de X tiene Premium"
+msgstr ""
+
 msgid "Minimalista"
 msgstr ""
 
@@ -500,11 +564,19 @@ msgstr ""
 msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
 msgstr ""
 
+#, python-brace-format
+msgid "No conectada en {servicio}"
+msgstr ""
+
 msgid "No enviado"
 msgstr ""
 
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
+msgstr ""
+
+#, python-brace-format
+msgid "No hay páginas de Facebook conectadas en {servicio}."
 msgstr ""
 
 msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
@@ -555,6 +627,12 @@ msgstr ""
 msgid "No se llegó a enviar."
 msgstr ""
 
+msgid "No se pudieron comprobar las cuentas."
+msgstr ""
+
+msgid "No se pudieron comprobar las cuentas; se usa lo último que se supo."
+msgstr ""
+
 #, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr ""
@@ -594,11 +672,19 @@ msgid "No se pudo leer la clave del Llavero (código {codigo})."
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo leer la lista de páginas ({motivo}). Escribe el ID de la página a mano: lo encontrarás en la información de la página de Facebook (transparencia de la página) o en la configuración de Meta Business Suite."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo leer la resolución del vídeo: {video}"
 msgstr ""
 
 #, python-brace-format
 msgid "No se pudo preparar el servicio ({tipo}). Detalles en el registro."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo preparar la consulta ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -672,6 +758,12 @@ msgstr ""
 msgid "Posición vertical:"
 msgstr ""
 
+msgid "Post público"
+msgstr ""
+
+msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Facebook"
+msgstr ""
+
 msgid "Preview no disponible"
 msgstr ""
 
@@ -708,13 +800,19 @@ msgstr ""
 msgid "Publicar"
 msgstr ""
 
-msgid "Publicar en TikTok, YouTube e Instagram"
+msgid "Publicar en TikTok, YouTube, Instagram, X y Facebook"
 msgstr ""
 
 msgid "Publicar en redes"
 msgstr ""
 
 msgid "Publicar…"
+msgstr ""
+
+msgid "Página de Facebook en la que se publica. La lista sale de las páginas conectadas en el servicio: pulsa «Comprobar conexión» para verla."
+msgstr ""
+
+msgid "Página de Facebook:"
 msgstr ""
 
 msgid "Público"
@@ -745,6 +843,9 @@ msgstr ""
 msgid "Redes…"
 msgstr ""
 
+msgid "Reel"
+msgstr ""
+
 msgid "Reel de prueba (a seguidores si funciona)"
 msgstr ""
 
@@ -762,6 +863,12 @@ msgstr ""
 
 #, python-brace-format
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr ""
 
 #, python-brace-format
@@ -830,7 +937,14 @@ msgstr ""
 msgid "Silencios:"
 msgstr ""
 
+#, python-brace-format
+msgid "Sin Premium: vídeos de hasta {duracion} y {tamano} MB, posts de {caracteres} caracteres."
+msgstr ""
+
 msgid "Sin clave guardada"
+msgstr ""
+
+msgid "Sin comprobar. Pulsa «Comprobar conexión» para ver qué cuentas tienes conectadas."
 msgstr ""
 
 msgid "Sin conexión para descargar un modelo"
@@ -884,7 +998,7 @@ msgstr ""
 msgid "Sustituyendo pista de audio"
 msgstr ""
 
-msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube e Instagram. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
+msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube, Instagram, X y Facebook. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
 msgstr ""
 
 msgid "Tamaño:"
@@ -895,6 +1009,13 @@ msgstr ""
 
 #, python-brace-format
 msgid "Terminó, pero no se pudo mostrar el resultado ({tipo}). Mira el registro."
+msgstr ""
+
+#, python-brace-format
+msgid "Texto para X de más de {maximo} caracteres: acórtalo (o marca Premium en Redes…)"
+msgstr ""
+
+msgid "Texto para X:"
 msgstr ""
 
 msgid "Textos"
@@ -951,7 +1072,18 @@ msgstr ""
 msgid "Vídeo final:     {final}"
 msgstr ""
 
+msgid "Vídeo normal"
+msgstr ""
+
 msgid "Vídeos ("
+msgstr ""
+
+#, python-brace-format
+msgid "X sin Premium admite vídeos de hasta {maximo} MB; este ocupa {tamano} MB."
+msgstr ""
+
+#, python-brace-format
+msgid "X sin Premium admite vídeos de hasta {maximo}; este dura {duracion}."
 msgstr ""
 
 #, python-brace-format
@@ -1074,10 +1206,17 @@ msgstr ""
 msgid "¿Publicar ahora?"
 msgstr ""
 
+#, python-brace-format
+msgid "Última comprobación: {fecha}"
+msgstr ""
+
 msgid "■ Cancelar"
 msgstr ""
 
 msgid "▶ Procesar"
+msgstr ""
+
+msgid "⚠ El ID de una página solo tiene números."
 msgstr ""
 
 msgid "⚠ Eso parece un email. El perfil no es el email de tu cuenta: es el nombre del perfil dentro del servicio."
@@ -1088,10 +1227,17 @@ msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá
 msgstr ""
 
 #, python-brace-format
+msgid "⚠ Reconecta {plataforma} en {servicio}"
+msgstr ""
+
+#, python-brace-format
 msgid "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: compruébalo en la app antes de publicar otra vez."
 msgstr ""
 
 msgid "⚠ el perfil parece un email: revísalo en Redes…"
+msgstr ""
+
+msgid "✓ En borradores: termínalo en Facebook"
 msgstr ""
 
 msgid "✓ En borradores: termínalo en la app de TikTok"

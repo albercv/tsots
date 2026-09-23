@@ -137,7 +137,7 @@ QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/t
 app/                 PySide6 GUI (main window, queue model, worker, widgets)
 videopipeline/       pipeline (steps, subtitles, caption, glossary, ollama
                      client, errors → diagnostics, runner subprocess, i18n)
-videopipeline/redes/ publishing to TikTok, YouTube, Instagram (see below)
+videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
 locale/              gettext catalogs (see Translations)
@@ -187,22 +187,72 @@ Package `videopipeline/redes/`:
 
 | Module | Role | Knows the provider? |
 |---|---|---|
-| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram), `Publicacion`, `Opciones` (TikTok draft/public, Instagram trial/regular, YouTube category), `Resultado` (ok, url, error, pendiente, referencia) | No |
-| `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are | No |
-| `proveedor.py` | `Proveedor` protocol, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
-| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, 503 retries | Yes, the only one |
+| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known), `Pagina` (Facebook Page) | No |
+| `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
+| `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
+| `proveedor.py` | `Proveedor` protocol, `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
+| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account and Facebook Page lookups | Yes, the only one |
 | `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry | No |
 | `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode. Never the key | No |
 
-GUI: `app/widgets/dialogo_publicar.py` (texts, platforms, modes,
-confirmation, upload in a `QThread`, per-platform status and links),
-`app/widgets/dialogo_redes.py` (provider, profile, API key, default modes)
+GUI: `app/widgets/dialogo_publicar.py` (texts, the X text with its live
+counter, platforms, modes, confirmation, upload in a `QThread`,
+per-platform status and links), `app/widgets/dialogo_redes.py` (provider,
+profile, API key, **Check connection**, X Premium, Facebook Page, default
+modes), `app/cuentas.py` (account lookup shared by both dialogs, always in
+the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button
 in the bottom bar of `app/main.py`, next to the language selector (app
 settings, not per video, so it is always visible; the Publish dialog also
 opens it).
-Settings (QSettings `redes/*`) store the provider id, the profile and the
-default modes; never the key.
+Settings (QSettings `redes/*`) store the provider id, the profile, the
+default modes, X Premium, the chosen Facebook Page (per provider) and the
+last successful account lookup (per provider, tied to the profile); never
+the key. The checked platforms are remembered; a list saved before X and
+Facebook existed keeps working (both stay unchecked), and a new user
+starts with TikTok, YouTube and Instagram.
+
+### X and Facebook
+
+- **Order:** TikTok → YouTube → Instagram → X → Facebook.
+- **X text:** an X post takes 280 characters counted the X way.
+  `textos.longitud_x` approximates `twitter-text` v3: NFC first; every URL
+  (http(s)://, www., or a domain with a common TLD) counts 23; an emoji,
+  including skin tones, ZWJ sequences, flags and keycaps, counts 2; code
+  points in the "light" ranges (U+0000–U+10FF, U+2000–U+200D,
+  U+2010–U+201F, U+2032–U+2037) count 1 and the rest 2. Rare symbols or
+  uncommon TLDs may be off by a few characters. The default text is title +
+  hashtags: hashtags are dropped from the end, then the title is shortened.
+  The dialog shows it in its own field with a live counter; while the user
+  has not edited it, it follows the title and hashtags. Without Premium a
+  text over 280 blocks publishing (a longer text would become a thread);
+  the provider also trims it as a safety net.
+- **X video limits:** without Premium, ≤ 140 s and ≤ 512 MB. The dialog
+  measures the duration with `steps.duracion_video` (ffprobe) in the
+  background; X stays disabled with "Comprobando…" until it is known, and
+  disabled with the reason if the video is too long or too heavy. An
+  unreadable duration does not block. With Premium (a user setting in
+  Networks…) nothing is checked.
+- **Facebook:** Meta only allows posting to Pages. The Page id is a
+  non-secret setting passed to the provider as `pagina_facebook` in
+  `ajustes_proveedor()`. Modes: reel (default), regular video, draft.
+
+### Connected accounts
+
+`Proveedor.cuentas()` returns one entry per `Plataforma` (`None` = not
+connected) and `Proveedor.paginas_facebook()` the Pages the profile can post
+to; both raise `ErrorConsulta` (readable, never the key) and nothing else.
+The Networks… dialog runs them on **Check connection** (with the key just
+typed or the one in the Keychain): it lists each platform as connected
+(@handle), not connected or "reconnect", fills the Page list (a single
+Page is picked automatically; if the list call fails, a manual id field
+appears) and pre-ticks X Premium when the provider reports it. The Publish
+dialog repeats the lookup in the background when it opens (and after
+Networks… closes): not-connected platforms are disabled, reconnect ones
+show a warning, a single Page is stored automatically. If the lookup fails
+it keeps the cached result, or leaves everything enabled when there is
+none. The publication log records which accounts were used and whether
+they came from a live lookup or the cache.
 
 ### Provider interface
 
@@ -211,6 +261,8 @@ class Proveedor(Protocol):
     nombre: str
     def publicar(self, plataforma, publicacion, opciones) -> Resultado: ...
     def estado(self, plataforma, referencia) -> Resultado: ...
+    def cuentas(self) -> dict[Plataforma, Cuenta | None]: ...
+    def paginas_facebook(self) -> list[Pagina]: ...
 ```
 
 - `publicar` uploads to one platform. It never raises for network or
@@ -218,10 +270,12 @@ class Proveedor(Protocol):
   `pendiente=True` plus an opaque `referencia` when the service keeps
   processing. Error texts never contain the key.
 - `estado` checks a pending upload with that `referencia`, same rules.
+- `cuentas` and `paginas_facebook` are lookups: they raise `ErrorConsulta`
+  with a readable message (never the key) and no other exception.
 
 A provider module exposes `NOMBRE` (display name), `USA_PERFIL` (whether it
 needs a profile/account name) and `crear(clave, ajustes, http=None)`, where
-`ajustes` holds the non-secret settings (`{"perfil": ...}`) and `http` is an
+`ajustes` holds the non-secret settings (`{"perfil": ..., "pagina_facebook": ...}`) and `http` is an
 optional `httpx.Client` that tests replace with `httpx.MockTransport`.
 
 ### Adding a provider
@@ -232,12 +286,14 @@ optional `httpx.Client` that tests replace with `httpx.MockTransport`.
 2. Add `"<id>": "videopipeline.redes.<id>"` to `PROVEEDORES`.
 3. Run the tests: `tests/test_redes_contrato.py` runs the common contract
    against every registered provider (never raises, never leaks the key,
-   uses the injected HTTP client, sends nothing without a video). Add
+   uses the injected HTTP client, sends nothing without a video, lookups
+   only raise `ErrorConsulta`). Add
    field-level tests like `tests/test_redes_upload_post.py`.
 
 `tests/test_redes_contrato.py` also fails if Upload-Post strings (its name,
 domain, `Apikey`, field names such as `post_mode`, `share_mode`,
-`privacyStatus`) appear outside `upload_post.py`; the only allowed mentions
+`privacyStatus`, `x_title`, `facebook_page_id`, `social_accounts`) appear
+outside `upload_post.py`; the only allowed mentions
 are the registry entry and `PROVEEDOR_POR_DEFECTO` in `proveedor.py`. The
 new provider appears in Networks… automatically; its key goes to the
 Keychain under `tsots-<id>`.
@@ -251,8 +307,10 @@ through stdin, so the key never shows up in the process list, then reads it
 back to confirm. Keys with spaces or quotes are rejected. `leer` uses
 `find-generic-password -w`; `hay_clave` checks without `-w` (the Networks…
 dialog never reads the secret); `borrar` uses `delete-generic-password`. The
-key is read only when the user confirms a publication, and it is never
-logged, shown, stored in QSettings, `PipelineConfig` or the registry.
+key is read when the user confirms a publication and, in a background
+thread, for the account lookups (when the Publish dialog opens and on
+**Check connection**). It is never logged, shown, stored in QSettings,
+`PipelineConfig` or the registry.
 
 ### Upload-Post assumptions to confirm with a real upload
 
@@ -267,6 +325,25 @@ logged, shown, stored in QSettings, `PipelineConfig` or the registry.
 - Each platform is a separate request (to keep the order and isolate
   failures); whether the free plan counts one upload per video or per
   platform is unknown.
+- X: `x_title` is the post text; `x_long_text_as_post=true` only with
+  Premium and a text over 280, otherwise the text is ≤ 280 so it never
+  becomes a thread. Results may come back as `x` or `twitter`. Unused:
+  `reply_settings`, `nullcast`, `community_id`, `x_alt_text`,
+  `x_paid_partnership`, `x_subtitles_url` (public URL only).
+- Facebook: `facebook_page_id`, `facebook_title`, `facebook_description`,
+  `facebook_media_type` (`REELS` or `VIDEO`) and `video_state`
+  (`PUBLISHED` or `DRAFT`); a draft is sent as a reel in `DRAFT`.
+- Whether X and Facebook are in the free plan is unknown; a refusal is
+  shown with the service's own reason.
+- Accounts: `GET /api/uploadposts/users/{profile}` → `social_accounts` per
+  platform (`null`/`""` = not connected; otherwise `display_name`,
+  `handle`, `username`, `reauth_required`, `capabilities`), found even
+  inside wrappers such as `{"profile": {...}}`. An X capability naming
+  Premium or long video/text/post is taken as Premium; otherwise Premium is
+  unknown (never assumed false).
+- Facebook Pages: `GET /api/uploadposts/facebook/pages?profile=` → list of
+  `{page_id, page_name, profile}`, also inside `{"pages": [...]}` or
+  `{"data": [...]}`; entries of another profile are dropped.
 
 ## App bundle (Dock icon)
 

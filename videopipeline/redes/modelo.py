@@ -12,6 +12,8 @@ class Plataforma(str, Enum):
     TIKTOK = "tiktok"
     YOUTUBE = "youtube"
     INSTAGRAM = "instagram"
+    X = "x"
+    FACEBOOK = "facebook"
 
     @property
     def nombre(self) -> str:
@@ -21,6 +23,7 @@ class Plataforma(str, Enum):
 # Orden fijo de publicación.
 ORDEN: tuple[Plataforma, ...] = (
     Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM,
+    Plataforma.X, Plataforma.FACEBOOK,
 )
 
 # Marcas: no se traducen.
@@ -28,6 +31,8 @@ NOMBRES = {
     Plataforma.TIKTOK: "TikTok",
     Plataforma.YOUTUBE: "YouTube",
     Plataforma.INSTAGRAM: "Instagram",
+    Plataforma.X: "X",
+    Plataforma.FACEBOOK: "Facebook",
 }
 
 
@@ -41,6 +46,12 @@ class ModoInstagram(str, Enum):
     NORMAL = "normal"  # reel normal, también en el feed
 
 
+class ModoFacebook(str, Enum):
+    REEL = "reel"          # reel publicado
+    VIDEO = "video"        # vídeo normal publicado
+    BORRADOR = "borrador"  # reel sin publicar; se termina en Facebook
+
+
 # Categoría "People & Blogs" de YouTube.
 YOUTUBE_CATEGORIA_POR_DEFECTO = "22"
 
@@ -52,6 +63,11 @@ ETIQUETAS_TIKTOK = {
 ETIQUETAS_INSTAGRAM = {
     ModoInstagram.PRUEBA: N_("Reel de prueba (a seguidores si funciona)"),
     ModoInstagram.NORMAL: N_("Reel normal"),
+}
+ETIQUETAS_FACEBOOK = {
+    ModoFacebook.REEL: N_("Reel"),
+    ModoFacebook.VIDEO: N_("Vídeo normal"),
+    ModoFacebook.BORRADOR: N_("Borrador (lo terminas en Facebook)"),
 }
 # Categorías de YouTube (id de la API de YouTube → nombre).
 CATEGORIAS_YOUTUBE = {
@@ -75,6 +91,9 @@ class Publicacion:
     caption: str
     hashtags: tuple[str, ...] = ()
     palabras_clave: tuple[str, ...] = ()
+    # Texto propio del post de X, revisado por el usuario. Vacío: se usa el
+    # de por defecto (título + hashtags, ver `textos.texto_x_por_defecto`).
+    texto_x: str = ""
 
 
 @dataclass(frozen=True)
@@ -82,6 +101,10 @@ class Opciones:
     tiktok_modo: ModoTikTok = ModoTikTok.BORRADOR
     instagram_modo: ModoInstagram = ModoInstagram.PRUEBA
     youtube_categoria: str = YOUTUBE_CATEGORIA_POR_DEFECTO
+    # Lo declara el usuario en Redes…: con Premium, X admite vídeos largos y
+    # textos de más de 280 caracteres en un solo post.
+    x_premium: bool = False
+    facebook_modo: ModoFacebook = ModoFacebook.REEL
 
 
 @dataclass(frozen=True)
@@ -100,3 +123,35 @@ class Resultado:
     pendiente: bool = False
     referencia: str = ""
     extra: dict = field(default_factory=dict, compare=False)
+
+
+@dataclass(frozen=True)
+class Cuenta:
+    """Cuenta de una plataforma conectada en el proveedor.
+
+    `premium`: solo X. `True` si el proveedor lo indica claramente, `None`
+    si no lo sabe (nunca se deduce que no lo tenga)."""
+
+    plataforma: Plataforma
+    nombre: str = ""
+    usuario: str = ""  # sin «@»
+    reconectar: bool = False
+    capacidades: tuple[str, ...] = ()
+    premium: bool | None = None
+
+    @property
+    def visible(self) -> str:
+        """«@usuario», o el nombre si no hay usuario."""
+        return f"@{self.usuario}" if self.usuario else self.nombre
+
+
+@dataclass(frozen=True)
+class Pagina:
+    """Página de Facebook (Meta solo deja publicar en páginas)."""
+
+    id: str
+    nombre: str = ""
+
+    @property
+    def visible(self) -> str:
+        return f"{self.nombre} ({self.id})" if self.nombre else self.id

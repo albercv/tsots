@@ -36,6 +36,8 @@ def modo_de(plataforma: Plataforma, opciones: Opciones) -> str:
         return opciones.tiktok_modo.value
     if plataforma == Plataforma.INSTAGRAM:
         return opciones.instagram_modo.value
+    if plataforma == Plataforma.FACEBOOK:
+        return opciones.facebook_modo.value
     return "publico"
 
 
@@ -69,10 +71,11 @@ def publicar(
     intervalo: float | None = None,
     espera_maxima: float | None = None,
 ) -> dict[Plataforma, Resultado]:
-    """Publica en las plataformas elegidas, en el orden TikTok → YouTube →
-    Instagram. Un fallo en una no detiene las siguientes. Las que quedan
-    pendientes en el proveedor se consultan hasta `espera_maxima` segundos.
-    Cada éxito se anota en el registro en cuanto se conoce."""
+    """Publica en las plataformas elegidas, en el orden fijo de `ORDEN`
+    (TikTok → YouTube → Instagram → X → Facebook). Un fallo en una no
+    detiene las siguientes. Las que quedan pendientes en el proveedor se
+    consultan hasta `espera_maxima` segundos. Cada éxito se anota en el
+    registro en cuanto se conoce."""
     # Se leen al llamar (no al definir la función) para poder ajustarlas.
     intervalo = INTERVALO_SONDEO if intervalo is None else intervalo
     espera_maxima = ESPERA_MAXIMA if espera_maxima is None else espera_maxima

@@ -14,6 +14,24 @@ API (docs y openapi.json consultados el 2026-09-23):
   [{"platform", "success", "message"}]}`. No documenta la URL de la
   publicación en esa respuesta: se busca en varios campos y en el mensaje.
   Pendiente de confirmar con la prueba real.
+- X (`platform[]=x`): `x_title` es el texto del post. Si pasa de 280
+  caracteres, el servicio lo publica como hilo salvo con
+  `x_long_text_as_post=true` (solo cuentas Premium): la app garantiza ≤ 280
+  sin Premium. No se usan `reply_settings`, `nullcast`, `community_id`,
+  `x_alt_text`, `x_paid_partnership` ni `x_subtitles_url` (solo admite una
+  URL pública). Los resultados pueden venir como `x` o como `twitter`.
+- Facebook (`platform[]=facebook`): `facebook_page_id` (obligatorio; Meta
+  solo deja publicar en páginas), `facebook_title`, `facebook_description`,
+  `facebook_media_type` (REELS | VIDEO | STORIES) y `video_state`
+  (PUBLISHED | DRAFT). Supuesto: el borrador es un reel en DRAFT.
+- Cuentas conectadas: `GET /api/uploadposts/users/{perfil}` → perfil con
+  `social_accounts`: por plataforma, `null`/`""` si no está conectada o un
+  objeto con `display_name`, `handle`, `username`, `reauth_required` y
+  `capabilities`. Supuesto: una capacidad de X que nombra Premium o vídeo o
+  texto largo indica una cuenta Premium; si no hay ninguna, no se sabe.
+- Páginas de Facebook: `GET /api/uploadposts/facebook/pages?profile=` →
+  lista de `{page_id, page_name, profile}` (se aceptan envoltorios como
+  `{"pages": [...]}`).
 
 Cada petición, su código HTTP, su cuerpo (limpio y acotado) y cada sondeo
 se anotan con `logging` en el registro de la publicación (`diario`).
@@ -41,20 +59,25 @@ from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable, Iterator
+from urllib.parse import quote
 
 import httpx
 
 from ..i18n import N_, _
 from . import diario
 from .modelo import (
+    Cuenta,
+    ModoFacebook,
     ModoInstagram,
     ModoTikTok,
     Opciones,
+    Pagina,
     Plataforma,
     Publicacion,
     Resultado,
 )
-from .textos import etiquetas_youtube, texto_para, titulo_para
+from .proveedor import ErrorConsulta
+from .textos import MAX_TEXTO_X, etiquetas_youtube, longitud_x, texto_para, titulo_para
 
 NOMBRE = "Upload-Post"
 USA_PERFIL = True
@@ -66,6 +89,11 @@ AYUDA_PERFIL = N_(
 URL_API = "https://api.upload-post.com/api"
 URL_SUBIDA = f"{URL_API}/upload"
 URL_ESTADO = f"{URL_API}/uploadposts/status"
+URL_USUARIOS = f"{URL_API}/uploadposts/users"
+URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
+# Las consultas de cuentas y páginas se hacen al abrir los diálogos: si el
+# servicio no responde pronto, la app sigue con lo último que sabía.
+ESPERA_CONSULTA = httpx.Timeout(10.0, connect=5.0)
 
 # Solo la consulta de estado (GET) reintenta un 503. La subida, nunca.
 ESPERAS_503 = (2.0, 5.0)
@@ -89,7 +117,14 @@ _PLATAFORMAS = {
     Plataforma.TIKTOK: "tiktok",
     Plataforma.YOUTUBE: "youtube",
     Plataforma.INSTAGRAM: "instagram",
+    Plataforma.X: "x",
+    Plataforma.FACEBOOK: "facebook",
 }
+# Nombres con que el servicio puede devolver cada plataforma.
+_NOMBRES_RESPUESTA = {plataforma: (nombre,) for plataforma, nombre in _PLATAFORMAS.items()}
+_NOMBRES_RESPUESTA[Plataforma.X] = ("x", "twitter")
+# Capacidades de una cuenta de X que indican Premium (supuesto, ver arriba).
+_RE_PREMIUM = re.compile(r"premium|long[\s_-]?(?:video|form|post|text)", re.IGNORECASE)
 # Estados (de la petición o de una plataforma) que da el servicio.
 _ESTADOS_EN_CURSO = {"pending", "processing", "in_progress", "in progress", "queued",
                      "scheduled", "uploading", "started", "submitted", "running", "waiting"}
@@ -127,7 +162,7 @@ def tiempos(tamano: int) -> httpx.Timeout:
 
 
 def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
-           perfil: str) -> dict[str, str | list[str]]:
+           perfil: str, pagina_facebook: str = "") -> dict[str, str | list[str]]:
     """Campos del formulario multipart (sin el vídeo) para una plataforma."""
     datos: dict[str, str | list[str]] = {
         "user": perfil,
@@ -138,7 +173,7 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         # Obligatorio para YouTube; las demás usan su título propio.
         "title": titulo_para(Plataforma.YOUTUBE, publicacion),
     }
-    texto = texto_para(plataforma, publicacion)
+    texto = texto_para(plataforma, publicacion, x_premium=opciones.x_premium)
     if plataforma == Plataforma.TIKTOK:
         datos["tiktok_title"] = texto
         datos["is_aigc"] = "false"
@@ -165,6 +200,21 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
             datos["share_to_feed"] = "true"
         else:
             datos["share_mode"] = "TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED"
+    elif plataforma == Plataforma.X:
+        # Sin Premium, `texto_para` ya lo deja en 280: nunca sale un hilo.
+        datos["x_title"] = texto
+        largo = opciones.x_premium and longitud_x(texto) > MAX_TEXTO_X
+        datos["x_long_text_as_post"] = "true" if largo else "false"
+        datos["made_with_ai"] = "false"
+    elif plataforma == Plataforma.FACEBOOK:
+        datos["facebook_page_id"] = pagina_facebook
+        datos["facebook_title"] = titulo_para(Plataforma.FACEBOOK, publicacion)
+        datos["facebook_description"] = texto
+        datos["facebook_media_type"] = (
+            "VIDEO" if opciones.facebook_modo == ModoFacebook.VIDEO else "REELS")
+        datos["video_state"] = (
+            "DRAFT" if opciones.facebook_modo == ModoFacebook.BORRADOR else "PUBLISHED")
+        datos["facebook_is_ai_generated"] = "false"
     return datos
 
 
@@ -172,9 +222,10 @@ class ProveedorUploadPost:
     nombre = NOMBRE
 
     def __init__(self, clave: str, perfil: str, http: httpx.Client | None = None,
-                 espera: Callable[[float], None] = time.sleep):
+                 espera: Callable[[float], None] = time.sleep, pagina_facebook: str = ""):
         self._clave = clave
         self._perfil = perfil.strip()
+        self._pagina_facebook = (pagina_facebook or "").strip()
         self._http = http
         self._espera = espera
 
@@ -190,10 +241,13 @@ class ProveedorUploadPost:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
         if not self._perfil:
             return self._error(plataforma, _("Falta el perfil. Escríbelo en Redes…"))
+        if plataforma == Plataforma.FACEBOOK and not self._pagina_facebook:
+            return self._error(plataforma, _(
+                "Falta la página de Facebook. Elígela en Redes…"))
         if not video.is_file():
             return self._error(plataforma, _("No se encuentra el vídeo: {nombre}").format(
                 nombre=video.name))
-        datos = campos(plataforma, publicacion, opciones, self._perfil)
+        datos = campos(plataforma, publicacion, opciones, self._perfil, self._pagina_facebook)
         try:
             estado_video = video.stat()
             tamano = estado_video.st_size
@@ -263,6 +317,124 @@ class ProveedorUploadPost:
         resultado = self._interpretar_estado(plataforma, referencia, respuesta)
         self._registrar_resultado(resultado)
         return resultado
+
+    def cuentas(self) -> dict[Plataforma, Cuenta | None]:
+        cuerpo = self._consultar("cuentas", URL_USUARIOS + "/{perfil}",
+                                 f"{URL_USUARIOS}/{quote(self._perfil, safe='')}")
+        sociales = self._buscar(cuerpo, "social_accounts")
+        if not isinstance(sociales, dict):
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae las cuentas conectadas."))
+        por_nombre = {str(nombre).strip().lower(): valor for nombre, valor in sociales.items()}
+        cuentas: dict[Plataforma, Cuenta | None] = {}
+        for plataforma in Plataforma:
+            valor = next((por_nombre[n] for n in _NOMBRES_RESPUESTA[plataforma]
+                          if n in por_nombre), None)
+            cuentas[plataforma] = self._cuenta(plataforma, valor)
+        log.info("Cuentas: %s", ", ".join(
+            f"{p.nombre} " + ("no conectada" if c is None else (c.visible or "conectada")
+                             + (" (reconectar)" if c.reconectar else "")
+                             + (" (Premium)" if c.premium else ""))
+            for p, c in cuentas.items()))
+        return cuentas
+
+    def paginas_facebook(self) -> list[Pagina]:
+        cuerpo = self._consultar("páginas de Facebook", URL_PAGINAS_FACEBOOK + "?profile={perfil}",
+                                 URL_PAGINAS_FACEBOOK, {"profile": self._perfil})
+        lista = cuerpo if isinstance(cuerpo, list) else None
+        for campo in ("pages", "data", "facebook_pages", "results"):
+            if lista is not None:
+                break
+            encontrada = self._buscar(cuerpo, campo)
+            lista = encontrada if isinstance(encontrada, list) else None
+        if lista is None:
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae las páginas de Facebook."))
+        paginas: list[Pagina] = []
+        for elemento in lista:
+            if not isinstance(elemento, dict):
+                continue
+            ident = str(elemento.get("page_id") or elemento.get("id") or "").strip()
+            perfil = elemento.get("profile")
+            if not ident or (isinstance(perfil, str) and perfil.strip()
+                             and perfil.strip().lower() != self._perfil.lower()):
+                continue
+            nombre = str(elemento.get("page_name") or elemento.get("name") or "").strip()
+            paginas.append(Pagina(ident, nombre))
+        log.info("Páginas de Facebook: %s",
+                 ", ".join(p.visible for p in paginas) or "(ninguna)")
+        return paginas
+
+    def _consultar(self, que: str, plantilla: str, url: str,
+                   parametros: dict | None = None) -> Any:
+        """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
+        motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
+        if not self._clave:
+            raise ErrorConsulta(_("Falta la API key. Guárdala en Redes…"))
+        if not self._perfil:
+            raise ErrorConsulta(_("Falta el perfil. Escríbelo en Redes…"))
+        log.info("Consulta de %s: GET %s", que, plantilla)
+        inicio = time.monotonic()
+        try:
+            with self._cliente() as http:
+                respuesta = http.get(url, headers=self._cabeceras(), params=parametros,
+                                     timeout=ESPERA_CONSULTA)
+        except httpx.HTTPError as e:
+            log.warning("Consulta de %s fallida tras %.1f s: %s", que,
+                        time.monotonic() - inicio, self._traza(e))
+            raise ErrorConsulta(_("No se pudo conectar con el servicio ({tipo}).").format(
+                tipo=type(e).__name__)) from None
+        log.info("Consulta de %s → HTTP %d en %.1f s · cuerpo: %s", que, respuesta.status_code,
+                 time.monotonic() - inicio,
+                 diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)")
+        if respuesta.status_code >= 400:
+            raise ErrorConsulta(self._mensaje_http(respuesta))
+        cuerpo = self._json(respuesta)
+        if not isinstance(cuerpo, (dict, list)):
+            raise ErrorConsulta(self._limpiar(_(
+                "Respuesta inesperada del servicio (HTTP {codigo}).").format(
+                codigo=respuesta.status_code)))
+        return cuerpo
+
+    @classmethod
+    def _buscar(cls, datos: Any, campo: str, profundidad: int = 0) -> Any:
+        """Valor de `campo` en `datos` o en un diccionario anidado (envoltorios
+        como `{"profile": {...}}` o `{"data": {...}}`)."""
+        if not isinstance(datos, dict) or profundidad > 3:
+            return None
+        if campo in datos:
+            return datos[campo]
+        for valor in datos.values():
+            encontrado = cls._buscar(valor, campo, profundidad + 1)
+            if encontrado is not None:
+                return encontrado
+        return None
+
+    @staticmethod
+    def _cuenta(plataforma: Plataforma, valor: Any) -> Cuenta | None:
+        if isinstance(valor, str):
+            usuario = valor.strip().lstrip("@")
+            return Cuenta(plataforma, usuario=usuario) if usuario else None
+        if not isinstance(valor, dict) or not valor:
+            return None
+        nombre = str(valor.get("display_name") or valor.get("name") or "").strip()
+        usuario = str(valor.get("handle") or valor.get("username") or "").strip().lstrip("@")
+        bruto = valor.get("capabilities")
+        if isinstance(bruto, dict):
+            capacidades = [str(k) for k, v in bruto.items() if v]
+        elif isinstance(bruto, list):
+            capacidades = [str(c if not isinstance(c, dict) else
+                               c.get("name") or c.get("id") or c.get("capability") or "")
+                           for c in bruto]
+        else:
+            capacidades = []
+        capacidades = [c.strip() for c in capacidades if c and c.strip()]
+        premium = None
+        if plataforma == Plataforma.X and any(_RE_PREMIUM.search(c) for c in capacidades):
+            premium = True
+        return Cuenta(plataforma, nombre=nombre, usuario=usuario,
+                      reconectar=_verdadero(valor.get("reauth_required")),
+                      capacidades=tuple(capacidades), premium=premium)
 
     def _interpretar_estado(self, plataforma: Plataforma, referencia: str,
                             respuesta: httpx.Response) -> Resultado:
@@ -365,14 +537,15 @@ class ProveedorUploadPost:
     def _resultado_de(resultados: Any, plataforma: Plataforma) -> dict | None:
         """Resultado de una plataforma, sea `{plataforma: {...}}` o
         `[{"platform": ..., ...}]`."""
-        clave = _PLATAFORMAS[plataforma]
+        nombres = _NOMBRES_RESPUESTA[plataforma]
         if isinstance(resultados, dict):
             for nombre, valor in resultados.items():
-                if str(nombre).lower() == clave and isinstance(valor, dict):
+                if str(nombre).lower() in nombres and isinstance(valor, dict):
                     return valor
         elif isinstance(resultados, list):
             for valor in resultados:
-                if isinstance(valor, dict) and str(valor.get("platform", "")).lower() == clave:
+                if (isinstance(valor, dict)
+                        and str(valor.get("platform", "")).lower() in nombres):
                     return valor
         return None
 
@@ -486,12 +659,14 @@ class ProveedorUploadPost:
         except ValueError:
             return None
 
-    def _mensaje_http(self, respuesta: httpx.Response, plataforma: Plataforma) -> str:
+    def _mensaje_http(self, respuesta: httpx.Response,
+                      plataforma: Plataforma | None = None) -> str:
         codigo = respuesta.status_code
         cuerpo = self._json(respuesta)
         if isinstance(cuerpo, dict):
             # El motivo propio de la plataforma (p. ej. «fuera del plan») antes que el general.
-            propio = self._resultado_de(cuerpo.get("results"), plataforma)
+            propio = (self._resultado_de(cuerpo.get("results"), plataforma)
+                      if plataforma is not None else None)
             detalle = (self._texto(propio) if propio else "") or self._texto(cuerpo)
         elif cuerpo is None:
             detalle = self._texto_plano(respuesta.text)
@@ -528,6 +703,10 @@ class ProveedorUploadPost:
         return Resultado(plataforma, ok=False, error=self._limpiar(texto))
 
 
+def _verdadero(valor: Any) -> bool:
+    return valor is True or str(valor).strip().lower() in ("true", "1", "yes")
+
+
 def identificador_externo(plataforma: Plataforma, video: Path, tamano: int,
                           modificado: float) -> str:
     """`external_id` de un intento: huella del vídeo + plataforma + momento.
@@ -538,4 +717,5 @@ def identificador_externo(plataforma: Plataforma, video: Path, tamano: int,
 
 
 def crear(clave: str, ajustes: dict, http: httpx.Client | None = None) -> ProveedorUploadPost:
-    return ProveedorUploadPost(clave, str(ajustes.get("perfil", "") or ""), http=http)
+    return ProveedorUploadPost(clave, str(ajustes.get("perfil", "") or ""), http=http,
+                               pagina_facebook=str(ajustes.get("pagina_facebook", "") or ""))

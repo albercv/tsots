@@ -1,4 +1,4 @@
-"""Publicación en redes sociales (TikTok, YouTube, Instagram).
+"""Publicación en redes sociales (TikTok, YouTube, Instagram, X y Facebook).
 
 El paquete es independiente del proveedor: la app solo usa los tipos neutros
 de `modelo`, los límites de `textos`, el protocolo `proveedor.Proveedor`, el
