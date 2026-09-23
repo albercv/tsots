@@ -65,8 +65,8 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
   your videos are). Accept; otherwise it cannot read them. If you
   declined: System Settings → Privacy & Security → Files and Folders →
   The Silence of the Shorts.
-- The first time you enable subtitles it downloads the Whisper model
-  (~460 MB). Only that once.
+- The first time you enable subtitles or the caption it downloads the
+  Whisper model (~1.6 GB with turbo, the recommended one). Only once.
 
 ## How it works
 
@@ -132,8 +132,8 @@ TSOTS_LANG=en ./TheSilenceOfTheShorts.command                # force a language
 
 [ClearVoice](https://github.com/modelscope/ClearerVoice-Studio) (voice
 cleaning, Apache-2.0), [auto-editor](https://auto-editor.com) (silences),
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-(transcription), ffmpeg (video), [Ollama](https://ollama.com) (local
+[mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
+(transcription on the Apple GPU; faster-whisper on macOS 13), ffmpeg (video), [Ollama](https://ollama.com) (local
 language model), PySide6 (interface). Technical docs in
 `docs/DEVELOPMENT.md`; translations live in `locale/` (add a language by
 adding a `.po` file — see the development docs).

@@ -2,7 +2,7 @@
 
 Desktop app (PySide6) that cleans a video's audio with ClearVoice
 (MossFormer2_SE_48K), cuts silences with auto-editor, optionally
-transcribes/burns subtitles with faster-whisper and writes an SEO caption
+transcribes/burns subtitles with Whisper and writes an SEO caption
 with a local LLM through Ollama. User docs: `README.md` / `README.es.md`.
 
 ## Running
@@ -54,9 +54,14 @@ rm -rf .venv-clearvoice
 - `checkpoints/MossFormer2_SE_48K/` (221 MB) is NOT in git; the installer
   downloads it from HuggingFace. If missing, ClearVoice downloads it on
   first use.
-- Whisper (`Systran/faster-whisper-small`, ~460 MB) lives in the global
-  cache `~/.cache/huggingface/hub/`, downloaded the first time subtitles
-  are enabled.
+- Whisper runs on two engines with the same model names (`small`, `medium`,
+  `turbo`; default `turbo` = large-v3-turbo). `mlx-whisper` uses the Apple
+  GPU and needs macOS 14+ (`mlx-community/whisper-*` repos, ~10x faster
+  than CPU). On macOS 13 mlx is not installed (marker in
+  `requirements.txt`) and `faster-whisper` on CPU is used instead. The
+  choice is automatic (`subtitles.usa_mlx()`). Models live in the global
+  cache `~/.cache/huggingface/hub/` and are downloaded on first use
+  (turbo ~1.6 GB).
 - Ollama models are managed by Ollama (`ollama list`). The GUI lists them
   from `GET /api/tags` and disables the ones that exceed the GPU memory
   budget (75 % of RAM minus 1.5 GB of context, see `videopipeline/ollama.py`).
@@ -102,7 +107,7 @@ tests/               pytest + pytest-qt
 The GUI never runs the pipeline in-process: `app/worker.py` launches
 `python -m videopipeline.runner --config <json>` and parses JSON progress
 lines (`step/total/label/percent`, `warning`, `error` + `diagnostico`,
-`done`). Heavy imports (torch, faster-whisper) therefore only happen in
+`done`). Heavy imports (torch, mlx, faster-whisper) therefore only happen in
 the subprocess.
 
 ## App bundle (Dock icon)

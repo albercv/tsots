@@ -79,8 +79,11 @@ fi
 # ------------------------------------------------------------- entorno Python
 paso "$(t "Entorno Python" "Python environment") (.venv-clearvoice)"
 PY=/opt/homebrew/opt/python@3.11/bin/python3.11
-if [ -x .venv-clearvoice/bin/python ] && .venv-clearvoice/bin/python -c "import PySide6, torch, clearvoice, faster_whisper" 2>/dev/null; then
-    ok "$(t "ya creado y completo" "already created and complete")"
+if [ -x .venv-clearvoice/bin/python ] && .venv-clearvoice/bin/python -c "import PySide6, torch, clearvoice" 2>/dev/null; then
+    # Entorno existente: solo añade lo que falte (p. ej. mlx-whisper en
+    # versiones nuevas). Si ya está todo, tarda unos segundos.
+    .venv-clearvoice/bin/python -m pip install --quiet -r requirements.txt
+    ok "$(t "ya creado; dependencias al día" "already created; dependencies up to date")"
 else
     rm -rf .venv-clearvoice
     "$PY" -m venv .venv-clearvoice
@@ -133,5 +136,5 @@ EOF
 echo
 printf '\033[1;32m%s\033[0m %s\n' "$(t "Instalación completa." "Installation complete.")" "$(t "Abre \"The Silence of the Shorts\" desde el Dock o con doble clic en TheSilenceOfTheShorts.app. Guía de uso: README.es.md" "Open \"The Silence of the Shorts\" from the Dock or by double-clicking TheSilenceOfTheShorts.app. User guide: README.md")"
 echo
-echo "$(t "La primera vez que actives subtítulos se descargará Whisper (~460 MB)." "The first time you enable subtitles, Whisper (~460 MB) will be downloaded.")"
+echo "$(t "La primera vez que actives subtítulos o el caption se descargará Whisper (~1,6 GB)." "The first time you enable subtitles or the caption, Whisper (~1.6 GB) will be downloaded.")"
 echo "$(t "macOS pedirá permiso para acceder a Documentos/Escritorio la primera vez: acepta." "macOS will ask for permission to access Documents/Desktop the first time: accept.")"

@@ -194,7 +194,7 @@ def test_subs_on_modo_completo(entorno_subs, tmp_path):
     )
     assert resultado == salida
     assert salida.read_bytes() == b"MP4SUBS"
-    assert "transcribir:es:small" in llamadas
+    assert "transcribir:es:turbo" in llamadas
     assert "agrupar:caja" in llamadas
     assert "ass:80:(1080, 1920):120" in llamadas
     assert llamadas[-1] == "quemar"
@@ -356,7 +356,7 @@ def test_caption_con_subtitulos_reutiliza_transcripcion(entorno_caption, tmp_pat
                        caption_seo=True, contexto_marca="marca X"),
         eventos.append,
     )
-    assert llamadas.count("transcribir:es:small") == 1
+    assert llamadas.count("transcribir:es:turbo") == 1
     assert "generar:qwen3.5:9b:marca X:hola" in llamadas
     assert llamadas.index("ollama:asegurar") < llamadas.index("ollama:cerrar")
     md = (tmp_path / "f.md").read_text(encoding="utf-8")
@@ -374,7 +374,7 @@ def test_caption_sin_subtitulos_transcribe(entorno_caption, tmp_path):
         PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True),
         eventos.append,
     )
-    assert llamadas.count("transcribir:es:small") == 1
+    assert llamadas.count("transcribir:es:turbo") == 1
     assert "srt" not in llamadas and "quemar" not in llamadas
     etiquetas = [e["label"] for e in eventos if "label" in e]
     assert etiquetas[-2:] == ["Transcribiendo", "Generando caption SEO"]
@@ -491,7 +491,7 @@ def test_caption_reutiliza_transcripcion_aunque_falle_el_quemado(entorno_caption
                        caption_seo=True),
         eventos.append,
     )
-    assert llamadas.count("transcribir:es:small") == 1
+    assert llamadas.count("transcribir:es:turbo") == 1
     assert (tmp_path / "f.md").is_file()
     assert (tmp_path / "f.srt").is_file()
 

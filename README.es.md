@@ -65,8 +65,8 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
   carpeta donde tengas los vídeos). Acepta; si no, no podrá leerlos. Si
   lo negaste: Ajustes del Sistema → Privacidad y seguridad → Archivos y
   carpetas → The Silence of the Shorts.
-- La primera vez que actives subtítulos descarga el modelo Whisper
-  (~460 MB). Solo esa vez.
+- La primera vez que actives subtítulos o el caption descarga el modelo
+  Whisper (~1,6 GB con turbo, el recomendado). Solo esa vez.
 
 ## Cómo funciona
 
@@ -131,7 +131,8 @@ detiene nada; cerrar la tapa sin monitor externo sí.
 
 [ClearVoice](https://github.com/modelscope/ClearerVoice-Studio) (limpieza de
 voz, Apache-2.0), [auto-editor](https://auto-editor.com) (silencios),
-[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (transcripción),
+[mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
+(transcripción con la GPU del Mac; faster-whisper en macOS 13),
 ffmpeg (vídeo), [Ollama](https://ollama.com) (modelo de lenguaje local),
 PySide6 (interfaz). Documentación técnica en `docs/DEVELOPMENT.md` (en inglés).
 

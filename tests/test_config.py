@@ -91,7 +91,7 @@ def test_defectos_subtitulos():
     assert c.diseno == "reels_bold"
     assert c.posicion_subs == 75
     assert c.idioma_subs == "es"
-    assert c.modelo_whisper == "small"
+    assert c.modelo_whisper == "turbo"
 
 
 def test_json_incluye_subtitulos():
@@ -128,7 +128,7 @@ def test_tablas_subtitulos():
                        "amarillo", "karaoke_verde", "minimal", "caja_blanca")
     assert set(DISENOS) == set(PRESETS)
     assert IDIOMAS_SUBS == ("es", "auto", "en")
-    assert MODELOS_WHISPER == ("small", "medium")
+    assert MODELOS_WHISPER == ("small", "medium", "turbo")
 
 
 def test_defecto_tamano_subs():

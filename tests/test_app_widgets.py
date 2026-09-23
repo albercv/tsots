@@ -95,7 +95,7 @@ def test_panel_subtitulos_defecto_off_y_deshabilitado(qtbot):
     assert valores["diseno"] == "reels_bold"
     assert valores["posicion_subs"] == 75
     assert valores["idioma_subs"] == "es"
-    assert valores["modelo_whisper"] == "small"
+    assert valores["modelo_whisper"] == "turbo"
     assert not panel.combo_diseno.isEnabled()
     assert not panel.spin_posicion.isEnabled()
 
@@ -147,13 +147,16 @@ def test_panel_subtitulos_cargar_tolera_claves_ausentes(qtbot):
 def test_panel_aviso_whisper(qtbot, tmp_path, monkeypatch):
     from app.widgets import panel_opciones
 
+    from videopipeline import subtitles
+
     monkeypatch.setattr(panel_opciones, "WHISPER_CACHE_DIR", tmp_path)
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     panel.check_subtitulos.setChecked(True)
     panel._refrescar_aviso_whisper()
-    assert panel.aviso_whisper.text() != ""
-    (tmp_path / "models--Systran--faster-whisper-small").mkdir()
+    assert "1,6 GB" in panel.aviso_whisper.text()  # turbo por defecto
+    (tmp_path / "models--mlx-community--whisper-large-v3-turbo").mkdir()
     panel._refrescar_aviso_whisper()
     assert panel.aviso_whisper.text() == ""
 
@@ -413,3 +416,12 @@ def test_etiquetas_de_estilo_traducidas_al_ingles():
         encoding="utf-8")
     traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
     assert [e for e in ETIQUETA_DISENO if e not in traducidas] == []
+
+
+def test_combo_whisper_ofrece_turbo_primero(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    datos = [panel.combo_modelo_whisper.itemData(i)
+             for i in range(panel.combo_modelo_whisper.count())]
+    assert datos[0] == "turbo"
+    assert set(datos) == {"turbo", "small", "medium"}
