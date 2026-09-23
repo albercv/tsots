@@ -34,6 +34,11 @@ Pending work, most urgent first. Remove an item when it is merged into
       that means an in-app light/dark selector, a darker visual style, or a
       dark app icon and logo.
 
+- [ ] **Verify X and Facebook publishing with a real upload.** Needs the
+      user: Task 6 of `docs/superpowers/plans/2026-09-23-publicar-x.md`
+      (free plan, single post instead of a thread, Premium detection,
+      Facebook draft, real shape of the accounts and Pages responses).
+
 ## Improvements
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
