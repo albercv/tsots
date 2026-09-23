@@ -7,6 +7,9 @@
 - **No documentation-only PRs.** Docs, TODO updates and plans travel in
   the branch of the feature they belong to and reach `develop` when that
   branch is merged.
+- Every PR has a description: what changes, why, how it was verified, and
+  anything the reviewer must decide or know (risks, follow-ups). Never open
+  a PR with an empty body or GitHub's default title.
 - Commits and PR descriptions carry no AI attribution (no `Co-Authored-By`
   trailer, no "Generated with" line). Commit messages in English.
 - Run the tests before committing and commit only if they pass:

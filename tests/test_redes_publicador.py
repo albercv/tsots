@@ -95,7 +95,8 @@ def test_pendiente_que_no_termina_se_rinde_con_aviso(pub):
     r = resultados[I]
     assert not r.ok and r.pendiente and "Instagram" in r.error
     assert eventos[-1] == (I, Estado.ERROR)
-    assert I not in registro.ya_publicado(pub.video)
+    # Puede acabar publicándose: se anota sin confirmar para avisar antes de repetir.
+    assert registro.ultimas(pub.video)[I].sin_confirmar
 
 
 def test_excepcion_en_estado_se_reintenta(pub):
@@ -144,3 +145,42 @@ def test_cancelado_detiene_las_siguientes(pub):
 
     resultados, _ = _publicar(proveedor, pub, [T, Y, I], cancelado=cancelado)
     assert list(resultados) == [T]
+
+
+def test_registro_de_diagnostico_con_traceback_y_sondeos(pub, tmp_path, monkeypatch):
+    from videopipeline.redes import diario
+
+    clave = "clave-que-no-debe-salir-1234"
+    proveedor = ProveedorFalso(
+        respuestas={T: RuntimeError(f"explota con {clave}"),
+                    Y: Resultado(Y, ok=False, pendiente=True, referencia="ref-9")},
+        estados={Y: [Resultado(Y, ok=True, url="https://yt/9")]},
+    )
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
+    d = diario.Diario(pub.video)
+    d.ocultar(clave)
+    try:
+        resultados, _ = _publicar(proveedor, pub, [T, Y], registrar=False)
+    finally:
+        d.cerrar()
+    assert "registro" in resultados[T].error  # remite al log
+    texto = d.ruta.read_text(encoding="utf-8")
+    assert "Traceback" in texto and "RuntimeError" in texto
+    assert clave not in texto
+    assert "ref-9" in texto  # referencia del pendiente y su sondeo
+    assert "https://yt/9" in texto
+    assert "TikTok" in texto and "YouTube" in texto
+
+
+def test_pendiente_sin_referencia_no_se_sondea_y_se_anota_sin_confirmar(pub):
+    proveedor = ProveedorFalso(respuestas={
+        I: Resultado(I, ok=False, pendiente=True, error="Revisa Instagram")})
+    esperas: list[float] = []
+    resultados, eventos = _publicar(proveedor, pub, [Y, I], espera=esperas.append)
+    assert resultados[I].pendiente and not resultados[I].ok
+    assert esperas == []  # nada que consultar
+    assert all(c[0] == "publicar" for c in proveedor.llamadas)
+    assert eventos[-1] == (I, Estado.ERROR)
+    ultimas = registro.ultimas(pub.video)
+    assert ultimas[I].sin_confirmar and not ultimas[Y].sin_confirmar
+    assert registro.ya_publicado(pub.video) == {Y, I}

@@ -76,10 +76,14 @@ def video_con_voz(tmp_path_factory) -> Path:
 
 @pytest.fixture(autouse=True)
 def logs_en_tmp(tmp_path, monkeypatch):
-    """El runner escribe un log por trabajo; en tests nunca en el proyecto."""
+    """El runner escribe un log por trabajo y la publicación otro por intento;
+    en tests nunca en el proyecto."""
     from videopipeline import runner
 
     monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    from videopipeline.redes import diario
+
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
 
 
 @pytest.fixture(autouse=True)
@@ -183,3 +187,14 @@ def sin_dialogos_modales(monkeypatch):
         monkeypatch.setattr(
             QInputDialog, estatico, prohibido(f"QInputDialog.{estatico}")
         )
+
+
+@pytest.fixture(autouse=True)
+def sin_finder(monkeypatch):
+    """Red de seguridad: «Ver registro» abriría el Finder en la pantalla del
+    usuario. Aquí solo se anota la ruta pedida."""
+    from app.widgets import dialogo_publicar
+
+    reveladas: list[Path] = []
+    monkeypatch.setattr(dialogo_publicar, "revelar_en_finder", reveladas.append)
+    return reveladas

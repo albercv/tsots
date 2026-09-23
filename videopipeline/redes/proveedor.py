@@ -4,6 +4,7 @@ Un proveedor es un módulo de este paquete que expone:
 
 - `NOMBRE: str`: nombre visible (p. ej. en el diálogo Redes…).
 - `USA_PERFIL: bool`: si necesita un perfil o cuenta dentro del servicio.
+- `AYUDA_PERFIL: str` (opcional, marcado con `N_`): qué escribir como perfil.
 - `crear(clave, ajustes, http=None) -> Proveedor`: `clave` es la API key
   (sale del Llavero), `ajustes` los datos no secretos (hoy, `perfil`) y
   `http` un `httpx.Client` opcional que los tests sustituyen por uno falso.
@@ -13,9 +14,11 @@ Añadir un proveedor = un módulo nuevo + una línea en `PROVEEDORES`.
 from __future__ import annotations
 
 import importlib
+import re
 from types import ModuleType
 from typing import Any, Mapping, Protocol, runtime_checkable
 
+from ..i18n import _
 from .modelo import Opciones, Plataforma, Publicacion, Resultado
 
 
@@ -55,6 +58,20 @@ def nombre_visible(nombre: str) -> str:
 
 def usa_perfil(nombre: str) -> bool:
     return bool(getattr(modulo(nombre), "USA_PERFIL", False))
+
+
+def ayuda_perfil(nombre: str) -> str:
+    """Explicación (traducida) de qué es el perfil en ese servicio, o ""."""
+    texto = getattr(modulo(nombre), "AYUDA_PERFIL", "")
+    return _(texto) if texto else ""
+
+
+_RE_EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[^@\s]+")
+
+
+def parece_email(texto: str) -> bool:
+    """Un perfil nunca es un email: se usa para avisar al escribirlo."""
+    return bool(_RE_EMAIL.fullmatch((texto or "").strip()))
 
 
 def crear(nombre: str, clave: str, ajustes: Mapping[str, str] | None = None,

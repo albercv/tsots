@@ -38,6 +38,7 @@ from .settings import Ajustes
 from .widgets.cabecera import Cabecera
 from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
+from .widgets import dialogo_publicar
 from .widgets.dialogo_publicar import DialogoPublicar
 from .widgets.dialogo_redes import DialogoRedes
 from .widgets.panel_caption import PanelCaption
@@ -435,6 +436,9 @@ class VentanaPrincipal(QMainWindow):
     def _publicar(self) -> None:
         caption, video = self.panel_caption.caption, self.panel_caption.video
         if caption is None or video is None:
+            QMessageBox.warning(
+                self, _("Publicar en redes"),
+                _("Elige en la cola un vídeo terminado que tenga caption."))
             return
         if not video.is_file():
             QMessageBox.warning(
@@ -445,6 +449,10 @@ class VentanaPrincipal(QMainWindow):
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+        # El hilo de la subida no depende del diálogo (ver dialogo_publicar);
+        # aun así, solo se libera cuando no publica.
+        if not dialogo.publicando:
+            dialogo.deleteLater()
 
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
@@ -604,6 +612,12 @@ class VentanaPrincipal(QMainWindow):
     # --- ciclo de vida ---
 
     def closeEvent(self, evento) -> None:
+        if dialogo_publicar.hilos_vivos():
+            QMessageBox.information(
+                self, _("Publicar en redes"),
+                _("Se está publicando en redes. Espera a que termine para salir."))
+            evento.ignore()
+            return
         if self._procesando and not self._reiniciando:
             respuesta = QMessageBox.question(
                 self,
@@ -635,6 +649,8 @@ def main() -> int:
             ),
         )
         return 1
+    # Nunca destruir un hilo de publicación en marcha al salir (Qt abortaría).
+    app.aboutToQuit.connect(dialogo_publicar.esperar_hilos)
     ventana = VentanaPrincipal(ajustes)
     ventana.resize(*TAMANO_INICIAL)
     ventana._ajustar_a_pantalla()

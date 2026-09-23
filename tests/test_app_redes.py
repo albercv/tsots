@@ -9,11 +9,12 @@ from PySide6.QtWidgets import QLineEdit, QMessageBox
 
 from app import credenciales
 from app.settings import Ajustes
+from app.widgets import dialogo_publicar
 from app.widgets.dialogo_publicar import DialogoPublicar
 from app.widgets.dialogo_redes import DialogoRedes
 from tests.redes_falsos import ProveedorFalso
 from videopipeline.caption import Caption
-from videopipeline.redes import registro
+from videopipeline.redes import publicador, registro
 from videopipeline.redes.modelo import (
     ORDEN,
     ModoInstagram,
@@ -25,6 +26,13 @@ from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO
 
 T, Y, I = Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM
 CLAVE = "clave-de-prueba-42"
+
+
+@pytest.fixture(autouse=True)
+def sin_hilos_colgando(qtbot):
+    """Ningún test acaba con una publicación en marcha."""
+    yield
+    qtbot.waitUntil(lambda: dialogo_publicar.hilos_vivos() == 0, timeout=10000)
 
 
 @pytest.fixture
@@ -173,6 +181,20 @@ def test_dialogo_redes_clave_invalida_avisa_y_no_cierra(qtbot, ajustes, llavero_
     assert credenciales.leer(PROVEEDOR_POR_DEFECTO) is None
 
 
+def test_dialogo_redes_explica_el_perfil_y_avisa_si_es_un_email(qtbot, ajustes,
+                                                               llavero_falso):
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    assert "Manage Users" in dialogo.ayuda_perfil.text()
+    assert "email" in dialogo.ayuda_perfil.text()
+    assert dialogo.aviso_perfil.isHidden()
+    dialogo.campo_perfil.setText("yo@example.com")
+    assert not dialogo.aviso_perfil.isHidden()
+    assert "email" in dialogo.aviso_perfil.text()
+    dialogo.campo_perfil.setText("mi_perfil")
+    assert dialogo.aviso_perfil.isHidden()
+
+
 # --- diálogo Publicar ---
 
 
@@ -303,7 +325,8 @@ def test_publicar_muestra_resultados_y_enlaces(qtbot, video, ajustes, llavero_fa
     assert [c[1] for c in proveedor.llamadas] == [T, Y, I]
     assert "borradores" in dialogo.estados[T].text()
     assert "✗" in dialogo.estados[Y].text()
-    assert "&lt;agotada&gt;" in dialogo.estados[Y].text()  # texto del servicio escapado
+    assert dialogo.estados[Y].toolTip() == "cuota <agotada>"
+    assert "&lt;agotada&gt;" in dialogo.resumen.text()  # texto del servicio escapado
     assert 'href="https://instagram.com/reel/1"' in dialogo.estados[I].text()
     assert dialogo.estados[I].openExternalLinks()
     # Lo publicado se desmarca; lo fallido queda marcado para reintentar.
@@ -340,3 +363,345 @@ def test_no_se_cierra_mientras_publica(qtbot, video, ajustes, llavero_falso):
     dialogo._hilo = None
     dialogo.reject()
     assert not dialogo.isVisible()
+
+
+# --- ningún final silencioso: estado, resumen y registro ---
+
+
+def _log(dialogo) -> str:
+    assert dialogo.ruta_log is not None and dialogo.ruta_log.is_file()
+    return dialogo.ruta_log.read_text(encoding="utf-8")
+
+
+class ProveedorLento(ProveedorFalso):
+    """Espera a que el test lo suelte antes de responder a cada plataforma."""
+
+    def __init__(self, *a, **kw):
+        import threading
+
+        super().__init__(*a, **kw)
+        self.soltar = threading.Event()
+
+    def publicar(self, plataforma, publicacion, opciones):
+        self.soltar.wait(5)
+        return super().publicar(plataforma, publicacion, opciones)
+
+
+def test_estado_visible_desde_el_primer_clic(qtbot, video, ajustes, llavero_falso,
+                                             monkeypatch):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorLento(respuestas={
+        Y: Resultado(Y, ok=False, pendiente=True, referencia="r")},
+        estados={Y: [Resultado(Y, ok=True, url="https://yt/1")]})
+    monkeypatch.setattr("videopipeline.redes.publicador.INTERVALO_SONDEO", 0.01)
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    dialogo.show()
+    dialogo.casillas[I].setChecked(False)
+    _confirmar(monkeypatch)
+    dialogo.boton_publicar.click()
+    # Nada más aceptar: cola, barra en marcha y línea de estado.
+    assert dialogo.estados[T].text() == "En cola"
+    assert dialogo.estados[Y].text() == "En cola"
+    assert dialogo.estados[I].text() == ""
+    assert dialogo.barra.isVisible() and dialogo.barra.height() >= 8
+    assert dialogo.barra.minimum() == dialogo.barra.maximum() == 0  # indeterminada
+    assert dialogo.etiqueta_estado.isVisible() and dialogo.etiqueta_estado.text()
+    qtbot.waitUntil(lambda: dialogo.estados[T].text() == "Subiendo…", timeout=3000)
+    assert "TikTok" in dialogo.etiqueta_estado.text()
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        proveedor.soltar.set()
+        qtbot.waitUntil(lambda: dialogo.estados[Y].text() == "Procesando en el servicio…"
+                        or not dialogo.publicando, timeout=3000)
+    assert not dialogo.barra.isVisible()
+
+
+def test_resumen_final_con_enlaces_y_ver_registro(qtbot, video, ajustes, llavero_falso,
+                                                   monkeypatch, sin_finder):
+    _listo(ajustes, llavero_falso)
+    ajustes.tiktok_modo = ModoTikTok.BORRADOR
+    proveedor = ProveedorFalso(respuestas={
+        T: Resultado(T, ok=True),
+        Y: Resultado(Y, ok=True, url="https://youtube.com/shorts/1"),
+        I: Resultado(I, ok=False, error="Media too long"),
+    })
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    dialogo.show()
+    assert dialogo.boton_registro.isHidden()
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert dialogo.etiqueta_estado.text() == "Publicado en 2 de 3"
+    resumen = dialogo.resumen.text()
+    assert "TikTok" in resumen and "borradores" in resumen
+    assert 'href="https://youtube.com/shorts/1"' in resumen
+    assert "Instagram" in resumen and "Media too long" in resumen
+    assert dialogo.resumen.isVisible()
+    assert dialogo.boton_registro.isVisible() and dialogo.boton_registro.isEnabled()
+    dialogo.boton_registro.click()
+    assert sin_finder == [dialogo.ruta_log]
+    log = _log(dialogo)
+    for texto in ("Inicio", "Proveedor: Upload-Post", "perfil: sí", "TikTok", "borrador",
+                  "Reel de prueba", str(video), f"{video.stat().st_size} bytes",
+                  "Media too long", "https://youtube.com/shorts/1", "Fin"):
+        assert texto in log, texto
+    assert CLAVE not in log and "mi_perfil" not in log
+
+
+def test_todas_fallan_lo_dice(qtbot, video, ajustes, llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorFalso(respuestas={
+        p: Resultado(p, ok=False, error="Username not associated with any profile")
+        for p in ORDEN})
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert dialogo.etiqueta_estado.text() == "Falló en todas"
+    assert dialogo.resumen.text().count("Username not associated") == 3
+
+
+def test_pendiente_cuenta_aparte(qtbot, video, ajustes, llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorFalso(respuestas={
+        I: Resultado(I, ok=False, pendiente=True, referencia="r")})
+    monkeypatch.setattr("videopipeline.redes.publicador.ESPERA_MAXIMA", 0.0)
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert dialogo.etiqueta_estado.text() == "Publicado en 2 de 3 · 1 por confirmar"
+    assert "⏳" in dialogo.resumen.text()
+    # Por confirmar: no se deja marcada para no publicarla dos veces sin querer.
+    assert not dialogo.casillas[I].isChecked()
+    assert "Instagram (sin confirmar)" in dialogo.aviso_publicado.text()
+
+
+def test_fallo_inesperado_del_hilo_da_error_a_cada_plataforma(qtbot, video, ajustes,
+                                                              llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+
+    def revienta(proveedor, publicacion, opciones, plataformas, *, progreso, **kw):
+        progreso(T, publicador.Estado.SUBIENDO, None)
+        progreso(T, publicador.Estado.HECHO, Resultado(T, ok=True, url="https://tt/1"))
+        raise RuntimeError(f"algo raro con {CLAVE}")
+
+    monkeypatch.setattr("app.widgets.dialogo_publicar.publicador.publicar", revienta)
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000) as senal:
+        dialogo.boton_publicar.click()
+    resultados = senal.args[0]
+    assert list(resultados) == [T, Y, I]
+    assert resultados[T].ok
+    for p in (Y, I):
+        assert not resultados[p].ok
+        assert "RuntimeError" in resultados[p].error
+        assert "registro" in resultados[p].error
+        assert "✗" in dialogo.estados[p].text()
+        assert "RuntimeError" in dialogo.estados[p].toolTip()
+        assert "RuntimeError" in dialogo.resumen.text()
+    assert dialogo.etiqueta_estado.text() == "Publicado en 1 de 3"
+    assert not dialogo.publicando
+    log = _log(dialogo)
+    assert "Traceback" in log and "RuntimeError" in log
+    assert CLAVE not in log
+    assert not dialogo.boton_registro.isHidden()
+
+
+class LlaveroRaro:
+    """Dice que hay clave, pero al leerla devuelve `lectura` (o la lanza)."""
+
+    def __init__(self, lectura):
+        self.lectura = lectura
+
+    def hay_clave(self, nombre):
+        return True
+
+    def leer(self, nombre):
+        if isinstance(self.lectura, BaseException):
+            raise self.lectura
+        return self.lectura
+
+
+@pytest.mark.parametrize("lectura, esperado", [
+    (None, "No se encontró la API key en el Llavero"),
+    (credenciales.ErrorLlavero("No se pudo leer la clave del Llavero (código 51)."),
+     "código 51"),
+    (OSError("sin permiso"), "OSError"),
+])
+def test_llavero_sin_clave_o_con_error_lo_dice(qtbot, video, ajustes, monkeypatch,
+                                               lectura, esperado):
+    ajustes.perfil_redes = "mi_perfil"
+    proveedor = ProveedorFalso()
+    dialogo = DialogoPublicar(video, _caption(), ajustes, llavero=LlaveroRaro(lectura),
+                              fabrica=lambda *a: proveedor)
+    qtbot.addWidget(dialogo)
+    dialogo.show()
+    assert dialogo.boton_publicar.isEnabled()
+    _confirmar(monkeypatch)
+    dialogo.boton_publicar.click()  # sin QMessageBox: el aviso va en el diálogo
+    assert esperado in dialogo.etiqueta_estado.text()
+    assert dialogo.etiqueta_estado.isVisible()
+    assert proveedor.llamadas == []
+    assert not dialogo.publicando and dialogo.boton_cerrar.isEnabled()
+    for p in ORDEN:
+        assert "✗" in dialogo.estados[p].text()
+    assert esperado.split(" (")[0] in _log(dialogo) or type(lectura).__name__ in _log(dialogo)
+    assert not dialogo.boton_registro.isHidden()
+
+
+def test_fabrica_que_falla_lo_dice(qtbot, video, ajustes, llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+
+    def fabrica(*a):
+        raise ImportError(f"falta httpx {CLAVE}")
+
+    dialogo = DialogoPublicar(video, _caption(), ajustes, fabrica=fabrica)
+    qtbot.addWidget(dialogo)
+    _confirmar(monkeypatch)
+    dialogo.boton_publicar.click()
+    assert "ImportError" in dialogo.etiqueta_estado.text()
+    assert CLAVE not in dialogo.etiqueta_estado.text()
+    log = _log(dialogo)
+    assert "Traceback" in log and CLAVE not in log
+
+
+def test_cancelar_la_confirmacion_lo_dice(qtbot, video, ajustes, llavero_falso,
+                                          monkeypatch):
+    _listo(ajustes, llavero_falso)
+    dialogo, proveedor = _dialogo(qtbot, video, ajustes)
+    _confirmar(monkeypatch, QMessageBox.StandardButton.Cancel)
+    dialogo.boton_publicar.click()
+    assert "cancelada" in dialogo.etiqueta_estado.text()
+    assert proveedor.llamadas == []
+    assert "cancel" in _log(dialogo).lower()
+
+
+
+def test_procesando_en_el_servicio_y_espera_final(qtbot, video, ajustes, llavero_falso):
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    dialogo._preparar([T, Y], dialogo.opciones())
+    dialogo._al_progresar("tiktok", "subiendo", None)
+    assert dialogo.estados[T].text() == "Subiendo…"
+    assert dialogo.etiqueta_estado.text() == "Subiendo a TikTok (1 de 2)…"
+    dialogo._al_progresar("tiktok", "procesando", Resultado(T, ok=False, pendiente=True))
+    assert dialogo.estados[T].text() == "Procesando en el servicio…"
+    assert dialogo.etiqueta_estado.text() == "Subiendo a TikTok (1 de 2)…"  # YouTube en cola
+    dialogo._al_progresar("youtube", "subiendo", None)
+    dialogo._al_progresar("youtube", "hecho", Resultado(Y, ok=True, url="https://y/1"))
+    assert dialogo.etiqueta_estado.text() == "Esperando a que el servicio termine: TikTok…"
+    dialogo._cerrar_diario()
+
+
+SCRIPT_DESTRUIR = r"""
+import os, sys, threading, time
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+from PySide6.QtCore import QSettings, QtMsgType, qInstallMessageHandler
+
+def manejador(tipo, contexto, mensaje):
+    sys.stderr.write(mensaje + "\n")
+    sys.stderr.flush()
+    if tipo == QtMsgType.QtFatalMsg:
+        os._exit(3)  # sin abort(): nada de «Python se cerró inesperadamente»
+
+qInstallMessageHandler(manejador)
+import shiboken6
+from PySide6.QtWidgets import QApplication, QMessageBox
+app = QApplication([])
+from app.settings import Ajustes
+from app.widgets import dialogo_publicar
+from videopipeline.caption import Caption
+from videopipeline.redes import diario
+from videopipeline.redes.modelo import Resultado
+
+carpeta = Path(sys.argv[2])
+diario.DIR_LOGS = carpeta / "logs"
+QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
+dentro, soltar = threading.Event(), threading.Event()
+
+class Lento:
+    nombre = "Lento"
+    def publicar(self, plataforma, publicacion, opciones):
+        dentro.set()
+        soltar.wait(10)
+        return Resultado(plataforma, ok=True, url="https://x/1")
+    def estado(self, plataforma, referencia):
+        return Resultado(plataforma, ok=True)
+
+class Llavero:
+    def hay_clave(self, nombre): return True
+    def leer(self, nombre): return "clave-falsa"
+
+video = carpeta / "v.mp4"
+video.write_bytes(b"MP4")
+ajustes = Ajustes(QSettings(str(carpeta / "t.ini"), QSettings.Format.IniFormat))
+ajustes.perfil_redes = "yo"
+d = dialogo_publicar.DialogoPublicar(video, Caption(titulo="t", caption="c", hashtags=[], palabras_clave=[]), ajustes,
+                                     llavero=Llavero(), fabrica=lambda *a: Lento())
+d.publicar()
+assert dentro.wait(5), "la subida no empezó"
+shiboken6.delete(d)  # el diálogo desaparece en plena subida
+app.processEvents()
+soltar.set()
+limite = time.monotonic() + 10
+while dialogo_publicar.hilos_vivos() and time.monotonic() < limite:
+    app.processEvents()
+    time.sleep(0.01)
+print("vivos", dialogo_publicar.hilos_vivos())
+print("log", next((carpeta / "logs").glob("*.log")).read_text(encoding="utf-8"))
+"""
+
+
+def test_destruir_el_dialogo_en_plena_subida_no_aborta(tmp_path):
+    """Antes, Qt abortaba la app: «QThread: Destroyed while thread is still
+    running». Se prueba en otro proceso para que un aborto no tumbe la suite."""
+    import os
+    import subprocess
+    import sys
+
+    script = tmp_path / "destruir.py"
+    script.write_text(SCRIPT_DESTRUIR, encoding="utf-8")
+    raiz = Path(__file__).resolve().parent.parent
+    entorno = {**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+    salida = subprocess.run([sys.executable, str(script), str(raiz), str(tmp_path)],
+                            capture_output=True, text=True, timeout=60, env=entorno)
+    assert "Destroyed while thread" not in salida.stderr
+    assert salida.returncode == 0, salida.stderr[-2000:]
+    assert "vivos 0" in salida.stdout
+    assert "Fin (hilo terminado sin diálogo)" in salida.stdout
+
+
+def test_esperar_hilos_al_salir(qtbot, video, ajustes, llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+    proveedor = ProveedorLento()
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    _confirmar(monkeypatch)
+    dialogo.boton_publicar.click()
+    assert dialogo_publicar.hilos_vivos() == 1
+    proveedor.soltar.set()
+    dialogo_publicar.esperar_hilos(5000)
+    assert dialogo_publicar.hilos_vivos() == 0
+
+
+def test_no_se_cierra_con_done_mientras_publica(qtbot, video, ajustes, llavero_falso):
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    dialogo.show()
+    dialogo._hilo = object()
+    dialogo.accept()
+    assert dialogo.isVisible()
+    dialogo._hilo = None
+
+
+def test_confirmacion_avisa_de_lo_que_quedo_sin_confirmar(qtbot, video, ajustes,
+                                                           llavero_falso, monkeypatch):
+    _listo(ajustes, llavero_falso)
+    registro.anotar(video, I, "", "prov", "prueba", sin_confirmar=True)
+    registro.anotar(video, Y, "https://yt/0", "prov")
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    assert "Instagram (sin confirmar)" in dialogo.aviso_publicado.text()
+    preguntas = _confirmar(monkeypatch, QMessageBox.StandardButton.Cancel)
+    dialogo.boton_publicar.click()
+    assert "Ya publicado antes en: YouTube." in preguntas[0]
+    assert "Sin confirmar en: Instagram" in preguntas[0]
+    assert "compruébalo" in preguntas[0]

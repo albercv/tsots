@@ -29,6 +29,7 @@ from ..settings import Ajustes
 
 COLOR_OK = "#43a047"
 COLOR_AVISO = "#b8860b"
+COLOR_SECUNDARIO = "#888888"
 
 
 class DialogoRedes(QDialog):
@@ -69,6 +70,19 @@ class DialogoRedes(QDialog):
         self.campo_perfil.setToolTip(_(
             "El perfil del servicio donde conectaste TikTok, YouTube e Instagram."))
         formulario.addRow(_("Perfil:"), self.campo_perfil)
+        # Qué es el perfil lo explica cada proveedor (texto propio del servicio).
+        self.ayuda_perfil = QLabel()
+        self.ayuda_perfil.setWordWrap(True)
+        self.ayuda_perfil.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
+        formulario.addRow("", self.ayuda_perfil)
+        self.aviso_perfil = QLabel(_(
+            "⚠ Eso parece un email. El perfil no es el email de tu cuenta: es el "
+            "nombre del perfil dentro del servicio."))
+        self.aviso_perfil.setWordWrap(True)
+        self.aviso_perfil.setStyleSheet(f"color: {COLOR_AVISO};")
+        self.aviso_perfil.hide()
+        formulario.addRow("", self.aviso_perfil)
+        self.campo_perfil.textChanged.connect(self._refrescar_perfil)
 
         self.campo_clave = QLineEdit()
         self.campo_clave.setEchoMode(QLineEdit.EchoMode.Password)
@@ -131,8 +145,16 @@ class DialogoRedes(QDialog):
         usa_perfil = proveedores.usa_perfil(self.proveedor)
         self.campo_perfil.setEnabled(usa_perfil)
         self.campo_perfil.setText(self.ajustes.perfil_de(self.proveedor))
+        ayuda = proveedores.ayuda_perfil(self.proveedor) if usa_perfil else ""
+        self.ayuda_perfil.setText(ayuda)
+        self.ayuda_perfil.setVisible(bool(ayuda))
+        self._refrescar_perfil()
         self.campo_clave.clear()
         self._refrescar_clave()
+
+    def _refrescar_perfil(self, *args) -> None:
+        self.aviso_perfil.setVisible(
+            self.campo_perfil.isEnabled() and proveedores.parece_email(self.campo_perfil.text()))
 
     def _refrescar_clave(self) -> None:
         guardada = self.llavero.hay_clave(self.proveedor)

@@ -45,3 +45,13 @@ def test_registro_ausente_o_danado_es_vacio(tmp_path):
                                       {"plataforma": "youtube", "fecha": "f"}]}),
         encoding="utf-8")
     assert registro.ya_publicado(video) == {Plataforma.YOUTUBE}
+
+
+def test_entrada_sin_confirmar(tmp_path):
+    video = tmp_path / "v.mp4"
+    registro.anotar(video, Plataforma.INSTAGRAM, "", "p", "prueba", sin_confirmar=True)
+    datos = json.loads(registro.ruta(video).read_text(encoding="utf-8"))
+    assert datos["publicaciones"][0]["sin_confirmar"] is True
+    [entrada] = registro.leer(video)
+    assert entrada.sin_confirmar
+    assert registro.ya_publicado(video) == {Plataforma.INSTAGRAM}
