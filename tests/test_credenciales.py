@@ -7,7 +7,9 @@ import pytest
 
 from app import credenciales
 
-CLAVE = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ4In0.firma-_123"
+from tests.secretos_falsos import jwt_falso
+
+CLAVE = jwt_falso(sub="yo")
 
 
 class Grabador:

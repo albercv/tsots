@@ -9,7 +9,9 @@ import pytest
 from videopipeline import steps
 from videopipeline.redes import diario
 
-CLAVE = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ5byJ9.Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MA"
+from tests.secretos_falsos import jwt_falso
+
+CLAVE = jwt_falso(sub="yo")
 CLAVE_CORTA = "k3y-muy+secreta/42=="
 
 
