@@ -80,11 +80,12 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
    - **Silence cutting**: margin kept around each sentence and volume
      threshold. "Speed up" plays the silences faster instead of cutting
      them.
-   - **Subtitles**: style (Reels bold, karaoke, box), position, size,
-     language and Whisper model size. The preview shows how they look on
+   - **Subtitles**: style (8 to choose from: Reels bold, karaoke, green
+     karaoke, Impact, yellow, minimal, black box and white box), position,
+     size, language and Whisper model size. The preview shows how they look on
      a real frame of the selected video.
    - **SEO caption**: writes `name_limpio.md` with a title, caption and
-     hashtags from what is said in the video. **Brand…** stores a text
+     the 5 hashtags that best describe what is said in the video. **Brand…** stores a text
      about who you are, your tone and your call to action so the copy
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the

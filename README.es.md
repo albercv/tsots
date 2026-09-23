@@ -80,11 +80,12 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    - **Corte de silencios**: margen que se deja alrededor de cada frase y
      umbral de volumen. "Acelerar" en vez de cortar los silencios los
      reproduce a la velocidad que indiques.
-   - **Subtítulos**: diseño (Reels bold, karaoke, caja), posición,
-     tamaño, idioma y tamaño del modelo Whisper. La previsualización te
+   - **Subtítulos**: diseño (8 a elegir: Reels bold, karaoke, karaoke
+     verde, Impacto, amarillo, minimalista, caja negra y caja blanca),
+     posición, tamaño, idioma y tamaño del modelo Whisper. La previsualización te
      enseña cómo quedan sobre un fotograma real del vídeo seleccionado.
    - **Caption SEO**: genera `nombre_limpio.md` con título, caption y
-     hashtags a partir de lo que se dice en el vídeo. **Marca…** guarda un
+     los 5 hashtags que mejor describen lo que se dice en el vídeo. **Marca…** guarda un
      texto con quién eres, tu tono y tu llamada a la acción para que el
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
