@@ -28,7 +28,7 @@ Paquete `videopipeline/redes/`:
 |---|---|---|
 | `modelo.py` | Tipos neutros: `Plataforma` (TIKTOK, YOUTUBE, INSTAGRAM, con `ORDEN`), `Publicacion` (vídeo, título, caption, hashtags, palabras clave), `Opciones` (`tiktok_modo`: borrador/publico; `instagram_modo`: prueba/normal; `youtube_categoria`), `Resultado` (ok, url, error, pendiente) | No |
 | `textos.py` | Límites de cada **plataforma** (no del proveedor): título de YouTube ≤ 100, textos ≤ 2200, ≤ 30 hashtags en Instagram; recorta el caption y nunca los hashtags | No |
-| `proveedor.py` | `Protocol Proveedor`: `nombre`, `publicar(plataforma, publicacion, opciones, video) -> Resultado`, `estado(ref) -> Resultado`. Registro `PROVEEDORES = {"upload_post": …}` y `crear(nombre, clave, ajustes)` | No |
+| `proveedor.py` | `Protocol Proveedor`: `nombre`, `publicar(plataforma, publicacion, opciones) -> Resultado` (el vídeo va en `Publicacion`), `estado(plataforma, referencia) -> Resultado`. Registro `PROVEEDORES = {"upload_post": "videopipeline.redes.upload_post"}` (import perezoso), `PROVEEDOR_POR_DEFECTO` y `crear(nombre, clave, ajustes, http=None)` | No |
 | `upload_post.py` | **Único** módulo con URLs, campos (`post_mode`, `share_mode`, `privacyStatus`…), cabecera `Apikey` y sondeo de estado de Upload-Post | Sí |
 | `publicador.py` | Orquesta: orden TikTok → YouTube → Instagram, sigue si una falla, progreso, espera de pendientes, escribe el registro | No |
 | `registro.py` | `nombre_limpio.publicado.json`: plataforma, fecha, url, proveedor | No |
@@ -99,13 +99,14 @@ Resto de la app:
 - [x] Botón **Publicar…** en `PanelCaption`, activo cuando el vídeo terminado tiene caption; menú o botón **Redes…** para la configuración. Tests en `tests/test_app_main.py`.
 
 ### Task 8: traducciones, documentación y TODO
-- [ ] Cadenas nuevas traducidas al inglés.
-- [ ] README (es/en): sección "Publicar en redes" con los requisitos: cuenta en Upload-Post, perfiles conectados, Instagram profesional.
-- [ ] `docs/DEVELOPMENT.md`: módulo `redes.py`, Llavero y el motivo del servicio intermediario.
-- [ ] Quitar la tarea de `docs/TODO.md`.
+- [x] Cadenas nuevas traducidas al inglés.
+- [x] README (es/en): sección "Publicar en redes" con los requisitos: cuenta en Upload-Post, perfiles conectados, Instagram profesional.
+- [x] `docs/DEVELOPMENT.md`: paquete `videopipeline/redes/`, interfaz `Proveedor`, cómo añadir un proveedor, Llavero y el motivo del servicio intermediario.
+- [x] Quitar la tarea de `docs/TODO.md`.
 
 ### Task 9: verificación real (necesita al usuario)
 - [ ] El usuario crea la cuenta de Upload-Post, conecta TikTok, YouTube e Instagram y guarda la clave desde **Redes…**.
+- [ ] Prueba automática opcional: `QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/test_redes_real.py -s` (sube un vídeo de 5 s solo a TikTok, como borrador).
 - [ ] Publicar un vídeo de prueba: TikTok en borrador, YouTube como Short e Instagram como reel de prueba. Comprobar los tres enlaces.
 - [ ] Comprobar cuánto descuenta cada subida del plan gratuito (campo `usage` de la respuesta).
 
@@ -113,7 +114,13 @@ Resto de la app:
 
 - **Dependencia de un tercero:** si Upload-Post cambia precios o cierra, se añade otro módulo proveedor y se cambia el ajuste. Nada más cambia.
 - **Reel de prueba:** depende de que Instagram mantenga la función para la cuenta. Si la API la rechaza, el diálogo informa y ofrece publicar como reel normal.
-- **Plan gratuito:** 10 subidas al mes; no está claro si cuenta por vídeo o por plataforma.
+- **Plan gratuito:** 10 subidas al mes; no está claro si cuenta por vídeo o por plataforma. Cada plataforma va en una petición aparte (para respetar el orden y aislar fallos), así que un vídeo en las tres puede contar como tres.
+- **Supuestos sobre la API de Upload-Post (a confirmar en la Task 9):**
+  - Los arrays del multipart van como campos repetidos `platform[]` y `tags[]` (así aparece en su documentación).
+  - Si la subida pasa de ~59 s se vuelve asíncrona (`request_id`). La forma de `GET /api/uploadposts/status` solo está en `openapi.json` (`status`: pending/in_progress/completed; `results`: lista de `{platform, success, message}`) y no documenta la URL de la publicación. El análisis es tolerante (acepta también un diccionario por plataforma y busca `url`, `post_url`, `platform_post_url`, `permalink` o una URL dentro de `message`) y vive solo en `upload_post.py`. Si termina sin URL, el diálogo muestra "Publicado" sin enlace.
+  - Un borrador de TikTok (`MEDIA_UPLOAD`) no devuelve URL pública.
+  - Solo se reintenta el 503 (dos reintentos, 2 s y 5 s); 401/403/429 se muestran tal cual.
+- **Llavero:** la clave se pasa a `security -i` por la entrada estándar para que no aparezca en `ps`; no se ha podido probar con el Llavero real (los tests lo simulan). La Task 9 lo confirma al guardar la clave desde Redes….
 
 ## Estimación
 

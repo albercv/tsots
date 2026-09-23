@@ -106,7 +106,8 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    Mac no entra en reposo.
 5. Al terminar, **doble clic** en un vídeo hecho lo abre. Si generaste
    caption, aparece debajo de la previsualización con botones para copiar
-   título, caption, hashtags o todo.
+   título, caption, hashtags o todo, y **Publicar…** (ver
+   [Publicar en redes](#publicar-en-redes)).
 
 Puedes seguir usando el Mac mientras procesa. Bloquear la pantalla no
 detiene nada; cerrar la tapa sin monitor externo sí.
@@ -118,6 +119,45 @@ detiene nada; cerrar la tapa sin monitor externo sí.
 .venv-clearvoice/bin/python limpiarVideo.py video.mov        # sin interfaz
 .venv-clearvoice/bin/python limpiarVideo.py video.mov --caption --marca "Soy…"
 ```
+
+## Publicar en redes
+
+Desde un vídeo terminado con caption, **Publicar…** lo envía a **TikTok →
+YouTube → Instagram**, en ese orden. Nunca se publica nada solo: revisas
+título, caption y hashtags, marcas las plataformas, pulsas **Publicar** y
+confirmas. Si una plataforma falla, las demás siguen; cada fila muestra su
+progreso y, al terminar, el enlace o el error.
+
+TikTok y YouTube solo dejan publicar en público a apps auditadas, así que
+TSOTS publica a través de un servicio que ya tiene ese permiso:
+**Upload-Post** ([upload-post.com](https://www.upload-post.com), plan
+gratuito de 10 subidas al mes). Necesitas:
+
+1. Una cuenta en Upload-Post.
+2. En Upload-Post, un **perfil** con TikTok, YouTube e Instagram
+   conectados. La cuenta de Instagram debe ser **profesional** (empresa o
+   creador).
+3. La **API key** de Upload-Post.
+
+Guárdalos una vez en **Redes…** (junto a Publicar…): el nombre del perfil
+y la API key. La clave va directa al **Llavero de macOS** (servicio
+`tsots-upload_post`); la app nunca la muestra ni la escribe en disco. Para
+quitarla: **Olvidar clave** en el mismo diálogo, o borra la entrada en
+Acceso a Llaveros.
+
+Qué hace cada modo:
+
+| Plataforma | Modo | Resultado |
+|---|---|---|
+| TikTok | **Borrador** (por defecto) | El vídeo llega a tus borradores de TikTok; lo terminas y publicas en la app. |
+| TikTok | **Público** | Se publica al momento, visible para todos. |
+| YouTube | **Short público** | Se publica como Short público en la categoría elegida en Redes… (Personas y blogs por defecto). |
+| Instagram | **Reel de prueba** (por defecto) | Se enseña primero a quien no te sigue; Instagram lo comparte con tus seguidores solo si funciona. |
+| Instagram | **Reel normal** | Un reel normal, también en tu feed. |
+
+TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
+vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar
+con ese vídeo, avisa de que ya se publicó.
 
 ## Si algo va mal
 
@@ -142,7 +182,7 @@ voz, Apache-2.0), [auto-editor](https://auto-editor.com) (silencios),
 [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
 (transcripción con la GPU del Mac; faster-whisper en macOS 13),
 ffmpeg (vídeo), [Ollama](https://ollama.com) (modelo de lenguaje local),
-PySide6 (interfaz). Documentación técnica en `docs/DEVELOPMENT.md` (en inglés).
+[Upload-Post](https://www.upload-post.com) (publicar, opcional), PySide6 (interfaz). Documentación técnica en `docs/DEVELOPMENT.md` (en inglés).
 
 Licencia: Apache-2.0 (ver `LICENSE`). Incluye código de ClearerVoice-Studio,
 © Alibaba, bajo la misma licencia.
