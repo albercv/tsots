@@ -425,3 +425,47 @@ def test_combo_whisper_ofrece_turbo_primero(qtbot):
              for i in range(panel.combo_modelo_whisper.count())]
     assert datos[0] == "turbo"
     assert set(datos) == {"turbo", "small", "medium"}
+
+
+# --- glosario de términos ----------------------------------------------------------
+
+def test_dialogo_glosario_devuelve_texto_y_resumen(qtbot):
+    from app.widgets.dialogo_glosario import DialogoGlosario
+
+    d = DialogoGlosario("Claude Code = Cloud Code, Claus Code\nAnthropic")
+    qtbot.addWidget(d)
+    assert d.texto() == "Claude Code = Cloud Code, Claus Code\nAnthropic"
+    assert "2" in d.resumen.text() and "2" in d.resumen.text().split("·")[1]
+    d.editor.setPlainText("  TSOTS  ")
+    assert d.texto() == "TSOTS"
+    assert "1" in d.resumen.text()
+    assert d.aviso.text() == ""
+
+
+def test_dialogo_glosario_avisa_si_no_cabe_en_la_pista(qtbot):
+    from app.widgets.dialogo_glosario import DialogoGlosario
+
+    d = DialogoGlosario("\n".join(f"termino{i:03d}" for i in range(200)))
+    qtbot.addWidget(d)
+    assert d.aviso.text() != ""
+
+
+def test_panel_boton_glosario_emite_senal(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_subtitulos.setChecked(True)
+    with qtbot.waitSignal(panel.editar_glosario, timeout=1000):
+        panel.boton_glosario.click()
+
+
+def test_panel_boton_glosario_activo_con_subtitulos_o_caption(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_subtitulos.setChecked(False)
+    panel.check_caption.setChecked(False)
+    assert not panel.boton_glosario.isEnabled()
+    panel.check_subtitulos.setChecked(True)
+    assert panel.boton_glosario.isEnabled()
+    panel.check_subtitulos.setChecked(False)
+    panel.check_caption.setChecked(True)
+    assert panel.boton_glosario.isEnabled()

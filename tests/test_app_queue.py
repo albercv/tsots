@@ -147,3 +147,10 @@ def test_ajustes_idioma_ui_defecto_y_persistido(tmp_path):
     a.idioma_ui = "en"
     b = _ajustes(tmp_path)  # misma ruta .ini → mismos datos
     assert b.idioma_ui == "en"
+
+
+def test_ajustes_glosario_persistido(tmp_path):
+    a = _ajustes(tmp_path)
+    assert a.glosario == ""
+    a.glosario = "Claude Code = Cloud Code\nAnthropic"
+    assert _ajustes(tmp_path).glosario == "Claude Code = Cloud Code\nAnthropic"

@@ -30,6 +30,14 @@ class Ajustes:
         self._q.setValue("caption/contexto_marca", texto)
 
     @property
+    def glosario(self) -> str:
+        return str(self._q.value("transcripcion/glosario", "") or "")
+
+    @glosario.setter
+    def glosario(self, texto: str) -> None:
+        self._q.setValue("transcripcion/glosario", texto)
+
+    @property
     def modelo_caption(self) -> str:
         return str(self._q.value("caption/modelo", "qwen3.5:9b") or "qwen3.5:9b")
 

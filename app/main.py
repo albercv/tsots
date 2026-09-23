@@ -32,6 +32,7 @@ from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
 from .queue_model import EstadoTrabajo, ModeloCola
 from .settings import Ajustes
+from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
 from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
@@ -182,6 +183,7 @@ class VentanaPrincipal(QMainWindow):
 
         self.panel.opciones_subs_cambiadas.connect(self._refrescar_preview)
         self.panel.editar_marca.connect(self._editar_marca)
+        self.panel.editar_glosario.connect(self._editar_glosario)
         self.panel.modelo_caption_cambiado.connect(self._al_cambiar_modelo_caption)
         self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
         self._cargar_modelos_ollama()
@@ -343,6 +345,11 @@ class VentanaPrincipal(QMainWindow):
         if dialogo.exec():
             self.ajustes.contexto_marca = dialogo.texto()
 
+    def _editar_glosario(self) -> None:
+        dialogo = DialogoGlosario(self.ajustes.glosario, self)
+        if dialogo.exec():
+            self.ajustes.glosario = dialogo.texto()
+
     # --- procesado ---
 
     def procesar(self) -> None:
@@ -358,6 +365,7 @@ class VentanaPrincipal(QMainWindow):
             config = PipelineConfig(
                 video=trabajo.ruta, salida=carpeta,
                 contexto_marca=self.ajustes.contexto_marca,
+                glosario=self.ajustes.glosario,
                 modelo_caption=self.ajustes.modelo_caption,
                 idioma_ui=i18n.idioma_actual(),
                 **valores,
