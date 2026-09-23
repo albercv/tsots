@@ -228,3 +228,29 @@ def test_normaliza_puntuacion_y_acentos_pero_conserva_la_enie():
     r["hashtags"] = ["#IA-Generativa!", "#Educación", "#España", "#año_2026", "#ok"]
     c = cap.generar("t", "", "m", cliente=lambda *a: r)
     assert c.hashtags == ["#iagenerativa", "#educacion", "#españa", "#año_2026", "#ok"]
+
+
+# --- términos del glosario ---------------------------------------------------------
+
+@pytest.mark.parametrize("idioma", ["es", "en"])
+def test_prompt_incluye_terminos_del_glosario(idioma):
+    system = cap.construir_mensajes("t", "", idioma,
+                                    terminos=("Claude Code", "Anthropic"))[0]["content"]
+    assert "Claude Code, Anthropic" in system
+
+
+def test_prompt_sin_terminos_no_menciona_glosario():
+    con = cap.construir_mensajes("t", "", "es", terminos=("X",))[0]["content"]
+    sin = cap.construir_mensajes("t", "", "es")[0]["content"]
+    assert len(con) > len(sin) and "X" not in sin
+
+
+def test_generar_pasa_terminos_al_prompt():
+    vistos = []
+
+    def cliente(modelo, mensajes, esquema):
+        vistos.append(mensajes[0]["content"])
+        return _respuesta_ok()
+
+    cap.generar("t", "", "m", cliente=cliente, terminos=("Claude Code",))
+    assert "Claude Code" in vistos[0]

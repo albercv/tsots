@@ -51,6 +51,7 @@ class PipelineConfig:
     tamano_subs: int = 100
     caption_seo: bool = False
     contexto_marca: str = ""
+    glosario: str = ""  # texto crudo; ver videopipeline/glosario.py
     modelo_caption: str = "qwen3.5:9b"
     idioma_ui: str = "es"  # idioma de etiquetas, avisos y diagnósticos del runner
 

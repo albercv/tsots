@@ -114,7 +114,8 @@ def recortar(transcripcion: str, max_palabras: int = MAX_PALABRAS) -> str:
 
 
 def construir_mensajes(transcripcion: str, contexto_marca: str,
-                       idioma: str = "es") -> list[dict]:
+                       idioma: str = "es",
+                       terminos: tuple[str, ...] = ()) -> list[dict]:
     ingles = idioma == "en"
     system = _SYSTEM_EN if ingles else _SYSTEM_ES
     if contexto_marca.strip():
@@ -127,6 +128,18 @@ def construir_mensajes(transcripcion: str, contexto_marca: str,
             system += (
                 "\n\nContexto de marca (respétalo en tono, nombre y llamada a la "
                 f"acción):\n{contexto_marca.strip()}"
+            )
+    if terminos:
+        lista = ", ".join(terminos)
+        if ingles:
+            system += (
+                "\n\nThe user's own terms. Spell them exactly like this in the "
+                f"title, caption, keywords and hashtags: {lista}."
+            )
+        else:
+            system += (
+                "\n\nTérminos propios del usuario. Escríbelos exactamente así en "
+                f"título, caption, palabras clave y hashtags: {lista}."
             )
     etiqueta = "Transcript" if ingles else "Transcripción"
     return [
@@ -202,13 +215,15 @@ def generar(
     modelo: str,
     cliente: Callable[[str, list[dict], dict], dict] = chat_json,
     idioma: str = "es",
+    terminos: tuple[str, ...] = (),
 ) -> Caption:
     if not transcripcion.strip():
         raise PasoFallido(
             _("La transcripción está vacía; no hay texto para el caption")
         )
     datos = cliente(
-        modelo, construir_mensajes(transcripcion, contexto_marca, idioma), ESQUEMA
+        modelo, construir_mensajes(transcripcion, contexto_marca, idioma, terminos),
+        ESQUEMA
     )
     return _validar(datos)
 
