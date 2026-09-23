@@ -495,3 +495,75 @@ def test_cabecera_encima_de_zona_drop_y_cola(qtbot, tmp_path, monkeypatch):
         assert cabecera.bottom() < rect(widget).top()
     assert cabecera.left() <= rect(ventana.zona_drop).left()
     assert cabecera.right() >= rect(ventana.scroll_derecha).right()
+
+
+class _DialogoFalso:
+    """Sustituye a DialogoPublicar / DialogoRedes y registra con qué se abrió."""
+
+    abiertos: list = []
+
+    def __init__(self, *args, parent=None, **kwargs):
+        type(self).abiertos.append(args)
+        self.configurar_redes = type("S", (), {"connect": lambda s, f: None})()
+
+    def exec(self):
+        return 0
+
+
+def _hecho_con_caption(ventana, tmp_path):
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    salida = tmp_path / "a_limpio.mp4"
+    salida.write_bytes(b"MP4")
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(salida), "")
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    return salida
+
+
+def test_boton_publicar_activo_con_caption_del_video_terminado(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+    assert ventana.panel_caption.boton_publicar.isEnabled()
+    assert ventana.panel_caption.boton_redes.isEnabled()
+    assert ventana.panel_caption.video == salida
+    ventana.panel_caption.mostrar(None)
+    assert not ventana.panel_caption.boton_publicar.isEnabled()
+
+
+def test_publicar_abre_dialogo_con_video_y_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    [(video, caption, ajustes)] = Falso.abiertos
+    assert video == salida
+    assert caption.titulo == "Título X"
+    assert ajustes is ventana.ajustes
+
+
+def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+    salida.unlink()
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.warning", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.DialogoPublicar",
+                        lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
+    ventana.panel_caption.boton_publicar.click()
+    assert len(avisos) == 1
+
+
+def test_boton_redes_abre_configuracion(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _hecho_con_caption(ventana, tmp_path)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    ventana.panel_caption.boton_redes.click()
+    assert Falso.abiertos == [(ventana.ajustes,)]

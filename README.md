@@ -106,7 +106,8 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
    app is open.
 5. When done, **double-click** a finished video to open it. If you
    generated a caption, it appears under the preview with buttons to copy
-   the title, caption, hashtags or everything.
+   the title, caption, hashtags or everything, and **Publish…** (see
+   [Publish to social networks](#publish-to-social-networks)).
 
 You can keep using the Mac while it processes. Locking the screen does
 not stop anything; closing the lid without an external display does.
@@ -119,6 +120,45 @@ not stop anything; closing the lid without an external display does.
 .venv-clearvoice/bin/python limpiarVideo.py video.mov --caption --marca "I am…"
 TSOTS_LANG=en ./TheSilenceOfTheShorts.command                # force a language
 ```
+
+## Publish to social networks
+
+From a finished video with a caption, **Publish…** sends it to **TikTok →
+YouTube → Instagram**, in that order. Nothing is published automatically:
+you review the title, caption and hashtags, tick the platforms, press
+**Publish** and confirm. A failure on one platform does not stop the
+others; each row shows its progress and, at the end, a link or the error.
+
+TikTok and YouTube only let audited apps post publicly, so TSOTS publishes
+through a service that already has that approval: **Upload-Post**
+([upload-post.com](https://www.upload-post.com), free plan with 10
+uploads a month). Requirements:
+
+1. An Upload-Post account.
+2. In Upload-Post, a **profile** with TikTok, YouTube and Instagram
+   connected. Instagram must be a **professional** account (Business or
+   Creator).
+3. Your Upload-Post **API key**.
+
+Save them once in **Networks…** (next to Publish…): the profile name and
+the API key. The key goes straight to the **macOS Keychain** (service
+`tsots-upload_post`); the app never shows it or writes it to disk. To
+remove it: **Forget key** in the same dialog, or delete the entry in
+Keychain Access.
+
+What each mode does:
+
+| Platform | Mode | Result |
+|---|---|---|
+| TikTok | **Draft** (default) | The video lands in your TikTok drafts; you finish and publish it in the app. |
+| TikTok | **Public** | Published straight away, visible to everyone. |
+| YouTube | **Public Short** | Published as a public Short in the category chosen in Networks… (People & Blogs by default). |
+| Instagram | **Trial reel** (default) | Shown to non-followers first; Instagram shares it with your followers only if it performs. |
+| Instagram | **Regular reel** | A normal reel, also shown in your feed. |
+
+TSOTS writes `name_limpio.publicado.json` next to the video (platform,
+date, link, service). If you open Publish again for that video, it warns
+you that it was already published.
 
 ## If something goes wrong
 
@@ -142,7 +182,8 @@ TSOTS_LANG=en ./TheSilenceOfTheShorts.command                # force a language
 cleaning, Apache-2.0), [auto-editor](https://auto-editor.com) (silences),
 [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
 (transcription on the Apple GPU; faster-whisper on macOS 13), ffmpeg (video), [Ollama](https://ollama.com) (local
-language model), PySide6 (interface). Technical docs in
+language model), [Upload-Post](https://www.upload-post.com) (publishing,
+optional), PySide6 (interface). Technical docs in
 `docs/DEVELOPMENT.md`; translations live in `locale/` (add a language by
 adding a `.po` file — see the development docs).
 

@@ -35,6 +35,8 @@ from .settings import Ajustes
 from .widgets.cabecera import Cabecera
 from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
+from .widgets.dialogo_publicar import DialogoPublicar
+from .widgets.dialogo_redes import DialogoRedes
 from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
 from .widgets.vista_previa import VistaPrevia
@@ -132,6 +134,8 @@ class VentanaPrincipal(QMainWindow):
         self.vista_previa = VistaPrevia()
         columna_derecha.addWidget(self.vista_previa)
         self.panel_caption = PanelCaption()
+        self.panel_caption.publicar.connect(self._publicar)
+        self.panel_caption.configurar_redes.connect(self._configurar_redes)
         columna_derecha.addWidget(self.panel_caption)
         columna_derecha.addStretch(1)
         self.scroll_derecha = QScrollArea()
@@ -304,10 +308,14 @@ class VentanaPrincipal(QMainWindow):
             trabajo = self.modelo_cola.trabajo(indice.row())
             self.vista_previa.establecer_video(trabajo.ruta)
             self._refrescar_preview()
-            self.panel_caption.mostrar(self._caption_de(trabajo))
+            self._mostrar_caption(trabajo)
         else:
             self.vista_previa.establecer_video(None)
             self.panel_caption.mostrar(None)
+
+    def _mostrar_caption(self, trabajo) -> None:
+        caption = self._caption_de(trabajo)
+        self.panel_caption.mostrar(caption, trabajo.salida if caption else None)
 
     def _caption_de(self, trabajo) -> Caption | None:
         if trabajo.estado != EstadoTrabajo.HECHO or not trabajo.salida:
@@ -354,6 +362,27 @@ class VentanaPrincipal(QMainWindow):
         dialogo = DialogoGlosario(self.ajustes.glosario, self)
         if dialogo.exec():
             self.ajustes.glosario = dialogo.texto()
+
+    # --- redes ---
+
+    def _publicar(self) -> None:
+        caption, video = self.panel_caption.caption, self.panel_caption.video
+        if caption is None or video is None:
+            return
+        if not video.is_file():
+            QMessageBox.warning(
+                self, _("Publicar en redes"),
+                _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
+            return
+        dialogo = DialogoPublicar(video, caption, self.ajustes, parent=self)
+        dialogo.configurar_redes.connect(
+            lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
+        dialogo.exec()
+
+    def _configurar_redes(self, al_guardar=None, padre=None) -> None:
+        dialogo = DialogoRedes(self.ajustes, parent=padre or self)
+        if dialogo.exec() and al_guardar is not None:
+            al_guardar()
 
     # --- procesado ---
 
@@ -411,9 +440,7 @@ class VentanaPrincipal(QMainWindow):
             )
             actual = self.vista_cola.currentIndex()
             if actual.isValid() and actual.row() == fila:
-                self.panel_caption.mostrar(
-                    self._caption_de(self.modelo_cola.trabajo(fila))
-                )
+                self._mostrar_caption(self.modelo_cola.trabajo(fila))
         else:
             estado = (
                 EstadoTrabajo.CANCELADO
