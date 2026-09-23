@@ -26,7 +26,8 @@ SAMPLE_RATE_POR_MODELO: dict[str, int] = {
 
 SILENCIOS = ("cortar", "acelerar")
 
-DISENOS = ("reels_bold", "reels_karaoke", "caja")
+DISENOS = ("reels_bold", "reels_karaoke", "caja", "impacto", "amarillo",
+           "karaoke_verde", "minimal", "caja_blanca")
 IDIOMAS_SUBS = ("es", "auto", "en")
 MODELOS_WHISPER = ("small", "medium")
 

@@ -76,5 +76,8 @@ def test_pipeline_con_caption_real(video_con_voz, tmp_path, monkeypatch):
     caption = leer_md(tmp_path / "final.md")
     assert caption is not None
     assert 0 < len(caption.titulo) <= 60
-    assert 8 <= len(caption.hashtags) <= 15
+    from videopipeline.caption import HASHTAGS_GENERICOS, NUM_HASHTAGS
+
+    assert len(caption.hashtags) == NUM_HASHTAGS
+    assert not set(caption.hashtags) & HASHTAGS_GENERICOS
     assert all(h.startswith("#") for h in caption.hashtags)

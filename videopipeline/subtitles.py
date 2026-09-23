@@ -67,6 +67,37 @@ PRESETS: dict[str, EstiloPreset] = {
         negrita=0, borde_estilo=3, grosor_contorno=1, sombra=0,
         mayusculas=False, tipo="frases", resaltado=None,
     ),
+    # Colores en formato ASS: &HAABBGGRR (alfa, azul, verde, rojo).
+    "impacto": EstiloPreset(
+        fuente="Impact", tamano_rel=0.08,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=0, borde_estilo=1, grosor_contorno=5, sombra=0,
+        mayusculas=True, tipo="palabras", resaltado=None,
+    ),
+    "amarillo": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.072,
+        primario="&H0000D4FF", contorno_color="&H00000000", fondo="&H80000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=4, sombra=3,
+        mayusculas=True, tipo="palabras", resaltado=None,
+    ),
+    "karaoke_verde": EstiloPreset(
+        fuente="Arial Black", tamano_rel=0.07,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H00000000",
+        negrita=-1, borde_estilo=1, grosor_contorno=3, sombra=2,
+        mayusculas=True, tipo="palabras", resaltado="&H006BE62E",
+    ),
+    "minimal": EstiloPreset(
+        fuente="Avenir Next", tamano_rel=0.042,
+        primario="&H00FFFFFF", contorno_color="&H00000000", fondo="&H80000000",
+        negrita=0, borde_estilo=1, grosor_contorno=1, sombra=1,
+        mayusculas=False, tipo="frases", resaltado=None,
+    ),
+    "caja_blanca": EstiloPreset(
+        fuente="Helvetica", tamano_rel=0.045,
+        primario="&H00000000", contorno_color="&H00FFFFFF", fondo="&H00FFFFFF",
+        negrita=-1, borde_estilo=3, grosor_contorno=1, sombra=0,
+        mayusculas=False, tipo="frases", resaltado=None,
+    ),
 }
 
 

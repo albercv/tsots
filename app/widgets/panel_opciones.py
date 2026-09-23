@@ -42,6 +42,11 @@ ETIQUETA_DISENO = {
     N_("Reels Bold"): "reels_bold",
     N_("Reels Karaoke"): "reels_karaoke",
     N_("Caja negra"): "caja",
+    N_("Impacto"): "impacto",
+    N_("Amarillo"): "amarillo",
+    N_("Karaoke verde"): "karaoke_verde",
+    N_("Minimalista"): "minimal",
+    N_("Caja blanca"): "caja_blanca",
 }
 
 # "Español" y "English" son nombres de idioma: no se traducen.

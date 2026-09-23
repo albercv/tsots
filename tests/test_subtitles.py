@@ -19,7 +19,9 @@ def _palabras(*tuplas) -> list[Palabra]:
 
 
 def test_presets_definidos():
-    assert set(PRESETS) == {"reels_bold", "reels_karaoke", "caja"}
+    assert set(PRESETS) == {"reels_bold", "reels_karaoke", "caja", "impacto",
+                            "amarillo", "karaoke_verde", "minimal",
+                            "caja_blanca"}
     assert PRESETS["reels_bold"].tipo == "palabras"
     assert PRESETS["reels_karaoke"].resaltado == "&H000AD6FF"
     assert PRESETS["caja"].tipo == "frases"
@@ -259,3 +261,31 @@ def test_generar_ass_tamano_defecto_retrocompatible(tmp_path):
     ruta = tmp_path / "s.ass"
     generar_ass(bloques, "reels_bold", 75, (1080, 1920), ruta)
     assert _fontsize_de(ruta.read_text(encoding="utf-8")) == int(1920 * 0.075)
+
+
+# --- estilos añadidos --------------------------------------------------------
+
+def test_estilos_nuevos_tienen_rasgos_propios():
+    assert PRESETS["impacto"].fuente == "Impact"
+    assert PRESETS["amarillo"].primario == "&H0000D4FF"
+    assert PRESETS["karaoke_verde"].resaltado == "&H006BE62E"
+    assert PRESETS["minimal"].tipo == "frases" and not PRESETS["minimal"].mayusculas
+    assert PRESETS["caja_blanca"].borde_estilo == 3
+    assert PRESETS["caja_blanca"].primario == "&H00000000"
+
+
+def test_ningun_estilo_duplica_otro():
+    firmas = [tuple(vars(p).values()) for p in PRESETS.values()]
+    assert len(firmas) == len(set(firmas))
+
+
+@pytest.mark.parametrize("preset_id", sorted(PRESETS))
+def test_cada_estilo_genera_ass_valido(tmp_path, preset_id):
+    palabras = _palabras(("hola", 0.0, 0.4), ("qué", 0.5, 0.8),
+                         ("tal", 0.9, 1.2), ("estás.", 1.3, 1.8))
+    bloques = agrupar(palabras, preset_id)
+    ruta = tmp_path / f"{preset_id}.ass"
+    generar_ass(bloques, preset_id, 75, (1080, 1920), ruta)
+    texto = ruta.read_text(encoding="utf-8")
+    assert f"Style: Sub,{PRESETS[preset_id].fuente}," in texto
+    assert "Dialogue:" in texto
