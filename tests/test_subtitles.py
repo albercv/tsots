@@ -362,3 +362,25 @@ def test_modelo_en_cache_segun_backend(tmp_path, monkeypatch):
     (tmp_path / "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo").mkdir()
     assert subtitles.modelo_en_cache("turbo", tmp_path)
     assert not subtitles.modelo_en_cache("small", tmp_path / "no-existe")
+
+
+# --- pista (prompt) para Whisper -------------------------------------------------
+
+def test_transcribir_mlx_pasa_initial_prompt(tmp_path, monkeypatch):
+    llamadas = _mlx_falso(monkeypatch, [])
+    transcribir(tmp_path / "v.mp4", "es", "turbo", prompt="Claude Code.")
+    assert llamadas[0][1]["initial_prompt"] == "Claude Code."
+
+
+def test_transcribir_mlx_sin_prompt_envia_none(tmp_path, monkeypatch):
+    llamadas = _mlx_falso(monkeypatch, [])
+    transcribir(tmp_path / "v.mp4", "es", "turbo")
+    assert llamadas[0][1]["initial_prompt"] is None
+
+
+def test_transcribir_faster_pasa_initial_prompt(tmp_path, monkeypatch):
+    falso = WhisperFalso([])
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
+    monkeypatch.setattr(subtitles, "_crear_whisper", lambda modelo: falso)
+    transcribir(tmp_path / "v.mp4", "es", "small", prompt="Anthropic.")
+    assert falso.kwargs["initial_prompt"] == "Anthropic."
