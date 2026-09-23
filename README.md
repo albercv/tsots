@@ -140,7 +140,8 @@ uploads a month). Requirements:
    Creator).
 3. Your Upload-Post **API key**.
 
-Save them once in **Networks…** (next to Publish…): the profile name and
+Save them once in **Networks…** (bottom bar, next to the language; always
+visible, also reachable from Publish…): the profile name and
 the API key. The key goes straight to the **macOS Keychain** (service
 `tsots-upload_post`); the app never shows it or writes it to disk. To
 remove it: **Forget key** in the same dialog, or delete the entry in

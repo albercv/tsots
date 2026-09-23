@@ -117,8 +117,12 @@ call the real Ollama if it is running; they skip otherwise).
 
 Tests never reach the Internet or the real Keychain: an autouse fixture in
 `tests/conftest.py` blocks outbound `httpx` traffic and routes every
-`security` call to an in-memory Keychain (`tests/redes_falsos.py`). The only
-exception is `-m lenta` (deselected by default in `pytest.ini`):
+`security` call to an in-memory Keychain (`tests/redes_falsos.py`); `slow`
+tests may only reach Hugging Face (Whisper model). Another autouse fixture
+makes every real modal dialog (`exec()`, the `QMessageBox`/`QFileDialog`/
+`QInputDialog` statics) raise instead of blocking the offscreen run forever;
+tests that need one replace it with `monkeypatch`. The only
+exception to the network rule is `-m lenta` (deselected by default in `pytest.ini`):
 `tests/test_redes_real.py` uploads a 5 s test video to **TikTok as a draft
 only**, using the key in the Keychain and the profile from Networks… (or
 `TSOTS_PERFIL_REDES`); it skips when there is no key.
@@ -184,7 +188,10 @@ Package `videopipeline/redes/`:
 GUI: `app/widgets/dialogo_publicar.py` (texts, platforms, modes,
 confirmation, upload in a `QThread`, per-platform status and links),
 `app/widgets/dialogo_redes.py` (provider, profile, API key, default modes)
-and the **Publish…** / **Networks…** buttons in `panel_caption.py`.
+the **Publish…** button in `panel_caption.py` and the **Networks…** button
+in the bottom bar of `app/main.py`, next to the language selector (app
+settings, not per video, so it is always visible; the Publish dialog also
+opens it).
 Settings (QSettings `redes/*`) store the provider id, the profile and the
 default modes; never the key.
 

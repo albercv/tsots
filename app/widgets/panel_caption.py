@@ -24,7 +24,6 @@ class PanelCaption(QWidget):
     da paso a publicarlo en redes."""
 
     publicar = Signal()
-    configurar_redes = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,13 +66,9 @@ class PanelCaption(QWidget):
         layout.addLayout(botones)
         fila_redes = QHBoxLayout()
         fila_redes.addStretch(1)
-        self.boton_redes = QPushButton(_("Redes…"))
-        self.boton_redes.setToolTip(_("Servicio, perfil y API key para publicar"))
-        self.boton_redes.clicked.connect(self.configurar_redes)
         self.boton_publicar = QPushButton(_("Publicar…"))
         self.boton_publicar.setToolTip(_("Publicar en TikTok, YouTube e Instagram"))
         self.boton_publicar.clicked.connect(self.publicar)
-        fila_redes.addWidget(self.boton_redes)
         fila_redes.addWidget(self.boton_publicar)
         layout.addLayout(fila_redes)
         raiz.addWidget(grupo)

@@ -139,7 +139,8 @@ gratuito de 10 subidas al mes). Necesitas:
    creador).
 3. La **API key** de Upload-Post.
 
-Guárdalos una vez en **Redes…** (junto a Publicar…): el nombre del perfil
+Guárdalos una vez en **Redes…** (barra inferior, junto al idioma; siempre
+visible, también desde Publicar…): el nombre del perfil
 y la API key. La clave va directa al **Llavero de macOS** (servicio
 `tsots-upload_post`); la app nunca la muestra ni la escribe en disco. Para
 quitarla: **Olvidar clave** en el mismo diálogo, o borra la entrada en
