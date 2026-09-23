@@ -34,6 +34,16 @@ Pending work, most urgent first. Remove an item when it is merged into
       that means an in-app light/dark selector, a darker visual style, or a
       dark app icon and logo.
 
+- [ ] **Publish to Threads.** Add Threads as a sixth platform in
+      Publicar… and Redes…, following the X/Facebook pattern
+      (`videopipeline/redes/upload_post.py`, per-platform text, accounts
+      check). Upload-Post takes `platform[]=threads` with `threads_title`
+      (falls back to `title`), `threads_topic_tag` (1-50 chars, no `.` or
+      `&`), `threads_alt_text` and `threads_reply_control`; the global
+      `description` is ignored for Threads videos, so the post text must go
+      in `threads_title`. Check Threads' own text and video limits before
+      building the text field.
+
 - [ ] **Verify X and Facebook publishing with a real upload.** Needs the
       user: Task 6 of `docs/superpowers/plans/2026-09-23-publicar-x.md`
       (free plan, single post instead of a thread, Premium detection,
