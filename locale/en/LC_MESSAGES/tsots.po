@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-11 13:13+0200\n"
+"POT-Creation-Date: 2026-09-23 10:35+0200\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -46,6 +46,9 @@ msgstr "Speed up"
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
 msgstr "System Settings → Privacy & Security → Files and Folders: grant access to Terminal/Python, or choose another output folder."
 
+msgid "Amarillo"
+msgstr "Yellow"
+
 msgid "Archivo de vídeo incompleto o corrupto"
 msgstr "Incomplete or corrupt video file"
 
@@ -61,6 +64,9 @@ msgstr "Auto-detect"
 
 msgid "Añadir subtítulos"
 msgstr "Add subtitles"
+
+msgid "Caja blanca"
+msgstr "White box"
 
 msgid "Caja negra"
 msgstr "Black box"
@@ -257,8 +263,14 @@ msgstr "Language"
 msgid "Idioma:"
 msgstr "Language:"
 
+msgid "Impacto"
+msgstr "Impact"
+
 msgid "Junto al original (_limpio.mp4)"
 msgstr "Next to the original (_limpio.mp4)"
+
+msgid "Karaoke verde"
+msgstr "Green karaoke"
 
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr "The app re-encodes the video with h264_videotoolbox and retries automatically. If it still fails, re-encode by hand: ffmpeg -i input.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy output.mp4"
@@ -292,6 +304,9 @@ msgstr "Margin:"
 
 msgid "Mejora de voz"
 msgstr "Speech enhancement"
+
+msgid "Minimalista"
+msgstr "Minimal"
 
 msgid "Modelo de Ollama no descargado"
 msgstr "Ollama model not downloaded"
@@ -643,4 +658,3 @@ msgstr "■ Cancel"
 
 msgid "▶ Procesar"
 msgstr "▶ Process"
-

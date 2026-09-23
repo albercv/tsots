@@ -392,3 +392,24 @@ def test_estado_trabajo_display_usa_traduccion(qtbot):
     m.anadir([Path("/v/a.mp4")])
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert EstadoTrabajo.ESPERA.value in texto  # español = idioma fuente
+
+
+def test_combo_diseno_ofrece_todos_los_estilos(qtbot):
+    from videopipeline.config import DISENOS
+
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    datos = [panel.combo_diseno.itemData(i) for i in range(panel.combo_diseno.count())]
+    assert datos == list(DISENOS)
+
+
+def test_etiquetas_de_estilo_traducidas_al_ingles():
+    """Cada estilo tiene traducción en el catálogo inglés (puede coincidir)."""
+    import re
+
+    from app.widgets.panel_opciones import ETIQUETA_DISENO
+
+    po = (Path(__file__).parent.parent / "locale/en/LC_MESSAGES/tsots.po").read_text(
+        encoding="utf-8")
+    traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
+    assert [e for e in ETIQUETA_DISENO if e not in traducidas] == []

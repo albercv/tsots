@@ -122,7 +122,11 @@ def test_validar_idioma_y_modelo_whisper():
 def test_tablas_subtitulos():
     from videopipeline.config import DISENOS, IDIOMAS_SUBS, MODELOS_WHISPER
 
-    assert DISENOS == ("reels_bold", "reels_karaoke", "caja")
+    from videopipeline.subtitles import PRESETS
+
+    assert DISENOS == ("reels_bold", "reels_karaoke", "caja", "impacto",
+                       "amarillo", "karaoke_verde", "minimal", "caja_blanca")
+    assert set(DISENOS) == set(PRESETS)
     assert IDIOMAS_SUBS == ("es", "auto", "en")
     assert MODELOS_WHISPER == ("small", "medium")
 

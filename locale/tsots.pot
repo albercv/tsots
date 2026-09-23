@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-11 13:13+0200\n"
+"POT-Creation-Date: 2026-09-23 10:35+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -37,9 +37,7 @@ msgstr ""
 msgid "AVISO: {aviso}"
 msgstr ""
 
-msgid ""
-"Abre el log del trabajo y añade este caso a videopipeline/errores.py para "
-"que la próxima vez se explique."
+msgid "Abre el log del trabajo y añade este caso a videopipeline/errores.py para que la próxima vez se explique."
 msgstr ""
 
 msgid "Abrir log"
@@ -48,9 +46,10 @@ msgstr ""
 msgid "Acelerar"
 msgstr ""
 
-msgid ""
-"Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede "
-"acceso a Terminal/Python, o elige otra carpeta de salida."
+msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
+msgstr ""
+
+msgid "Amarillo"
 msgstr ""
 
 msgid "Archivo de vídeo incompleto o corrupto"
@@ -65,6 +64,9 @@ msgid "Autodetectar"
 msgstr ""
 
 msgid "Añadir subtítulos"
+msgstr ""
+
+msgid "Caja blanca"
 msgstr ""
 
 msgid "Caja negra"
@@ -100,14 +102,10 @@ msgstr ""
 msgid "Cola"
 msgstr ""
 
-msgid ""
-"Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en "
-"audio_procesado/, bórralo y vuelve a procesar."
+msgid "Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en audio_procesado/, bórralo y vuelve a procesar."
 msgstr ""
 
-msgid ""
-"Conecta a internet y vuelve a procesar; los modelos se descargan una sola "
-"vez."
+msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
 msgstr ""
 
 msgid "Contexto de marca"
@@ -174,42 +172,28 @@ msgstr ""
 msgid "ERROR: {error}"
 msgstr ""
 
-msgid ""
-"Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo "
-"y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital "
-"#iaparapymes"
+msgid "Ej.: Soy Alberto, consultor de IA para pymes (Evolve2Digital). Tono directo y cercano. CTA: sígueme para más. Hashtags fijos: #evolve2digital #iaparapymes"
 msgstr ""
 
-msgid ""
-"Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de "
-"Ollama. Si el puerto 11434 está ocupado, libéralo."
+msgid "Ejecuta `ollama serve` en una terminal para ver el error, o abre la app de Ollama. Si el puerto 11434 está ocupado, libéralo."
 msgstr ""
 
-msgid ""
-"El caption SEO se genera con un modelo local servido por Ollama y no se "
-"encuentra el ejecutable `ollama` en PATH."
+msgid "El caption SEO se genera con un modelo local servido por Ollama y no se encuentra el ejecutable `ollama` en PATH."
 msgstr ""
 
-msgid ""
-"El disco donde se escriben los temporales o la salida está lleno. Los "
-"intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del "
-"vídeo original."
+msgid "El disco donde se escriben los temporales o la salida está lleno. Los intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del vídeo original."
 msgstr ""
 
 msgid "El modelo Whisper se descargará al primer uso (~500MB)."
 msgstr ""
 
-msgid ""
-"El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los "
-"vídeos largos a 48 kHz cargan el audio completo en memoria."
+msgid "El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los vídeos largos a 48 kHz cargan el audio completo en memoria."
 msgstr ""
 
 msgid "El modelo se descargará al primer uso."
 msgstr ""
 
-msgid ""
-"El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no "
-"se encuentra."
+msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno no se encuentra."
 msgstr ""
 
 #, python-brace-format
@@ -243,17 +227,13 @@ msgstr ""
 msgid "Extracción de audio"
 msgstr ""
 
-msgid ""
-"Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista "
-"original y recorta silencios con auto-editor."
+msgid "Extrae el audio de un vídeo, lo limpia con ClearVoice, sustituye la pista original y recorta silencios con auto-editor."
 msgstr ""
 
 msgid "Extrayendo audio"
 msgstr ""
 
-msgid ""
-"Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar "
-"de HuggingFace."
+msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
 msgstr ""
 
 msgid "Falta una herramienta externa"
@@ -262,9 +242,7 @@ msgstr ""
 msgid "Faltan dependencias"
 msgstr ""
 
-msgid ""
-"Genera nombre_limpio.md con un modelo local (Ollama) a partir de la "
-"transcripción."
+msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
 msgid "Genera título SEO, caption y hashtags (nombre_limpio.md) con Ollama."
@@ -282,13 +260,16 @@ msgstr ""
 msgid "Idioma:"
 msgstr ""
 
+msgid "Impacto"
+msgstr ""
+
 msgid "Junto al original (_limpio.mp4)"
 msgstr ""
 
-msgid ""
-"La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. "
-"Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v "
-"h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
+msgid "Karaoke verde"
+msgstr ""
+
+msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr ""
 
 msgid "La respuesta del modelo no es JSON válido"
@@ -321,6 +302,9 @@ msgstr ""
 msgid "Mejora de voz"
 msgstr ""
 
+msgid "Minimalista"
+msgstr ""
+
 msgid "Modelo de Ollama no descargado"
 msgstr ""
 
@@ -335,24 +319,17 @@ msgid "Modo"
 msgstr ""
 
 #, python-brace-format
-msgid ""
-"Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este "
-"Mac deja ~{memoria} GB para modelos."
+msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr ""
 
-msgid ""
-"Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: "
-"brew install ffmpeg-full"
+msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
 msgstr ""
 
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr ""
 
-msgid ""
-"No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama "
-"serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del "
-"modelo en curso)."
+msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
 msgstr ""
 
 msgid "No queda espacio en disco"
@@ -425,9 +402,7 @@ msgstr ""
 msgid "Ollama responde pero no tiene el modelo pedido en local."
 msgstr ""
 
-msgid ""
-"Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso "
-"en marcha. ¿Reiniciar ahora?"
+msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
 #, python-brace-format
@@ -462,9 +437,7 @@ msgstr ""
 msgid "Quitar"
 msgstr ""
 
-msgid ""
-"Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que "
-"quieres siempre. Se envía al modelo con cada vídeo."
+msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
 msgstr ""
 
 #, python-brace-format
@@ -489,14 +462,10 @@ msgstr ""
 msgid "SIGBUS: acceso a memoria inválido en una librería nativa"
 msgstr ""
 
-msgid ""
-"SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria "
-"(jetsam) o porque se cerró la app"
+msgid "SIGKILL: el sistema mató el proceso, casi siempre por falta de memoria (jetsam) o porque se cerró la app"
 msgstr ""
 
-msgid ""
-"SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, "
-"PyAV)"
+msgid "SIGSEGV: fallo de segmentación en una librería nativa (torch, ctranslate2, PyAV)"
 msgstr ""
 
 msgid "SIGTERM: el proceso fue terminado desde fuera"
@@ -542,9 +511,7 @@ msgid "Subtítulos"
 msgstr ""
 
 #, python-brace-format
-msgid ""
-"Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt "
-"conservado)."
+msgid "Subtítulos fallaron: {error}. Vídeo guardado sin subtítulos (.srt conservado)."
 msgstr ""
 
 #, python-brace-format
@@ -597,11 +564,7 @@ msgstr ""
 msgid "argumentos inválidos: se requiere --config"
 msgstr ""
 
-msgid ""
-"auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream "
-"H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el "
-"muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo "
-"original está bien."
+msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
 msgstr ""
 
 #, python-brace-format
@@ -613,9 +576,7 @@ msgid "auto-editor falló (código {codigo}) incluso tras reencodar la entrada"
 msgstr ""
 
 #, python-brace-format
-msgid ""
-"auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha "
-"reencodado con h264_videotoolbox y se ha reintentado."
+msgid "auto-editor no aceptó el stream H.264 original ({error}); el vídeo se ha reencodado con h264_videotoolbox y se ha reintentado."
 msgstr ""
 
 msgid "auto-editor no pudo escribir el vídeo"
@@ -639,10 +600,7 @@ msgstr ""
 msgid "error"
 msgstr ""
 
-msgid ""
-"ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo "
-"está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso "
-"anterior dejó una salida a medias)."
+msgid "ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso anterior dejó una salida a medias)."
 msgstr ""
 
 msgid "ffmpeg sin soporte de subtítulos (libass)"
@@ -651,9 +609,7 @@ msgstr ""
 msgid "hecho"
 msgstr ""
 
-msgid ""
-"macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, "
-"Documentos y discos externos requieren permiso)."
+msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
 msgstr ""
 
 msgid "medium (más preciso)"
