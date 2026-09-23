@@ -173,3 +173,10 @@ def test_idioma_ui_por_defecto_y_json():
     assert c.idioma_ui == "es"
     c2 = PipelineConfig.from_json(_config_minima(idioma_ui="en").to_json())
     assert c2.idioma_ui == "en"
+
+
+def test_glosario_por_defecto_vacio_y_viaja_en_json():
+    c = _config_minima()
+    assert c.glosario == ""
+    c = _config_minima(glosario="Claude Code = Cloud Code\nAnthropic")
+    assert PipelineConfig.from_json(c.to_json()).glosario == c.glosario

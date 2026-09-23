@@ -19,6 +19,9 @@ from .subtitles import (
 from .caption import escribir_md, texto_plano
 from .caption import generar as generar_caption
 from .errores import explicar
+from .glosario import corregir as corregir_glosario
+from .glosario import parsear as parsear_glosario
+from .glosario import prompt_whisper, terminos_caption
 from .i18n import _
 from .ollama import asegurar_servidor
 from .subtitles import Palabra
@@ -39,6 +42,24 @@ def _avisar(on_progress: Progreso | None, texto: str) -> None:
         on_progress({"warning": texto})
 
 
+def _transcribir(config: PipelineConfig, video: Path,
+                 on_progress: Progreso | None) -> list[Palabra]:
+    """Transcribe con la pista del glosario y corrige los errores conocidos.
+
+    Si el glosario falla, avisa y devuelve la transcripción sin corregir.
+    """
+    glosario = parsear_glosario(config.glosario)
+    palabras = transcribir(video, config.idioma_subs, config.modelo_whisper,
+                           prompt=prompt_whisper(glosario))
+    try:
+        return corregir_glosario(palabras, glosario)
+    except Exception as error:  # noqa: BLE001 — degradación deliberada
+        _avisar(on_progress,
+                _("El glosario de términos falló: {error}. Se usa la "
+                  "transcripción sin corregir.").format(error=error))
+        return palabras
+
+
 def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
                      trabajo: Path, on_progress: Progreso | None,
                      paso: int, total: int) -> tuple[Path, list[Palabra] | None]:
@@ -55,8 +76,7 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
             _("Transcribiendo") if en_cache
             else _("Descargando modelo Whisper y transcribiendo"),
         )
-        palabras = transcribir(tmp_final, config.idioma_subs,
-                               config.modelo_whisper)
+        palabras = _transcribir(config, tmp_final, on_progress)
         if not palabras:
             raise RuntimeError("la transcripción no produjo palabras")
         bloques = agrupar(palabras, config.diseno)
@@ -108,14 +128,14 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
         ruta_md.unlink(missing_ok=True)  # nunca dejar un caption obsoleto
         if palabras is None:
             _emitir(on_progress, paso, total, _("Transcribiendo"))
-            palabras = transcribir(video_publicable, config.idioma_subs,
-                                   config.modelo_whisper)
+            palabras = _transcribir(config, video_publicable, on_progress)
             paso += 1
         _emitir(on_progress, paso, total, _("Generando caption SEO"))
         servidor = asegurar_servidor()
         caption = generar_caption(
             texto_plano(palabras), config.contexto_marca, config.modelo_caption,
             idioma=config.idioma_subs if config.idioma_subs in ("es", "en") else "es",
+            terminos=terminos_caption(parsear_glosario(config.glosario)),
         )
         escribir_md(caption, ruta_md)
     except Exception as error:  # noqa: BLE001 — degradación deliberada

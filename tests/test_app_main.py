@@ -439,3 +439,35 @@ def test_ventana_muestra_catalogo_ingles_instalado(qtbot, tmp_path, monkeypatch)
         assert ventana.etiqueta_cola.text() == "Queue"
     finally:
         i18n.instalar("es")
+
+
+def test_editar_glosario_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.glosario = "antes"
+    visto = {}
+
+    class DialogoFalso:
+        def __init__(self, texto_inicial="", parent=None):
+            visto["inicial"] = texto_inicial
+
+        def exec(self):
+            return 1
+
+        def texto(self):
+            return "Claude Code = Cloud Code"
+
+    monkeypatch.setattr("app.main.DialogoGlosario", DialogoFalso)
+    ventana.panel.editar_glosario.emit()
+    assert visto["inicial"] == "antes"
+    assert ventana.ajustes.glosario == "Claude Code = Cloud Code"
+
+
+def test_procesar_incluye_glosario(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.glosario = "Anthropic"
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    capturado = {}
+    monkeypatch.setattr(ventana.ejecutor, "iniciar",
+                        lambda trabajos: capturado.setdefault("t", trabajos))
+    ventana.procesar()
+    assert json.loads(capturado["t"][0][1])["glosario"] == "Anthropic"

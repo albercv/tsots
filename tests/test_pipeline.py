@@ -140,8 +140,10 @@ def entorno_subs(entorno, monkeypatch, tmp_path):
     """Extiende `entorno` mockeando la fase de subtítulos."""
     llamadas, video, base = entorno
 
-    def falso_transcribir(video_, idioma, modelo):
+    def falso_transcribir(video_, idioma, modelo, prompt=None):
         llamadas.append(f"transcribir:{idioma}:{modelo}")
+        if prompt:
+            llamadas.append(f"prompt:{prompt}")
         from videopipeline.subtitles import Palabra
         return [Palabra(texto="hola", inicio=0.0, fin=0.5)]
 
@@ -222,7 +224,7 @@ def test_transcripcion_falla_degrada_con_warning(entorno_subs, tmp_path,
                                                  monkeypatch):
     llamadas, video, _ = entorno_subs
 
-    def revienta(video_, idioma, modelo):
+    def revienta(video_, idioma, modelo, prompt=None):
         raise RuntimeError("sin GPU")
 
     monkeypatch.setattr(pipeline, "transcribir", revienta)
@@ -336,8 +338,10 @@ def entorno_caption(entorno_subs, monkeypatch):
         return ServidorFalso()
 
     def falso_generar(transcripcion, contexto_marca, modelo, cliente=None,
-                      idioma="es"):
+                      idioma="es", terminos=()):
         llamadas.append(f"generar:{modelo}:{contexto_marca}:{transcripcion}")
+        if terminos:
+            llamadas.append(f"terminos:{','.join(terminos)}")
         llamadas.append(f"idioma_caption:{idioma}")
         from videopipeline.caption import Caption
         return Caption(titulo="T", caption="C", hashtags=["#a"], palabras_clave=["k"])
@@ -440,7 +444,7 @@ def test_caption_con_subtitulos_fallidos_transcribe_de_nuevo(entorno_caption, tm
     llamadas, video, base = entorno_caption
     intentos = {"n": 0}
 
-    def transcribir_flaky(video_, idioma, modelo):
+    def transcribir_flaky(video_, idioma, modelo, prompt=None):
         intentos["n"] += 1
         if intentos["n"] == 1:
             raise RuntimeError("whisper caído")
@@ -535,3 +539,80 @@ def test_caption_usa_es_si_idioma_subs_auto(entorno_caption, tmp_path):
         None,
     )
     assert "idioma_caption:es" in llamadas
+
+
+# --- glosario de términos ----------------------------------------------------------
+
+def _transcripcion_cloud(monkeypatch, llamadas):
+    from videopipeline.subtitles import Palabra
+
+    def falso(video_, idioma, modelo, prompt=None):
+        llamadas.append(f"prompt:{prompt}")
+        return [Palabra("en", 0.0, 0.2), Palabra("Cloud", 0.3, 0.5),
+                Palabra("Code.", 0.6, 0.9)]
+
+    agrupadas: list[list[str]] = []
+
+    def falso_agrupar(palabras, preset_id):
+        from videopipeline.subtitles import Bloque
+        agrupadas.append([p.texto for p in palabras])
+        return [Bloque(palabras=palabras, inicio=0.0, fin=0.9)]
+
+    monkeypatch.setattr(pipeline, "transcribir", falso)
+    monkeypatch.setattr(pipeline, "agrupar", falso_agrupar)
+    return agrupadas
+
+
+def test_glosario_corrige_subtitulos_y_caption(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, _ = entorno_caption
+    agrupadas = _transcripcion_cloud(monkeypatch, llamadas)
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", subtitulos=True,
+                       caption_seo=True, glosario="Claude Code = Cloud Code"),
+        None,
+    )
+    assert "prompt:Claude Code." in llamadas
+    assert agrupadas == [["en", "Claude", "Code."]]
+    assert any(l.endswith(":en Claude Code.") for l in llamadas if l.startswith("generar:"))
+    assert "terminos:Claude Code" in llamadas
+
+
+def test_glosario_corrige_caption_sin_subtitulos(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, _ = entorno_caption
+    _transcripcion_cloud(monkeypatch, llamadas)
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True,
+                       glosario="Claude Code = Cloud Code"),
+        None,
+    )
+    assert any(l.endswith(":en Claude Code.") for l in llamadas if l.startswith("generar:"))
+
+
+def test_sin_glosario_no_hay_prompt_ni_terminos(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, _ = entorno_caption
+    _transcripcion_cloud(monkeypatch, llamadas)
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", caption_seo=True),
+        None,
+    )
+    assert "prompt:None" in llamadas
+    assert not any(l.startswith("terminos:") for l in llamadas)
+
+
+def test_glosario_que_falla_avisa_y_sigue(entorno_caption, tmp_path, monkeypatch):
+    llamadas, video, _ = entorno_caption
+    agrupadas = _transcripcion_cloud(monkeypatch, llamadas)
+
+    def revienta(palabras, g):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(pipeline, "corregir_glosario", revienta)
+    eventos: list[dict] = []
+    salida = pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", subtitulos=True,
+                       glosario="Claude Code = Cloud Code"),
+        eventos.append,
+    )
+    assert salida.exists()
+    assert agrupadas == [["en", "Cloud", "Code."]]
+    assert any("boom" in e.get("warning", "") for e in eventos)

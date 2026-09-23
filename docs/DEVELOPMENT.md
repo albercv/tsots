@@ -96,8 +96,8 @@ call the real Ollama if it is running; they skip otherwise).
 
 ```
 app/                 PySide6 GUI (main window, queue model, worker, widgets)
-videopipeline/       pipeline (steps, subtitles, caption, ollama client,
-                     errors → diagnostics, runner subprocess, i18n)
+videopipeline/       pipeline (steps, subtitles, caption, glossary, ollama
+                     client, errors → diagnostics, runner subprocess, i18n)
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
 locale/              gettext catalogs (see Translations)
@@ -109,6 +109,21 @@ The GUI never runs the pipeline in-process: `app/worker.py` launches
 lines (`step/total/label/percent`, `warning`, `error` + `diagnostico`,
 `done`). Heavy imports (torch, mlx, faster-whisper) therefore only happen in
 the subprocess.
+
+## Glossary of terms
+
+`videopipeline/glosario.py` (pure, no I/O). The user's text (QSettings key
+`transcripcion/glosario`, CLI `--glosario FILE`) travels raw in
+`PipelineConfig.glosario` and is applied in `pipeline._transcribir`:
+
+1. The correct forms go to Whisper as `initial_prompt`, capped at
+   `MAX_CHARS_PROMPT` (600 chars, below Whisper's 224-token context).
+2. Known mishearings (`Term = variant, variant`) are replaced once in the
+   word list, keeping timestamps, so subtitles and caption share the fix.
+   This also covers long videos, where the prompt leaves Whisper's window.
+3. The caption prompt asks the LLM to keep the terms' spelling.
+
+A failing glossary only emits a warning.
 
 ## App bundle (Dock icon)
 

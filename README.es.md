@@ -90,6 +90,14 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
      tooltip dice por qué.
+   - **Términos…**: tus marcas y nombres propios, uno por línea, para que
+     Whisper los escriba bien en los subtítulos y el caption. Después de
+     `=`, las formas en que Whisper se equivoca; se corrigen solas:
+
+     ```
+     Claude Code = Cloud Code, Claus Code
+     Anthropic
+     ```
 3. **Salida**: por defecto junto al original como `nombre_limpio.mp4`;
    con **Cambiar…** eliges otra carpeta.
 4. **▶ Procesar**. La cola avanza de uno en uno mostrando el paso

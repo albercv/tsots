@@ -324,19 +324,23 @@ def _crear_whisper(modelo: str):
     return WhisperModel(modelo, device="auto", compute_type="auto")
 
 
-def transcribir(video: Path, idioma: str, modelo: str) -> list[Palabra]:
+def transcribir(video: Path, idioma: str, modelo: str,
+                prompt: str | None = None) -> list[Palabra]:
+    """`prompt`: pista con términos propios (ver `glosario.prompt_whisper`)."""
     lengua = None if idioma == "auto" else idioma
     if usa_mlx():
-        return _transcribir_mlx(video, lengua, modelo)
-    return _transcribir_faster(video, lengua, modelo)
+        return _transcribir_mlx(video, lengua, modelo, prompt)
+    return _transcribir_faster(video, lengua, modelo, prompt)
 
 
-def _transcribir_mlx(video: Path, lengua: str | None, modelo: str) -> list[Palabra]:
+def _transcribir_mlx(video: Path, lengua: str | None, modelo: str,
+                     prompt: str | None) -> list[Palabra]:
     resultado = _mlx_transcribe(
         _cargar_audio(video),
         path_or_hf_repo=MODELOS_MLX[modelo],
         language=lengua,
         word_timestamps=True,
+        initial_prompt=prompt,
         hallucination_silence_threshold=SILENCIO_ALUCINACION,
         verbose=None,
     )
@@ -351,14 +355,15 @@ def _transcribir_mlx(video: Path, lengua: str | None, modelo: str) -> list[Palab
     return palabras
 
 
-def _transcribir_faster(video: Path, lengua: str | None,
-                        modelo: str) -> list[Palabra]:
+def _transcribir_faster(video: Path, lengua: str | None, modelo: str,
+                        prompt: str | None) -> list[Palabra]:
     whisper = _crear_whisper(MODELOS_FASTER[modelo])
     segmentos, _info = whisper.transcribe(
         str(video),
         language=lengua,
         word_timestamps=True,
         vad_filter=True,
+        initial_prompt=prompt,
     )
     palabras: list[Palabra] = []
     for segmento in segmentos:

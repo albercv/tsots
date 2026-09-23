@@ -25,10 +25,6 @@ Pending work, most urgent first. Remove an item when it is merged into
       Fallback if CLI auth fails: a scheduled task in the Claude desktop app,
       which already has the e2d connector (not verified).
 
-- [ ] **Glossary of terms for transcription.** Plan ready:
-      `docs/superpowers/plans/2026-09-23-glosario.md`. Fixes brand names
-      such as "Claude Code" being transcribed as "Cloud Code".
-
 ## Improvements
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in

@@ -63,6 +63,7 @@ ETIQUETA_MODELO_WHISPER = {
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
     editar_marca = Signal()
+    editar_glosario = Signal()
     modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
     refrescar_modelos = Signal()
 
@@ -158,8 +159,15 @@ class PanelOpciones(QWidget):
         fila_tamano.addWidget(self.etiqueta_tamano)
         form_subs.addRow(_("Tamaño:"), fila_tamano)
         form_subs.addRow(_("Idioma:"), self.combo_idioma_subs)
+        self.boton_glosario = QPushButton(_("Términos…"))
+        self.boton_glosario.setToolTip(
+            _("Marcas y nombres propios que Whisper debe escribir bien.")
+        )
+        self.boton_glosario.clicked.connect(self.editar_glosario)
         form_subs.addRow(_("Modelo:"), self.combo_modelo_whisper)
         form_subs.addRow("", self.aviso_whisper)
+        # Fila propia: junto al combo ensancharía la columna de opciones.
+        form_subs.addRow("", self.boton_glosario)
         layout.addWidget(grupo_subs)
         self._grupo_subs = grupo_subs
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
@@ -184,6 +192,10 @@ class PanelOpciones(QWidget):
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
         caption_layout.addLayout(fila_caption)
+        # El glosario sirve a subtítulos y caption: activo si hay alguno.
+        self.check_subtitulos.toggled.connect(self._actualizar_glosario)
+        self.check_caption.toggled.connect(self._actualizar_glosario)
+        self._actualizar_glosario()
         # Selector de modelo: se rellena con los modelos instalados en Ollama
         # (poblar_modelos); los que no caben en memoria quedan deshabilitados.
         fila_modelo = QHBoxLayout()
@@ -261,6 +273,11 @@ class PanelOpciones(QWidget):
         ):
             control.setEnabled(activo)
         self._refrescar_aviso_whisper()
+
+    def _actualizar_glosario(self, *args) -> None:
+        self.boton_glosario.setEnabled(
+            self.check_subtitulos.isChecked() or self.check_caption.isChecked()
+        )
 
     def _emitir_cambio_subs(self, *args) -> None:
         self.opciones_subs_cambiadas.emit()

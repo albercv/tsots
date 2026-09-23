@@ -40,6 +40,11 @@ def main(argv: list[str] | None = None) -> None:
         "--marca", default="",
         help=_("Contexto de marca para el caption (quién eres, tono, CTA)."),
     )
+    parser.add_argument(
+        "--glosario", type=Path, default=None,
+        help=_("Fichero de texto con términos propios para la transcripción "
+               "(una línea por término; «Término = variante, variante»)."),
+    )
     args = parser.parse_args(argv)
 
     faltan = comprobar_dependencias()
@@ -66,10 +71,23 @@ def main(argv: list[str] | None = None) -> None:
         )
         sys.exit(1)
 
+    glosario = ""
+    if args.glosario is not None:
+        ruta_glosario = args.glosario.expanduser()
+        try:
+            glosario = ruta_glosario.read_text(encoding="utf-8")
+        except OSError:
+            print(
+                _("ERROR: no se puede leer el glosario: {ruta}").format(
+                    ruta=ruta_glosario),
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     salida = args.salida.expanduser().resolve() if args.salida else None
     config = PipelineConfig(
         video=video, salida=salida,
-        caption_seo=args.caption, contexto_marca=args.marca,
+        caption_seo=args.caption, contexto_marca=args.marca, glosario=glosario,
         idioma_ui=i18n.idioma_actual(),
     )
 

@@ -90,6 +90,14 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the
      tooltip says why. The caption is written in the subtitle language.
+   - **Terms…**: your brands and proper names, one per line, so Whisper
+     spells them right in the subtitles and the caption. After `=`, the
+     ways Whisper gets them wrong; they are fixed automatically:
+
+     ```
+     Claude Code = Cloud Code, Claus Code
+     Anthropic
+     ```
 3. **Output**: next to the original as `name_limpio.mp4` by default;
    **Change…** picks another folder.
 4. **▶ Process**. The queue advances one video at a time, showing the
