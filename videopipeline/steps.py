@@ -34,6 +34,13 @@ def _ejecutar(cmd: list[str], descripcion: str) -> None:
         )
 
 
+# El iPhone graba audio que arranca tarde y con cortes entre paquetes (hasta
+# 0,3 s por vídeo). Si no se rellenan con silencio, ffmpeg y auto-editor los
+# colapsan y la voz se adelanta al vídeo, cada vez más hacia el final.
+# min_hard_comp baja el umbral de relleno de 0,1 s (defecto) a 10 ms.
+FILTRO_HUECOS_AUDIO = "aresample=async=1:min_hard_comp=0.01:first_pts=0"
+
+
 def cmd_extraer_audio(
     ffmpeg: str, video: Path, wav: Path, sample_rate: int
 ) -> list[str]:
@@ -41,25 +48,26 @@ def cmd_extraer_audio(
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video),
         "-map", "0:a:0", "-vn",
-        # El iPhone graba audio que arranca tarde y con cortes entre paquetes
-        # (hasta 0,3 s por vídeo). Sin rellenarlos con silencio el WAV los
-        # colapsa y la voz se adelanta al vídeo, cada vez más hacia el final.
-        # min_hard_comp baja el umbral de relleno de 0,1 s (defecto) a 10 ms.
-        "-af", "aresample=async=1:min_hard_comp=0.01:first_pts=0",
+        "-af", FILTRO_HUECOS_AUDIO,
         "-ac", "1", "-ar", str(sample_rate),
         "-c:a", "pcm_s16le",
         str(wav),
     ]
 
 
-def cmd_remux(ffmpeg: str, video: Path, audio: Path, salida: Path) -> list[str]:
+def cmd_remux(
+    ffmpeg: str, video: Path, audio: Path, salida: Path, intermedio: bool = False
+) -> list[str]:
+    """Sustituye la pista de audio. `intermedio`: audio PCM (salida .mov) para
+    que auto-editor no herede el retardo de arranque del AAC (~23 ms)."""
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video), "-i", str(audio),
         "-map", "0:v:0", "-map", "1:a:0",
         "-map_metadata", "0",
         "-c:v", "copy",
-        "-c:a", "aac", "-b:a", "192k",
+        *(["-c:a", "pcm_s16le"] if intermedio
+          else ["-c:a", "aac", "-b:a", "192k"]),
         "-movflags", "+faststart",
         "-shortest",
         str(salida),
@@ -144,10 +152,40 @@ def extraer_audio(video: Path, wav: Path, sample_rate: int) -> None:
         raise PasoFallido(_("No se generó el WAV: {wav}").format(wav=wav))
 
 
-def remux(video: Path, audio: Path, salida: Path) -> None:
+def cmd_rellenar_huecos_audio(ffmpeg: str, video: Path, salida: Path) -> list[str]:
+    """Copia el vídeo tal cual y reescribe solo el audio con los huecos
+    rellenos, para que auto-editor no los colapse. PCM (sin el retardo de
+    arranque del AAC): la salida debe ser .mov."""
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-map_metadata", "0",
+        "-c:v", "copy",
+        "-af", FILTRO_HUECOS_AUDIO,
+        "-c:a", "pcm_s16le",
+        str(salida),
+    ]
+
+
+def rellenar_huecos_audio(video: Path, salida: Path) -> None:
     salida.parent.mkdir(parents=True, exist_ok=True)
     _ejecutar(
-        cmd_remux(_binario("ffmpeg"), video, audio, salida),
+        cmd_rellenar_huecos_audio(_binario("ffmpeg"), video, salida),
+        _("Preparación del audio"),
+    )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(
+            _("No se generó el vídeo preparado: {salida}").format(salida=salida)
+        )
+
+
+def remux(
+    video: Path, audio: Path, salida: Path, intermedio: bool = False
+) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    _ejecutar(
+        cmd_remux(_binario("ffmpeg"), video, audio, salida, intermedio),
         _("Sustitución de la pista de audio"),
     )
     if not salida.is_file() or salida.stat().st_size == 0:

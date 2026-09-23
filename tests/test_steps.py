@@ -43,6 +43,22 @@ def test_cmd_remux():
     assert "+faststart" in cmd
 
 
+def test_cmd_remux_intermedio_usa_pcm():
+    cmd = cmd_remux("ffmpeg", Path("v.mp4"), Path("a.wav"), Path("o.mov"),
+                    intermedio=True)
+    assert cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
+    assert "aac" not in cmd
+    assert cmd[cmd.index("-c:v") + 1] == "copy"
+
+
+def test_cmd_rellenar_huecos_audio():
+    cmd = steps.cmd_rellenar_huecos_audio("ffmpeg", Path("v.MOV"), Path("o.mov"))
+    assert cmd[cmd.index("-c:v") + 1] == "copy"
+    assert cmd[cmd.index("-af") + 1] == steps.FILTRO_HUECOS_AUDIO
+    assert cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
+    assert cmd[-1] == "o.mov"
+
+
 def test_extraer_audio_rellena_arranque_tardio_y_huecos(tmp_path):
     """El iPhone graba audio que empieza tarde y con cortes entre paquetes.
     El WAV debe conservar esos silencios; si los colapsa, la voz se adelanta
