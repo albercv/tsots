@@ -72,7 +72,11 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
 
 1. **Arrastra** uno o varios vídeos a la zona de la izquierda (o haz clic
    para elegirlos). Aparecen en la cola.
-2. **Elige opciones** a la derecha:
+2. **Elige opciones** a la derecha. Cada grupo es una sección plegable:
+   pulsa su título para abrirla y se cierra la que estaba abierta (al
+   arrancar, **Modo**). Si no caben, solo las opciones hacen scroll; debajo,
+   siempre a la vista, quedan las pestañas **Previsualización** y
+   **Caption**.
    - **Modo**: pipeline completo (limpiar + recortar), solo limpiar audio,
      o solo cortar silencios.
    - **Limpieza de audio**: modelo de IA para quitar ruido. El de defecto
@@ -82,8 +86,9 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      reproduce a la velocidad que indiques.
    - **Subtítulos**: diseño (8 a elegir: Reels bold, karaoke, karaoke
      verde, Impacto, amarillo, minimalista, caja negra y caja blanca),
-     posición, tamaño, idioma y tamaño del modelo Whisper. La previsualización te
-     enseña cómo quedan sobre un fotograma real del vídeo seleccionado.
+     posición, tamaño, idioma y tamaño del modelo Whisper. La pestaña
+     **Previsualización** te enseña cómo quedan sobre un fotograma real del
+     vídeo seleccionado.
    - **Caption SEO**: genera `nombre_limpio.md` con título, caption y
      los 5 hashtags que mejor describen lo que se dice en el vídeo. **Marca…** guarda un
      texto con quién eres, tu tono y tu llamada a la acción para que el
@@ -105,8 +110,8 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    aproximadamente lo que dura el vídeo. Mientras la app esté abierta el
    Mac no entra en reposo.
 5. Al terminar, **doble clic** en un vídeo hecho lo abre. Si generaste
-   caption, aparece debajo de la previsualización con botones para copiar
-   título, caption, hashtags o todo, y **Publicar…** (ver
+   caption, al seleccionarlo se abre la pestaña **Caption** con botones para
+   copiar título, caption, hashtags o todo, y **Publicar…** (ver
    [Publicar en redes](#publicar-en-redes)).
 
 Puedes seguir usando el Mac mientras procesa. Bloquear la pantalla no

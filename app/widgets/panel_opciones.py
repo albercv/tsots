@@ -7,7 +7,6 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -23,6 +22,8 @@ from videopipeline import subtitles
 from videopipeline.config import MODELOS_POR_TAREA
 from videopipeline.i18n import N_, _
 from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
+
+from .seccion_plegable import Acordeon, SeccionPlegable
 
 # clearvoice/app/widgets/panel_opciones.py → clearvoice/checkpoints
 CHECKPOINTS_DIR = Path(__file__).resolve().parents[2] / "checkpoints"
@@ -60,19 +61,29 @@ ETIQUETA_MODELO_WHISPER = {
 }
 
 
+# Sangría del contenido de cada sección (px lógicos), bajo el título.
+MARGEN_CONTENIDO = 22
+
+
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
     editar_marca = Signal()
     editar_glosario = Signal()
     modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
     refrescar_modelos = Signal()
+    seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
 
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        # Secciones plegables en acordeón: solo una abierta, Modo al arrancar.
+        self.secciones: dict[str, SeccionPlegable] = {}
+        self._acordeon = Acordeon(self)
+        self._acordeon.cambiada.connect(self._emitir_seccion_abierta)
 
-        grupo_modo = QGroupBox(_("Modo"))
-        modo_layout = QVBoxLayout(grupo_modo)
+        modo_layout = self._seccion("modo", _("Modo"), QVBoxLayout)
         self.radio_completo = QRadioButton(_("Pipeline completo"))
         self.radio_solo_audio = QRadioButton(_("Solo limpiar audio"))
         self.radio_solo_silencios = QRadioButton(_("Solo cortar silencios"))
@@ -82,10 +93,10 @@ class PanelOpciones(QWidget):
         ):
             modo_layout.addWidget(radio)
             radio.toggled.connect(self._actualizar_habilitados)
-        layout.addWidget(grupo_modo)
 
-        grupo_audio = QGroupBox(_("Limpieza de audio"))
-        form_audio = QFormLayout(grupo_audio)
+        form_audio = self._seccion(
+            "audio", _("Limpieza de audio"), QFormLayout
+        )
         self.combo_tarea = QComboBox()
         for etiqueta, valor in ETIQUETA_TAREA.items():
             self.combo_tarea.addItem(_(etiqueta), valor)
@@ -100,12 +111,12 @@ class PanelOpciones(QWidget):
         form_audio.addRow(_("Tarea:"), self.combo_tarea)
         form_audio.addRow(_("Modelo:"), self.combo_modelo)
         form_audio.addRow("", self.aviso_modelo)
-        layout.addWidget(grupo_audio)
         self._repoblar_modelos()
         self._refrescar_aviso_modelo()
 
-        grupo_silencios = QGroupBox(_("Corte de silencios"))
-        form_sil = QFormLayout(grupo_silencios)
+        form_sil = self._seccion(
+            "silencios", _("Corte de silencios"), QFormLayout
+        )
         self.campo_margen = QLineEdit("0.2s")
         self.campo_umbral = QLineEdit("4%")
         self.combo_silencios = QComboBox()
@@ -121,10 +132,10 @@ class PanelOpciones(QWidget):
         form_sil.addRow(_("Umbral:"), self.campo_umbral)
         form_sil.addRow(_("Silencios:"), self.combo_silencios)
         form_sil.addRow(_("Velocidad:"), self.spin_velocidad)
-        layout.addWidget(grupo_silencios)
 
-        grupo_subs = QGroupBox(_("Subtítulos"))
-        form_subs = QFormLayout(grupo_subs)
+        form_subs = self._seccion(
+            "subtitulos", _("Subtítulos"), QFormLayout
+        )
         self.check_subtitulos = QCheckBox(_("Añadir subtítulos"))
         self.combo_diseno = QComboBox()
         for etiqueta, valor in ETIQUETA_DISENO.items():
@@ -168,16 +179,15 @@ class PanelOpciones(QWidget):
         form_subs.addRow("", self.aviso_whisper)
         # Fila propia: junto al combo ensancharía la columna de opciones.
         form_subs.addRow("", self.boton_glosario)
-        layout.addWidget(grupo_subs)
-        self._grupo_subs = grupo_subs
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
         self.combo_modelo_whisper.currentIndexChanged.connect(
             self._refrescar_aviso_whisper
         )
         self._actualizar_subtitulos()
 
-        grupo_caption = QGroupBox(_("Caption SEO"))
-        caption_layout = QVBoxLayout(grupo_caption)
+        caption_layout = self._seccion(
+            "caption", _("Caption SEO"), QVBoxLayout
+        )
         fila_caption = QHBoxLayout()
         self.check_caption = QCheckBox(_("Título, caption y hashtags"))
         self.check_caption.setToolTip(
@@ -221,18 +231,43 @@ class PanelOpciones(QWidget):
         self.combo_modelo_caption.currentIndexChanged.connect(
             self._emitir_cambio_modelo
         )
-        layout.addWidget(grupo_caption)
-
+        for seccion in self.secciones.values():
+            layout.addWidget(seccion)
+            self._acordeon.anadir(seccion)
         layout.addStretch(1)
 
-        self._grupo_audio = grupo_audio
-        self._grupo_silencios = grupo_silencios
+        self._grupo_audio = self.secciones["audio"].contenido
+        self._grupo_silencios = self.secciones["silencios"].contenido
         self._actualizar_habilitados()
 
         self.check_subtitulos.toggled.connect(self._emitir_cambio_subs)
         self.combo_diseno.currentIndexChanged.connect(self._emitir_cambio_subs)
         self.spin_posicion.valueChanged.connect(self._emitir_cambio_subs)
         self.slider_tamano.valueChanged.connect(self._emitir_cambio_subs)
+
+    def _seccion(self, clave: str, titulo: str, tipo_layout):
+        """Crea la sección plegable `clave` y devuelve el layout de su contenido.
+
+        Los controles van en `contenido`: la lógica de habilitados lo recorre
+        entero sin tocar nunca la cabecera."""
+        seccion = SeccionPlegable(titulo)
+        self.secciones[clave] = seccion
+        layout = tipo_layout(seccion.contenido)
+        # Sangría para alinear los controles con el título, tras la flecha.
+        layout.setContentsMargins(MARGEN_CONTENIDO, 2, 4, 10)
+        return layout
+
+    def seccion_abierta(self) -> str:
+        abierta = self._acordeon.abierta()
+        return next(
+            (clave for clave, s in self.secciones.items() if s is abierta), ""
+        )
+
+    def abrir_seccion(self, clave: str) -> None:
+        self._acordeon.abrir(self.secciones[clave])
+
+    def _emitir_seccion_abierta(self, *args) -> None:
+        self.seccion_abierta_cambiada.emit(self.seccion_abierta())
 
     def _repoblar_modelos(self) -> None:
         tarea = self.combo_tarea.currentData()

@@ -248,15 +248,25 @@ def _caption_ejemplo():
                    hashtags=["#a", "#b"], palabras_clave=["k"])
 
 
-def test_panel_caption_oculto_sin_datos_y_muestra_con_datos(qtbot):
+def test_panel_caption_marcador_sin_datos_y_muestra_con_datos(qtbot):
     from app.widgets.panel_caption import PanelCaption
 
     panel = PanelCaption()
     qtbot.addWidget(panel)
-    panel.mostrar(None)
-    assert panel.isHidden()
-    panel.mostrar(_caption_ejemplo())
+    panel.show()
+    qtbot.waitExposed(panel)
+    # Sin caption no se oculta: enseña un marcador y conserva su alto.
     assert not panel.isHidden()
+    assert panel.etiqueta_vacia.isVisible()
+    assert not panel.etiqueta_titulo.isVisible()
+    alto = panel.sizeHint().height()
+    panel.mostrar(_caption_ejemplo())
+    assert not panel.etiqueta_vacia.isVisible()
+    assert panel.etiqueta_titulo.isVisible()
+    assert panel.sizeHint().height() == alto
+    panel.mostrar(None)
+    assert panel.etiqueta_vacia.isVisible()
+    panel.mostrar(_caption_ejemplo())
     assert panel.etiqueta_titulo.text() == "Título X"
     assert panel.texto_caption.toPlainText() == "Cuerpo\ndos líneas"
     assert panel.etiqueta_hashtags.text() == "#a #b"
@@ -576,3 +586,138 @@ def test_cabecera_lema_traducible(qtbot, tmp_path):
     qtbot.addWidget(cabecera)
     assert cabecera.lema.text() == "Edit quieter. Create louder."
     assert cabecera.titulo.text() == "The Silence of the Shorts"
+
+
+# --- secciones plegables (acordeón) ---
+
+
+def _seccion_con_contenido(titulo="Sección", ancho=420):
+    from PySide6.QtWidgets import QLabel, QVBoxLayout
+
+    from app.widgets.seccion_plegable import SeccionPlegable
+
+    seccion = SeccionPlegable(titulo)
+    etiqueta = QLabel("contenido")
+    etiqueta.setMinimumWidth(ancho)
+    QVBoxLayout(seccion.contenido).addWidget(etiqueta)
+    return seccion
+
+
+def test_seccion_plegable_abre_y_cierra(qtbot):
+    from PySide6.QtCore import Qt
+
+    seccion = _seccion_con_contenido("Modo")
+    qtbot.addWidget(seccion)
+    assert seccion.cabecera.text() == "Modo"
+    assert not seccion.esta_abierta()
+    assert seccion.contenido.isHidden()
+    assert seccion.cabecera.arrowType() == Qt.ArrowType.RightArrow
+    seccion.expandir(True)
+    assert seccion.esta_abierta()
+    assert not seccion.contenido.isHidden()
+    assert seccion.cabecera.arrowType() == Qt.ArrowType.DownArrow
+    seccion.expandir(False)
+    assert seccion.contenido.isHidden()
+    assert seccion.cabecera.arrowType() == Qt.ArrowType.RightArrow
+
+
+def test_seccion_plegable_ancho_cuenta_contenido_plegado(qtbot):
+    """El ancho no salta al abrir: la sección plegada ya reserva el del
+    contenido."""
+    seccion = _seccion_con_contenido(ancho=420)
+    qtbot.addWidget(seccion)
+    assert seccion.contenido.isHidden()
+    assert seccion.minimumSizeHint().width() >= 420
+    alto_plegada = seccion.sizeHint().height()
+    seccion.expandir(True)
+    assert seccion.sizeHint().height() > alto_plegada
+
+
+def test_acordeon_solo_una_abierta(qtbot):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QVBoxLayout, QWidget
+
+    from app.widgets.seccion_plegable import Acordeon
+
+    contenedor = QWidget()
+    qtbot.addWidget(contenedor)
+    layout = QVBoxLayout(contenedor)
+    a, b, c = (_seccion_con_contenido(t) for t in "ABC")
+    acordeon = Acordeon(contenedor)
+    for seccion in (a, b, c):
+        layout.addWidget(seccion)
+        acordeon.anadir(seccion)
+    acordeon.abrir(a)
+    contenedor.show()
+    qtbot.waitExposed(contenedor)
+    assert acordeon.abierta() is a
+    qtbot.mouseClick(b.cabecera, Qt.MouseButton.LeftButton)
+    assert acordeon.abierta() is b
+    assert [s.esta_abierta() for s in (a, b, c)] == [False, True, False]
+    assert a.contenido.isHidden() and not b.contenido.isHidden()
+    # Pulsar la abierta no la pliega: siempre queda exactamente una.
+    qtbot.mouseClick(b.cabecera, Qt.MouseButton.LeftButton)
+    assert [s.esta_abierta() for s in (a, b, c)] == [False, True, False]
+
+
+def test_panel_secciones_en_orden_y_modo_abierto(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert list(panel.secciones) == [
+        "modo", "audio", "silencios", "subtitulos", "caption",
+    ]
+    assert [s.cabecera.text() for s in panel.secciones.values()] == [
+        "Modo", "Limpieza de audio", "Corte de silencios", "Subtítulos",
+        "Caption SEO",
+    ]
+    assert panel.seccion_abierta() == "modo"
+    assert [s.esta_abierta() for s in panel.secciones.values()] == [
+        True, False, False, False, False,
+    ]
+
+
+def test_panel_clic_en_otra_seccion_cambia_la_abierta(qtbot):
+    from PySide6.QtCore import Qt
+
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.show()
+    qtbot.waitExposed(panel)
+    qtbot.mouseClick(panel.secciones["subtitulos"].cabecera,
+                     Qt.MouseButton.LeftButton)
+    assert panel.seccion_abierta() == "subtitulos"
+    assert panel.secciones["modo"].contenido.isHidden()
+    assert panel.check_subtitulos.isVisible()
+    assert not panel.radio_completo.isVisible()
+    qtbot.mouseClick(panel.secciones["caption"].cabecera,
+                     Qt.MouseButton.LeftButton)
+    assert panel.seccion_abierta() == "caption"
+    assert panel.secciones["subtitulos"].contenido.isHidden()
+
+
+def test_panel_valores_no_dependen_de_la_seccion_abierta(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"modo": "solo_audio", "subtitulos": True,
+                  "diseno": "caja", "caption_seo": True, "margen": "0.5s"})
+    esperado = panel.valores()
+    for clave in panel.secciones:
+        panel.abrir_seccion(clave)
+        assert panel.seccion_abierta() == clave
+        assert panel.valores() == esperado
+    assert esperado["modo"] == "solo_audio"
+    assert esperado["diseno"] == "caja"
+    assert esperado["caption_seo"] is True
+
+
+def test_panel_habilitados_no_tocan_cabeceras(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.radio_solo_silencios.setChecked(True)
+    assert not panel.combo_tarea.isEnabled()
+    assert panel.secciones["audio"].cabecera.isEnabled()
+    panel.radio_solo_audio.setChecked(True)
+    assert not panel.campo_margen.isEnabled()
+    assert panel.secciones["silencios"].cabecera.isEnabled()
+    panel.check_subtitulos.setChecked(False)
+    assert panel.secciones["subtitulos"].cabecera.isEnabled()

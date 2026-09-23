@@ -4,12 +4,13 @@ from pathlib import Path
 from typing import Callable
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QPalette
 from PySide6.QtWidgets import (
     QApplication,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QStackedLayout,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -29,9 +30,20 @@ class PanelCaption(QWidget):
         super().__init__(parent)
         self._caption: Caption | None = None
         self._video: Path | None = None
-        raiz = QVBoxLayout(self)
-        raiz.setContentsMargins(0, 0, 0, 0)
-        grupo = QGroupBox(_("Caption SEO"))
+        # Sin caption no se oculta: enseña un marcador y conserva el alto del
+        # contenido (QStackedLayout mide todas las páginas). El título y el
+        # marco los pone la pestaña que lo contiene.
+        raiz = QStackedLayout(self)
+        self.etiqueta_vacia = QLabel(
+            _("Selecciona un vídeo terminado con Caption SEO para ver su "
+              "título, caption y hashtags.")
+        )
+        self.etiqueta_vacia.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.etiqueta_vacia.setWordWrap(True)
+        self.etiqueta_vacia.setMargin(24)
+        self.etiqueta_vacia.setForegroundRole(QPalette.ColorRole.PlaceholderText)
+        raiz.addWidget(self.etiqueta_vacia)
+        grupo = QWidget()
         layout = QVBoxLayout(grupo)
         self.etiqueta_titulo = QLabel()
         self.etiqueta_titulo.setStyleSheet("font-weight: bold;")
@@ -72,7 +84,7 @@ class PanelCaption(QWidget):
         fila_redes.addWidget(self.boton_publicar)
         layout.addLayout(fila_redes)
         raiz.addWidget(grupo)
-        self.hide()
+        self._pila = raiz
 
     @property
     def caption(self) -> Caption | None:
@@ -87,12 +99,12 @@ class PanelCaption(QWidget):
         self._video = Path(video) if video else None
         self.boton_publicar.setEnabled(caption is not None and self._video is not None)
         if caption is None:
-            self.hide()
+            self._pila.setCurrentWidget(self.etiqueta_vacia)
             return
         self.etiqueta_titulo.setText(caption.titulo)
         self.texto_caption.setPlainText(caption.caption)
         self.etiqueta_hashtags.setText(caption.hashtags_texto)
-        self.show()
+        self._pila.setCurrentIndex(1)
 
     def _copiar(self, extraer: Callable[[Caption], str]) -> None:
         if self._caption is None:

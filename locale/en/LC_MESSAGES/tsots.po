@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 13:46+0200\n"
+"POT-Creation-Date: 2026-09-23 14:57+0200\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -88,6 +88,9 @@ msgstr "Cancelled"
 
 msgid "Cancelar"
 msgstr "Cancel"
+
+msgid "Caption"
+msgstr "Caption"
 
 msgid "Caption SEO"
 msgstr "SEO caption"
@@ -608,6 +611,9 @@ msgstr "Preview not available"
 msgid "Preview no disponible: {error}"
 msgstr "Preview not available: {error}"
 
+msgid "Previsualización"
+msgstr "Preview"
+
 msgid "Procesando en el servicio…"
 msgstr "Processing in the service…"
 
@@ -711,6 +717,9 @@ msgstr ""
 
 msgid "Selecciona un vídeo de la cola"
 msgstr "Select a video from the queue"
+
+msgid "Selecciona un vídeo terminado con Caption SEO para ver su título, caption y hashtags."
+msgstr "Select a finished video with SEO caption to see its title, caption and hashtags."
 
 msgid "Separación de hablantes"
 msgstr "Speaker separation"

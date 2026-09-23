@@ -226,20 +226,23 @@ def test_seleccion_de_hecho_muestra_caption(qtbot, tmp_path, monkeypatch):
     ventana.ejecutor.trabajo_terminado.emit(0, True, str(salida_a), "")
     ventana.ejecutor.trabajo_terminado.emit(1, True, str(tmp_path / "b_limpio.mp4"), "")
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
-    assert not ventana.panel_caption.isHidden()
+    assert ventana.panel_caption.caption is not None
+    assert ventana.panel_caption.etiqueta_vacia.isHidden()
     assert ventana.panel_caption.etiqueta_titulo.text() == "Título X"
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(1))  # sin .md
-    assert ventana.panel_caption.isHidden()
+    assert ventana.panel_caption.caption is None
+    assert not ventana.panel_caption.etiqueta_vacia.isHidden()
 
 
 def test_terminar_trabajo_seleccionado_refresca_caption(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.anadir_videos([tmp_path / "a.mp4"])
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
-    assert ventana.panel_caption.isHidden()
+    assert ventana.panel_caption.caption is None
     _md_ejemplo(tmp_path / "a_limpio.md")
     ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
-    assert not ventana.panel_caption.isHidden()
+    assert ventana.panel_caption.caption is not None
+    assert ventana.panel_caption.etiqueta_vacia.isHidden()
 
 
 def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
@@ -588,3 +591,144 @@ def test_boton_redes_abre_configuracion(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("app.main.DialogoRedes", Falso)
     ventana.boton_redes.click()
     assert Falso.abiertos == [(ventana.ajustes,)]
+
+
+# --- pestañas fijas: previsualización y caption ---
+
+
+def _es_descendiente(widget, ancestro) -> bool:
+    padre = widget.parentWidget()
+    while padre is not None:
+        if padre is ancestro:
+            return True
+        padre = padre.parentWidget()
+    return False
+
+
+def test_pestanas_fijas_fuera_del_scroll(qtbot, tmp_path, monkeypatch):
+    """Solo las secciones de opciones hacen scroll; la previsualización y el
+    caption quedan debajo, siempre a la vista."""
+    from PySide6.QtCore import QPoint, QRect
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(700, 600)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    assert _es_descendiente(ventana.panel, ventana.scroll_derecha)
+    for widget in (ventana.pestanas, ventana.vista_previa, ventana.panel_caption):
+        assert not _es_descendiente(widget, ventana.scroll_derecha)
+    assert _es_descendiente(ventana.vista_previa, ventana.pestanas)
+    assert _es_descendiente(ventana.panel_caption, ventana.pestanas)
+    central = ventana.centralWidget()
+
+    def rect(widget):
+        return QRect(widget.mapTo(central, QPoint(0, 0)), widget.size())
+
+    assert rect(ventana.scroll_derecha).bottom() < rect(ventana.pestanas).top()
+    assert ventana.pestanas.isVisible()
+    # A 700 × 600 las secciones no caben: hacen scroll, las pestañas no.
+    ventana.panel.abrir_seccion("subtitulos")
+    qtbot.wait(20)
+    assert ventana.scroll_derecha.verticalScrollBar().maximum() > 0
+    visible = rect(ventana.pestanas)
+    assert visible.bottom() <= central.height()
+    assert ventana.vista_previa.etiqueta.height() >= 180
+
+
+def test_pestanas_siempre_presentes_con_marcador(qtbot, tmp_path, monkeypatch):
+    from videopipeline.caption import Caption
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    pestanas = ventana.pestanas
+    assert pestanas.count() == 2
+    assert [pestanas.tabText(i) for i in range(2)] == ["Previsualización", "Caption"]
+    assert pestanas.widget(0) is ventana.vista_previa
+    assert pestanas.widget(1) is ventana.panel_caption
+    assert pestanas.currentWidget() is ventana.vista_previa
+    assert "Selecciona un vídeo" in ventana.vista_previa.etiqueta.text()
+    # Sin caption: la pestaña existe y enseña un marcador, no se oculta.
+    pestanas.setCurrentWidget(ventana.panel_caption)
+    assert ventana.panel_caption.isVisible()
+    assert ventana.panel_caption.etiqueta_vacia.isVisible()
+    assert ventana.panel_caption.etiqueta_vacia.text()
+    alto_vacio = pestanas.height()
+    ventana.panel_caption.mostrar(Caption("t", "c", ["#a"], ["k"]))
+    qtbot.wait(20)
+    assert not ventana.panel_caption.etiqueta_vacia.isVisible()
+    assert ventana.panel_caption.etiqueta_titulo.isVisible()
+    # El hueco no cambia con o sin contenido, ni con la otra pestaña.
+    assert pestanas.height() == alto_vacio
+    pestanas.setCurrentWidget(ventana.vista_previa)
+    qtbot.wait(20)
+    assert pestanas.height() == alto_vacio
+
+
+def test_seleccion_cambia_de_pestana_segun_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    salida_a = tmp_path / "a_limpio.mp4"
+    salida_a.write_bytes(b"MP4")
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(salida_a), "")
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert ventana.pestanas.currentWidget() is ventana.panel_caption
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(1))  # pendiente
+    assert ventana.pestanas.currentWidget() is ventana.vista_previa
+
+
+def test_terminar_con_caption_muestra_pestana_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert ventana.pestanas.currentWidget() is ventana.vista_previa
+    # Termina otro vídeo (no el seleccionado): no cambia nada.
+    _md_ejemplo(tmp_path / "b_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(1, True, str(tmp_path / "b_limpio.mp4"), "")
+    assert ventana.pestanas.currentWidget() is ventana.vista_previa
+    _md_ejemplo(tmp_path / "a_limpio.md")
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    assert ventana.pestanas.currentWidget() is ventana.panel_caption
+
+
+def test_opciones_subs_vuelven_a_previsualizacion(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.pestanas.setCurrentWidget(ventana.panel_caption)
+    ventana.panel.check_subtitulos.setChecked(True)
+    assert ventana.pestanas.currentWidget() is ventana.vista_previa
+    ventana.pestanas.setCurrentWidget(ventana.panel_caption)
+    ventana.panel.slider_tamano.setValue(120)
+    assert ventana.pestanas.currentWidget() is ventana.vista_previa
+
+
+def test_modo_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    assert ventana.panel.seccion_abierta() == "modo"
+
+
+def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
+    """En ventanas bajas, la sección que se abre queda a la vista."""
+    from PySide6.QtCore import Qt
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(700, 600)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    scroll = ventana.scroll_derecha
+    for clave in ("caption", "subtitulos", "modo", "caption"):
+        seccion = ventana.panel.secciones[clave]
+        qtbot.mouseClick(seccion.cabecera, Qt.MouseButton.LeftButton)
+        barra = scroll.verticalScrollBar()
+
+        def a_la_vista():
+            arriba = seccion.y() - barra.value()
+            visible = scroll.viewport().height()
+            assert arriba >= 0
+            # Entera si cabe; si no, desde su cabecera.
+            if seccion.height() <= visible:
+                assert arriba + seccion.height() <= visible
+            else:
+                assert arriba == 0
+
+        qtbot.waitUntil(a_la_vista, timeout=1000)
