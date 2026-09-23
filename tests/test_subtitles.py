@@ -181,6 +181,7 @@ def _segmento(*palabras):
 
 def test_transcribir_devuelve_palabras(tmp_path, monkeypatch):
     falso = WhisperFalso([_segmento((" hola", 0.0, 0.4), ("mundo ", 0.5, 0.9))])
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
     monkeypatch.setattr(subtitles, "_crear_whisper", lambda modelo: falso)
     video = tmp_path / "v.mp4"
     video.write_bytes(b"VID")
@@ -194,6 +195,7 @@ def test_transcribir_devuelve_palabras(tmp_path, monkeypatch):
 
 def test_transcribir_auto_pasa_none(tmp_path, monkeypatch):
     falso = WhisperFalso([])
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
     monkeypatch.setattr(subtitles, "_crear_whisper", lambda modelo: falso)
     video = tmp_path / "v.mp4"
     video.write_bytes(b"VID")
@@ -204,6 +206,7 @@ def test_transcribir_auto_pasa_none(tmp_path, monkeypatch):
 def test_transcribir_ignora_segmentos_sin_words(tmp_path, monkeypatch):
     seg_sin = SimpleNamespace(words=None)
     falso = WhisperFalso([seg_sin, _segmento(("ok", 0.0, 0.2))])
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
     monkeypatch.setattr(subtitles, "_crear_whisper", lambda modelo: falso)
     video = tmp_path / "v.mp4"
     video.write_bytes(b"VID")
@@ -289,3 +292,73 @@ def test_cada_estilo_genera_ass_valido(tmp_path, preset_id):
     texto = ruta.read_text(encoding="utf-8")
     assert f"Style: Sub,{PRESETS[preset_id].fuente}," in texto
     assert "Dialogue:" in texto
+
+
+# --- mlx-whisper (GPU) y respaldo ----------------------------------------------
+
+def _mlx_falso(monkeypatch, segmentos):
+    llamadas = []
+
+    def transcribe(audio, **kwargs):
+        llamadas.append((audio, kwargs))
+        return {"text": "", "segments": segmentos, "language": "es"}
+
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: True)
+    monkeypatch.setattr(subtitles, "_cargar_audio", lambda video: "AUDIO")
+    monkeypatch.setattr(subtitles, "_mlx_transcribe", transcribe)
+    return llamadas
+
+
+def test_transcribir_mlx_devuelve_palabras(tmp_path, monkeypatch):
+    llamadas = _mlx_falso(monkeypatch, [
+        {"words": [{"word": " hola", "start": 0.0, "end": 0.4},
+                   {"word": "mundo ", "start": 0.5, "end": 0.9}]},
+        {"words": []},
+        {},
+    ])
+    palabras = transcribir(tmp_path / "v.mp4", "es", "turbo")
+    assert [p.texto for p in palabras] == ["hola", "mundo"]
+    assert palabras[1].fin == 0.9
+    audio, kwargs = llamadas[0]
+    assert audio == "AUDIO"
+    assert kwargs["path_or_hf_repo"] == "mlx-community/whisper-large-v3-turbo"
+    assert kwargs["language"] == "es"
+    assert kwargs["word_timestamps"] is True
+
+
+def test_transcribir_mlx_auto_pasa_none(tmp_path, monkeypatch):
+    llamadas = _mlx_falso(monkeypatch, [])
+    assert transcribir(tmp_path / "v.mp4", "auto", "small") == []
+    assert llamadas[0][1]["language"] is None
+    assert llamadas[0][1]["path_or_hf_repo"] == "mlx-community/whisper-small-mlx"
+
+
+def test_respaldo_faster_whisper_traduce_turbo(tmp_path, monkeypatch):
+    creados = []
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
+    monkeypatch.setattr(subtitles, "_crear_whisper",
+                        lambda modelo: creados.append(modelo) or WhisperFalso([]))
+    transcribir(tmp_path / "v.mp4", "es", "turbo")
+    assert creados == ["large-v3-turbo"]
+
+
+def test_todos_los_modelos_tienen_repo_y_tamano():
+    from videopipeline.config import MODELOS_WHISPER
+
+    for m in MODELOS_WHISPER:
+        assert m in subtitles.MODELOS_MLX
+        assert m in subtitles.MODELOS_FASTER
+        assert m in subtitles.TAMANO_DESCARGA
+
+
+def test_modelo_en_cache_segun_backend(tmp_path, monkeypatch):
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: True)
+    assert not subtitles.modelo_en_cache("turbo", tmp_path)
+    (tmp_path / "models--mlx-community--whisper-large-v3-turbo").mkdir()
+    assert subtitles.modelo_en_cache("turbo", tmp_path)
+
+    monkeypatch.setattr(subtitles, "usa_mlx", lambda: False)
+    assert not subtitles.modelo_en_cache("turbo", tmp_path)
+    (tmp_path / "models--mobiuslabsgmbh--faster-whisper-large-v3-turbo").mkdir()
+    assert subtitles.modelo_en_cache("turbo", tmp_path)
+    assert not subtitles.modelo_en_cache("small", tmp_path / "no-existe")

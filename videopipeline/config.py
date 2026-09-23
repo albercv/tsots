@@ -29,7 +29,7 @@ SILENCIOS = ("cortar", "acelerar")
 DISENOS = ("reels_bold", "reels_karaoke", "caja", "impacto", "amarillo",
            "karaoke_verde", "minimal", "caja_blanca")
 IDIOMAS_SUBS = ("es", "auto", "en")
-MODELOS_WHISPER = ("small", "medium")
+MODELOS_WHISPER = ("small", "medium", "turbo")
 
 
 @dataclass
@@ -47,7 +47,7 @@ class PipelineConfig:
     diseno: str = "reels_bold"
     posicion_subs: int = 75
     idioma_subs: str = "es"
-    modelo_whisper: str = "small"
+    modelo_whisper: str = "turbo"
     tamano_subs: int = 100
     caption_seo: bool = False
     contexto_marca: str = ""

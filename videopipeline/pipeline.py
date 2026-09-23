@@ -13,7 +13,9 @@ from .steps import (
     remux,
     resolucion_video,
 )
-from .subtitles import agrupar, generar_ass, generar_srt, transcribir
+from .subtitles import (
+    agrupar, generar_ass, generar_srt, modelo_en_cache, transcribir,
+)
 from .caption import escribir_md, texto_plano
 from .caption import generar as generar_caption
 from .errores import explicar
@@ -47,10 +49,7 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
     transcripción no se consiguió (el caption la reintentará).
     """
     try:
-        cache_whisper = Path.home() / ".cache" / "huggingface" / "hub"
-        en_cache = cache_whisper.is_dir() and any(
-            cache_whisper.glob(f"models--*faster-whisper-{config.modelo_whisper}*")
-        )
+        en_cache = modelo_en_cache(config.modelo_whisper)
         _emitir(
             on_progress, paso, total,
             _("Transcribiendo") if en_cache

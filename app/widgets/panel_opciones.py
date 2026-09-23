@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from videopipeline import subtitles
 from videopipeline.config import MODELOS_POR_TAREA
 from videopipeline.i18n import N_, _
 from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
@@ -53,6 +54,7 @@ ETIQUETA_DISENO = {
 ETIQUETA_IDIOMA = {"Español": "es", N_("Autodetectar"): "auto", "English": "en"}
 
 ETIQUETA_MODELO_WHISPER = {
+    N_("turbo (recomendado)"): "turbo",
     N_("small (rápido)"): "small",
     N_("medium (más preciso)"): "medium",
 }
@@ -268,13 +270,10 @@ class PanelOpciones(QWidget):
             self.aviso_whisper.setText("")
             return
         modelo = self.combo_modelo_whisper.currentData()
-        patron = f"models--*faster-whisper-{modelo}*"
-        en_cache = WHISPER_CACHE_DIR.is_dir() and any(
-            WHISPER_CACHE_DIR.glob(patron)
-        )
         self.aviso_whisper.setText(
-            "" if en_cache
-            else _("El modelo Whisper se descargará al primer uso (~500MB).")
+            "" if subtitles.modelo_en_cache(modelo, WHISPER_CACHE_DIR)
+            else _("El modelo Whisper se descargará al primer uso ({tamano}).").format(
+                tamano=subtitles.TAMANO_DESCARGA[modelo])
         )
 
     # --- selector de modelo de caption ---
@@ -387,7 +386,7 @@ class PanelOpciones(QWidget):
         indice = self.combo_idioma_subs.findData(idioma)
         if indice >= 0:
             self.combo_idioma_subs.setCurrentIndex(indice)
-        modelo = valores.get("modelo_whisper", "small")
+        modelo = valores.get("modelo_whisper", "turbo")
         indice = self.combo_modelo_whisper.findData(modelo)
         if indice >= 0:
             self.combo_modelo_whisper.setCurrentIndex(indice)
