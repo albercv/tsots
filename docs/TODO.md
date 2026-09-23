@@ -40,6 +40,15 @@ Pending work, most urgent first. Remove an item when it is merged into
         Upload-Post (free tier 10 uploads/month) or Blotato. Try it with 2-3
         videos first. The API key goes in the macOS Keychain.
 
+- [ ] **Header alignment.** The header (`app/widgets/cabecera.py`) sits too
+      far to the left. Review spacing and alignment with the rest of the
+      window, ideally with the user looking at the real app.
+
+- [ ] **Dark version of the app.** The app already follows the macOS
+      appearance setting. The user wants a dark version too: clarify whether
+      that means an in-app light/dark selector, a darker visual style, or a
+      dark app icon and logo.
+
 ## Improvements
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
