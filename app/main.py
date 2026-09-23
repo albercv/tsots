@@ -135,7 +135,6 @@ class VentanaPrincipal(QMainWindow):
         columna_derecha.addWidget(self.vista_previa)
         self.panel_caption = PanelCaption()
         self.panel_caption.publicar.connect(self._publicar)
-        self.panel_caption.configurar_redes.connect(self._configurar_redes)
         columna_derecha.addWidget(self.panel_caption)
         columna_derecha.addStretch(1)
         self.scroll_derecha = QScrollArea()
@@ -171,6 +170,13 @@ class VentanaPrincipal(QMainWindow):
             self._al_cambiar_idioma_ui
         )
         fila_inferior.addWidget(self.combo_idioma_ui)
+        # Ajustes de la app (no de un vídeo): junto al idioma, siempre visibles.
+        self.boton_redes = QPushButton(_("Redes…"))
+        self.boton_redes.setToolTip(_("Servicio, perfil y API key para publicar"))
+        # Método ligado, no lambda: una lambda con `self` mantiene viva la
+        # ventana después de soltarla (el botón es su hijo y guarda la lambda).
+        self.boton_redes.clicked.connect(self._abrir_redes)
+        fila_inferior.addWidget(self.boton_redes)
         fila_inferior.addWidget(QLabel(_("Salida:")))
         fila_inferior.addWidget(self.etiqueta_salida, 1)
         fila_inferior.addWidget(self.boton_carpeta)
@@ -378,6 +384,10 @@ class VentanaPrincipal(QMainWindow):
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+
+    def _abrir_redes(self) -> None:
+        """Botón de la barra inferior: sin `checked` ni callback."""
+        self._configurar_redes()
 
     def _configurar_redes(self, al_guardar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)

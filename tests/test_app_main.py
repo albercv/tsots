@@ -524,7 +524,8 @@ def test_boton_publicar_activo_con_caption_del_video_terminado(qtbot, tmp_path, 
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     salida = _hecho_con_caption(ventana, tmp_path)
     assert ventana.panel_caption.boton_publicar.isEnabled()
-    assert ventana.panel_caption.boton_redes.isEnabled()
+    # Redes es configuración de la app, no del vídeo: no vive en este panel.
+    assert not hasattr(ventana.panel_caption, "boton_redes")
     assert ventana.panel_caption.video == salida
     ventana.panel_caption.mostrar(None)
     assert not ventana.panel_caption.boton_publicar.isEnabled()
@@ -557,13 +558,33 @@ def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
     assert len(avisos) == 1
 
 
+def _layout_de(layout, widget):
+    """El layout (anidado o no) que contiene directamente a `widget`."""
+    if layout.indexOf(widget) >= 0:
+        return layout
+    for i in range(layout.count()):
+        hijo = layout.itemAt(i).layout()
+        if hijo is not None and (encontrado := _layout_de(hijo, widget)):
+            return encontrado
+    return None
+
+
+def test_boton_redes_visible_sin_videos_junto_al_idioma(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.show()
+    assert ventana.boton_redes.isVisible()
+    assert ventana.boton_redes.isEnabled()
+    fila = _layout_de(ventana.centralWidget().layout(), ventana.combo_idioma_ui)
+    assert fila is not None
+    assert fila.indexOf(ventana.boton_redes) == fila.indexOf(ventana.combo_idioma_ui) + 1
+
+
 def test_boton_redes_abre_configuracion(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    _hecho_con_caption(ventana, tmp_path)
 
     class Falso(_DialogoFalso):
         abiertos: list = []
 
     monkeypatch.setattr("app.main.DialogoRedes", Falso)
-    ventana.panel_caption.boton_redes.click()
+    ventana.boton_redes.click()
     assert Falso.abiertos == [(ventana.ajustes,)]
