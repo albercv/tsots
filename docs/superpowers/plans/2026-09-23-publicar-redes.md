@@ -88,15 +88,15 @@ Resto de la app:
 - [x] Implementar `app/credenciales.py`.
 
 ### Task 5: configuración de redes
-- [ ] `Ajustes`: `proveedor_redes` (por defecto `upload_post`), `perfil_redes`, `youtube_categoria`, modo por defecto de TikTok e Instagram. Tests de persistencia.
-- [ ] `DialogoRedes`: perfil y API key (campo de contraseña; muestra "guardada" sin revelar la clave). Tests.
+- [x] `Ajustes`: `proveedor_redes` (por defecto `upload_post`), `perfil_redes`, `youtube_categoria`, modo por defecto de TikTok e Instagram. Tests de persistencia.
+- [x] `DialogoRedes`: perfil y API key (campo de contraseña; muestra "guardada" sin revelar la clave). Tests.
 
 ### Task 6: diálogo Publicar
-- [ ] Tests: textos editables precargados desde el `Caption`; casillas en orden TikTok, YouTube, Instagram; modos por defecto (TikTok según ajustes, Instagram prueba); aviso si ya se publicó; botón deshabilitado sin clave o sin plataformas; confirmación antes de publicar; muestra resultado y enlaces por plataforma con `publicar` falso.
-- [ ] Implementar `DialogoPublicar` con la subida en un `QThread`.
+- [x] Tests: textos editables precargados desde el `Caption`; casillas en orden TikTok, YouTube, Instagram; modos por defecto (TikTok según ajustes, Instagram prueba); aviso si ya se publicó; botón deshabilitado sin clave o sin plataformas; confirmación antes de publicar; muestra resultado y enlaces por plataforma con `publicar` falso.
+- [x] Implementar `DialogoPublicar` con la subida en un `QThread`.
 
 ### Task 7: cableado en la ventana
-- [ ] Botón **Publicar…** en `PanelCaption`, activo cuando el vídeo terminado tiene caption; menú o botón **Redes…** para la configuración. Tests en `tests/test_app_main.py`.
+- [x] Botón **Publicar…** en `PanelCaption`, activo cuando el vídeo terminado tiene caption; menú o botón **Redes…** para la configuración. Tests en `tests/test_app_main.py`.
 
 ### Task 8: traducciones, documentación y TODO
 - [ ] Cadenas nuevas traducidas al inglés.

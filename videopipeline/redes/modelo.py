@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 
+from ..i18n import N_
+
 
 class Plataforma(str, Enum):
     TIKTOK = "tiktok"
@@ -41,6 +43,29 @@ class ModoInstagram(str, Enum):
 
 # Categoría "People & Blogs" de YouTube.
 YOUTUBE_CATEGORIA_POR_DEFECTO = "22"
+
+# Textos de interfaz (se traducen al mostrarlos con `_`).
+ETIQUETAS_TIKTOK = {
+    ModoTikTok.BORRADOR: N_("Borrador (lo terminas en la app)"),
+    ModoTikTok.PUBLICO: N_("Público"),
+}
+ETIQUETAS_INSTAGRAM = {
+    ModoInstagram.PRUEBA: N_("Reel de prueba (a seguidores si funciona)"),
+    ModoInstagram.NORMAL: N_("Reel normal"),
+}
+# Categorías de YouTube (id de la API de YouTube → nombre).
+CATEGORIAS_YOUTUBE = {
+    "22": N_("Personas y blogs"),
+    "27": N_("Educación"),
+    "28": N_("Ciencia y tecnología"),
+    "26": N_("Consejos y estilo"),
+    "24": N_("Entretenimiento"),
+    "25": N_("Noticias y política"),
+    "23": N_("Humor"),
+    "19": N_("Viajes y eventos"),
+    "17": N_("Deportes"),
+    "10": N_("Música"),
+}
 
 
 @dataclass(frozen=True)
