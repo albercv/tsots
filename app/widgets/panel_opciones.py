@@ -71,6 +71,7 @@ class PanelOpciones(QWidget):
     editar_glosario = Signal()
     modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
     refrescar_modelos = Signal()
+    seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -80,6 +81,7 @@ class PanelOpciones(QWidget):
         # Secciones plegables en acordeón: solo una abierta, Modo al arrancar.
         self.secciones: dict[str, SeccionPlegable] = {}
         self._acordeon = Acordeon(self)
+        self._acordeon.cambiada.connect(self._emitir_seccion_abierta)
 
         modo_layout = self._seccion("modo", _("Modo"), QVBoxLayout)
         self.radio_completo = QRadioButton(_("Pipeline completo"))
@@ -263,6 +265,9 @@ class PanelOpciones(QWidget):
 
     def abrir_seccion(self, clave: str) -> None:
         self._acordeon.abrir(self.secciones[clave])
+
+    def _emitir_seccion_abierta(self, *args) -> None:
+        self.seccion_abierta_cambiada.emit(self.seccion_abierta())
 
     def _repoblar_modelos(self) -> None:
         tarea = self.combo_tarea.currentData()

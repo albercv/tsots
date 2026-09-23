@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QProcess, Qt, QUrl
+from PySide6.QtCore import QProcess, Qt, QTimer, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -20,6 +20,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
+    QStackedWidget,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -48,6 +51,10 @@ from .worker import EjecutorCola
 RUTA_ICONO = Path(__file__).resolve().parent / "recursos" / "icon_512.png"
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Lanzador nativo del bundle: relanzar por aquí conserva identidad y caffeinate.
+# Alto mínimo de la zona de secciones: la cabecera abierta y un par de filas.
+ALTO_MINIMO_SECCIONES = 90
+# Tamaño inicial; se recorta al área útil de la pantalla.
+TAMANO_INICIAL = (960, 720)
 RUTA_LANZADOR = (
     BASE_DIR / "TheSilenceOfTheShorts.app" / "Contents" / "MacOS" / "TheSilenceOfTheShorts"
 )
@@ -122,33 +129,38 @@ class VentanaPrincipal(QMainWindow):
 
         fila_superior.addLayout(columna_izquierda, 2)
 
-        # La columna derecha apilada (opciones + preview + caption) supera los
-        # 1100 px; va dentro de un QScrollArea para que la ventana pueda
-        # encoger en pantallas pequeñas y aparezca scroll en vez de bloquear.
+        # Columna derecha: arriba las secciones de opciones (plegables) en un
+        # QScrollArea, que es lo único que se desplaza si no caben; abajo, fija
+        # y siempre a la vista, la previsualización y el caption en pestañas.
         self.panel = PanelOpciones()
         self.panel.cargar(self.ajustes.cargar_panel())
-        contenido_derecha = QWidget()
-        columna_derecha = QVBoxLayout(contenido_derecha)
-        columna_derecha.setContentsMargins(0, 0, 0, 0)
-        columna_derecha.addWidget(self.panel)
-        self.vista_previa = VistaPrevia()
-        columna_derecha.addWidget(self.vista_previa)
-        self.panel_caption = PanelCaption()
-        self.panel_caption.publicar.connect(self._publicar)
-        columna_derecha.addWidget(self.panel_caption)
-        columna_derecha.addStretch(1)
         self.scroll_derecha = QScrollArea()
-        self.scroll_derecha.setWidget(contenido_derecha)
+        self.scroll_derecha.setWidget(self.panel)
         self.scroll_derecha.setWidgetResizable(True)
         self.scroll_derecha.setFrameShape(QFrame.Shape.NoFrame)
         self.scroll_derecha.setHorizontalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.scroll_derecha.setMinimumWidth(
-            contenido_derecha.minimumSizeHint().width()
+            self.panel.minimumSizeHint().width()
             + self.scroll_derecha.verticalScrollBar().sizeHint().width()
         )
-        fila_superior.addWidget(self.scroll_derecha, 1)
+        self.scroll_derecha.setMinimumHeight(ALTO_MINIMO_SECCIONES)
+
+        self.vista_previa = VistaPrevia()
+        self.panel_caption = PanelCaption()
+        self.panel_caption.publicar.connect(self._publicar)
+        self.pestanas = QTabWidget()
+        self.pestanas.setDocumentMode(True)
+        self.pestanas.addTab(self.vista_previa, _("Previsualización"))
+        self.pestanas.addTab(self.panel_caption, _("Caption"))
+        self._fijar_alto_pestanas()
+
+        columna_derecha = QVBoxLayout()
+        columna_derecha.setContentsMargins(0, 0, 0, 0)
+        columna_derecha.addWidget(self.scroll_derecha, 1)
+        columna_derecha.addWidget(self.pestanas)
+        fila_superior.addLayout(columna_derecha, 1)
         raiz.addLayout(fila_superior, 1)
 
         fila_inferior = QHBoxLayout()
@@ -197,10 +209,12 @@ class VentanaPrincipal(QMainWindow):
         self._refrescar_boton()
 
         self.panel.opciones_subs_cambiadas.connect(self._refrescar_preview)
+        self.panel.opciones_subs_cambiadas.connect(self._mostrar_pestana_preview)
         self.panel.editar_marca.connect(self._editar_marca)
         self.panel.editar_glosario.connect(self._editar_glosario)
         self.panel.modelo_caption_cambiado.connect(self._al_cambiar_modelo_caption)
         self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
+        self.panel.seccion_abierta_cambiada.connect(self._al_abrir_seccion)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -210,6 +224,41 @@ class VentanaPrincipal(QMainWindow):
         if geometria:
             self.restoreGeometry(geometria)
         self._ajustar_a_pantalla()
+
+    def _fijar_alto_pestanas(self) -> None:
+        """Alto fijo para la zona de pestañas: el de la previsualización a
+        tamaño completo o el del caption, lo que sea mayor. Así no salta al
+        cambiar de pestaña, al llegar el primer fotograma ni al aparecer un
+        caption, y las secciones de encima se llevan el resto."""
+        pila = self.pestanas.findChild(QStackedWidget)
+        paginas = max(
+            self.vista_previa.etiqueta.maximumHeight(),
+            self.panel_caption.sizeHint().height(),
+        )
+        cromo = self.pestanas.sizeHint().height() - pila.sizeHint().height()
+        self.pestanas.setFixedHeight(cromo + paginas)
+        self.pestanas.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
+
+    def _al_abrir_seccion(self, _clave: str) -> None:
+        # El layout aún no ha recolocado las secciones: esperar a que lo haga.
+        QTimer.singleShot(0, self._mostrar_seccion_abierta)
+
+    def _mostrar_seccion_abierta(self) -> None:
+        """Desplaza las opciones para que la sección recién abierta se vea
+        entera o, si no cabe, desde su cabecera."""
+        clave = self.panel.seccion_abierta()
+        if not clave:
+            return
+        seccion = self.panel.secciones[clave]
+        barra = self.scroll_derecha.verticalScrollBar()
+        alto_visible = self.scroll_derecha.viewport().height()
+        arriba, alto = seccion.y(), seccion.height()
+        if alto > alto_visible or arriba < barra.value():
+            barra.setValue(arriba)
+        elif arriba + alto > barra.value() + alto_visible:
+            barra.setValue(arriba + alto - alto_visible)
 
     def _ajustar_a_pantalla(self) -> None:
         """Evita ventanas más grandes que el área útil (geometría guardada en
@@ -318,15 +367,27 @@ class VentanaPrincipal(QMainWindow):
         else:
             self.vista_previa.establecer_video(None)
             self.panel_caption.mostrar(None)
+            self.pestanas.setCurrentWidget(self.vista_previa)
 
     def _mostrar_caption(self, trabajo) -> None:
+        """Carga el caption del trabajo y elige pestaña: Caption si lo hay
+        (lo siguiente es copiarlo o publicarlo), Previsualización si no."""
         caption = self._caption_de(trabajo)
         self.panel_caption.mostrar(caption, trabajo.salida if caption else None)
+        self.pestanas.setCurrentWidget(
+            self.panel_caption if caption else self.vista_previa
+        )
 
     def _caption_de(self, trabajo) -> Caption | None:
         if trabajo.estado != EstadoTrabajo.HECHO or not trabajo.salida:
             return None
         return leer_md(trabajo.salida.with_suffix(".md"))
+
+    def _mostrar_pestana_preview(self) -> None:
+        # Al tocar las opciones de subtítulos se quiere ver el efecto.
+        # Método y no lambda: una lambda con self en una señal mantiene viva
+        # la ventana tras cerrarla.
+        self.pestanas.setCurrentWidget(self.vista_previa)
 
     def _refrescar_preview(self) -> None:
         valores = self.panel.valores()
@@ -575,7 +636,8 @@ def main() -> int:
         )
         return 1
     ventana = VentanaPrincipal(ajustes)
-    ventana.resize(900, 560)
+    ventana.resize(*TAMANO_INICIAL)
+    ventana._ajustar_a_pantalla()
     ventana.show()
     return app.exec()
 

@@ -248,15 +248,25 @@ def _caption_ejemplo():
                    hashtags=["#a", "#b"], palabras_clave=["k"])
 
 
-def test_panel_caption_oculto_sin_datos_y_muestra_con_datos(qtbot):
+def test_panel_caption_marcador_sin_datos_y_muestra_con_datos(qtbot):
     from app.widgets.panel_caption import PanelCaption
 
     panel = PanelCaption()
     qtbot.addWidget(panel)
-    panel.mostrar(None)
-    assert panel.isHidden()
-    panel.mostrar(_caption_ejemplo())
+    panel.show()
+    qtbot.waitExposed(panel)
+    # Sin caption no se oculta: enseña un marcador y conserva su alto.
     assert not panel.isHidden()
+    assert panel.etiqueta_vacia.isVisible()
+    assert not panel.etiqueta_titulo.isVisible()
+    alto = panel.sizeHint().height()
+    panel.mostrar(_caption_ejemplo())
+    assert not panel.etiqueta_vacia.isVisible()
+    assert panel.etiqueta_titulo.isVisible()
+    assert panel.sizeHint().height() == alto
+    panel.mostrar(None)
+    assert panel.etiqueta_vacia.isVisible()
+    panel.mostrar(_caption_ejemplo())
     assert panel.etiqueta_titulo.text() == "Título X"
     assert panel.texto_caption.toPlainText() == "Cuerpo\ndos líneas"
     assert panel.etiqueta_hashtags.text() == "#a #b"
