@@ -469,3 +469,107 @@ def test_panel_boton_glosario_activo_con_subtitulos_o_caption(qtbot):
     panel.check_subtitulos.setChecked(False)
     panel.check_caption.setChecked(True)
     assert panel.boton_glosario.isEnabled()
+
+
+# --- cabecera ---
+
+
+def test_cabecera_carga_logo(qtbot):
+    from app.widgets.cabecera import LADO_LOGO, Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    cabecera.show()
+    pixmap = cabecera.logo.pixmap()
+    assert not pixmap.isNull()
+    assert cabecera.logo.isVisible()
+    assert cabecera.logo.size().width() == LADO_LOGO
+    assert cabecera.logo.size().height() == LADO_LOGO
+
+
+def test_pixmap_logo_escala_con_dpr():
+    from PySide6.QtGui import QImage
+
+    from app.main import RUTA_ICONO
+    from app.widgets.cabecera import pixmap_logo
+
+    imagen = QImage(str(RUTA_ICONO))
+    pixmap = pixmap_logo(imagen, 44, 2.0)
+    assert pixmap.width() == 88 and pixmap.height() == 88
+    assert pixmap.devicePixelRatio() == 2.0
+    assert pixmap_logo(imagen, 44, 1.0).width() == 44
+
+
+def test_cabecera_muestra_nombre_y_lema(qtbot):
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.titulo.text() == "The Silence of the Shorts"
+    assert cabecera.lema.text() == "Edita en silencio. Crea a lo grande."
+
+
+def test_cabecera_sin_logo_no_falla(qtbot, tmp_path):
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera(ruta_logo=tmp_path / "no_existe.png")
+    qtbot.addWidget(cabecera)
+    cabecera.show()
+    assert not cabecera.logo.isVisible()
+    assert cabecera.titulo.isVisible()
+    assert not cabecera.grab().isNull()
+
+
+def test_cabecera_sigue_la_paleta(qtbot):
+    """Sin colores fijos: el título se pinta con el WindowText de la paleta,
+    así el modo oscuro de macOS funciona."""
+    from PySide6.QtGui import QColor, QPalette
+
+    from app.widgets.cabecera import Cabecera
+
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.styleSheet() == ""
+    assert all(
+        not hijo.styleSheet() for hijo in (cabecera.titulo, cabecera.lema)
+    )
+    oscura = QPalette(cabecera.palette())
+    for grupo in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive):
+        oscura.setColor(grupo, QPalette.ColorRole.Window, QColor("#1e1e1e"))
+        oscura.setColor(grupo, QPalette.ColorRole.WindowText, QColor("#ffffff"))
+    cabecera.setPalette(oscura)
+    cabecera.titulo.setAutoFillBackground(True)
+    cabecera.show()
+    imagen = cabecera.titulo.grab().toImage()
+    mas_clara = max(
+        QColor(imagen.pixel(x, y)).lightness()
+        for x in range(imagen.width())
+        for y in range(imagen.height())
+    )
+    assert mas_clara > 200
+
+
+def test_cabecera_lema_traducible(qtbot, tmp_path):
+    import subprocess
+
+    from videopipeline import i18n
+
+    from app.widgets.cabecera import Cabecera
+
+    carpeta = tmp_path / "en" / "LC_MESSAGES"
+    carpeta.mkdir(parents=True)
+    po = carpeta / "tsots.po"
+    po.write_text(
+        'msgid ""\nmsgstr ""\n"Content-Type: text/plain; charset=UTF-8\\n"\n\n'
+        'msgid "Edita en silencio. Crea a lo grande."\n'
+        'msgstr "Edit quieter. Create louder."\n',
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["msgfmt", "-o", str(carpeta / "tsots.mo"), str(po)], check=True
+    )
+    i18n.instalar("en", dir_locale=tmp_path)
+    cabecera = Cabecera()
+    qtbot.addWidget(cabecera)
+    assert cabecera.lema.text() == "Edit quieter. Create louder."
+    assert cabecera.titulo.text() == "The Silence of the Shorts"
