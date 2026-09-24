@@ -82,11 +82,17 @@ def cmd_cortar_silencios(
     umbral: str,
     silencios: str,
     velocidad: int,
+    fps: str = "30",
 ) -> list[str]:
+    """Salida lista para redes: audio AAC (auto-editor copiaría el PCM del
+    intermedio a un MP4) y fps entero (auto-editor usaría la media del VFR
+    del iPhone, p. ej. 30,02, que TikTok obliga a recodificar)."""
     cmd = [
         auto_editor, str(entrada),
         "--margin", margen,
         "--edit", f"audio:threshold={umbral}",
+        "-c:a", "aac", "-b:a", "192k",
+        "--frame-rate", fps,
         "--progress", "machine",
         "--no-open",
         "-o", str(salida),
@@ -259,7 +265,8 @@ def _ejecutar_auto_editor(
 ) -> tuple[int, str]:
     """Lanza auto-editor y devuelve (código, salida cruda)."""
     cmd = cmd_cortar_silencios(
-        _binario("auto-editor"), entrada, salida, margen, umbral, silencios, velocidad
+        _binario("auto-editor"), entrada, salida, margen, umbral, silencios,
+        velocidad, fps=fps_objetivo(entrada),
     )
     proceso = subprocess.Popen(
         cmd,
@@ -384,6 +391,58 @@ def resolucion_video(video: Path) -> tuple[int, int]:
     if abs(rotacion) % 180 == 90:
         ancho, alto = alto, ancho
     return ancho, alto
+
+
+_TASAS_ESTANDAR = (
+    (24000, 1001), (24, 1), (25, 1), (30000, 1001), (30, 1),
+    (50, 1), (60000, 1001), (60, 1),
+)
+
+
+def _fraccion(texto: str) -> float:
+    num, _sep, den = texto.strip().partition("/")
+    try:
+        valor = float(num) / float(den or 1)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+    return valor if valor > 0 else 0.0
+
+
+def fps_objetivo(video: Path) -> str:
+    """Fps entero para la salida de auto-editor.
+
+    La nominal (`r_frame_rate`: 30 en el iPhone aunque grabe tramos a 60) si
+    es razonable y cercana a la media; si no, la tasa estándar más cercana a
+    la media. Sin datos, 30.
+    """
+    resultado = subprocess.run(
+        [
+            _binario("ffprobe"), "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=r_frame_rate,avg_frame_rate",
+            "-of", "default=noprint_wrappers=1",
+            str(video),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    valores: dict[str, str] = {}
+    for linea in resultado.stdout.splitlines():
+        clave, separador, valor = linea.partition("=")
+        if separador:
+            valores[clave.strip()] = valor.strip()
+    nominal_txt = valores.get("r_frame_rate", "")
+    nominal = _fraccion(nominal_txt)
+    media = _fraccion(valores.get("avg_frame_rate", ""))
+    if 0 < nominal <= 60 and (media == 0 or abs(nominal - media) / media < 0.10):
+        return nominal_txt
+    referencia = media or nominal
+    if referencia == 0:
+        return "30"
+    num, den = min(
+        _TASAS_ESTANDAR, key=lambda t: abs(t[0] / t[1] - referencia)
+    )
+    return f"{num}/{den}" if den != 1 else str(num)
 
 
 def duracion_video(video: Path) -> float:

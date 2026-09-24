@@ -92,6 +92,17 @@ def test_cmd_cortar_silencios_cortar():
     assert "--margin" in cmd and cmd[cmd.index("--margin") + 1] == "0.3s"
     assert "--edit" in cmd and cmd[cmd.index("--edit") + 1] == "audio:threshold=6%"
     assert "--when-silent" not in cmd
+    # Salida lista para redes: AAC y fps entero.
+    assert cmd[cmd.index("-c:a") + 1] == "aac"
+    assert cmd[cmd.index("--frame-rate") + 1] == "30"
+
+
+def test_cmd_cortar_silencios_fps_explicito():
+    cmd = cmd_cortar_silencios(
+        "auto-editor", Path("i.mp4"), Path("o.mp4"), "0.2s", "4%", "cortar", 4,
+        fps="25",
+    )
+    assert cmd[cmd.index("--frame-rate") + 1] == "25"
 
 
 def test_cmd_cortar_silencios_acelerar():
@@ -285,6 +296,24 @@ def test_resolucion_salida_corrupta(tmp_path, monkeypatch):
     _mock_ffprobe(monkeypatch, "basura sin igual\n")
     with pytest.raises(PasoFallido):
         resolucion_video(tmp_path / "v.mp4")
+
+
+@pytest.mark.parametrize("salida, esperado", [
+    # iPhone: nominal 30 con tramos a 60 fps.
+    ("r_frame_rate=30/1\navg_frame_rate=958500/31313\n", "30/1"),
+    # strangeClients.MOV: media 30,02.
+    ("r_frame_rate=30/1\navg_frame_rate=3372000/112313\n", "30/1"),
+    ("r_frame_rate=30000/1001\navg_frame_rate=30000/1001\n", "30000/1001"),
+    # Nominal absurda (timebase): la estándar más cercana a la media.
+    ("r_frame_rate=90000/1\navg_frame_rate=2999/100\n", "30"),
+    ("r_frame_rate=90000/1\navg_frame_rate=29.95\n", "30000/1001"),
+    ("r_frame_rate=120/1\navg_frame_rate=24000/1001\n", "24000/1001"),
+    ("r_frame_rate=0/0\navg_frame_rate=0/0\n", "30"),
+    ("", "30"),
+])
+def test_fps_objetivo(tmp_path, monkeypatch, salida, esperado):
+    _mock_ffprobe(monkeypatch, salida)
+    assert steps.fps_objetivo(tmp_path / "v.mov") == esperado
 
 
 def test_duracion_video_con_coma_final(tmp_path, monkeypatch):
