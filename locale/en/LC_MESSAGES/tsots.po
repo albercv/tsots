@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 17:59+0200\n"
+"POT-Creation-Date: 2026-09-23 19:00+0200\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -624,6 +624,10 @@ msgid "No se generó el vídeo editado: {salida}"
 msgstr "The edited video was not produced: {salida}"
 
 #, python-brace-format
+msgid "No se generó el vídeo preparado: {salida}"
+msgstr "The prepared video was not produced: {salida}"
+
+#, python-brace-format
 msgid "No se generó el vídeo reencodado: {salida}"
 msgstr "The re-encoded video was not produced: {salida}"
 
@@ -705,6 +709,10 @@ msgid "Noticias y política"
 msgstr "News & Politics"
 
 #, python-brace-format
+msgid "Ocupa ~{total} GB, más de la mitad de los ~{memoria} GB que este Mac deja para modelos: puede ralentizar el equipo. Mejor uno más ligero."
+msgstr "Takes ~{total} GB, more than half of the ~{memoria} GB this Mac leaves for models: it may slow the computer down. A lighter one is better."
+
+#, python-brace-format
 msgid "Ollama devolvió HTTP {codigo}"
 msgstr "Ollama returned HTTP {codigo}"
 
@@ -770,6 +778,9 @@ msgstr "Public post"
 
 msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Facebook"
 msgstr "Asks the service which accounts you have connected and your Facebook Pages"
+
+msgid "Preparación del audio"
+msgstr "Audio preparation"
 
 msgid "Preview no disponible"
 msgstr "Preview not available"

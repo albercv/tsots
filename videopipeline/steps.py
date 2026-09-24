@@ -34,6 +34,13 @@ def _ejecutar(cmd: list[str], descripcion: str) -> None:
         )
 
 
+# El iPhone graba audio que arranca tarde y con cortes entre paquetes (hasta
+# 0,3 s por vídeo). Si no se rellenan con silencio, ffmpeg y auto-editor los
+# colapsan y la voz se adelanta al vídeo, cada vez más hacia el final.
+# min_hard_comp baja el umbral de relleno de 0,1 s (defecto) a 10 ms.
+FILTRO_HUECOS_AUDIO = "aresample=async=1:min_hard_comp=0.01:first_pts=0"
+
+
 def cmd_extraer_audio(
     ffmpeg: str, video: Path, wav: Path, sample_rate: int
 ) -> list[str]:
@@ -41,20 +48,26 @@ def cmd_extraer_audio(
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video),
         "-map", "0:a:0", "-vn",
+        "-af", FILTRO_HUECOS_AUDIO,
         "-ac", "1", "-ar", str(sample_rate),
         "-c:a", "pcm_s16le",
         str(wav),
     ]
 
 
-def cmd_remux(ffmpeg: str, video: Path, audio: Path, salida: Path) -> list[str]:
+def cmd_remux(
+    ffmpeg: str, video: Path, audio: Path, salida: Path, intermedio: bool = False
+) -> list[str]:
+    """Sustituye la pista de audio. `intermedio`: audio PCM (salida .mov) para
+    que auto-editor no herede el retardo de arranque del AAC (~23 ms)."""
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video), "-i", str(audio),
         "-map", "0:v:0", "-map", "1:a:0",
         "-map_metadata", "0",
         "-c:v", "copy",
-        "-c:a", "aac", "-b:a", "192k",
+        *(["-c:a", "pcm_s16le"] if intermedio
+          else ["-c:a", "aac", "-b:a", "192k"]),
         "-movflags", "+faststart",
         "-shortest",
         str(salida),
@@ -69,11 +82,17 @@ def cmd_cortar_silencios(
     umbral: str,
     silencios: str,
     velocidad: int,
+    fps: str = "30",
 ) -> list[str]:
+    """Salida lista para redes: audio AAC (auto-editor copiaría el PCM del
+    intermedio a un MP4) y fps entero (auto-editor usaría la media del VFR
+    del iPhone, p. ej. 30,02, que TikTok obliga a recodificar)."""
     cmd = [
         auto_editor, str(entrada),
         "--margin", margen,
         "--edit", f"audio:threshold={umbral}",
+        "-c:a", "aac", "-b:a", "192k",
+        "--frame-rate", fps,
         "--progress", "machine",
         "--no-open",
         "-o", str(salida),
@@ -139,10 +158,40 @@ def extraer_audio(video: Path, wav: Path, sample_rate: int) -> None:
         raise PasoFallido(_("No se generó el WAV: {wav}").format(wav=wav))
 
 
-def remux(video: Path, audio: Path, salida: Path) -> None:
+def cmd_rellenar_huecos_audio(ffmpeg: str, video: Path, salida: Path) -> list[str]:
+    """Copia el vídeo tal cual y reescribe solo el audio con los huecos
+    rellenos, para que auto-editor no los colapse. PCM (sin el retardo de
+    arranque del AAC): la salida debe ser .mov."""
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-map", "0:v:0", "-map", "0:a:0",
+        "-map_metadata", "0",
+        "-c:v", "copy",
+        "-af", FILTRO_HUECOS_AUDIO,
+        "-c:a", "pcm_s16le",
+        str(salida),
+    ]
+
+
+def rellenar_huecos_audio(video: Path, salida: Path) -> None:
     salida.parent.mkdir(parents=True, exist_ok=True)
     _ejecutar(
-        cmd_remux(_binario("ffmpeg"), video, audio, salida),
+        cmd_rellenar_huecos_audio(_binario("ffmpeg"), video, salida),
+        _("Preparación del audio"),
+    )
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(
+            _("No se generó el vídeo preparado: {salida}").format(salida=salida)
+        )
+
+
+def remux(
+    video: Path, audio: Path, salida: Path, intermedio: bool = False
+) -> None:
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    _ejecutar(
+        cmd_remux(_binario("ffmpeg"), video, audio, salida, intermedio),
         _("Sustitución de la pista de audio"),
     )
     if not salida.is_file() or salida.stat().st_size == 0:
@@ -216,7 +265,8 @@ def _ejecutar_auto_editor(
 ) -> tuple[int, str]:
     """Lanza auto-editor y devuelve (código, salida cruda)."""
     cmd = cmd_cortar_silencios(
-        _binario("auto-editor"), entrada, salida, margen, umbral, silencios, velocidad
+        _binario("auto-editor"), entrada, salida, margen, umbral, silencios,
+        velocidad, fps=fps_objetivo(entrada),
     )
     proceso = subprocess.Popen(
         cmd,
@@ -341,6 +391,58 @@ def resolucion_video(video: Path) -> tuple[int, int]:
     if abs(rotacion) % 180 == 90:
         ancho, alto = alto, ancho
     return ancho, alto
+
+
+_TASAS_ESTANDAR = (
+    (24000, 1001), (24, 1), (25, 1), (30000, 1001), (30, 1),
+    (50, 1), (60000, 1001), (60, 1),
+)
+
+
+def _fraccion(texto: str) -> float:
+    num, _sep, den = texto.strip().partition("/")
+    try:
+        valor = float(num) / float(den or 1)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+    return valor if valor > 0 else 0.0
+
+
+def fps_objetivo(video: Path) -> str:
+    """Fps entero para la salida de auto-editor.
+
+    La nominal (`r_frame_rate`: 30 en el iPhone aunque grabe tramos a 60) si
+    es razonable y cercana a la media; si no, la tasa estándar más cercana a
+    la media. Sin datos, 30.
+    """
+    resultado = subprocess.run(
+        [
+            _binario("ffprobe"), "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=r_frame_rate,avg_frame_rate",
+            "-of", "default=noprint_wrappers=1",
+            str(video),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    valores: dict[str, str] = {}
+    for linea in resultado.stdout.splitlines():
+        clave, separador, valor = linea.partition("=")
+        if separador:
+            valores[clave.strip()] = valor.strip()
+    nominal_txt = valores.get("r_frame_rate", "")
+    nominal = _fraccion(nominal_txt)
+    media = _fraccion(valores.get("avg_frame_rate", ""))
+    if 0 < nominal <= 60 and (media == 0 or abs(nominal - media) / media < 0.10):
+        return nominal_txt
+    referencia = media or nominal
+    if referencia == 0:
+        return "30"
+    num, den = min(
+        _TASAS_ESTANDAR, key=lambda t: abs(t[0] / t[1] - referencia)
+    )
+    return f"{num}/{den}" if den != 1 else str(num)
 
 
 def duracion_video(video: Path) -> float:

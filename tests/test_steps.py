@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import shutil
 import stat
+import subprocess
 import wave
 from pathlib import Path
 
@@ -28,6 +30,10 @@ def test_cmd_extraer_audio():
     assert cmd[-1] == "a.wav"
     assert "-ac" in cmd and cmd[cmd.index("-ac") + 1] == "1"
     assert "pcm_s16le" in cmd
+    # Huecos y arranque tardío del audio se rellenan con silencio.
+    assert cmd[cmd.index("-af") + 1] == (
+        "aresample=async=1:min_hard_comp=0.01:first_pts=0"
+    )
 
 
 def test_cmd_remux():
@@ -35,6 +41,47 @@ def test_cmd_remux():
     assert "copy" in cmd  # vídeo copiado
     assert "aac" in cmd and "192k" in cmd
     assert "+faststart" in cmd
+
+
+def test_cmd_remux_intermedio_usa_pcm():
+    cmd = cmd_remux("ffmpeg", Path("v.mp4"), Path("a.wav"), Path("o.mov"),
+                    intermedio=True)
+    assert cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
+    assert "aac" not in cmd
+    assert cmd[cmd.index("-c:v") + 1] == "copy"
+
+
+def test_cmd_rellenar_huecos_audio():
+    cmd = steps.cmd_rellenar_huecos_audio("ffmpeg", Path("v.MOV"), Path("o.mov"))
+    assert cmd[cmd.index("-c:v") + 1] == "copy"
+    assert cmd[cmd.index("-af") + 1] == steps.FILTRO_HUECOS_AUDIO
+    assert cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
+    assert cmd[-1] == "o.mov"
+
+
+def test_extraer_audio_rellena_arranque_tardio_y_huecos(tmp_path):
+    """El iPhone graba audio que empieza tarde y con cortes entre paquetes.
+    El WAV debe conservar esos silencios; si los colapsa, la voz se adelanta
+    al vídeo cada vez más (gptDown.MOV: 0,31 s al final). El hueco es menor
+    que el umbral por defecto de aresample (0,1 s), como los reales."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg no disponible")
+    video = tmp_path / "huecos.mp4"
+    subprocess.run(
+        [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "lavfi", "-i", "color=c=black:s=160x120:d=3:r=30",
+         "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+         # Audio desde 0,3 s y con un salto de 0,08 s en el segundo 1.
+         "-af", "asetpts='PTS+0.3/TB+if(gte(T,1),0.08/TB,0)'",
+         "-c:v", "libx264", "-c:a", "aac", str(video)],
+        check=True,
+    )
+    wav = tmp_path / "a.wav"
+    extraer_audio(video, wav, 16000)
+    with wave.open(str(wav)) as w:
+        duracion = w.getnframes() / w.getframerate()
+    assert duracion == pytest.approx(2.38, abs=0.025)  # sin relleno: 2,0 s
 
 
 def test_cmd_cortar_silencios_cortar():
@@ -45,6 +92,17 @@ def test_cmd_cortar_silencios_cortar():
     assert "--margin" in cmd and cmd[cmd.index("--margin") + 1] == "0.3s"
     assert "--edit" in cmd and cmd[cmd.index("--edit") + 1] == "audio:threshold=6%"
     assert "--when-silent" not in cmd
+    # Salida lista para redes: AAC y fps entero.
+    assert cmd[cmd.index("-c:a") + 1] == "aac"
+    assert cmd[cmd.index("--frame-rate") + 1] == "30"
+
+
+def test_cmd_cortar_silencios_fps_explicito():
+    cmd = cmd_cortar_silencios(
+        "auto-editor", Path("i.mp4"), Path("o.mp4"), "0.2s", "4%", "cortar", 4,
+        fps="25",
+    )
+    assert cmd[cmd.index("--frame-rate") + 1] == "25"
 
 
 def test_cmd_cortar_silencios_acelerar():
@@ -238,6 +296,24 @@ def test_resolucion_salida_corrupta(tmp_path, monkeypatch):
     _mock_ffprobe(monkeypatch, "basura sin igual\n")
     with pytest.raises(PasoFallido):
         resolucion_video(tmp_path / "v.mp4")
+
+
+@pytest.mark.parametrize("salida, esperado", [
+    # iPhone: nominal 30 con tramos a 60 fps.
+    ("r_frame_rate=30/1\navg_frame_rate=958500/31313\n", "30/1"),
+    # strangeClients.MOV: media 30,02.
+    ("r_frame_rate=30/1\navg_frame_rate=3372000/112313\n", "30/1"),
+    ("r_frame_rate=30000/1001\navg_frame_rate=30000/1001\n", "30000/1001"),
+    # Nominal absurda (timebase): la estándar más cercana a la media.
+    ("r_frame_rate=90000/1\navg_frame_rate=2999/100\n", "30"),
+    ("r_frame_rate=90000/1\navg_frame_rate=29.95\n", "30000/1001"),
+    ("r_frame_rate=120/1\navg_frame_rate=24000/1001\n", "24000/1001"),
+    ("r_frame_rate=0/0\navg_frame_rate=0/0\n", "30"),
+    ("", "30"),
+])
+def test_fps_objetivo(tmp_path, monkeypatch, salida, esperado):
+    _mock_ffprobe(monkeypatch, salida)
+    assert steps.fps_objetivo(tmp_path / "v.mov") == esperado
 
 
 def test_duracion_video_con_coma_final(tmp_path, monkeypatch):
