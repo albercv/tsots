@@ -303,7 +303,10 @@ def cortar_silencios(
     reintentado = False
     if codigo != 0 and _ERROR_PAQUETE_AUTO_EDITOR in texto:
         reintentado = True
-        normalizado = salida.with_name(f".{entrada.stem}_normalizado.mp4")
+        # .mov: el audio se copia y puede ser el PCM del intermedio; en un
+        # .mp4 pasaría a `ipcm` sin layout de canales y auto-editor no podría
+        # abrir el encoder AAC.
+        normalizado = salida.with_name(f".{entrada.stem}_normalizado.mov")
         try:
             normalizar_video(entrada, normalizado)
             if on_aviso is not None:

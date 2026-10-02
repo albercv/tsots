@@ -515,3 +515,37 @@ def test_cortar_silencios_falla_si_persiste_tras_normalizar(
                          "cortar", 4)
     assert "Could not write packet" in info.value.detalle
     assert "reencod" in str(info.value).lower()  # el mensaje dice que ya se intentó
+
+
+def test_cortar_silencios_reintento_con_audio_pcm_del_intermedio(
+    video_sintetico, tmp_path, monkeypatch
+):
+    """En modo completo la entrada es el intermedio .mov con PCM. Si el
+    reencodado lo copia a un .mp4, el PCM pasa a `ipcm` sin layout de canales
+    y el auto-editor real no abre el encoder AAC ("Could not open encoder
+    'aac': Invalid argument"). El reintento debe llegar al final."""
+    auto_editor = shutil.which("auto-editor")
+    if auto_editor is None:
+        pytest.skip("auto-editor no disponible")
+    wav = tmp_path / "limpio.wav"
+    extraer_audio(video_sintetico, wav, 48000)
+    intermedio = tmp_path / "sintetico_solo_audio_limpio.mov"
+    remux(video_sintetico, wav, intermedio, intermedio=True)
+    # Falla como el H.264 problemático en el primer intento; en el reintento
+    # delega en el auto-editor real con los mismos argumentos.
+    fake = _auto_editor_falso(
+        tmp_path,
+        "import os\n"
+        "if '_normalizado' not in sys.argv[1]:\n"
+        "    print('Error! Could not write packet: Invalid argument', flush=True)\n"
+        "    sys.exit(1)\n"
+        f"os.execv({auto_editor!r}, [{auto_editor!r}, *sys.argv[1:]])\n",
+    )
+    real_binario = steps._binario
+    monkeypatch.setattr(
+        steps, "_binario",
+        lambda nombre: str(fake) if nombre == "auto-editor" else real_binario(nombre),
+    )
+    salida = tmp_path / "out.mp4"
+    cortar_silencios(intermedio, salida, "0.2s", "4%", "cortar", 4)
+    assert tiene_pista_audio(salida)
