@@ -84,6 +84,8 @@ def test_chat_json_envia_formato_y_parsea(servidor_falso):
     assert cuerpo["format"] == esquema
     assert cuerpo["think"] is False
     assert cuerpo["options"]["num_ctx"] == 16384
+    # Liberar la memoria del modelo en cuanto responde.
+    assert cuerpo["keep_alive"] == 0
 
 
 def test_chat_json_modelo_no_descargado(servidor_falso):
@@ -221,6 +223,17 @@ def test_cabe_y_motivo():
     assert ollama.cabe(ollama.Modelo("grande", 26 * GB), memoria) is False  # + margen
     motivo = ollama.motivo_no_cabe(ollama.Modelo("grande", 30 * GB), memoria)
     assert "30" in motivo and "27" in motivo and "GB" in motivo
+
+
+def test_pesado_y_motivo():
+    memoria = 27 * GB  # Mac de 36 GB
+    # gemma4:26b cabe, pero ocupa más de la mitad: pesado.
+    gemma26 = ollama.Modelo("gemma4:26b", 18 * GB)
+    assert ollama.cabe(gemma26, memoria) and ollama.pesado(gemma26, memoria)
+    assert not ollama.pesado(ollama.Modelo("gemma4:12b", int(7.6 * GB)), memoria)
+    assert not ollama.pesado(ollama.Modelo("qwen3.5:9b", int(6.6 * GB)), memoria)
+    motivo = ollama.motivo_pesado(gemma26, memoria)
+    assert "19,5" in motivo and "27" in motivo and "ralentizar" in motivo
 
 
 def test_modelo_etiqueta_con_tamano():

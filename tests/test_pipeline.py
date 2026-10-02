@@ -23,9 +23,14 @@ def entorno(tmp_path, monkeypatch):
         llamadas.append(f"limpiar:{tarea}:{modelo}")
         salida.write_bytes(b"WAVLIMPIO")
 
-    def falso_remux(video_, audio, salida):
-        llamadas.append("remux")
+    def falso_remux(video_, audio, salida, intermedio=False):
+        llamadas.append("remux:intermedio" if intermedio else "remux")
         salida.write_bytes(b"MP4")
+
+    def falso_rellenar(video_, salida):
+        llamadas.append("rellenar")
+        salida.parent.mkdir(parents=True, exist_ok=True)
+        salida.write_bytes(b"MOVRELLENO")
 
     def falso_cortar(entrada, salida, margen, umbral, silencios, velocidad,
                      on_percent=None, on_aviso=None):
@@ -37,6 +42,7 @@ def entorno(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "extraer_audio", falso_extraer)
     monkeypatch.setattr(pipeline, "limpiar_audio", falso_limpiar)
     monkeypatch.setattr(pipeline, "remux", falso_remux)
+    monkeypatch.setattr(pipeline, "rellenar_huecos_audio", falso_rellenar)
     monkeypatch.setattr(pipeline, "cortar_silencios", falso_cortar)
     monkeypatch.setattr(pipeline, "BASE_DIR", tmp_path)
     return llamadas, video, tmp_path
@@ -54,7 +60,7 @@ def test_modo_completo(entorno, tmp_path):
     assert llamadas == [
         "extraer:48000",
         "limpiar:speech_enhancement:MossFormer2_SE_48K",
-        "remux",
+        "remux:intermedio",  # audio PCM hacia auto-editor
         "cortar:0.2s:4%:cortar:4",
     ]
     assert [e["step"] for e in eventos] == [1, 2, 3, 4]
@@ -71,7 +77,7 @@ def test_modo_solo_audio(entorno, tmp_path):
         PipelineConfig(video=video, salida=salida, modo="solo_audio"),
         None,
     )
-    assert [l.split(":")[0] for l in llamadas] == ["extraer", "limpiar", "remux"]
+    assert llamadas[-1] == "remux"  # salida final: AAC, no PCM
     assert salida.read_bytes() == b"MP4"
 
 
@@ -82,7 +88,30 @@ def test_modo_solo_silencios(entorno, tmp_path):
         PipelineConfig(video=video, salida=salida, modo="solo_silencios"),
         None,
     )
-    assert [l.split(":")[0] for l in llamadas] == ["cortar"]
+    assert [l.split(":")[0] for l in llamadas] == ["rellenar", "cortar"]
+
+
+def test_solo_silencios_corta_la_copia_rellena_y_la_borra(entorno, tmp_path,
+                                                          monkeypatch):
+    """auto-editor colapsa los huecos del audio del iPhone: debe cortar una
+    copia con los huecos rellenos, que no queda en disco ni si falla."""
+    llamadas, video, base = entorno
+    entradas: list[Path] = []
+
+    def falso_cortar(entrada, salida, *a, **k):
+        entradas.append(entrada)
+        assert entrada.read_bytes() == b"MOVRELLENO"
+        raise RuntimeError("auto-editor roto")
+
+    monkeypatch.setattr(pipeline, "cortar_silencios", falso_cortar)
+    with pytest.raises(RuntimeError):
+        pipeline.run(
+            PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                           modo="solo_silencios"),
+            None,
+        )
+    assert entradas and entradas[0] != video
+    assert not entradas[0].exists()
 
 
 def test_sample_rate_por_modelo(entorno, tmp_path):

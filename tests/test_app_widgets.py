@@ -343,6 +343,26 @@ def test_panel_modelos_pobla_deshabilita_grandes_y_selecciona(qtbot):
     assert panel.modelo_caption() == "medio:9b"
 
 
+def test_panel_modelos_pesado_seleccionable_con_aviso(qtbot):
+    from PySide6.QtCore import Qt
+    from videopipeline.ollama import Modelo
+
+    GB = 1024 ** 3
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    modelos = [Modelo("gemma4:12b", int(7.6 * GB)), Modelo("gemma4:26b", 18 * GB)]
+    panel.poblar_modelos(modelos, memoria=27 * GB, seleccionado="gemma4:26b")
+    combo = panel.combo_modelo_caption
+    item_pesado = combo.model().item(1)
+    assert item_pesado.flags() & Qt.ItemFlag.ItemIsEnabled
+    assert "ralentizar" in item_pesado.toolTip()
+    assert "ralentizar" in panel.aviso_modelos.text()
+    combo.setCurrentIndex(0)  # uno ligero: el aviso desaparece
+    assert panel.aviso_modelos.text() == ""
+    combo.setCurrentIndex(1)
+    assert "ralentizar" in panel.aviso_modelos.text()
+
+
 def test_panel_modelos_sin_ollama_conserva_el_guardado(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)

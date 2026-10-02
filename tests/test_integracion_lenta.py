@@ -22,6 +22,16 @@ def test_pipeline_completo_real(video_sintetico, tmp_path, monkeypatch):
     assert resultado == salida
     assert salida.is_file() and salida.stat().st_size > 0
     assert eventos[0]["step"] == 1 and eventos[-1]["step"] == 4
+    # Formato apto para redes: AAC (no el PCM del intermedio) y fps entero.
+    import subprocess
+    sondeo = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries",
+         "stream=codec_type,codec_name,r_frame_rate", "-of", "csv=p=0",
+         str(salida)],
+        capture_output=True, text=True,
+    ).stdout
+    assert "aac,audio" in sondeo
+    assert "video,10/1" in sondeo  # el vídeo sintético es de 10 fps
 
 
 @pytest.mark.slow

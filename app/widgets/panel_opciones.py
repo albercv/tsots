@@ -21,7 +21,9 @@ from PySide6.QtWidgets import (
 from videopipeline import subtitles
 from videopipeline.config import MODELOS_POR_TAREA
 from videopipeline.i18n import N_, _
-from videopipeline.ollama import Modelo, cabe, motivo_no_cabe
+from videopipeline.ollama import (
+    Modelo, cabe, motivo_no_cabe, motivo_pesado, pesado,
+)
 
 from .seccion_plegable import Acordeon, SeccionPlegable
 
@@ -228,8 +230,14 @@ class PanelOpciones(QWidget):
         self.aviso_modelos.setStyleSheet("color: #b8860b;")
         self.aviso_modelos.setWordWrap(True)
         caption_layout.addWidget(self.aviso_modelos)
+        self._hay_modelos = False
+        self._modelos_pesados: dict[str, str] = {}
+        self._modelos_no_caben = 0
         self.combo_modelo_caption.currentIndexChanged.connect(
             self._emitir_cambio_modelo
+        )
+        self.combo_modelo_caption.currentIndexChanged.connect(
+            self._refrescar_aviso_modelos
         )
         for seccion in self.secciones.values():
             layout.addWidget(seccion)
@@ -335,18 +343,27 @@ class PanelOpciones(QWidget):
         """Rellena el desplegable con los modelos instalados.
 
         Los que no caben en `memoria` quedan deshabilitados con el motivo en
-        el tooltip. Si `seleccionado` no está instalado (o no hay lista), se
-        añade marcado para no perder el ajuste guardado.
+        el tooltip; los pesados se pueden elegir, pero con aviso. Si
+        `seleccionado` no está instalado (o no hay lista), se añade marcado
+        para no perder el ajuste guardado.
         """
         combo = self.combo_modelo_caption
         combo.blockSignals(True)
         combo.clear()
+        self._hay_modelos = bool(modelos)
+        self._modelos_pesados = {}
+        self._modelos_no_caben = 0
         for modelo in modelos:
             combo.addItem(modelo.etiqueta, modelo.nombre)
+            item = combo.model().item(combo.count() - 1)
             if not cabe(modelo, memoria):
-                item = combo.model().item(combo.count() - 1)
                 item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
                 item.setToolTip(motivo_no_cabe(modelo, memoria))
+                self._modelos_no_caben += 1
+            elif pesado(modelo, memoria):
+                motivo = motivo_pesado(modelo, memoria)
+                item.setToolTip(motivo)
+                self._modelos_pesados[modelo.nombre] = motivo
         if seleccionado and combo.findData(seleccionado) < 0:
             combo.insertItem(
                 0, _("{modelo} (no instalado)").format(modelo=seleccionado),
@@ -362,16 +379,22 @@ class PanelOpciones(QWidget):
                 )
             )
         else:
-            deshabilitados = sum(
-                1 for i in range(combo.count())
-                if not combo.model().item(i).flags() & Qt.ItemFlag.ItemIsEnabled
-            )
-            self.aviso_modelos.setText(
+            self._refrescar_aviso_modelos()
+
+    def _refrescar_aviso_modelos(self, *args) -> None:
+        if not self._hay_modelos:
+            return  # el aviso de Ollama caído lo pone poblar_modelos
+        avisos = []
+        motivo = self._modelos_pesados.get(self.modelo_caption())
+        if motivo:
+            avisos.append(motivo)
+        if self._modelos_no_caben:
+            avisos.append(
                 _("{n} modelo(s) no caben en memoria (ver tooltip).").format(
-                    n=deshabilitados
+                    n=self._modelos_no_caben
                 )
-                if deshabilitados else ""
             )
+        self.aviso_modelos.setText("\n".join(avisos))
 
     def modelo_caption(self) -> str:
         return str(self.combo_modelo_caption.currentData() or "")

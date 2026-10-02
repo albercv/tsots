@@ -10,6 +10,7 @@ from .steps import (
     extraer_audio,
     limpiar_audio,
     quemar_subtitulos,
+    rellenar_huecos_audio,
     remux,
     resolucion_video,
 )
@@ -185,15 +186,22 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
 
     if config.modo == "solo_silencios":
         total = 1 + extra
-        _emitir(on_progress, 1, total, _("Recortando silencios"))
-        cortar_silencios(
-            video, tmp_final, config.margen, config.umbral,
-            config.silencios, config.velocidad_silencios,
-            on_percent=lambda p: _emitir(
-                on_progress, 1, total, _("Recortando silencios"), p
-            ),
-            on_aviso=lambda texto: _avisar(on_progress, texto),
-        )
+        # auto-editor colapsa los huecos del audio del iPhone y desincroniza:
+        # se le pasa una copia con los huecos rellenos.
+        preparado = trabajo / f"{nombre}_audio_relleno.mov"
+        try:
+            _emitir(on_progress, 1, total, _("Recortando silencios"))
+            rellenar_huecos_audio(video, preparado)
+            cortar_silencios(
+                preparado, tmp_final, config.margen, config.umbral,
+                config.silencios, config.velocidad_silencios,
+                on_percent=lambda p: _emitir(
+                    on_progress, 1, total, _("Recortando silencios"), p
+                ),
+                on_aviso=lambda texto: _avisar(on_progress, texto),
+            )
+        finally:
+            preparado.unlink(missing_ok=True)
         publicar, palabras = tmp_final, None
         if config.subtitulos:
             publicar, palabras = _fase_subtitulos(
@@ -231,9 +239,9 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
         _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
         remux(video, wav_limpio, tmp_final)
     else:
-        video_intermedio = trabajo / f"{nombre}_solo_audio_limpio.mp4"
+        video_intermedio = trabajo / f"{nombre}_solo_audio_limpio.mov"
         _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
-        remux(video, wav_limpio, video_intermedio)
+        remux(video, wav_limpio, video_intermedio, intermedio=True)
         _emitir(on_progress, 4, total, _("Recortando silencios"))
         cortar_silencios(
             video_intermedio, tmp_final, config.margen, config.umbral,
