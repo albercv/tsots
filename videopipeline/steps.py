@@ -465,37 +465,16 @@ def duracion_video(video: Path) -> float:
         return 0.0
 
 
-def cmd_quemar_subtitulos(
-    ffmpeg: str, video: Path, ass_nombre: str, salida: Path
-) -> list[str]:
-    return [
-        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-        "-i", str(video),
-        "-vf", f"ass={ass_nombre}",
-        "-c:v", "libx264", "-crf", "18", "-preset", "medium",
-        "-c:a", "copy",
-        "-movflags", "+faststart",
-        "-progress", "pipe:1", "-nostats",
-        str(salida),
-    ]
-
-
-def quemar_subtitulos(
-    video: Path,
-    ass: Path,
-    salida: Path,
-    on_percent: Callable[[float], None] | None = None,
-) -> None:
-    if not ass.is_file():
-        raise PasoFallido(
-            _("No existe el archivo de subtítulos: {ass}").format(ass=ass)
-        )
-    salida.parent.mkdir(parents=True, exist_ok=True)
-    duracion = duracion_video(video)
-    cmd = cmd_quemar_subtitulos(ffmpeg_con_ass(), video, ass.name, salida)
+def ejecutar_ffmpeg_con_progreso(
+    cmd: list[str],
+    cwd: Path | None,
+    duracion: float,
+    on_percent: Callable[[float], None] | None,
+) -> tuple[int, str]:
+    """Ejecuta ffmpeg con ``-progress pipe:1``; devuelve (código, salida)."""
     proceso = subprocess.Popen(
         cmd,
-        cwd=str(ass.parent),
+        cwd=str(cwd) if cwd is not None else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -507,15 +486,61 @@ def quemar_subtitulos(
         if on_percent is not None and duracion > 0 and "out_time_us=" in linea:
             try:
                 us = int(linea.split("=", 1)[1])
-                on_percent(min(100.0, us / 1_000_000 / duracion * 100.0))
+                on_percent(max(0.0, min(100.0, us / 1_000_000 / duracion * 100.0)))
             except ValueError:
                 pass
     proceso.wait()
-    if proceso.returncode != 0:
+    return proceso.returncode, "".join(lineas)
+
+
+def cmd_quemar_subtitulos(
+    ffmpeg: str, video: Path, ass_nombre: str, salida: Path,
+    desde_original: bool = False, fps: str | None = None,
+) -> list[str]:
+    """`desde_original`: la fuente es el vídeo sin procesar (p. ej. del
+    iPhone): se fija una tasa entera y se rellenan los huecos del audio."""
+    if desde_original:
+        tasa = ["-r", fps or "30"]
+        audio = ["-af", FILTRO_HUECOS_AUDIO, "-c:a", "aac", "-b:a", "192k"]
+    else:
+        tasa, audio = [], ["-c:a", "copy"]
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(video),
+        "-vf", f"ass={ass_nombre}",
+        *tasa,
+        "-c:v", "libx264", "-crf", "18", "-preset", "medium",
+        *audio,
+        "-movflags", "+faststart",
+        "-progress", "pipe:1", "-nostats",
+        str(salida),
+    ]
+
+
+def quemar_subtitulos(
+    video: Path,
+    ass: Path,
+    salida: Path,
+    on_percent: Callable[[float], None] | None = None,
+    desde_original: bool = False,
+) -> None:
+    if not ass.is_file():
+        raise PasoFallido(
+            _("No existe el archivo de subtítulos: {ass}").format(ass=ass)
+        )
+    salida.parent.mkdir(parents=True, exist_ok=True)
+    cmd = cmd_quemar_subtitulos(
+        ffmpeg_con_ass(), video, ass.name, salida, desde_original,
+        fps_objetivo(video) if desde_original else None,
+    )
+    codigo, salida_ffmpeg = ejecutar_ffmpeg_con_progreso(
+        cmd, ass.parent, duracion_video(video), on_percent
+    )
+    if codigo != 0:
         raise PasoFallido(
             _("El quemado de subtítulos falló (código {codigo})").format(
-                codigo=proceso.returncode),
-            detalle="".join(lineas).strip()[-4000:],
+                codigo=codigo),
+            detalle=salida_ffmpeg.strip()[-4000:],
         )
     if not salida.is_file() or salida.stat().st_size == 0:
         raise PasoFallido(

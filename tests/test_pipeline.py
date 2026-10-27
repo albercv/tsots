@@ -6,6 +6,7 @@ import pytest
 
 from videopipeline import pipeline
 from videopipeline.config import PipelineConfig
+from videopipeline.steps import PasoFallido
 
 
 @pytest.fixture()
@@ -192,8 +193,8 @@ def entorno_subs(entorno, monkeypatch, tmp_path):
     def falso_resolucion(video_):
         return (1080, 1920)
 
-    def falso_quemar(video_, ass, salida, on_percent=None):
-        llamadas.append("quemar")
+    def falso_quemar(video_, ass, salida, on_percent=None, desde_original=False):
+        llamadas.append("quemar:original" if desde_original else "quemar")
         salida.write_bytes(b"MP4SUBS")
 
     monkeypatch.setattr(pipeline, "transcribir", falso_transcribir)
@@ -645,3 +646,321 @@ def test_glosario_que_falla_avisa_y_sigue(entorno_caption, tmp_path, monkeypatch
     assert salida.exists()
     assert agrupadas == [["en", "Cloud", "Code."]]
     assert any("boom" in e.get("warning", "") for e in eventos)
+
+
+@pytest.fixture()
+def entorno_vertical(entorno_subs, monkeypatch):
+    """Extiende `entorno_subs` mockeando la conversión y el seguimiento."""
+    llamadas, video, base = entorno_subs
+    resolucion = {"valor": (1920, 1080)}
+    monkeypatch.setattr(pipeline, "resolucion_video", lambda v: resolucion["valor"])
+
+    def falso_convertir(video_, salida, filtro, cwd, usa_ass, desde_original=False,
+                        on_percent=None):
+        llamadas.append(
+            f"vertical:{Path(video_).name}:{usa_ass}:{desde_original}:{filtro}")
+        salida.write_bytes(b"VERTICAL")
+
+    def falso_seguimiento(video_, ancho, alto, ruta_cmd, on_percent=None,
+                          detector=None):
+        llamadas.append("caras")
+        ruta_cmd.write_text("0.000 crop@v x 10;")
+        return 10
+
+    monkeypatch.setattr(pipeline, "convertir_vertical", falso_convertir)
+    monkeypatch.setattr(pipeline, "preparar_seguimiento", falso_seguimiento)
+    return llamadas, video, base, resolucion
+
+
+def _sin_temporales(carpeta: Path) -> bool:
+    return [p for p in carpeta.iterdir() if p.name.startswith(".")] == []
+
+
+def test_vertical_off_no_convierte(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4"), None)
+    assert not any(l.startswith("vertical") for l in llamadas)
+    assert not (tmp_path / "f_vertical.mp4").exists()
+
+
+def test_completo_con_vertical_dos_archivos(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    eventos: list[dict] = []
+    r = pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", paso_vertical=True),
+        eventos.append,
+    )
+    assert r == tmp_path / "f.mp4" and r.read_bytes() == b"MP4FINAL"
+    assert (tmp_path / "f_vertical.mp4").read_bytes() == b"VERTICAL"
+    assert llamadas[-1].startswith("vertical:f.mp4:False:False:")
+    pasos = [e for e in eventos if "step" in e]
+    assert [e["step"] for e in pasos] == [1, 2, 3, 4, 5]
+    assert {e["total"] for e in pasos} == {5}
+    assert pasos[-1]["label"] == "Convirtiendo a vertical"
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_silencios_con_vertical(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                       paso_audio=False, paso_vertical=True),
+        None,
+    )
+    assert [l.split(":")[0] for l in llamadas] == ["rellenar", "cortar", "vertical"]
+    assert (tmp_path / "f.mp4").read_bytes() == b"MP4FINAL"
+    assert (tmp_path / "f_vertical.mp4").read_bytes() == b"VERTICAL"
+    assert _sin_temporales(tmp_path)
+
+
+def test_vertical_con_subs_transcribe_una_vez(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", paso_vertical=True,
+                       subtitulos=True),
+        eventos.append,
+    )
+    assert llamadas.count("transcribir:es:turbo") == 1
+    assert "ass:75:(1920, 1080):100" in llamadas
+    assert "ass:75:(1080, 1920):100" in llamadas
+    vertical = next(l for l in llamadas if l.startswith("vertical"))
+    assert vertical.startswith("vertical:.f_tmp.mp4:True:False:")
+    assert vertical.endswith("ass=subs_vertical.ass,format=yuv420p[v]")
+    assert (tmp_path / "f.mp4").read_bytes() == b"MP4SUBS"
+    assert {e["total"] for e in eventos if "step" in e} == {7}
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_vertical(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    r = pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path, paso_audio=False, paso_silencios=False, paso_vertical=True), None
+    )
+    assert r == tmp_path / "charla_vertical.mp4" and r.read_bytes() == b"VERTICAL"
+    assert [l.split(":")[0] for l in llamadas] == ["vertical"]
+    assert llamadas[0].startswith("vertical:charla.mov:False:True:")
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_vertical_cara_con_subs(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path, paso_audio=False, paso_silencios=False, paso_vertical=True,
+                       encuadre="cara", subtitulos=True),
+        eventos.append,
+    )
+    pasos = [e for e in eventos if "step" in e]
+    assert sorted({e["step"] for e in pasos}) == [1, 2, 3]
+    assert {e["total"] for e in pasos} == {3}
+    etiquetas = [e["label"] for e in pasos]
+    assert "Detectando caras" in etiquetas
+    assert etiquetas[-1] == "Convirtiendo a vertical"
+    assert "caras" in llamadas and "crop@v=606:1080:10:0" in llamadas[-1]
+    assert llamadas[-1].split(":")[2] == "True"
+
+
+def test_vertical_falla_degrada(entorno_vertical, tmp_path, monkeypatch):
+    _, video, _, _ = entorno_vertical
+
+    def revienta(video_, salida, *args, **kwargs):
+        salida.write_bytes(b"MEDIO")
+        raise PasoFallido("boom")
+
+    monkeypatch.setattr(pipeline, "convertir_vertical", revienta)
+    eventos: list[dict] = []
+    r = pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", paso_vertical=True),
+        eventos.append,
+    )
+    assert r.read_bytes() == b"MP4FINAL"
+    assert any(
+        e.get("warning", "").startswith("Versión vertical falló: ") for e in eventos
+    )
+    assert not (tmp_path / "f_vertical.mp4").exists()
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_vertical_falla_es_error(entorno_vertical, tmp_path, monkeypatch):
+    _, video, _, _ = entorno_vertical
+
+    def revienta(video_, salida, *args, **kwargs):
+        salida.write_bytes(b"MEDIO")
+        raise PasoFallido("boom")
+
+    monkeypatch.setattr(pipeline, "convertir_vertical", revienta)
+    with pytest.raises(PasoFallido):
+        pipeline.run(
+            PipelineConfig(video=video, salida=tmp_path, paso_audio=False, paso_silencios=False, paso_vertical=True), None
+        )
+    assert _sin_temporales(tmp_path)
+
+
+def test_ya_vertical_usa_barras_y_avisa(entorno_vertical, tmp_path):
+    llamadas, video, _, resolucion = entorno_vertical
+    resolucion["valor"] = (1080, 1920)
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", paso_vertical=True),
+        eventos.append,
+    )
+    assert "pad=1080:1920" in llamadas[-1]
+    assert any(
+        e.get("warning", "").startswith("El vídeo ya era vertical") for e in eventos
+    )
+
+
+def test_cara_sin_caras_cae_a_central(entorno_vertical, tmp_path, monkeypatch):
+    llamadas, video, _, _ = entorno_vertical
+    monkeypatch.setattr(pipeline, "preparar_seguimiento", lambda *a, **k: None)
+    eventos: list[dict] = []
+    pipeline.run(
+        PipelineConfig(video=video, salida=tmp_path / "f.mp4", paso_vertical=True,
+                       encuadre="cara"),
+        eventos.append,
+    )
+    assert "crop=606:1080" in llamadas[-1] and "sendcmd" not in llamadas[-1]
+    assert any(
+        e.get("warning", "").startswith("No se detectó ninguna cara") for e in eventos
+    )
+
+
+def test_silencios_y_vertical(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    eventos: list[dict] = []
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_audio=False, paso_vertical=True), eventos.append)
+    assert [l.split(":")[0] for l in llamadas] == ["rellenar", "cortar", "vertical"]
+    assert llamadas[-1].startswith("vertical:f.mp4:False:False:")
+    assert {e["total"] for e in eventos if "step" in e} == {2}
+
+
+def test_audio_y_vertical_sin_silencios(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_silencios=False, paso_vertical=True), None)
+    assert [l.split(":")[0] for l in llamadas][-1] == "vertical"
+    assert (tmp_path / "f.mp4").exists() and (tmp_path / "f_vertical.mp4").exists()
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_vertical_desde_original(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path, paso_audio=False,
+                                paso_silencios=False, paso_vertical=True), None)
+    assert llamadas == [l for l in llamadas if l.startswith("vertical")]
+    assert llamadas[0].startswith("vertical:charla.mov:False:True:")
+
+
+def test_solo_subtitulos_quema_desde_original(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    r = pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                    paso_audio=False, paso_silencios=False,
+                                    subtitulos=True), None)
+    assert r.read_bytes() == b"MP4SUBS" and "quemar:original" in llamadas
+    assert _sin_temporales(tmp_path)
+
+
+def test_solo_subtitulos_falla_si_falla_el_quemado(entorno_vertical, tmp_path,
+                                                   monkeypatch):
+    _, video, _, _ = entorno_vertical
+
+    def revienta(*args, **kwargs):
+        raise PasoFallido("boom")
+
+    monkeypatch.setattr(pipeline, "quemar_subtitulos", revienta)
+    with pytest.raises(PasoFallido):
+        pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                    paso_audio=False, paso_silencios=False,
+                                    subtitulos=True), None)
+    assert not (tmp_path / "f.mp4").exists() and _sin_temporales(tmp_path)
+
+
+def test_solo_vertical_con_caption_lo_genera_sobre_el_vertical(entorno_vertical,
+                                                              tmp_path, monkeypatch):
+    llamadas, video, _, _ = entorno_vertical
+
+    def falso_caption(config, video_publicable, final, *args):
+        llamadas.append(f"caption:{final.name}")
+
+    monkeypatch.setattr(pipeline, "_fase_caption", falso_caption)
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path, paso_audio=False,
+                                paso_silencios=False, paso_vertical=True,
+                                subtitulos=True, caption_seo=True), None)
+    assert llamadas[-1] == "caption:charla_vertical.mp4"
+
+
+def test_cara_sin_detector_cae_a_central(entorno_vertical, tmp_path, monkeypatch):
+    llamadas, video, _, _ = entorno_vertical
+
+    def revienta(*args, **kwargs):
+        raise PasoFallido("sin pesos")
+
+    monkeypatch.setattr(pipeline, "preparar_seguimiento", revienta)
+    eventos: list[dict] = []
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_vertical=True, encuadre="cara"), eventos.append)
+    assert "crop=606:1080" in llamadas[-1]
+    assert any("detector de caras" in e.get("warning", "") for e in eventos)
+
+
+def test_solo_subtitulos_sin_bloques_no_mueve_el_original(entorno_vertical, tmp_path,
+                                                          monkeypatch):
+    # Sin ningún paso aplicado, publicar el "resultado" sería mover el original.
+    _, video, _, _ = entorno_vertical
+    monkeypatch.setattr(pipeline, "agrupar", lambda palabras, preset_id: [])
+    with pytest.raises(PasoFallido):
+        pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                    paso_audio=False, paso_silencios=False,
+                                    subtitulos=True), None)
+    assert video.read_bytes() == b"VID"
+    assert not (tmp_path / "f.mp4").exists()
+
+
+@pytest.mark.parametrize("pasos", [
+    {"paso_vertical": True, "subtitulos": True},  # vertical + subtítulos
+    {"subtitulos": True},                         # solo subtítulos
+])
+def test_subtitulos_sin_base_transcriben_audio_rellenado(entorno_vertical, tmp_path,
+                                                         monkeypatch, pasos):
+    # Whisper ignora los huecos del audio del iPhone: sin pasos de audio ni
+    # silencios hay que transcribir una pista continua o los subtítulos se adelantan.
+    llamadas, video, _, _ = entorno_vertical
+    fuentes: list[Path] = []
+
+    def falso_transcribir(video_, idioma, modelo, prompt=None):
+        fuentes.append(Path(video_))
+        from videopipeline.subtitles import Palabra
+        return [Palabra(texto="hola", inicio=0.0, fin=0.5)]
+
+    monkeypatch.setattr(pipeline, "transcribir", falso_transcribir)
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_audio=False, paso_silencios=False, **pasos), None)
+    assert "extraer:16000" in llamadas
+    assert fuentes and fuentes[0].suffix == ".wav" and fuentes[0] != video
+    assert not fuentes[0].exists()
+
+
+def test_vertical_falla_borra_vertical_anterior(entorno_vertical, tmp_path, monkeypatch):
+    _, video, _, _ = entorno_vertical
+    anterior = tmp_path / "f_vertical.mp4"
+    anterior.write_bytes(b"VIEJO")
+
+    def revienta(*args, **kwargs):
+        raise PasoFallido("boom")
+
+    monkeypatch.setattr(pipeline, "convertir_vertical", revienta)
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_vertical=True), None)
+    assert (tmp_path / "f.mp4").exists() and not anterior.exists()
+
+
+def test_vertical_nunca_sobrescribe_la_entrada(entorno_vertical, tmp_path):
+    llamadas, _, _, _ = entorno_vertical
+    entrada = tmp_path / "X_vertical.mp4"
+    entrada.write_bytes(b"ORIGINAL")
+    with pytest.raises(ValueError, match="salida"):
+        pipeline.run(PipelineConfig(video=entrada, salida=tmp_path / "X.mp4",
+                                    paso_vertical=True), None)
+    assert entrada.read_bytes() == b"ORIGINAL" and llamadas == []

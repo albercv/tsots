@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Callable
 
 from .config import SAMPLE_RATE_POR_MODELO, PipelineConfig
+from .seguimiento import RUTA_PESOS, preparar_seguimiento
 from .steps import (
     BASE_DIR,
+    PasoFallido,
     cortar_silencios,
     extraer_audio,
     limpiar_audio,
@@ -25,7 +27,14 @@ from .glosario import parsear as parsear_glosario
 from .glosario import prompt_whisper, terminos_caption
 from .i18n import _
 from .ollama import asegurar_servidor
-from .subtitles import Palabra
+from .subtitles import Bloque, Palabra
+from .vertical import (
+    ALTO_VERTICAL,
+    ANCHO_VERTICAL,
+    convertir_vertical,
+    es_ya_vertical,
+    filtro_vertical,
+)
 
 Progreso = Callable[[dict], None]
 
@@ -61,14 +70,17 @@ def _transcribir(config: PipelineConfig, video: Path,
         return palabras
 
 
-def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
-                     trabajo: Path, on_progress: Progreso | None,
-                     paso: int, total: int) -> tuple[Path, list[Palabra] | None]:
-    """Añade subtítulos a tmp_final. Devuelve (ruta a publicar, palabras).
+def _transcribir_subs(config: PipelineConfig, fuente: Path, final: Path,
+                      on_progress: Progreso | None, paso: int, total: int,
+                      degradar: bool, wav_continuo: Path | None = None
+                      ) -> tuple[list[Palabra] | None, list[Bloque] | None]:
+    """Transcribe `fuente` una vez y escribe el .srt. Devuelve (palabras, bloques).
 
-    Si algo falla, emite {"warning": ...} y devuelve tmp_final sin tocar:
-    el pipeline nunca falla por subtítulos. `palabras` es None si la
-    transcripción no se consiguió (el caption la reintentará).
+    Con `wav_continuo`, se transcribe una pista de audio con los huecos
+    rellenos extraída de `fuente`: Whisper encadena el audio sin respetar los
+    huecos del iPhone y los subtítulos se adelantarían a la voz.
+    Con `degradar`, un fallo avisa y devuelve (None, None): el vídeo se guarda
+    sin subtítulos. Sin él (los subtítulos son el único paso), el error sube.
     """
     try:
         en_cache = modelo_en_cache(config.modelo_whisper)
@@ -77,46 +89,64 @@ def _fase_subtitulos(config: PipelineConfig, tmp_final: Path, final: Path,
             _("Transcribiendo") if en_cache
             else _("Descargando modelo Whisper y transcribiendo"),
         )
-        palabras = _transcribir(config, tmp_final, on_progress)
+        if wav_continuo is not None:
+            wav_continuo.parent.mkdir(parents=True, exist_ok=True)
+            extraer_audio(fuente, wav_continuo, 16000)
+            fuente = wav_continuo
+        palabras = _transcribir(config, fuente, on_progress)
         if not palabras:
             raise RuntimeError("la transcripción no produjo palabras")
         bloques = agrupar(palabras, config.diseno)
         generar_srt(bloques, final.with_suffix(".srt"))
     except Exception as error:  # noqa: BLE001 — degradación deliberada
-        if on_progress is not None:
-            on_progress({
-                "warning": _("Subtítulos fallaron: {error}. "
-                             "Vídeo guardado sin subtítulos.").format(error=error)
-            })
-        return tmp_final, None
+        if not degradar:
+            raise
+        _avisar(on_progress,
+                _("Subtítulos fallaron: {error}. "
+                  "Vídeo guardado sin subtítulos.").format(error=error))
+        return None, None
+    finally:
+        if wav_continuo is not None:
+            wav_continuo.unlink(missing_ok=True)
+    return palabras, bloques
 
+
+def _quemar_subs(config: PipelineConfig, bloques: list[Bloque], fuente: Path,
+                 final: Path, trabajo: Path, on_progress: Progreso | None,
+                 paso: int, total: int, desde_original: bool,
+                 degradar: bool) -> Path | None:
+    """Quema los subtítulos de `fuente` en un temporal y lo devuelve.
+
+    No toca `fuente`: la fase vertical la usa sin subtítulos. Con `degradar`,
+    un fallo avisa y devuelve None; sin él, el error sube.
+    """
     ass = trabajo / "subs.ass"
     tmp_subs = final.with_name(f".{final.stem}_subs_tmp{final.suffix}")
     try:
         trabajo.mkdir(parents=True, exist_ok=True)
         generar_ass(bloques, config.diseno, config.posicion_subs,
-                    resolucion_video(tmp_final), ass, tamano=config.tamano_subs)
+                    resolucion_video(fuente), ass, tamano=config.tamano_subs)
         tmp_subs.unlink(missing_ok=True)
-        _emitir(on_progress, paso + 1, total, _("Quemando subtítulos"))
+        _emitir(on_progress, paso, total, _("Quemando subtítulos"))
         quemar_subtitulos(
-            tmp_final, ass, tmp_subs,
+            fuente, ass, tmp_subs,
             on_percent=lambda p: _emitir(
-                on_progress, paso + 1, total, _("Quemando subtítulos"), p
+                on_progress, paso, total, _("Quemando subtítulos"), p
             ),
+            desde_original=desde_original,
         )
-        ass.unlink(missing_ok=True)
-        tmp_final.unlink(missing_ok=True)
-        return tmp_subs, palabras
+        return tmp_subs
     except Exception as error:  # noqa: BLE001 — degradación deliberada
-        ass.unlink(missing_ok=True)
         tmp_subs.unlink(missing_ok=True)
-        if on_progress is not None:
-            on_progress({
-                "warning": _("Subtítulos fallaron: {error}. "
-                             "Vídeo guardado sin subtítulos (.srt conservado)."
-                             ).format(error=error)
-            })
-        return tmp_final, palabras
+        if not degradar:
+            raise
+        _avisar(on_progress,
+                _("Subtítulos fallaron: {error}. "
+                  "Vídeo guardado sin subtítulos (.srt conservado)."
+                  ).format(error=error))
+        return None
+    finally:
+        ass.unlink(missing_ok=True)
 
 
 def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
@@ -166,6 +196,143 @@ def pasos_extra(config: PipelineConfig) -> int:
     return extra
 
 
+def total_pasos(config: PipelineConfig) -> int:
+    """Pasos que verá el usuario según los pasos pedidos."""
+    total = 3 * config.paso_audio + config.paso_silencios
+    if config.subtitulos:
+        # Transcribir y, si hay horizontal, quemar (el vertical quema al convertir).
+        total += 1 + config.hay_horizontal()
+    if config.caption_seo:
+        total += 1 if config.subtitulos else 2
+    if config.paso_vertical:
+        total += 1 + (config.encuadre == "cara")
+    return total
+
+
+def _fase_base(config: PipelineConfig, video: Path, tmp_final: Path,
+               trabajo: Path, on_progress: Progreso | None, total: int) -> None:
+    """Audio y/o silencios sobre `video`; deja el resultado en `tmp_final`."""
+    nombre = video.stem
+    entrada_silencios: Path | None = None
+    if config.paso_audio:
+        trabajo.mkdir(parents=True, exist_ok=True)
+        wav_original = trabajo / f"{nombre}_original.wav"
+        wav_limpio = trabajo / f"{nombre}_audio_limpio.wav"
+        _emitir(on_progress, 1, total, _("Extrayendo audio"))
+        extraer_audio(video, wav_original, SAMPLE_RATE_POR_MODELO[config.modelo])
+        checkpoint = BASE_DIR / "checkpoints" / config.modelo
+        etiqueta_limpieza = (
+            _("Limpiando audio")
+            if checkpoint.is_dir()
+            else _("Descargando modelo y limpiando audio")
+        )
+        _emitir(on_progress, 2, total, etiqueta_limpieza)
+        limpiar_audio(wav_original, wav_limpio, config.tarea, config.modelo)
+        _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
+        if config.paso_silencios:
+            # PCM intermedio: auto-editor no hereda el retardo de arranque del AAC.
+            entrada_silencios = trabajo / f"{nombre}_solo_audio_limpio.mov"
+            remux(video, wav_limpio, entrada_silencios, intermedio=True)
+        else:
+            remux(video, wav_limpio, tmp_final)
+    if not config.paso_silencios:
+        return
+    paso = 4 if config.paso_audio else 1
+    try:
+        _emitir(on_progress, paso, total, _("Recortando silencios"))
+        if entrada_silencios is None:
+            # auto-editor colapsa los huecos del audio del iPhone y desincroniza:
+            # se le pasa una copia con los huecos rellenos.
+            entrada_silencios = trabajo / f"{nombre}_audio_relleno.mov"
+            rellenar_huecos_audio(video, entrada_silencios)
+        cortar_silencios(
+            entrada_silencios, tmp_final, config.margen, config.umbral,
+            config.silencios, config.velocidad_silencios,
+            on_percent=lambda p: _emitir(
+                on_progress, paso, total, _("Recortando silencios"), p
+            ),
+            on_aviso=lambda texto: _avisar(on_progress, texto),
+        )
+    finally:
+        if entrada_silencios is not None:
+            entrada_silencios.unlink(missing_ok=True)
+
+
+def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
+                   bloques: list[Bloque] | None, trabajo: Path,
+                   on_progress: Progreso | None, paso: int, total: int,
+                   degradar: bool, desde_original: bool) -> None:
+    """Convierte `fuente` (sin subtítulos) a vertical y lo publica en `destino`.
+
+    Con `degradar`, un fallo deja solo un aviso (el horizontal ya está
+    publicado); sin él, el error se propaga.
+    """
+    tmp = destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
+    ass = trabajo / "subs_vertical.ass"
+    comandos = trabajo / "cara.cmd"
+    try:
+        trabajo.mkdir(parents=True, exist_ok=True)
+        ancho, alto = resolucion_video(fuente)
+        encuadre = config.encuadre
+        x_cara = None
+        if es_ya_vertical(ancho, alto):
+            _avisar(on_progress,
+                    _("El vídeo ya era vertical: se reescala con barras."))
+            encuadre = "barras"
+        if config.encuadre == "cara":
+            if encuadre == "cara":
+                etiqueta = (
+                    _("Detectando caras") if RUTA_PESOS.is_file()
+                    else _("Descargando detector de caras")
+                )
+                _emitir(on_progress, paso, total, etiqueta)
+                try:
+                    x_cara = preparar_seguimiento(
+                        fuente, ancho, alto, comandos,
+                        on_percent=lambda p: _emitir(
+                            on_progress, paso, total, _("Detectando caras"), p
+                        ),
+                    )
+                    if x_cara is None:
+                        _avisar(on_progress, _("No se detectó ninguna cara: "
+                                               "se usa recorte central."))
+                except Exception as error:  # noqa: BLE001 — degradación deliberada
+                    _avisar(on_progress,
+                            _("No se pudo preparar el detector de caras: "
+                              "{error}. Se usa recorte central.").format(error=error))
+                if x_cara is None:
+                    encuadre = "central"
+            paso += 1  # el total cuenta el paso aunque se salte
+        if bloques:
+            generar_ass(bloques, config.diseno, config.posicion_subs,
+                        (ANCHO_VERTICAL, ALTO_VERTICAL), ass,
+                        tamano=config.tamano_subs)
+        tmp.unlink(missing_ok=True)
+        _emitir(on_progress, paso, total, _("Convirtiendo a vertical"))
+        convertir_vertical(
+            fuente, tmp,
+            filtro_vertical(encuadre, ancho, alto, x_cara=x_cara,
+                            ass_nombre=ass.name if bloques else None),
+            cwd=trabajo, usa_ass=bool(bloques), desde_original=desde_original,
+            on_percent=lambda p: _emitir(
+                on_progress, paso, total, _("Convirtiendo a vertical"), p
+            ),
+        )
+        tmp.replace(destino)
+    except Exception as error:  # noqa: BLE001 — degradación deliberada
+        tmp.unlink(missing_ok=True)
+        # Un vertical de una ejecución anterior no debe pasar por el de esta.
+        destino.unlink(missing_ok=True)
+        if not degradar:
+            raise
+        _avisar(on_progress,
+                _("Versión vertical falló: {error}. Se conserva el vídeo "
+                  "horizontal.").format(error=error))
+    finally:
+        ass.unlink(missing_ok=True)
+        comandos.unlink(missing_ok=True)
+
+
 def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     config.validar()
     video = config.video.expanduser().resolve()
@@ -175,95 +342,81 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     final = config.ruta_salida_final().expanduser().resolve()
     if final == video:
         raise ValueError("La salida no puede ser el mismo archivo que la entrada.")
+    vertical = config.ruta_salida_vertical()
+    if vertical is not None and vertical.expanduser().resolve() == video:
+        raise ValueError(
+            "La salida vertical no puede ser el mismo archivo que la entrada."
+        )
     final.parent.mkdir(parents=True, exist_ok=True)
 
-    nombre = video.stem
+    # tmp_final: horizontal sin subtítulos (fuente también del vertical).
     tmp_final = final.with_name(f".{final.stem}_tmp{final.suffix}")
     tmp_final.unlink(missing_ok=True)
+    trabajo = BASE_DIR / "audio_procesado" / video.stem
+    total = total_pasos(config)
+    horizontal = config.hay_horizontal()
+    hay_base = config.paso_audio or config.paso_silencios
+    # Si los subtítulos son el único paso, su fallo es el fallo del trabajo.
+    solo_subs = not (hay_base or config.paso_vertical)
 
-    extra = pasos_extra(config)
-    trabajo = BASE_DIR / "audio_procesado" / nombre
+    try:
+        if hay_base:
+            _fase_base(config, video, tmp_final, trabajo, on_progress, total)
+        base = tmp_final if hay_base else video
+        paso = 3 * config.paso_audio + config.paso_silencios + 1
 
-    if config.modo == "solo_silencios":
-        total = 1 + extra
-        # auto-editor colapsa los huecos del audio del iPhone y desincroniza:
-        # se le pasa una copia con los huecos rellenos.
-        preparado = trabajo / f"{nombre}_audio_relleno.mov"
-        try:
-            _emitir(on_progress, 1, total, _("Recortando silencios"))
-            rellenar_huecos_audio(video, preparado)
-            cortar_silencios(
-                preparado, tmp_final, config.margen, config.umbral,
-                config.silencios, config.velocidad_silencios,
-                on_percent=lambda p: _emitir(
-                    on_progress, 1, total, _("Recortando silencios"), p
-                ),
-                on_aviso=lambda texto: _avisar(on_progress, texto),
-            )
-        finally:
-            preparado.unlink(missing_ok=True)
-        publicar, palabras = tmp_final, None
+        palabras = bloques = None
         if config.subtitulos:
-            publicar, palabras = _fase_subtitulos(
-                config, tmp_final, final, trabajo, on_progress, 2, total
+            palabras, bloques = _transcribir_subs(
+                config, base, final, on_progress, paso, total,
+                degradar=not solo_subs,
+                wav_continuo=None if hay_base else trabajo / f"{video.stem}_subs.wav",
             )
-        if config.caption_seo:
-            primer_paso_caption = 1 + (2 if config.subtitulos else 0) + 1
-            _fase_caption(config, publicar, final, palabras, on_progress,
-                          primer_paso_caption, total)
-        else:
-            final.with_suffix(".md").unlink(missing_ok=True)
-        publicar.replace(final)
+            paso += 1
+
+        fuente_v = video
+        if horizontal:
+            publicar = base
+            if config.subtitulos:
+                if bloques:
+                    quemado = _quemar_subs(
+                        config, bloques, base, final, trabajo, on_progress,
+                        paso, total, desde_original=not hay_base,
+                        degradar=not solo_subs,
+                    )
+                    publicar = quemado or base
+                paso += 1
+            if config.caption_seo:
+                _fase_caption(config, publicar, final, palabras, on_progress,
+                              paso, total)
+                paso += 1 if config.subtitulos else 2
+            else:
+                final.with_suffix(".md").unlink(missing_ok=True)
+            if publicar == video:
+                # Nada se aplicó: publicar sería mover el original del usuario.
+                raise PasoFallido(
+                    _("No se pudieron añadir los subtítulos: la transcripción "
+                      "no dio texto que mostrar.")
+                )
+            publicar.replace(final)  # el horizontal se publica antes del vertical
+            if hay_base:
+                fuente_v = final if publicar == tmp_final else tmp_final
+
+        if config.paso_vertical:
+            destino = (
+                config.ruta_salida_vertical().expanduser().resolve()
+                if horizontal else final
+            )
+            _fase_vertical(config, fuente_v, destino, bloques, trabajo,
+                           on_progress, paso, total, degradar=horizontal,
+                           desde_original=fuente_v == video)
+            if not horizontal:
+                paso += 1 + (config.encuadre == "cara")
+                if config.caption_seo:
+                    _fase_caption(config, final, final, palabras, on_progress,
+                                  paso, total)
+                else:
+                    final.with_suffix(".md").unlink(missing_ok=True)
         return final
-
-    trabajo.mkdir(parents=True, exist_ok=True)
-    wav_original = trabajo / f"{nombre}_original.wav"
-    wav_limpio = trabajo / f"{nombre}_audio_limpio.wav"
-
-    total = (4 if config.modo == "completo" else 3) + extra
-    sample_rate = SAMPLE_RATE_POR_MODELO[config.modelo]
-
-    _emitir(on_progress, 1, total, _("Extrayendo audio"))
-    extraer_audio(video, wav_original, sample_rate)
-
-    checkpoint = BASE_DIR / "checkpoints" / config.modelo
-    etiqueta_limpieza = (
-        _("Limpiando audio")
-        if checkpoint.is_dir()
-        else _("Descargando modelo y limpiando audio")
-    )
-    _emitir(on_progress, 2, total, etiqueta_limpieza)
-    limpiar_audio(wav_original, wav_limpio, config.tarea, config.modelo)
-
-    if config.modo == "solo_audio":
-        _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
-        remux(video, wav_limpio, tmp_final)
-    else:
-        video_intermedio = trabajo / f"{nombre}_solo_audio_limpio.mov"
-        _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
-        remux(video, wav_limpio, video_intermedio, intermedio=True)
-        _emitir(on_progress, 4, total, _("Recortando silencios"))
-        cortar_silencios(
-            video_intermedio, tmp_final, config.margen, config.umbral,
-            config.silencios, config.velocidad_silencios,
-            on_percent=lambda p: _emitir(
-                on_progress, 4, total, _("Recortando silencios"), p
-            ),
-            on_aviso=lambda texto: _avisar(on_progress, texto),
-        )
-        video_intermedio.unlink(missing_ok=True)
-
-    publicar, palabras = tmp_final, None
-    pasos_base = total - pasos_extra(config)
-    if config.subtitulos:
-        publicar, palabras = _fase_subtitulos(
-            config, tmp_final, final, trabajo, on_progress, pasos_base + 1, total
-        )
-    if config.caption_seo:
-        primer_paso_caption = pasos_base + (2 if config.subtitulos else 0) + 1
-        _fase_caption(config, publicar, final, palabras, on_progress,
-                      primer_paso_caption, total)
-    else:
-        final.with_suffix(".md").unlink(missing_ok=True)
-    publicar.replace(final)
-    return final
+    finally:
+        tmp_final.unlink(missing_ok=True)

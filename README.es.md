@@ -76,11 +76,14 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    para elegirlos). Aparecen en la cola.
 2. **Elige opciones** a la derecha. Cada grupo es una sección plegable:
    pulsa su título para abrirla y se cierra la que estaba abierta (al
-   arrancar, **Modo**). Si no caben, solo las opciones hacen scroll; debajo,
-   siempre a la vista, quedan las pestañas **Previsualización** y
-   **Caption**.
-   - **Modo**: pipeline completo (limpiar + recortar), solo limpiar audio,
-     o solo cortar silencios.
+   arrancar, **Limpieza de audio**). Si no caben, solo las opciones hacen
+   scroll; debajo, siempre a la vista, quedan las pestañas
+   **Previsualización** y **Caption**.
+   - **Pasos**: cada sección empieza con la casilla de su paso (mejorar
+     audio, recortar silencios, subtítulos, caption, vertical) y se
+     combinan como quieras; la cabecera lleva ✓ cuando el paso está activo.
+     **Pipeline completo**, arriba, los marca todos de una vez (o los
+     desmarca si ya estaban todos). Por defecto: audio y silencios.
    - **Limpieza de audio**: modelo de IA para quitar ruido. El de defecto
      (MossFormer2 48 kHz) es el mejor para voz.
    - **Corte de silencios**: margen que se deja alrededor de cada frase y
@@ -97,6 +100,12 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
      tooltip dice por qué.
+   - **Formato vertical**: guarda además `nombre_limpio_vertical.mp4`
+     (9:16, 1080x1920) para Reels y TikTok; si no marcas audio ni
+     silencios, solo sale `nombre_vertical.mp4`. Encuadres: recorte central
+     (por defecto), fondo difuminado, barras negras o **seguir la cara**
+     (más lento; la primera vez descarga el detector, ~90 MB). Se desmarca
+     al reabrir la app: es un paso ocasional.
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que
      Whisper los escriba bien en los subtítulos y el caption. Después de
      `=`, las formas en que Whisper se equivoca; se corrigen solas:

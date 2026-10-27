@@ -198,3 +198,23 @@ def sin_finder(monkeypatch):
     reveladas: list[Path] = []
     monkeypatch.setattr(dialogo_publicar, "revelar_en_finder", reveladas.append)
     return reveladas
+
+
+@pytest.fixture(scope="session")
+def video_720p(tmp_path_factory) -> Path:
+    """Vídeo horizontal 1280x720 de 2 s con pista de audio AAC."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg no disponible")
+    destino = tmp_path_factory.mktemp("media") / "720p.mp4"
+    subprocess.run(
+        [
+            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=s=1280x720:d=2:r=10",
+            "-f", "lavfi", "-i", "sine=frequency=440:duration=2",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest",
+            str(destino),
+        ],
+        check=True,
+    )
+    return destino

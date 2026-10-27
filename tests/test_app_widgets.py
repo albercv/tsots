@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QMimeData, QUrl
+from PySide6.QtCore import QMimeData, Qt, QUrl
 
 from app.widgets.panel_opciones import PanelOpciones
 from app.widgets.zona_drop import ZonaDrop
@@ -30,7 +30,7 @@ def test_panel_valores_defecto_construyen_config(qtbot, tmp_path):
     valores = panel.valores()
     config = PipelineConfig(video=tmp_path / "v.mp4", **valores)
     config.validar()
-    assert config.modo == "completo"
+    assert (config.paso_audio, config.paso_silencios) == (True, True)
     assert config.modelo == "MossFormer2_SE_48K"
     assert config.margen == "0.2s"
     assert config.umbral == "4%"
@@ -44,12 +44,14 @@ def test_panel_modelo_sigue_a_tarea(qtbot):
     assert panel.valores()["modelo"] == "MossFormer2_SS_16K"
 
 
-def test_panel_deshabilita_por_modo(qtbot):
+def test_panel_deshabilita_por_paso(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    panel.radio_solo_silencios.setChecked(True)
+    panel.check_audio.setChecked(False)
     assert not panel.combo_tarea.isEnabled()
-    panel.radio_solo_audio.setChecked(True)
+    assert panel.check_audio.isEnabled()
+    panel.check_audio.setChecked(True)
+    panel.check_silencios.setChecked(False)
     assert panel.combo_tarea.isEnabled()
     assert not panel.campo_margen.isEnabled()
 
@@ -79,10 +81,10 @@ def test_panel_aviso_checkpoint(qtbot, tmp_path, monkeypatch):
 def test_panel_cargar_restaura(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    panel.cargar({"modo": "solo_audio", "margen": "0.5s",
+    panel.cargar({"paso_audio": True, "paso_silencios": False, "margen": "0.5s",
                   "silencios": "acelerar", "velocidad_silencios": 8})
     valores = panel.valores()
-    assert valores["modo"] == "solo_audio"
+    assert (valores["paso_audio"], valores["paso_silencios"]) == (True, False)
     assert valores["margen"] == "0.5s"
     assert valores["velocidad_silencios"] == 8
 
@@ -680,17 +682,17 @@ def test_acordeon_solo_una_abierta(qtbot):
     assert [s.esta_abierta() for s in (a, b, c)] == [False, True, False]
 
 
-def test_panel_secciones_en_orden_y_modo_abierto(qtbot):
+def test_panel_secciones_en_orden_y_audio_abierto(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     assert list(panel.secciones) == [
-        "modo", "audio", "silencios", "subtitulos", "caption",
+        "audio", "silencios", "subtitulos", "caption", "vertical",
     ]
     assert [s.cabecera.text() for s in panel.secciones.values()] == [
-        "Modo", "Limpieza de audio", "Corte de silencios", "Subtítulos",
-        "Caption SEO",
+        "✓ Limpieza de audio", "✓ Corte de silencios", "Subtítulos",
+        "Caption SEO", "Formato vertical",
     ]
-    assert panel.seccion_abierta() == "modo"
+    assert panel.seccion_abierta() == "audio"
     assert [s.esta_abierta() for s in panel.secciones.values()] == [
         True, False, False, False, False,
     ]
@@ -706,9 +708,9 @@ def test_panel_clic_en_otra_seccion_cambia_la_abierta(qtbot):
     qtbot.mouseClick(panel.secciones["subtitulos"].cabecera,
                      Qt.MouseButton.LeftButton)
     assert panel.seccion_abierta() == "subtitulos"
-    assert panel.secciones["modo"].contenido.isHidden()
+    assert panel.secciones["audio"].contenido.isHidden()
     assert panel.check_subtitulos.isVisible()
-    assert not panel.radio_completo.isVisible()
+    assert not panel.check_audio.isVisible()
     qtbot.mouseClick(panel.secciones["caption"].cabecera,
                      Qt.MouseButton.LeftButton)
     assert panel.seccion_abierta() == "caption"
@@ -725,7 +727,7 @@ def test_panel_valores_no_dependen_de_la_seccion_abierta(qtbot):
         panel.abrir_seccion(clave)
         assert panel.seccion_abierta() == clave
         assert panel.valores() == esperado
-    assert esperado["modo"] == "solo_audio"
+    assert (esperado["paso_audio"], esperado["paso_silencios"]) == (True, False)
     assert esperado["diseno"] == "caja"
     assert esperado["caption_seo"] is True
 
@@ -733,11 +735,108 @@ def test_panel_valores_no_dependen_de_la_seccion_abierta(qtbot):
 def test_panel_habilitados_no_tocan_cabeceras(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    panel.radio_solo_silencios.setChecked(True)
+    panel.check_audio.setChecked(False)
     assert not panel.combo_tarea.isEnabled()
     assert panel.secciones["audio"].cabecera.isEnabled()
-    panel.radio_solo_audio.setChecked(True)
+    panel.check_audio.setChecked(True)
+    panel.check_silencios.setChecked(False)
     assert not panel.campo_margen.isEnabled()
     assert panel.secciones["silencios"].cabecera.isEnabled()
     panel.check_subtitulos.setChecked(False)
     assert panel.secciones["subtitulos"].cabecera.isEnabled()
+
+
+def test_panel_pasos_por_defecto(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    v = panel.valores()
+    assert (v["paso_audio"], v["paso_silencios"], v["paso_vertical"]) == (
+        True, True, False)
+    assert (v["subtitulos"], v["caption_seo"], v["encuadre"]) == (
+        False, False, "central")
+    assert "modo" not in v
+    assert panel.check_completo.checkState() == Qt.CheckState.PartiallyChecked
+    assert panel.hay_pasos_de_video()
+
+
+def test_panel_pipeline_completo_marca_y_desmarca_todo(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    casillas = (panel.check_audio, panel.check_silencios, panel.check_subtitulos,
+                panel.check_caption, panel.check_vertical)
+    panel.check_completo.click()
+    assert all(c.isChecked() for c in casillas)
+    assert panel.check_completo.checkState() == Qt.CheckState.Checked
+    panel.check_completo.click()
+    assert not any(c.isChecked() for c in casillas)
+    assert panel.check_completo.checkState() == Qt.CheckState.Unchecked
+    assert not panel.hay_pasos_de_video()
+
+
+def test_panel_pasos_cambiados_se_emite(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    with qtbot.waitSignal(panel.pasos_cambiados, timeout=1000):
+        panel.check_vertical.setChecked(True)
+
+
+def test_panel_cabecera_marca_pasos_activos(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.secciones["audio"].cabecera.text().startswith("✓ ")
+    assert not panel.secciones["vertical"].cabecera.text().startswith("✓ ")
+    panel.check_vertical.setChecked(True)
+    assert panel.secciones["vertical"].cabecera.text() == "✓ Formato vertical"
+    panel.check_audio.setChecked(False)
+    assert panel.secciones["audio"].cabecera.text() == "Limpieza de audio"
+
+
+def test_panel_vertical_habilita_encuadre_y_aviso_cara(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert not panel.combo_encuadre.isEnabled()
+    panel.check_vertical.setChecked(True)
+    assert panel.combo_encuadre.isEnabled()
+    panel.combo_encuadre.setCurrentIndex(panel.combo_encuadre.findData("cara"))
+    assert panel.aviso_encuadre.text() != ""
+    panel.combo_encuadre.setCurrentIndex(panel.combo_encuadre.findData("central"))
+    assert panel.aviso_encuadre.text() == ""
+
+
+def test_panel_cargar_modo_antiguo(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"modo": "solo_silencios"})
+    v = panel.valores()
+    assert (v["paso_audio"], v["paso_silencios"]) == (False, True)
+
+
+def test_panel_cargar_no_restaura_vertical(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"paso_audio": "false", "paso_silencios": "true",
+                  "paso_vertical": "true", "encuadre": "difuminado",
+                  "modo": "completo"})
+    v = panel.valores()
+    assert (v["paso_audio"], v["paso_vertical"], v["encuadre"]) == (
+        False, False, "difuminado")
+
+
+def test_panel_vertical_config_valida(qtbot, tmp_path):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_vertical.setChecked(True)
+    panel.combo_encuadre.setCurrentIndex(panel.combo_encuadre.findData("cara"))
+    PipelineConfig(video=tmp_path / "a.mp4", **panel.valores()).validar()
+
+
+def test_panel_encuadres_traducidos():
+    """Cada encuadre tiene traducción en el catálogo inglés."""
+    import re
+
+    from app.widgets.panel_opciones import ETIQUETA_ENCUADRE
+
+    po = (Path(__file__).parent.parent / "locale/en/LC_MESSAGES/tsots.po").read_text(
+        encoding="utf-8")
+    traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
+    assert [e for e in ETIQUETA_ENCUADRE if e not in traducidas] == []
