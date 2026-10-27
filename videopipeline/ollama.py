@@ -118,8 +118,17 @@ def memoria_para_modelos(ram_bytes: int | None = None) -> int:
     return int(ram_bytes * FRACCION_GPU)
 
 
+# Por encima de esta fracción de `memoria` el modelo cabe, pero compite con
+# ClearVoice, Whisper y el resto de apps: el Mac tira de swap y se arrastra.
+FRACCION_PESADO = 0.5
+
+
 def cabe(modelo: Modelo, memoria: int) -> bool:
     return modelo.tamano + MARGEN_CONTEXTO <= memoria
+
+
+def pesado(modelo: Modelo, memoria: int) -> bool:
+    return modelo.tamano + MARGEN_CONTEXTO > memoria * FRACCION_PESADO
 
 
 def motivo_no_cabe(modelo: Modelo, memoria: int) -> str:
@@ -128,6 +137,13 @@ def motivo_no_cabe(modelo: Modelo, memoria: int) -> str:
         "y este Mac deja ~{memoria} GB para modelos."
     ).format(total=_gb(modelo.tamano + MARGEN_CONTEXTO), modelo=_gb(modelo.tamano),
              memoria=_gb(memoria))
+
+
+def motivo_pesado(modelo: Modelo, memoria: int) -> str:
+    return _(
+        "Ocupa ~{total} GB, más de la mitad de los ~{memoria} GB que este Mac "
+        "deja para modelos: puede ralentizar el equipo. Mejor uno más ligero."
+    ).format(total=_gb(modelo.tamano + MARGEN_CONTEXTO), memoria=_gb(memoria))
 
 
 def chat_json(
@@ -144,6 +160,10 @@ def chat_json(
         "stream": False,
         "format": esquema,
         "think": False,
+        # Descargar el modelo nada más responder: si no, Ollama lo retiene
+        # 5 min y el siguiente vídeo de la cola limpia audio y transcribe con
+        # esos GB ocupados.
+        "keep_alive": 0,
         "options": {"temperature": 0.7, "num_ctx": 16384},
     }).encode("utf-8")
     peticion = urllib.request.Request(
