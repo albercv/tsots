@@ -55,7 +55,9 @@ def asegurar_pesos_s3fd(ruta: Path = RUTA_PESOS) -> bool:
             raise RuntimeError(_("la descarga no produjo ningún fichero"))
         tmp.replace(ruta)
     except Exception as error:  # noqa: BLE001 — cualquier fallo de red o de Drive
-        tmp.unlink(missing_ok=True)
+        # gdown deja parciales (`<salida><aleatorio>.part`) para reanudar.
+        for resto in ruta.parent.glob(f"{ruta.name}*"):
+            resto.unlink(missing_ok=True)
         raise PasoFallido(
             _("No se pudieron descargar los pesos del detector de caras: "
               "{error}").format(error=error)

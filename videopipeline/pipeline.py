@@ -72,10 +72,13 @@ def _transcribir(config: PipelineConfig, video: Path,
 
 def _transcribir_subs(config: PipelineConfig, fuente: Path, final: Path,
                       on_progress: Progreso | None, paso: int, total: int,
-                      degradar: bool) -> tuple[list[Palabra] | None,
-                                               list[Bloque] | None]:
+                      degradar: bool, wav_continuo: Path | None = None
+                      ) -> tuple[list[Palabra] | None, list[Bloque] | None]:
     """Transcribe `fuente` una vez y escribe el .srt. Devuelve (palabras, bloques).
 
+    Con `wav_continuo`, se transcribe una pista de audio con los huecos
+    rellenos extraída de `fuente`: Whisper encadena el audio sin respetar los
+    huecos del iPhone y los subtítulos se adelantarían a la voz.
     Con `degradar`, un fallo avisa y devuelve (None, None): el vídeo se guarda
     sin subtítulos. Sin él (los subtítulos son el único paso), el error sube.
     """
@@ -86,6 +89,10 @@ def _transcribir_subs(config: PipelineConfig, fuente: Path, final: Path,
             _("Transcribiendo") if en_cache
             else _("Descargando modelo Whisper y transcribiendo"),
         )
+        if wav_continuo is not None:
+            wav_continuo.parent.mkdir(parents=True, exist_ok=True)
+            extraer_audio(fuente, wav_continuo, 16000)
+            fuente = wav_continuo
         palabras = _transcribir(config, fuente, on_progress)
         if not palabras:
             raise RuntimeError("la transcripción no produjo palabras")
@@ -98,6 +105,9 @@ def _transcribir_subs(config: PipelineConfig, fuente: Path, final: Path,
                 _("Subtítulos fallaron: {error}. "
                   "Vídeo guardado sin subtítulos.").format(error=error))
         return None, None
+    finally:
+        if wav_continuo is not None:
+            wav_continuo.unlink(missing_ok=True)
     return palabras, bloques
 
 
@@ -311,6 +321,8 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
         tmp.replace(destino)
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         tmp.unlink(missing_ok=True)
+        # Un vertical de una ejecución anterior no debe pasar por el de esta.
+        destino.unlink(missing_ok=True)
         if not degradar:
             raise
         _avisar(on_progress,
@@ -330,6 +342,11 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     final = config.ruta_salida_final().expanduser().resolve()
     if final == video:
         raise ValueError("La salida no puede ser el mismo archivo que la entrada.")
+    vertical = config.ruta_salida_vertical()
+    if vertical is not None and vertical.expanduser().resolve() == video:
+        raise ValueError(
+            "La salida vertical no puede ser el mismo archivo que la entrada."
+        )
     final.parent.mkdir(parents=True, exist_ok=True)
 
     # tmp_final: horizontal sin subtítulos (fuente también del vertical).
@@ -353,6 +370,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             palabras, bloques = _transcribir_subs(
                 config, base, final, on_progress, paso, total,
                 degradar=not solo_subs,
+                wav_continuo=None if hay_base else trabajo / f"{video.stem}_subs.wav",
             )
             paso += 1
 

@@ -250,3 +250,17 @@ def test_pesos_descarga_vacia_es_fallo(tmp_path, monkeypatch):
     with pytest.raises(PasoFallido):
         asegurar_pesos_s3fd(ruta)
     assert not ruta.exists()
+
+
+def test_pesos_fallo_borra_parciales_de_gdown(tmp_path, monkeypatch):
+    # gdown guarda `<salida><aleatorio>.part` para reanudar y no lo borra al fallar.
+    ruta = tmp_path / "sfd_face.pth"
+
+    def falso(id, output, quiet):
+        Path(output + "a1b2.part").write_bytes(b"MEDIO")
+        raise OSError("sin red")
+
+    monkeypatch.setattr(seguimiento.gdown, "download", falso)
+    with pytest.raises(PasoFallido):
+        asegurar_pesos_s3fd(ruta)
+    assert list(tmp_path.iterdir()) == []

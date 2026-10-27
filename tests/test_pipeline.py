@@ -916,3 +916,51 @@ def test_solo_subtitulos_sin_bloques_no_mueve_el_original(entorno_vertical, tmp_
                                     subtitulos=True), None)
     assert video.read_bytes() == b"VID"
     assert not (tmp_path / "f.mp4").exists()
+
+
+@pytest.mark.parametrize("pasos", [
+    {"paso_vertical": True, "subtitulos": True},  # vertical + subtítulos
+    {"subtitulos": True},                         # solo subtítulos
+])
+def test_subtitulos_sin_base_transcriben_audio_rellenado(entorno_vertical, tmp_path,
+                                                         monkeypatch, pasos):
+    # Whisper ignora los huecos del audio del iPhone: sin pasos de audio ni
+    # silencios hay que transcribir una pista continua o los subtítulos se adelantan.
+    llamadas, video, _, _ = entorno_vertical
+    fuentes: list[Path] = []
+
+    def falso_transcribir(video_, idioma, modelo, prompt=None):
+        fuentes.append(Path(video_))
+        from videopipeline.subtitles import Palabra
+        return [Palabra(texto="hola", inicio=0.0, fin=0.5)]
+
+    monkeypatch.setattr(pipeline, "transcribir", falso_transcribir)
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_audio=False, paso_silencios=False, **pasos), None)
+    assert "extraer:16000" in llamadas
+    assert fuentes and fuentes[0].suffix == ".wav" and fuentes[0] != video
+    assert not fuentes[0].exists()
+
+
+def test_vertical_falla_borra_vertical_anterior(entorno_vertical, tmp_path, monkeypatch):
+    _, video, _, _ = entorno_vertical
+    anterior = tmp_path / "f_vertical.mp4"
+    anterior.write_bytes(b"VIEJO")
+
+    def revienta(*args, **kwargs):
+        raise PasoFallido("boom")
+
+    monkeypatch.setattr(pipeline, "convertir_vertical", revienta)
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_vertical=True), None)
+    assert (tmp_path / "f.mp4").exists() and not anterior.exists()
+
+
+def test_vertical_nunca_sobrescribe_la_entrada(entorno_vertical, tmp_path):
+    llamadas, _, _, _ = entorno_vertical
+    entrada = tmp_path / "X_vertical.mp4"
+    entrada.write_bytes(b"ORIGINAL")
+    with pytest.raises(ValueError, match="salida"):
+        pipeline.run(PipelineConfig(video=entrada, salida=tmp_path / "X.mp4",
+                                    paso_vertical=True), None)
+    assert entrada.read_bytes() == b"ORIGINAL" and llamadas == []
