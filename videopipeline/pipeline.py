@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-from .config import SAMPLE_RATE_POR_MODELO, PipelineConfig
+from .config import SAMPLE_RATE_POR_MODELO, PipelineConfig, modo_equivalente
 from .steps import (
     BASE_DIR,
     cortar_silencios,
@@ -183,8 +183,10 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
 
     extra = pasos_extra(config)
     trabajo = BASE_DIR / "audio_procesado" / nombre
+    # Puente hasta reestructurar run() por pasos combinables.
+    modo = modo_equivalente(config.paso_audio, config.paso_silencios)
 
-    if config.modo == "solo_silencios":
+    if modo == "solo_silencios":
         total = 1 + extra
         # auto-editor colapsa los huecos del audio del iPhone y desincroniza:
         # se le pasa una copia con los huecos rellenos.
@@ -220,7 +222,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     wav_original = trabajo / f"{nombre}_original.wav"
     wav_limpio = trabajo / f"{nombre}_audio_limpio.wav"
 
-    total = (4 if config.modo == "completo" else 3) + extra
+    total = (4 if modo == "completo" else 3) + extra
     sample_rate = SAMPLE_RATE_POR_MODELO[config.modelo]
 
     _emitir(on_progress, 1, total, _("Extrayendo audio"))
@@ -235,7 +237,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     _emitir(on_progress, 2, total, etiqueta_limpieza)
     limpiar_audio(wav_original, wav_limpio, config.tarea, config.modelo)
 
-    if config.modo == "solo_audio":
+    if modo == "solo_audio":
         _emitir(on_progress, 3, total, _("Sustituyendo pista de audio"))
         remux(video, wav_limpio, tmp_final)
     else:

@@ -60,7 +60,8 @@ def test_procesar_construye_configs(qtbot, tmp_path, monkeypatch):
     datos = json.loads(config_json)
     assert datos["video"].endswith("a.mp4")
     assert datos["salida"].endswith("salidas")
-    assert datos["modo"] == "completo"
+    assert (datos["paso_audio"], datos["paso_silencios"]) == (True, True)
+    assert "modo" not in datos
     # iniciar está mockeado, así que trabajo_iniciado no se emite todavía:
     # la fila permanece en ESPERA hasta que el ejecutor la arranca de verdad.
     assert ventana.modelo_cola.trabajo(fila).estado == EstadoTrabajo.ESPERA

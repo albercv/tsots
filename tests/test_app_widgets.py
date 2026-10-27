@@ -30,7 +30,7 @@ def test_panel_valores_defecto_construyen_config(qtbot, tmp_path):
     valores = panel.valores()
     config = PipelineConfig(video=tmp_path / "v.mp4", **valores)
     config.validar()
-    assert config.modo == "completo"
+    assert (config.paso_audio, config.paso_silencios) == (True, True)
     assert config.modelo == "MossFormer2_SE_48K"
     assert config.margen == "0.2s"
     assert config.umbral == "4%"

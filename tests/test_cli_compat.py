@@ -23,7 +23,7 @@ def test_limpiar_video_defecto_junto_al_original(tmp_path, monkeypatch):
     monkeypatch.setattr(limpiarVideo, "tiene_pista_audio", lambda v: True)
     limpiarVideo.main([str(video)])
     config = capturado["config"]
-    assert config.modo == "completo"
+    assert (config.paso_audio, config.paso_silencios) == (True, True)
     assert config.modelo == "MossFormer2_SE_48K"
     assert config.ruta_salida_final() == tmp_path / "charla_limpio.mp4"
 

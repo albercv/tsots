@@ -10,6 +10,7 @@ from videopipeline.config import (
     MODOS,
     SAMPLE_RATE_POR_MODELO,
     PipelineConfig,
+    modo_equivalente,
 )
 
 
@@ -21,7 +22,7 @@ def _config_minima(**extra) -> PipelineConfig:
 
 def test_defectos():
     c = _config_minima()
-    assert c.modo == "completo"
+    assert (c.paso_audio, c.paso_silencios) == (True, True)
     assert c.tarea == "speech_enhancement"
     assert c.modelo == "MossFormer2_SE_48K"
     assert c.margen == "0.2s"
@@ -180,3 +181,69 @@ def test_glosario_por_defecto_vacio_y_viaja_en_json():
     assert c.glosario == ""
     c = _config_minima(glosario="Claude Code = Cloud Code\nAnthropic")
     assert PipelineConfig.from_json(c.to_json()).glosario == c.glosario
+
+
+def test_pasos_por_defecto():
+    c = PipelineConfig(video=Path("/v/a.mp4"))
+    assert (c.paso_audio, c.paso_silencios, c.paso_vertical) == (True, True, False)
+    assert c.encuadre == "central" and c.hay_horizontal()
+    assert c.ruta_salida_vertical() is None
+
+
+@pytest.mark.parametrize("modo, audio, silencios", [
+    ("completo", True, True), ("solo_audio", True, False),
+    ("solo_silencios", False, True)])
+def test_alias_modo(modo, audio, silencios):
+    c = PipelineConfig(video=Path("/v/a.mp4"), modo=modo)
+    assert (c.paso_audio, c.paso_silencios) == (audio, silencios)
+    assert "modo" not in json.loads(c.to_json())
+    antiguo = json.dumps({"video": "/v/a.mp4", "modo": modo})
+    assert PipelineConfig.from_json(antiguo) == c
+
+
+def test_modo_equivalente():
+    assert modo_equivalente(True, True) == "completo"
+    assert modo_equivalente(True, False) == "solo_audio"
+    assert modo_equivalente(False, True) == "solo_silencios"
+    assert modo_equivalente(False, False) == "completo"
+
+
+def test_encuadre_invalido():
+    with pytest.raises(ValueError, match="encuadre"):
+        PipelineConfig(video=Path("/v/a.mp4"), encuadre="zoom").validar()
+
+
+def test_sin_pasos_de_video_invalido():
+    c = PipelineConfig(video=Path("/v/a.mp4"), paso_audio=False,
+                       paso_silencios=False, caption_seo=True)
+    with pytest.raises(ValueError, match="paso"):
+        c.validar()
+
+
+@pytest.mark.parametrize("salida, principal, vertical", [
+    (None, "/v/a_limpio.mp4", "/v/a_limpio_vertical.mp4"),
+    (Path("/out"), "/out/a_limpio.mp4", "/out/a_limpio_vertical.mp4"),
+    (Path("/out/X.mp4"), "/out/X.mp4", "/out/X_vertical.mp4"),
+])
+def test_dos_salidas(salida, principal, vertical):
+    c = PipelineConfig(video=Path("/v/a.mp4"), salida=salida, paso_vertical=True,
+                       paso_audio=False)  # silencios + vertical
+    assert c.ruta_salida_final() == Path(principal)
+    assert c.ruta_salida_vertical() == Path(vertical)
+
+
+@pytest.mark.parametrize("subtitulos", [False, True])
+def test_solo_vertical_una_salida(subtitulos):
+    c = PipelineConfig(video=Path("/v/a.mp4"), salida=Path("/out"), paso_audio=False,
+                       paso_silencios=False, paso_vertical=True, subtitulos=subtitulos)
+    c.validar()
+    assert not c.hay_horizontal()
+    assert c.ruta_salida_final() == Path("/out/a_vertical.mp4")
+    assert c.ruta_salida_vertical() is None
+
+
+def test_solo_subtitulos_es_horizontal():
+    c = PipelineConfig(video=Path("/v/a.mp4"), paso_audio=False, paso_silencios=False,
+                       subtitulos=True)
+    c.validar()
+    assert c.hay_horizontal() and c.ruta_salida_final() == Path("/v/a_limpio.mp4")
