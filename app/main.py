@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from videopipeline import i18n
 from videopipeline.caption import Caption, leer_md
-from videopipeline.config import PipelineConfig
+from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
 
@@ -203,6 +203,7 @@ class VentanaPrincipal(QMainWindow):
         self.ejecutor.trabajo_terminado.connect(self._al_terminar_trabajo)
         self.ejecutor.cola_terminada.connect(self._al_terminar_cola)
         self.ejecutor.aviso.connect(self._al_avisar)
+        self.ejecutor.salida_vertical.connect(self._al_salida_vertical)
         self.ejecutor.diagnostico.connect(self._al_diagnosticar)
         self.modelo_cola.rowsInserted.connect(self._refrescar_boton)
         self.modelo_cola.rowsRemoved.connect(self._refrescar_boton)
@@ -471,7 +472,11 @@ class VentanaPrincipal(QMainWindow):
         if not pendientes:
             return
         valores = self.panel.valores()
-        self.ajustes.guardar_panel(valores)
+        # Las versiones anteriores comparten estos ajustes y solo leen `modo`.
+        self.ajustes.guardar_panel({
+            **valores,
+            "modo": modo_equivalente(valores["paso_audio"], valores["paso_silencios"]),
+        })
         carpeta = self.ajustes.carpeta_salida
         trabajos: list[tuple[int, str]] = []
         for fila in pendientes:
@@ -507,6 +512,9 @@ class VentanaPrincipal(QMainWindow):
             percent=evento.get("percent"),
         )
 
+    def _al_salida_vertical(self, fila: int, ruta: str) -> None:
+        self.modelo_cola.actualizar(fila, salida_vertical=Path(ruta))
+
     def _al_avisar(self, fila: int, texto: str) -> None:
         self.modelo_cola.actualizar(fila, aviso=texto)
 
@@ -535,18 +543,23 @@ class VentanaPrincipal(QMainWindow):
 
     def _limpiar_temporal(self, video: Path) -> None:
         """Borra los tmp ocultos que el runner dejó a medias al cancelar."""
-        final = (
-            PipelineConfig(video=video, salida=self.ajustes.carpeta_salida)
-            .ruta_salida_final()
-            .expanduser()
-            .resolve()
+        carpeta = self.ajustes.carpeta_salida
+        # Los pasos del trabajo cancelado no se conocen aquí: se prueban todos
+        # los destinos posibles (horizontal, su vertical y vertical único).
+        destinos = (
+            PipelineConfig(video=video, salida=carpeta).ruta_salida_final(),
+            PipelineConfig(video=video, salida=carpeta, paso_vertical=True)
+            .ruta_salida_vertical(),
+            PipelineConfig(video=video, salida=carpeta, paso_audio=False,
+                           paso_silencios=False, paso_vertical=True)
+            .ruta_salida_final(),
         )
-        final.with_name(f".{final.stem}_tmp{final.suffix}").unlink(
-            missing_ok=True
-        )
-        final.with_name(f".{final.stem}_subs_tmp{final.suffix}").unlink(
-            missing_ok=True
-        )
+        for destino in destinos:
+            final = destino.expanduser().resolve()
+            for sufijo in ("_tmp", "_subs_tmp"):
+                final.with_name(f".{final.stem}{sufijo}{final.suffix}").unlink(
+                    missing_ok=True
+                )
 
     def _al_terminar_cola(self) -> None:
         self._procesando = False

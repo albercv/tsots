@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QMessageBox
 
 from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
@@ -774,3 +775,42 @@ def test_procesar_deshabilitado_sin_pasos(qtbot, tmp_path, monkeypatch):
     assert ventana.boton_procesar.toolTip() != ""
     ventana.panel.check_vertical.setChecked(True)
     assert ventana.boton_procesar.isEnabled()
+
+
+def test_salida_vertical_actualiza_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.salida_vertical.emit(0, str(tmp_path / "a_limpio_vertical.mp4"))
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    assert ventana.modelo_cola.trabajo(0).salida_vertical == (
+        tmp_path / "a_limpio_vertical.mp4")
+
+
+def test_cancelado_limpia_temporales_vertical(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    horizontal = tmp_path / "a_limpio.mp4"
+    horizontal.write_bytes(b"OK")
+    temporales = [tmp_path / ".a_limpio_vertical_tmp.mp4",
+                  tmp_path / ".a_vertical_tmp.mp4",
+                  tmp_path / ".a_vertical_subs_tmp.mp4"]
+    for temporal in temporales:
+        temporal.write_bytes(b"MEDIO")
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "Cancelado")
+    assert horizontal.exists()
+    assert not any(t.exists() for t in temporales)
+
+
+def test_procesar_guarda_modo_equivalente(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    # Al cerrar con _procesando=True se abre un diálogo modal: responderlo.
+    monkeypatch.setattr("app.main.QMessageBox.question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda trabajos: None)
+    ventana.panel.check_audio.setChecked(False)  # solo silencios
+    ventana.procesar()
+    guardado = ventana.ajustes.cargar_panel()
+    assert guardado["modo"] == "solo_silencios"
+    assert str(guardado["paso_audio"]).lower() in ("false", "0")
