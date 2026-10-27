@@ -75,11 +75,14 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
 1. **Drag** one or more videos onto the area on the left (or click to
    choose them). They appear in the queue.
 2. **Pick options** on the right. Each group is a collapsible section:
-   click its title to open it and the open one closes (**Mode** at
-   startup). If they do not fit, only the options scroll; below them,
+   click its title to open it and the open one closes (**Audio cleaning**
+   at startup). If they do not fit, only the options scroll; below them,
    always visible, sit the **Preview** and **Caption** tabs.
-   - **Mode**: full pipeline (clean + cut), clean audio only, or cut
-     silences only.
+   - **Steps**: each section starts with the checkbox of its step (enhance
+     audio, cut silences, subtitles, caption, vertical) and they combine
+     freely; the header shows ✓ when the step is on. **Full pipeline**, at
+     the top, ticks them all at once (or clears them if they were all on).
+     Default: audio and silences.
    - **Audio cleaning**: AI model that removes noise. The default
      (MossFormer2 48 kHz) is the best for voice.
    - **Silence cutting**: margin kept around each sentence and volume
@@ -95,6 +98,12 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the
      tooltip says why. The caption is written in the subtitle language.
+   - **Vertical format**: also saves `name_limpio_vertical.mp4` (9:16,
+     1080x1920) for Reels and TikTok; without audio or silences selected,
+     only `name_vertical.mp4` is written. Framings: centre crop (default),
+     blurred background, black bars or **follow the face** (slower; the
+     first time it downloads the detector, ~90 MB). It is unticked when the
+     app reopens: it is an occasional step.
    - **Terms…**: your brands and proper names, one per line, so Whisper
      spells them right in the subtitles and the caption. After `=`, the
      ways Whisper gets them wrong; they are fixed automatically:

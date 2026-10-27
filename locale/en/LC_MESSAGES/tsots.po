@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 19:00+0200\n"
+"POT-Creation-Date: 2026-10-27 14:40+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -27,6 +27,9 @@ msgstr "(detected on your account)"
 
 msgid "(sin elegir)"
 msgstr "(none selected)"
+
+msgid "+ vertical"
+msgstr "+ vertical"
 
 #, python-brace-format
 msgid "<br>Causa: {causa}"
@@ -52,6 +55,9 @@ msgstr "Open log"
 msgid "Acelerar"
 msgstr "Speed up"
 
+msgid "Además del horizontal, guarda nombre_limpio_vertical.mp4 para Reels y TikTok (solo el vertical si no hay audio ni silencios)."
+msgstr "Besides the horizontal video, saves nombre_limpio_vertical.mp4 for Reels and TikTok (only the vertical one if neither audio nor silences are selected)."
+
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
 msgstr "System Settings → Privacy & Security → Files and Folders: grant access to Terminal/Python, or choose another output folder."
 
@@ -76,6 +82,9 @@ msgstr "Auto-detect"
 
 msgid "Añadir subtítulos"
 msgstr "Add subtitles"
+
+msgid "Barras negras"
+msgstr "Black bars"
 
 msgid "Borrador (lo terminas en Facebook)"
 msgstr "Draft (finish it in Facebook)"
@@ -173,6 +182,12 @@ msgstr "Brand context for the caption (who you are, tone, CTA)."
 msgid "Contexto de marca que se añade al prompt."
 msgstr "Brand context added to the prompt."
 
+msgid "Convertir a vertical (9:16)"
+msgstr "Convert to vertical (9:16)"
+
+msgid "Convirtiendo a vertical"
+msgstr "Converting to vertical"
+
 msgid "Copiar caption"
 msgstr "Copy caption"
 
@@ -200,6 +215,9 @@ msgstr "Connected accounts"
 msgid "Deportes"
 msgstr "Sports"
 
+msgid "Descargando detector de caras"
+msgstr "Downloading face detector"
+
 msgid "Descargando modelo Whisper y transcribiendo"
 msgstr "Downloading Whisper model and transcribing"
 
@@ -213,6 +231,9 @@ msgid ""
 msgstr ""
 "Technical detail:\n"
 "{detalle}"
+
+msgid "Detectando caras"
+msgstr "Detecting faces"
 
 msgid "Diseño:"
 msgstr "Style:"
@@ -319,6 +340,9 @@ msgstr "The video is too large for the service (413)."
 msgid "El vídeo se envió pero no llegó la respuesta del servicio ({tipo})."
 msgstr "The video was sent but the service response never arrived ({tipo})."
 
+msgid "El vídeo ya era vertical: se reescala con barras."
+msgstr "The video was already vertical: it is rescaled with bars."
+
 msgid "Elegir vídeos"
 msgstr "Choose videos"
 
@@ -330,6 +354,9 @@ msgstr "In Upload-Post this is the profile name shown in Manage Users (app.uploa
 
 msgid "En cola"
 msgstr "Queued"
+
+msgid "Encuadre:"
+msgstr "Framing:"
 
 msgid "Entretenimiento"
 msgstr "Entertainment"
@@ -431,6 +458,12 @@ msgstr "Missing dependencies"
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr "Text file with your own terms for the transcription (one line per term; \"Term = variant, variant\")."
 
+msgid "Fondo difuminado"
+msgstr "Blurred background"
+
+msgid "Formato vertical"
+msgstr "Vertical format"
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr "Writes name_limpio.md with a local model (Ollama) from the transcript."
 
@@ -479,6 +512,14 @@ msgstr "The app re-encodes the video with h264_videotoolbox and retries automati
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr "The key has spaces, quotes or other invalid characters."
 
+#, python-brace-format
+msgid "La conversión a vertical falló (código {codigo})"
+msgstr "Vertical conversion failed (code {codigo})"
+
+#, python-brace-format
+msgid "La detección de caras falló (código {codigo})"
+msgstr "Face detection failed (code {codigo})"
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr "The model's response is not valid JSON"
 
@@ -517,6 +558,9 @@ msgstr "The last {n} terms don't fit in Whisper's hint. They are still used for 
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr "Your plan's upload limit has been reached (429)."
 
+msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
+msgstr "Select at least one step: audio, silences, subtitles or vertical."
+
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr "Tick at least one platform and enter a title."
 
@@ -531,6 +575,9 @@ msgstr "Margin:"
 
 msgid "Mejora de voz"
 msgstr "Speech enhancement"
+
+msgid "Mejorar audio"
+msgstr "Enhance audio"
 
 msgid "Meta solo deja publicar en páginas, no en perfiles personales."
 msgstr "Meta only allows posting to Pages, not to personal profiles."
@@ -551,11 +598,11 @@ msgstr "Model not downloaded: {modelo}"
 msgid "Modelo:"
 msgstr "Model:"
 
-msgid "Modo"
-msgstr "Mode"
-
 msgid "Muestra en el Finder el registro de esta publicación"
 msgstr "Show this publishing log in the Finder"
+
+msgid "Más lento: analiza el vídeo."
+msgstr "Slower: it analyses the video."
 
 msgid "Música"
 msgstr "Music"
@@ -587,6 +634,9 @@ msgstr "There is no server at http://localhost:11434 and `ollama serve` could no
 
 msgid "No queda espacio en disco"
 msgstr "No space left on disk"
+
+msgid "No se detectó ninguna cara: se usa recorte central."
+msgstr "No face was detected: using a centre crop."
 
 msgid "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"
 msgstr "The API key was not found in the Keychain. Save it again in Networks…"
@@ -635,14 +685,25 @@ msgstr "The re-encoded video was not produced: {salida}"
 msgid "No se generó el vídeo remuxado: {salida}"
 msgstr "The remuxed video was not produced: {salida}"
 
+#, python-brace-format
+msgid "No se generó el vídeo vertical: {salida}"
+msgstr "The vertical video was not created: {salida}"
+
 msgid "No se llegó a enviar."
 msgstr "It was never sent."
+
+msgid "No se pudieron añadir los subtítulos: la transcripción no dio texto que mostrar."
+msgstr "Could not add subtitles: the transcription produced no text to show."
 
 msgid "No se pudieron comprobar las cuentas."
 msgstr "The accounts could not be checked."
 
 msgid "No se pudieron comprobar las cuentas; se usa lo último que se supo."
 msgstr "The accounts could not be checked; using the last known result."
+
+#, python-brace-format
+msgid "No se pudieron descargar los pesos del detector de caras: {error}"
+msgstr "Could not download the face detector weights: {error}"
 
 #, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
@@ -689,6 +750,10 @@ msgstr "The list of Pages could not be read ({motivo}). Type the Page ID by hand
 #, python-brace-format
 msgid "No se pudo leer la resolución del vídeo: {video}"
 msgstr "Could not read the video resolution: {video}"
+
+#, python-brace-format
+msgid "No se pudo preparar el detector de caras: {error}. Se usa recorte central."
+msgstr "Could not prepare the face detector: {error}. Using a centre crop."
 
 #, python-brace-format
 msgid "No se pudo preparar el servicio ({tipo}). Detalles en el registro."
@@ -855,6 +920,12 @@ msgstr "What to do: {solucion}"
 msgid "Recortando silencios"
 msgstr "Cutting silences"
 
+msgid "Recortar silencios"
+msgstr "Cut silences"
+
+msgid "Recorte central"
+msgstr "Centre crop"
+
 msgid "Redes sociales"
 msgstr "Social networks"
 
@@ -927,6 +998,9 @@ msgstr ""
 "\n"
 "{resumen}"
 
+msgid "Seguir la cara"
+msgstr "Follow the face"
+
 msgid "Selecciona un vídeo de la cola"
 msgstr "Select a video from the queue"
 
@@ -985,12 +1059,6 @@ msgstr "No audio track"
 
 msgid "Sistema"
 msgstr "System"
-
-msgid "Solo cortar silencios"
-msgstr "Cut silences only"
-
-msgid "Solo limpiar audio"
-msgstr "Clean audio only"
 
 #, python-brace-format
 msgid "Subiendo a {plataforma} ({n} de {total})…"
@@ -1072,6 +1140,14 @@ msgstr "Speed:"
 
 msgid "Ver registro"
 msgstr "Show log"
+
+#, python-brace-format
+msgid "Versión vertical falló: {error}. Se conserva el vídeo horizontal."
+msgstr "Vertical version failed: {error}. The horizontal video is kept."
+
+#, python-brace-format
+msgid "Vertical: {ruta}"
+msgstr "Vertical: {ruta}"
 
 msgid "Viajes y eventos"
 msgstr "Travel & Events"
@@ -1158,6 +1234,9 @@ msgstr "ffmpeg without subtitle support (libass)"
 
 msgid "hecho"
 msgstr "done"
+
+msgid "la descarga no produjo ningún fichero"
+msgstr "the download produced no file"
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
 msgstr "macOS denied access to the video or output folder (Desktop, Documents and external disks require permission)."
@@ -1277,8 +1356,17 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 #~ msgid "Al publicar, por defecto"
 #~ msgstr "Defaults when publishing"
 
+#~ msgid "Modo"
+#~ msgstr "Mode"
+
 #~ msgid "Página de Facebook en la que se publica"
 #~ msgstr "Facebook Page to post to"
+
+#~ msgid "Solo cortar silencios"
+#~ msgstr "Cut silences only"
+
+#~ msgid "Solo limpiar audio"
+#~ msgstr "Clean audio only"
 
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"

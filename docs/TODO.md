@@ -5,6 +5,15 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Features
 
+- [ ] **Choose horizontal or vertical when publishing.** With both outputs,
+      **Publish…** always uses the horizontal one.
+- [ ] **Show the horizontal output in the queue before the vertical one
+      finishes.** Today the row learns both at the end; with face tracking
+      on a long video the horizontal is on disk minutes earlier.
+- [ ] **Exact shot cuts for face tracking** (`scdet` in the sampling pass):
+      today a cut is detected when the face jumps more than 25% of the
+      width, so cuts between similar shots pan for ~1.5 s.
+
 - [ ] **Blog post from the video, published as a draft on evolve2digital.**
       Agreed design:
       1. Register the e2d MCP in Claude Code and check that `claude -p` sees

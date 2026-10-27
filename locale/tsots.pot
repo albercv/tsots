@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-23 19:00+0200\n"
+"POT-Creation-Date: 2026-10-27 14:40+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -29,6 +29,9 @@ msgid "(detectado en tu cuenta)"
 msgstr ""
 
 msgid "(sin elegir)"
+msgstr ""
+
+msgid "+ vertical"
 msgstr ""
 
 #, python-brace-format
@@ -55,6 +58,9 @@ msgstr ""
 msgid "Acelerar"
 msgstr ""
 
+msgid "Además del horizontal, guarda nombre_limpio_vertical.mp4 para Reels y TikTok (solo el vertical si no hay audio ni silencios)."
+msgstr ""
+
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
 msgstr ""
 
@@ -76,6 +82,9 @@ msgid "Autodetectar"
 msgstr ""
 
 msgid "Añadir subtítulos"
+msgstr ""
+
+msgid "Barras negras"
 msgstr ""
 
 msgid "Borrador (lo terminas en Facebook)"
@@ -174,6 +183,12 @@ msgstr ""
 msgid "Contexto de marca que se añade al prompt."
 msgstr ""
 
+msgid "Convertir a vertical (9:16)"
+msgstr ""
+
+msgid "Convirtiendo a vertical"
+msgstr ""
+
 msgid "Copiar caption"
 msgstr ""
 
@@ -201,6 +216,9 @@ msgstr ""
 msgid "Deportes"
 msgstr ""
 
+msgid "Descargando detector de caras"
+msgstr ""
+
 msgid "Descargando modelo Whisper y transcribiendo"
 msgstr ""
 
@@ -211,6 +229,9 @@ msgstr ""
 msgid ""
 "Detalle técnico:\n"
 "{detalle}"
+msgstr ""
+
+msgid "Detectando caras"
 msgstr ""
 
 msgid "Diseño:"
@@ -318,6 +339,9 @@ msgstr ""
 msgid "El vídeo se envió pero no llegó la respuesta del servicio ({tipo})."
 msgstr ""
 
+msgid "El vídeo ya era vertical: se reescala con barras."
+msgstr ""
+
 msgid "Elegir vídeos"
 msgstr ""
 
@@ -328,6 +352,9 @@ msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.u
 msgstr ""
 
 msgid "En cola"
+msgstr ""
+
+msgid "Encuadre:"
 msgstr ""
 
 msgid "Entretenimiento"
@@ -428,6 +455,12 @@ msgstr ""
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr ""
 
+msgid "Fondo difuminado"
+msgstr ""
+
+msgid "Formato vertical"
+msgstr ""
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
@@ -476,6 +509,14 @@ msgstr ""
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr ""
 
+#, python-brace-format
+msgid "La conversión a vertical falló (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "La detección de caras falló (código {codigo})"
+msgstr ""
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr ""
 
@@ -514,6 +555,9 @@ msgstr ""
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr ""
 
+msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
+msgstr ""
+
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr ""
 
@@ -527,6 +571,9 @@ msgid "Margen:"
 msgstr ""
 
 msgid "Mejora de voz"
+msgstr ""
+
+msgid "Mejorar audio"
 msgstr ""
 
 msgid "Meta solo deja publicar en páginas, no en perfiles personales."
@@ -548,10 +595,10 @@ msgstr ""
 msgid "Modelo:"
 msgstr ""
 
-msgid "Modo"
+msgid "Muestra en el Finder el registro de esta publicación"
 msgstr ""
 
-msgid "Muestra en el Finder el registro de esta publicación"
+msgid "Más lento: analiza el vídeo."
 msgstr ""
 
 msgid "Música"
@@ -583,6 +630,9 @@ msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama s
 msgstr ""
 
 msgid "No queda espacio en disco"
+msgstr ""
+
+msgid "No se detectó ninguna cara: se usa recorte central."
 msgstr ""
 
 msgid "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"
@@ -628,13 +678,24 @@ msgstr ""
 msgid "No se generó el vídeo remuxado: {salida}"
 msgstr ""
 
+#, python-brace-format
+msgid "No se generó el vídeo vertical: {salida}"
+msgstr ""
+
 msgid "No se llegó a enviar."
+msgstr ""
+
+msgid "No se pudieron añadir los subtítulos: la transcripción no dio texto que mostrar."
 msgstr ""
 
 msgid "No se pudieron comprobar las cuentas."
 msgstr ""
 
 msgid "No se pudieron comprobar las cuentas; se usa lo último que se supo."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr ""
 
 #, python-brace-format
@@ -681,6 +742,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se pudo leer la resolución del vídeo: {video}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo preparar el detector de caras: {error}. Se usa recorte central."
 msgstr ""
 
 #, python-brace-format
@@ -848,6 +913,12 @@ msgstr ""
 msgid "Recortando silencios"
 msgstr ""
 
+msgid "Recortar silencios"
+msgstr ""
+
+msgid "Recorte central"
+msgstr ""
+
 msgid "Redes sociales"
 msgstr ""
 
@@ -917,6 +988,9 @@ msgid ""
 "{resumen}"
 msgstr ""
 
+msgid "Seguir la cara"
+msgstr ""
+
 msgid "Selecciona un vídeo de la cola"
 msgstr ""
 
@@ -974,12 +1048,6 @@ msgid "Sin pista de audio"
 msgstr ""
 
 msgid "Sistema"
-msgstr ""
-
-msgid "Solo cortar silencios"
-msgstr ""
-
-msgid "Solo limpiar audio"
 msgstr ""
 
 #, python-brace-format
@@ -1061,6 +1129,14 @@ msgid "Velocidad:"
 msgstr ""
 
 msgid "Ver registro"
+msgstr ""
+
+#, python-brace-format
+msgid "Versión vertical falló: {error}. Se conserva el vídeo horizontal."
+msgstr ""
+
+#, python-brace-format
+msgid "Vertical: {ruta}"
 msgstr ""
 
 msgid "Viajes y eventos"
@@ -1147,6 +1223,9 @@ msgid "ffmpeg sin soporte de subtítulos (libass)"
 msgstr ""
 
 msgid "hecho"
+msgstr ""
+
+msgid "la descarga no produjo ningún fichero"
 msgstr ""
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."

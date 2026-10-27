@@ -828,3 +828,15 @@ def test_panel_vertical_config_valida(qtbot, tmp_path):
     panel.check_vertical.setChecked(True)
     panel.combo_encuadre.setCurrentIndex(panel.combo_encuadre.findData("cara"))
     PipelineConfig(video=tmp_path / "a.mp4", **panel.valores()).validar()
+
+
+def test_panel_encuadres_traducidos():
+    """Cada encuadre tiene traducción en el catálogo inglés."""
+    import re
+
+    from app.widgets.panel_opciones import ETIQUETA_ENCUADRE
+
+    po = (Path(__file__).parent.parent / "locale/en/LC_MESSAGES/tsots.po").read_text(
+        encoding="utf-8")
+    traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
+    assert [e for e in ETIQUETA_ENCUADRE if e not in traducidas] == []
