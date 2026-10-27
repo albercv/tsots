@@ -216,6 +216,7 @@ class VentanaPrincipal(QMainWindow):
         self.panel.modelo_caption_cambiado.connect(self._al_cambiar_modelo_caption)
         self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
         self.panel.seccion_abierta_cambiada.connect(self._al_abrir_seccion)
+        self.panel.pasos_cambiados.connect(self._refrescar_boton)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -561,7 +562,14 @@ class VentanaPrincipal(QMainWindow):
             self.boton_procesar.setEnabled(True)
         else:
             self.boton_procesar.setText(_("▶ Procesar"))
-            self.boton_procesar.setEnabled(bool(self.modelo_cola.pendientes()))
+            hay_pasos = self.panel.hay_pasos_de_video()
+            self.boton_procesar.setEnabled(
+                bool(self.modelo_cola.pendientes()) and hay_pasos
+            )
+            self.boton_procesar.setToolTip(
+                "" if hay_pasos else
+                _("Marca al menos un paso: audio, silencios, subtítulos o vertical.")
+            )
         self.boton_quitar.setEnabled(not self._procesando)
         self.boton_limpiar.setEnabled(not self._procesando)
 

@@ -732,9 +732,9 @@ def test_opciones_subs_vuelven_a_previsualizacion(qtbot, tmp_path, monkeypatch):
     assert ventana.pestanas.currentWidget() is ventana.vista_previa
 
 
-def test_modo_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
+def test_audio_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    assert ventana.panel.seccion_abierta() == "modo"
+    assert ventana.panel.seccion_abierta() == "audio"
 
 
 def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
@@ -746,7 +746,7 @@ def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
     ventana.show()
     qtbot.waitExposed(ventana)
     scroll = ventana.scroll_derecha
-    for clave in ("caption", "subtitulos", "modo", "caption"):
+    for clave in ("caption", "subtitulos", "audio", "vertical"):
         seccion = ventana.panel.secciones[clave]
         qtbot.mouseClick(seccion.cabecera, Qt.MouseButton.LeftButton)
         barra = scroll.verticalScrollBar()
@@ -762,3 +762,15 @@ def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
                 assert arriba == 0
 
         qtbot.waitUntil(a_la_vista, timeout=1000)
+
+
+def test_procesar_deshabilitado_sin_pasos(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    assert ventana.boton_procesar.isEnabled()
+    ventana.panel.check_audio.setChecked(False)
+    ventana.panel.check_silencios.setChecked(False)
+    assert not ventana.boton_procesar.isEnabled()
+    assert ventana.boton_procesar.toolTip() != ""
+    ventana.panel.check_vertical.setChecked(True)
+    assert ventana.boton_procesar.isEnabled()

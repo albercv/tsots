@@ -11,7 +11,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QRadioButton,
     QSlider,
     QSpinBox,
     QVBoxLayout,
@@ -19,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from videopipeline import subtitles
-from videopipeline.config import MODELOS_POR_TAREA
+from videopipeline.config import MODELOS_POR_TAREA, pasos_desde_modo
 from videopipeline.i18n import N_, _
 from videopipeline.ollama import (
     Modelo, cabe, motivo_no_cabe, motivo_pesado, pesado,
@@ -56,6 +55,13 @@ ETIQUETA_DISENO = {
 # "Español" y "English" son nombres de idioma: no se traducen.
 ETIQUETA_IDIOMA = {"Español": "es", N_("Autodetectar"): "auto", "English": "en"}
 
+ETIQUETA_ENCUADRE = {
+    N_("Recorte central"): "central",
+    N_("Fondo difuminado"): "difuminado",
+    N_("Barras negras"): "barras",
+    N_("Seguir la cara"): "cara",
+}
+
 ETIQUETA_MODELO_WHISPER = {
     N_("turbo (recomendado)"): "turbo",
     N_("small (rápido)"): "small",
@@ -66,6 +72,19 @@ ETIQUETA_MODELO_WHISPER = {
 # Sangría del contenido de cada sección (px lógicos), bajo el título.
 MARGEN_CONTENIDO = 22
 
+# Marca en la cabecera de las secciones cuyo paso está activo: con el acordeón
+# solo se ve una abierta y así se sabe qué pasos van a correr.
+MARCA_ACTIVO = "✓ "
+
+
+def _como_bool(valor, defecto: bool) -> bool:
+    """Booleano de QSettings: puede llegar como bool o como "true"/"1"."""
+    if valor is None:
+        return defecto
+    if isinstance(valor, bool):
+        return valor
+    return str(valor).lower() in ("true", "1")
+
 
 class PanelOpciones(QWidget):
     opciones_subs_cambiadas = Signal()
@@ -74,31 +93,35 @@ class PanelOpciones(QWidget):
     modelo_caption_cambiado = Signal(str)  # nombre del modelo elegido
     refrescar_modelos = Signal()
     seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
+    pasos_cambiados = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        # Secciones plegables en acordeón: solo una abierta, Modo al arrancar.
+        # Secciones plegables en acordeón: solo una abierta, Audio al arrancar.
         self.secciones: dict[str, SeccionPlegable] = {}
+        self._titulos: dict[str, str] = {}
         self._acordeon = Acordeon(self)
         self._acordeon.cambiada.connect(self._emitir_seccion_abierta)
 
-        modo_layout = self._seccion("modo", _("Modo"), QVBoxLayout)
-        self.radio_completo = QRadioButton(_("Pipeline completo"))
-        self.radio_solo_audio = QRadioButton(_("Solo limpiar audio"))
-        self.radio_solo_silencios = QRadioButton(_("Solo cortar silencios"))
-        self.radio_completo.setChecked(True)
-        for radio in (
-            self.radio_completo, self.radio_solo_audio, self.radio_solo_silencios
-        ):
-            modo_layout.addWidget(radio)
-            radio.toggled.connect(self._actualizar_habilitados)
+        # Tres estados: todos los pasos, algunos o ninguno. Pulsarla marca
+        # todos (o los desmarca si ya estaban todos).
+        self.check_completo = QCheckBox(_("Pipeline completo"))
+        self.check_completo.setTristate(True)
+        self.check_completo.clicked.connect(self._marcar_todo)
+        fila_completo = QHBoxLayout()
+        fila_completo.setContentsMargins(8, 6, 4, 6)
+        fila_completo.addWidget(self.check_completo)
+        layout.addLayout(fila_completo)
 
         form_audio = self._seccion(
             "audio", _("Limpieza de audio"), QFormLayout
         )
+        self.check_audio = QCheckBox(_("Mejorar audio"))
+        self.check_audio.setChecked(True)
+        form_audio.addRow(self.check_audio)
         self.combo_tarea = QComboBox()
         for etiqueta, valor in ETIQUETA_TAREA.items():
             self.combo_tarea.addItem(_(etiqueta), valor)
@@ -119,6 +142,9 @@ class PanelOpciones(QWidget):
         form_sil = self._seccion(
             "silencios", _("Corte de silencios"), QFormLayout
         )
+        self.check_silencios = QCheckBox(_("Recortar silencios"))
+        self.check_silencios.setChecked(True)
+        form_sil.addRow(self.check_silencios)
         self.campo_margen = QLineEdit("0.2s")
         self.campo_umbral = QLineEdit("4%")
         self.combo_silencios = QComboBox()
@@ -239,6 +265,28 @@ class PanelOpciones(QWidget):
         self.combo_modelo_caption.currentIndexChanged.connect(
             self._refrescar_aviso_modelos
         )
+
+        form_vertical = self._seccion(
+            "vertical", _("Formato vertical"), QFormLayout
+        )
+        self.check_vertical = QCheckBox(_("Convertir a vertical (9:16)"))
+        self.check_vertical.setToolTip(
+            _("Además del horizontal, guarda nombre_limpio_vertical.mp4 para "
+              "Reels y TikTok (solo el vertical si no hay audio ni silencios).")
+        )
+        self.combo_encuadre = QComboBox()
+        for etiqueta, valor in ETIQUETA_ENCUADRE.items():
+            self.combo_encuadre.addItem(_(etiqueta), valor)
+        self.aviso_encuadre = QLabel("")
+        self.aviso_encuadre.setStyleSheet("color: #b8860b;")
+        self.aviso_encuadre.setWordWrap(True)
+        form_vertical.addRow(self.check_vertical)
+        form_vertical.addRow(_("Encuadre:"), self.combo_encuadre)
+        form_vertical.addRow("", self.aviso_encuadre)
+        self.combo_encuadre.currentIndexChanged.connect(
+            self._refrescar_aviso_encuadre
+        )
+
         for seccion in self.secciones.values():
             layout.addWidget(seccion)
             self._acordeon.anadir(seccion)
@@ -246,7 +294,9 @@ class PanelOpciones(QWidget):
 
         self._grupo_audio = self.secciones["audio"].contenido
         self._grupo_silencios = self.secciones["silencios"].contenido
-        self._actualizar_habilitados()
+        for casilla in self._casillas_pasos().values():
+            casilla.toggled.connect(self._actualizar_pasos)
+        self._actualizar_pasos()
 
         self.check_subtitulos.toggled.connect(self._emitir_cambio_subs)
         self.combo_diseno.currentIndexChanged.connect(self._emitir_cambio_subs)
@@ -260,6 +310,7 @@ class PanelOpciones(QWidget):
         entero sin tocar nunca la cabecera."""
         seccion = SeccionPlegable(titulo)
         self.secciones[clave] = seccion
+        self._titulos[clave] = titulo
         layout = tipo_layout(seccion.contenido)
         # Sangría para alinear los controles con el título, tras la flecha.
         layout.setContentsMargins(MARGEN_CONTENIDO, 2, 4, 10)
@@ -291,22 +342,68 @@ class PanelOpciones(QWidget):
         else:
             self.aviso_modelo.setText("")
 
-    def _modo(self) -> str:
-        if self.radio_solo_audio.isChecked():
-            return "solo_audio"
-        if self.radio_solo_silencios.isChecked():
-            return "solo_silencios"
-        return "completo"
+    def _casillas_pasos(self) -> dict[str, QCheckBox]:
+        """Casilla de cada paso, por la clave de su sección."""
+        return {
+            "audio": self.check_audio,
+            "silencios": self.check_silencios,
+            "subtitulos": self.check_subtitulos,
+            "caption": self.check_caption,
+            "vertical": self.check_vertical,
+        }
 
-    def _actualizar_habilitados(self) -> None:
-        modo = self._modo()
+    def hay_pasos_de_video(self) -> bool:
+        """Hay algo que hacer con el vídeo (el caption solo no basta)."""
+        return any(c.isChecked() for c in (
+            self.check_audio, self.check_silencios, self.check_subtitulos,
+            self.check_vertical,
+        ))
+
+    def _marcar_todo(self, *args) -> None:
+        casillas = self._casillas_pasos().values()
+        marcar = not all(c.isChecked() for c in casillas)
+        for casilla in casillas:
+            casilla.setChecked(marcar)
+        self._actualizar_pasos()
+
+    def _actualizar_pasos(self, *args) -> None:
+        casillas = self._casillas_pasos()
+        for clave, casilla in casillas.items():
+            marca = MARCA_ACTIVO if casilla.isChecked() else ""
+            self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+        marcadas = sum(c.isChecked() for c in casillas.values())
+        estado = (
+            Qt.CheckState.Checked if marcadas == len(casillas)
+            else Qt.CheckState.Unchecked if marcadas == 0
+            else Qt.CheckState.PartiallyChecked
+        )
+        self.check_completo.blockSignals(True)
+        self.check_completo.setCheckState(estado)
+        self.check_completo.blockSignals(False)
+        self._actualizar_habilitados()
+        self.pasos_cambiados.emit()
+
+    def _actualizar_habilitados(self, *args) -> None:
+        audio = self.check_audio.isChecked()
         for hijo in self._grupo_audio.findChildren(QWidget):
-            hijo.setEnabled(modo != "solo_silencios")
+            if hijo is not self.check_audio:
+                hijo.setEnabled(audio)
+        silencios = self.check_silencios.isChecked()
         for hijo in self._grupo_silencios.findChildren(QWidget):
-            hijo.setEnabled(modo != "solo_audio")
-        if modo != "solo_audio":
+            if hijo is not self.check_silencios:
+                hijo.setEnabled(silencios)
+        if silencios:
             acelerar = self.combo_silencios.currentData() == "acelerar"
             self.spin_velocidad.setEnabled(acelerar)
+        self.combo_encuadre.setEnabled(self.check_vertical.isChecked())
+        self._refrescar_aviso_encuadre()
+
+    def _refrescar_aviso_encuadre(self, *args) -> None:
+        cara = (
+            self.check_vertical.isChecked()
+            and self.combo_encuadre.currentData() == "cara"
+        )
+        self.aviso_encuadre.setText(_("Más lento: analiza el vídeo.") if cara else "")
 
     def _actualizar_subtitulos(self, *args) -> None:
         activo = self.check_subtitulos.isChecked()
@@ -406,7 +503,10 @@ class PanelOpciones(QWidget):
 
     def valores(self) -> dict:
         return {
-            "modo": self._modo(),
+            "paso_audio": self.check_audio.isChecked(),
+            "paso_silencios": self.check_silencios.isChecked(),
+            "paso_vertical": self.check_vertical.isChecked(),
+            "encuadre": self.combo_encuadre.currentData(),
             "tarea": self.combo_tarea.currentData(),
             "modelo": self.combo_modelo.currentText(),
             "margen": self.campo_margen.text().strip() or "0.2s",
@@ -423,10 +523,24 @@ class PanelOpciones(QWidget):
         }
 
     def cargar(self, valores: dict) -> None:
-        modo = valores.get("modo", "completo")
-        {"completo": self.radio_completo,
-         "solo_audio": self.radio_solo_audio,
-         "solo_silencios": self.radio_solo_silencios}[modo].setChecked(True)
+        if "paso_audio" in valores or "paso_silencios" in valores:
+            pasos = {
+                "paso_audio": _como_bool(valores.get("paso_audio"), True),
+                "paso_silencios": _como_bool(valores.get("paso_silencios"), True),
+            }
+        else:
+            # Ajustes de una versión anterior: solo guardaban el modo.
+            try:
+                pasos = pasos_desde_modo(str(valores.get("modo", "completo")))
+            except ValueError:
+                pasos = pasos_desde_modo("completo")
+        self.check_audio.setChecked(pasos["paso_audio"])
+        self.check_silencios.setChecked(pasos["paso_silencios"])
+        # El vertical es un paso ocasional: nunca se restaura; el encuadre sí.
+        self.check_vertical.setChecked(False)
+        indice = self.combo_encuadre.findData(valores.get("encuadre", "central"))
+        if indice >= 0:
+            self.combo_encuadre.setCurrentIndex(indice)
         tarea = valores.get("tarea", "speech_enhancement")
         indice = self.combo_tarea.findData(tarea)
         if indice >= 0:
@@ -471,5 +585,5 @@ class PanelOpciones(QWidget):
                 valor if isinstance(valor, bool)
                 else str(valor).lower() in ("true", "1")
             )
-        self._actualizar_habilitados()
+        self._actualizar_pasos()
         self._actualizar_subtitulos()
