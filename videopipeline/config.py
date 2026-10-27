@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import InitVar, asdict, dataclass, field
 from pathlib import Path
 
 MODOS = ("completo", "solo_audio", "solo_silencios")
@@ -30,13 +30,32 @@ DISENOS = ("reels_bold", "reels_karaoke", "caja", "impacto", "amarillo",
            "karaoke_verde", "minimal", "caja_blanca")
 IDIOMAS_SUBS = ("es", "auto", "en")
 MODELOS_WHISPER = ("small", "medium", "turbo")
+ENCUADRES = ("central", "difuminado", "barras", "cara")
+
+
+def pasos_desde_modo(modo: str) -> dict[str, bool]:
+    """Traduce un modo antiguo (JSON de runner, ajustes guardados) a pasos."""
+    if modo not in MODOS:
+        raise ValueError(f"modo inválido: {modo!r} (esperado uno de {MODOS})")
+    return {
+        "paso_audio": modo in ("completo", "solo_audio"),
+        "paso_silencios": modo in ("completo", "solo_silencios"),
+    }
+
+
+def modo_equivalente(paso_audio: bool, paso_silencios: bool) -> str:
+    """Modo antiguo más cercano: lo leen las versiones anteriores de la app."""
+    if paso_audio and not paso_silencios:
+        return "solo_audio"
+    if paso_silencios and not paso_audio:
+        return "solo_silencios"
+    return "completo"
 
 
 @dataclass
 class PipelineConfig:
     video: Path
     salida: Path | None = None
-    modo: str = "completo"
     tarea: str = "speech_enhancement"
     modelo: str = "MossFormer2_SE_48K"
     margen: str = "0.2s"
@@ -54,10 +73,33 @@ class PipelineConfig:
     glosario: str = ""  # texto crudo; ver videopipeline/glosario.py
     modelo_caption: str = "qwen3.5:9b"
     idioma_ui: str = "es"  # idioma de etiquetas, avisos y diagnósticos del runner
+    paso_audio: bool = True
+    paso_silencios: bool = True
+    paso_vertical: bool = False
+    encuadre: str = "central"
+    # Alias de entrada de los modos antiguos: se traduce a pasos y no se guarda.
+    modo: InitVar[str | None] = None
+
+    def __post_init__(self, modo: str | None) -> None:
+        if modo is not None:
+            for campo, valor in pasos_desde_modo(modo).items():
+                setattr(self, campo, valor)
+
+    def hay_horizontal(self) -> bool:
+        """Hay salida horizontal salvo que el único procesado sea el vertical."""
+        return self.paso_audio or self.paso_silencios or not self.paso_vertical
 
     def validar(self) -> None:
-        if self.modo not in MODOS:
-            raise ValueError(f"modo inválido: {self.modo!r} (esperado uno de {MODOS})")
+        if not (self.paso_audio or self.paso_silencios or self.subtitulos
+                or self.paso_vertical):
+            raise ValueError(
+                "no hay ningún paso de vídeo seleccionado "
+                "(audio, silencios, subtítulos o vertical)"
+            )
+        if self.encuadre not in ENCUADRES:
+            raise ValueError(
+                f"encuadre inválido: {self.encuadre!r} (esperado uno de {ENCUADRES})"
+            )
         if self.tarea not in MODELOS_POR_TAREA:
             raise ValueError(
                 f"tarea inválida: {self.tarea!r} "
@@ -108,10 +150,19 @@ class PipelineConfig:
         return cls(**datos)
 
     def ruta_salida_final(self) -> Path:
-        nombre = f"{self.video.stem}_limpio.mp4"
+        """Salida principal: el horizontal si existe; si no, el vertical."""
+        sufijo = "_limpio" if self.hay_horizontal() else "_vertical"
+        nombre = f"{self.video.stem}{sufijo}.mp4"
         if self.salida is None:
             return self.video.with_name(nombre)
         # Una ruta sin sufijo (o un directorio existente) se trata como carpeta.
         if self.salida.suffix == "" or self.salida.is_dir():
             return self.salida / nombre
         return self.salida
+
+    def ruta_salida_vertical(self) -> Path | None:
+        """Vertical que acompaña al horizontal; None si no hay dos salidas."""
+        if not self.paso_vertical or not self.hay_horizontal():
+            return None
+        final = self.ruta_salida_final()
+        return final.with_name(f"{final.stem}_vertical{final.suffix}")

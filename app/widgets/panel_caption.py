@@ -79,7 +79,7 @@ class PanelCaption(QWidget):
         fila_redes = QHBoxLayout()
         fila_redes.addStretch(1)
         self.boton_publicar = QPushButton(_("Publicar…"))
-        self.boton_publicar.setToolTip(_("Publicar en TikTok, YouTube e Instagram"))
+        self.boton_publicar.setToolTip(_("Publicar en TikTok, YouTube, Instagram, X y Facebook"))
         self.boton_publicar.clicked.connect(self.publicar)
         fila_redes.addWidget(self.boton_publicar)
         layout.addLayout(fila_redes)

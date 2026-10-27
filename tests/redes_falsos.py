@@ -1,20 +1,51 @@
 """Dobles de prueba del paquete `videopipeline.redes` (sin red)."""
 from __future__ import annotations
 
-from videopipeline.redes.modelo import Opciones, Plataforma, Publicacion, Resultado
+from videopipeline.redes.modelo import (
+    Cuenta,
+    Opciones,
+    Pagina,
+    Plataforma,
+    Publicacion,
+    Resultado,
+)
+
+
+def todas_conectadas() -> dict[Plataforma, Cuenta]:
+    return {p: Cuenta(p, nombre=f"Yo en {p.nombre}", usuario=f"yo_{p.value}")
+            for p in Plataforma}
 
 
 class ProveedorFalso:
     """Proveedor en memoria. `respuestas[plataforma]` es el Resultado de
     `publicar` (o una excepción a lanzar); `estados[plataforma]` la lista de
-    Resultados que devuelve `estado` en cada consulta."""
+    Resultados que devuelve `estado` en cada consulta. `cuentas_conectadas` y
+    `paginas` son lo que devuelven `cuentas()` y `paginas_facebook()` (o una
+    excepción a lanzar); se anotan en `consultas`, no en `llamadas`."""
 
     nombre = "Falso"
 
-    def __init__(self, respuestas=None, estados=None):
+    def __init__(self, respuestas=None, estados=None, cuentas_conectadas=None,
+                 paginas=None):
         self.respuestas = dict(respuestas or {})
         self.estados = {p: list(v) for p, v in (estados or {}).items()}
+        self.cuentas_conectadas = (todas_conectadas() if cuentas_conectadas is None
+                                   else cuentas_conectadas)
+        self.paginas = [Pagina("111", "Mi página")] if paginas is None else paginas
         self.llamadas: list[tuple] = []
+        self.consultas: list[str] = []
+
+    def cuentas(self):
+        self.consultas.append("cuentas")
+        if isinstance(self.cuentas_conectadas, BaseException):
+            raise self.cuentas_conectadas
+        return {p: self.cuentas_conectadas.get(p) for p in Plataforma}
+
+    def paginas_facebook(self):
+        self.consultas.append("paginas")
+        if isinstance(self.paginas, BaseException):
+            raise self.paginas
+        return list(self.paginas)
 
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:

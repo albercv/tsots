@@ -154,3 +154,14 @@ def test_ajustes_glosario_persistido(tmp_path):
     assert a.glosario == ""
     a.glosario = "Claude Code = Cloud Code\nAnthropic"
     assert _ajustes(tmp_path).glosario == "Claude Code = Cloud Code\nAnthropic"
+
+
+def test_fila_muestra_vertical():
+    modelo = ModeloCola()
+    modelo.anadir([Path("/v/a.mp4")])
+    modelo.actualizar(0, estado=EstadoTrabajo.HECHO, salida=Path("/v/a_limpio.mp4"),
+                      salida_vertical=Path("/v/a_limpio_vertical.mp4"))
+    indice = modelo.index(0)
+    assert "+ vertical" in modelo.data(indice, Qt.ItemDataRole.DisplayRole)
+    assert "/v/a_limpio_vertical.mp4" in modelo.data(
+        indice, Qt.ItemDataRole.ToolTipRole)

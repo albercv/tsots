@@ -119,6 +119,7 @@ def main(argv: list[str] | None = None) -> int:
         })
         return 1
 
+    inicio = time.time() - 1  # margen para relojes de sistemas de archivos gruesos
     try:
         config = PipelineConfig.from_json(
             config_path.read_text(encoding="utf-8")
@@ -135,9 +136,22 @@ def main(argv: list[str] | None = None) -> int:
             "".join(traceback.format_exception(error)),
         )
 
-    log.escribir(f"OK · salida={salida}")
+    # Solo cuenta un vertical escrito en esta ejecución: si falló, el de una
+    # ejecución anterior sigue en disco y no debe parecer nuevo.
+    vertical = config.ruta_salida_vertical()
+    if vertical is not None:
+        vertical = vertical.expanduser().resolve()
+    nuevo = (
+        vertical is not None and vertical.is_file()
+        and vertical.stat().st_mtime >= inicio
+    )
+    log.escribir(f"OK · salida={salida}" + (f" · vertical={vertical}" if nuevo else ""))
     log.cerrar()
-    _imprimir({"done": True, "salida": str(salida)})
+    _imprimir({
+        "done": True,
+        "salida": str(salida),
+        "salida_vertical": str(vertical) if nuevo else None,
+    })
     return 0
 
 

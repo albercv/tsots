@@ -27,6 +27,7 @@ class Trabajo:
     error: str = ""
     aviso: str = ""
     salida: Path | None = None
+    salida_vertical: Path | None = None
     diagnostico: dict | None = None  # titulo, causa, solucion, detalle, paso, log
 
 
@@ -52,11 +53,15 @@ class ModeloCola(QAbstractListModel):
             if trabajo.estado == EstadoTrabajo.ERROR and trabajo.error:
                 # Primera línea = título legible; el resto va al tooltip/diálogo.
                 partes.append(f"· {trabajo.error.splitlines()[0]}")
+            if trabajo.estado == EstadoTrabajo.HECHO and trabajo.salida_vertical:
+                partes.append(_("+ vertical"))
             if trabajo.aviso:
                 partes.append("⚠")
             return " ".join(partes)
         if role == Qt.ItemDataRole.ToolTipRole:
             piezas = [t for t in (trabajo.error, trabajo.aviso) if t]
+            if trabajo.salida_vertical:
+                piezas.append(_("Vertical: {ruta}").format(ruta=trabajo.salida_vertical))
             return "\n".join(piezas) if piezas else None
         if role == Qt.ItemDataRole.ForegroundRole:
             if trabajo.estado == EstadoTrabajo.ERROR:

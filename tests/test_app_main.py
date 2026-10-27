@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QMessageBox
 
 from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
@@ -60,7 +61,8 @@ def test_procesar_construye_configs(qtbot, tmp_path, monkeypatch):
     datos = json.loads(config_json)
     assert datos["video"].endswith("a.mp4")
     assert datos["salida"].endswith("salidas")
-    assert datos["modo"] == "completo"
+    assert (datos["paso_audio"], datos["paso_silencios"]) == (True, True)
+    assert "modo" not in datos
     # iniciar está mockeado, así que trabajo_iniciado no se emite todavía:
     # la fila permanece en ESPERA hasta que el ejecutor la arranca de verdad.
     assert ventana.modelo_cola.trabajo(fila).estado == EstadoTrabajo.ESPERA
@@ -509,8 +511,13 @@ class _DialogoFalso:
         type(self).abiertos.append(args)
         self.configurar_redes = type("S", (), {"connect": lambda s, f: None})()
 
+    publicando = False
+
     def exec(self):
         return 0
+
+    def deleteLater(self):
+        pass
 
 
 def _hecho_con_caption(ventana, tmp_path):
@@ -559,6 +566,30 @@ def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
                         lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
     ventana.panel_caption.boton_publicar.click()
     assert len(avisos) == 1
+
+
+def test_publicar_sin_caption_avisa(qtbot, tmp_path, monkeypatch):
+    """Si la señal llega sin vídeo o sin caption, se dice (no vuelve en silencio)."""
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.warning", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.DialogoPublicar",
+                        lambda *a, **k: pytest.fail("no debe abrir el diálogo"))
+    ventana._publicar()
+    assert len(avisos) == 1 and "caption" in avisos[0][2]
+
+
+def test_no_sale_mientras_se_publica(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    avisos = []
+    monkeypatch.setattr("app.main.QMessageBox.information", lambda *a, **k: avisos.append(a))
+    monkeypatch.setattr("app.main.dialogo_publicar.hilos_vivos", lambda: 1)
+    ventana.show()
+    ventana.close()
+    assert ventana.isVisible() and len(avisos) == 1
+    monkeypatch.setattr("app.main.dialogo_publicar.hilos_vivos", lambda: 0)
+    ventana.close()
+    assert not ventana.isVisible()
 
 
 def _layout_de(layout, widget):
@@ -702,9 +733,9 @@ def test_opciones_subs_vuelven_a_previsualizacion(qtbot, tmp_path, monkeypatch):
     assert ventana.pestanas.currentWidget() is ventana.vista_previa
 
 
-def test_modo_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
+def test_audio_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    assert ventana.panel.seccion_abierta() == "modo"
+    assert ventana.panel.seccion_abierta() == "audio"
 
 
 def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
@@ -716,7 +747,7 @@ def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
     ventana.show()
     qtbot.waitExposed(ventana)
     scroll = ventana.scroll_derecha
-    for clave in ("caption", "subtitulos", "modo", "caption"):
+    for clave in ("caption", "subtitulos", "audio", "vertical"):
         seccion = ventana.panel.secciones[clave]
         qtbot.mouseClick(seccion.cabecera, Qt.MouseButton.LeftButton)
         barra = scroll.verticalScrollBar()
@@ -732,3 +763,54 @@ def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
                 assert arriba == 0
 
         qtbot.waitUntil(a_la_vista, timeout=1000)
+
+
+def test_procesar_deshabilitado_sin_pasos(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    assert ventana.boton_procesar.isEnabled()
+    ventana.panel.check_audio.setChecked(False)
+    ventana.panel.check_silencios.setChecked(False)
+    assert not ventana.boton_procesar.isEnabled()
+    assert ventana.boton_procesar.toolTip() != ""
+    ventana.panel.check_vertical.setChecked(True)
+    assert ventana.boton_procesar.isEnabled()
+
+
+def test_salida_vertical_actualiza_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.salida_vertical.emit(0, str(tmp_path / "a_limpio_vertical.mp4"))
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    assert ventana.modelo_cola.trabajo(0).salida_vertical == (
+        tmp_path / "a_limpio_vertical.mp4")
+
+
+def test_cancelado_limpia_temporales_vertical(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    horizontal = tmp_path / "a_limpio.mp4"
+    horizontal.write_bytes(b"OK")
+    temporales = [tmp_path / ".a_limpio_vertical_tmp.mp4",
+                  tmp_path / ".a_vertical_tmp.mp4",
+                  tmp_path / ".a_vertical_subs_tmp.mp4"]
+    for temporal in temporales:
+        temporal.write_bytes(b"MEDIO")
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "Cancelado")
+    assert horizontal.exists()
+    assert not any(t.exists() for t in temporales)
+
+
+def test_procesar_guarda_modo_equivalente(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    # Al cerrar con _procesando=True se abre un diálogo modal: responderlo.
+    monkeypatch.setattr("app.main.QMessageBox.question",
+                        lambda *a, **k: QMessageBox.StandardButton.Yes)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda trabajos: None)
+    ventana.panel.check_audio.setChecked(False)  # solo silencios
+    ventana.procesar()
+    guardado = ventana.ajustes.cargar_panel()
+    assert guardado["modo"] == "solo_silencios"
+    assert str(guardado["paso_audio"]).lower() in ("false", "0")

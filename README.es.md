@@ -31,12 +31,14 @@ No hace falta saber programar.
 
 ## Instalación
 
-1. Descarga el proyecto desde la rama **`main`**, que es la versión
-   estable (botón **Code → Download ZIP** en GitHub, la última entrada en
-   **Releases**, o `git clone -b main …`) y descomprímelo donde quieras
-   dejarlo, por ejemplo en `~/Documents`. La rama `develop` es trabajo en
-   curso y puede no funcionar. **No muevas la carpeta después de
-   instalar**; si lo haces, vuelve a ejecutar el instalador.
+1. Descarga la versión estable (rama **`main`**): el ZIP directo
+   [tsots-main.zip](https://github.com/albercv/tsots/archive/refs/heads/main.zip),
+   la [última Release](https://github.com/albercv/tsots/releases/latest) o
+   `git clone -b main https://github.com/albercv/tsots.git`. Descomprímelo
+   donde quieras dejarlo, por ejemplo en `~/Documents`. Ojo: el botón
+   **Code → Download ZIP** de GitHub descarga la rama `develop`, que es
+   trabajo en curso y puede no funcionar. **No muevas la carpeta después
+   de instalar**; si lo haces, vuelve a ejecutar el instalador.
 2. Doble clic en **`instalar.command`**. Si macOS dice que no se puede
    abrir porque es de un desarrollador no identificado: clic derecho →
    **Abrir** → **Abrir**. Se abre una ventana de Terminal.
@@ -74,11 +76,14 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    para elegirlos). Aparecen en la cola.
 2. **Elige opciones** a la derecha. Cada grupo es una sección plegable:
    pulsa su título para abrirla y se cierra la que estaba abierta (al
-   arrancar, **Modo**). Si no caben, solo las opciones hacen scroll; debajo,
-   siempre a la vista, quedan las pestañas **Previsualización** y
-   **Caption**.
-   - **Modo**: pipeline completo (limpiar + recortar), solo limpiar audio,
-     o solo cortar silencios.
+   arrancar, **Limpieza de audio**). Si no caben, solo las opciones hacen
+   scroll; debajo, siempre a la vista, quedan las pestañas
+   **Previsualización** y **Caption**.
+   - **Pasos**: cada sección empieza con la casilla de su paso (mejorar
+     audio, recortar silencios, subtítulos, caption, vertical) y se
+     combinan como quieras; la cabecera lleva ✓ cuando el paso está activo.
+     **Pipeline completo**, arriba, los marca todos de una vez (o los
+     desmarca si ya estaban todos). Por defecto: audio y silencios.
    - **Limpieza de audio**: modelo de IA para quitar ruido. El de defecto
      (MossFormer2 48 kHz) es el mejor para voz.
    - **Corte de silencios**: margen que se deja alrededor de cada frase y
@@ -95,6 +100,12 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
      tooltip dice por qué.
+   - **Formato vertical**: guarda además `nombre_limpio_vertical.mp4`
+     (9:16, 1080x1920) para Reels y TikTok; si no marcas audio ni
+     silencios, solo sale `nombre_vertical.mp4`. Encuadres: recorte central
+     (por defecto), fondo difuminado, barras negras o **seguir la cara**
+     (más lento; la primera vez descarga el detector, ~90 MB). Se desmarca
+     al reabrir la app: es un paso ocasional.
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que
      Whisper los escriba bien en los subtítulos y el caption. Después de
      `=`, las formas en que Whisper se equivoca; se corrigen solas:
@@ -128,9 +139,9 @@ detiene nada; cerrar la tapa sin monitor externo sí.
 ## Publicar en redes
 
 Desde un vídeo terminado con caption, **Publicar…** lo envía a **TikTok →
-YouTube → Instagram**, en ese orden. Nunca se publica nada solo: revisas
-título, caption y hashtags, marcas las plataformas, pulsas **Publicar** y
-confirmas. Si una plataforma falla, las demás siguen; cada fila muestra su
+YouTube → Instagram → X → Facebook**, en ese orden. Nunca se publica nada
+solo: revisas título, caption, hashtags y el texto para X, marcas las
+plataformas, pulsas **Publicar** y confirmas. Si una plataforma falla, las demás siguen; cada fila muestra su
 progreso y, al terminar, el enlace o el error.
 
 TikTok y YouTube solo dejan publicar en público a apps auditadas, así que
@@ -139,10 +150,15 @@ TSOTS publica a través de un servicio que ya tiene ese permiso:
 gratuito de 10 subidas al mes). Necesitas:
 
 1. Una cuenta en Upload-Post.
-2. En Upload-Post, un **perfil** con TikTok, YouTube e Instagram
-   conectados. La cuenta de Instagram debe ser **profesional** (empresa o
-   creador).
+2. En Upload-Post, un **perfil** con tus redes conectadas (TikTok,
+   YouTube, Instagram, X, Facebook: las que uses). La cuenta de Instagram
+   debe ser **profesional** (empresa o creador). En Facebook solo se puede
+   publicar en una **página**, no en un perfil personal.
 3. La **API key** de Upload-Post.
+
+No está claro si X y Facebook entran en el plan gratuito de Upload-Post:
+si no, la fila de esa plataforma muestra el error del servicio y las
+demás siguen.
 
 Guárdalos una vez en **Redes…** (barra inferior, junto al idioma; siempre
 visible, también desde Publicar…): el nombre del perfil
@@ -150,6 +166,24 @@ y la API key. La clave va directa al **Llavero de macOS** (servicio
 `tsots-upload_post`); la app nunca la muestra ni la escribe en disco. Para
 quitarla: **Olvidar clave** en el mismo diálogo, o borra la entrada en
 Acceso a Llaveros.
+
+**Comprobar conexión** (en Redes…) pregunta a Upload-Post qué cuentas
+tienes conectadas y en qué páginas de Facebook puedes publicar: elige ahí
+la página (si solo hay una, se elige sola). Al abrir Publicar… se vuelve a
+comprobar en segundo plano: una red sin conectar aparece deshabilitada
+(«No conectada en Upload-Post») y una que hay que reconectar, con un
+aviso. Sin conexión se usa lo último que se supo.
+
+**Límites de X.** Un post de X admite **280 caracteres** (una URL cuenta
+23 y un emoji, 2). Publicar… propone un texto para X con el título y los
+hashtags (quita hashtags desde el final y, si hace falta, acorta el
+título); puedes editarlo y el contador muestra cuánto ocupa. Sin Premium,
+X solo admite vídeos de hasta **2:20** y **512 MB**: con un vídeo más
+largo o más pesado, X aparece deshabilitada con el motivo. Si tu cuenta
+tiene Premium, márcalo en Redes… («Mi cuenta de X tiene Premium»): se
+admiten vídeos largos y textos largos en un solo post. Si Upload-Post
+indica que la cuenta es Premium, la casilla se marca sola al comprobar la
+conexión.
 
 Qué hace cada modo:
 
@@ -160,6 +194,10 @@ Qué hace cada modo:
 | YouTube | **Short público** | Se publica como Short público en la categoría elegida en Redes… (Personas y blogs por defecto). |
 | Instagram | **Reel de prueba** (por defecto) | Se enseña primero a quien no te sigue; Instagram lo comparte con tus seguidores solo si funciona. |
 | Instagram | **Reel normal** | Un reel normal, también en tu feed. |
+| X | **Post público** | Un post con el vídeo y el texto para X; nunca un hilo. |
+| Facebook | **Reel** (por defecto) | Un reel publicado en tu página. |
+| Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
+| Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
 
 TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
 vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar

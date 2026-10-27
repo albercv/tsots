@@ -24,6 +24,7 @@ class EjecutorCola(QObject):
     # Se emite ANTES de trabajo_terminado cuando el trabajo falla.
     diagnostico = Signal(int, dict)
     aviso = Signal(int, str)  # fila, texto
+    salida_vertical = Signal(int, str)  # fila, ruta del vídeo vertical
     cola_terminada = Signal()
 
     PROGRAMA = [sys.executable, "-m", "videopipeline.runner"]
@@ -118,6 +119,10 @@ class EjecutorCola(QObject):
                 self._error_evento = evento
             elif evento.get("done"):
                 self._salida_actual = evento.get("salida", "")
+                if evento.get("salida_vertical"):
+                    self.salida_vertical.emit(
+                        self._fila_actual, str(evento["salida_vertical"])
+                    )
             elif "warning" in evento:
                 self.aviso.emit(self._fila_actual, str(evento["warning"]))
             else:

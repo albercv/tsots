@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -215,3 +216,38 @@ def test_warning_pasa_por_stdout(tmp_path, monkeypatch, capsys):
     assert runner.main(["--config", str(ruta)]) == 0
     lineas = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
     assert any("warning" in l for l in lineas)
+
+
+def _run_que_escribe_vertical(escribir: bool):
+    def falso_run(config, on_progress):
+        if escribir:
+            config.ruta_salida_vertical().write_bytes(b"V")
+        return config.ruta_salida_final()
+    return falso_run
+
+
+@pytest.mark.parametrize("vertical, escribir, esperado", [
+    (True, True, "out_vertical.mp4"), (False, False, None), (True, False, None)])
+def test_done_salida_vertical(tmp_path, monkeypatch, capsys, vertical, escribir,
+                              esperado):
+    ruta = _config_json(tmp_path, paso_vertical=vertical)
+    monkeypatch.setattr(runner, "run", _run_que_escribe_vertical(escribir))
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 0
+    final = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    if esperado is None:
+        assert final["salida_vertical"] is None
+    else:
+        assert final["salida_vertical"].endswith(esperado)
+
+
+def test_done_ignora_vertical_de_ejecucion_anterior(tmp_path, monkeypatch, capsys):
+    ruta = _config_json(tmp_path, paso_vertical=True)
+    viejo = tmp_path / "out_vertical.mp4"
+    viejo.write_bytes(b"VIEJO")
+    os.utime(viejo, (1_000_000, 1_000_000))  # de una ejecución previa
+    monkeypatch.setattr(runner, "run", _run_que_escribe_vertical(False))
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 0
+    final = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert final["salida_vertical"] is None

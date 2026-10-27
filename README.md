@@ -31,11 +31,13 @@ Ollama. No programming knowledge needed.
 
 ## Installation
 
-1. Download the project from the **`main`** branch, which is the stable
-   version (**Code → Download ZIP** on GitHub, the latest entry under
-   **Releases**, or `git clone -b main …`) and unzip it where you want to
-   keep it, for example in `~/Documents`. The `develop` branch is work in
-   progress and may not work. **Do not move the folder after
+1. Download the stable version (**`main`** branch): the direct ZIP
+   [tsots-main.zip](https://github.com/albercv/tsots/archive/refs/heads/main.zip),
+   the [latest Release](https://github.com/albercv/tsots/releases/latest) or
+   `git clone -b main https://github.com/albercv/tsots.git`. Unzip it where
+   you want to keep it, for example in `~/Documents`. Note: GitHub's
+   **Code → Download ZIP** button downloads the `develop` branch, which is
+   work in progress and may not work. **Do not move the folder after
    installing**; if you do, run the installer again.
 2. Double-click **`instalar.command`**. If macOS says it cannot be opened
    because it is from an unidentified developer: right-click → **Open**
@@ -73,11 +75,14 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
 1. **Drag** one or more videos onto the area on the left (or click to
    choose them). They appear in the queue.
 2. **Pick options** on the right. Each group is a collapsible section:
-   click its title to open it and the open one closes (**Mode** at
-   startup). If they do not fit, only the options scroll; below them,
+   click its title to open it and the open one closes (**Audio cleaning**
+   at startup). If they do not fit, only the options scroll; below them,
    always visible, sit the **Preview** and **Caption** tabs.
-   - **Mode**: full pipeline (clean + cut), clean audio only, or cut
-     silences only.
+   - **Steps**: each section starts with the checkbox of its step (enhance
+     audio, cut silences, subtitles, caption, vertical) and they combine
+     freely; the header shows ✓ when the step is on. **Full pipeline**, at
+     the top, ticks them all at once (or clears them if they were all on).
+     Default: audio and silences.
    - **Audio cleaning**: AI model that removes noise. The default
      (MossFormer2 48 kHz) is the best for voice.
    - **Silence cutting**: margin kept around each sentence and volume
@@ -93,6 +98,12 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the
      tooltip says why. The caption is written in the subtitle language.
+   - **Vertical format**: also saves `name_limpio_vertical.mp4` (9:16,
+     1080x1920) for Reels and TikTok; without audio or silences selected,
+     only `name_vertical.mp4` is written. Framings: centre crop (default),
+     blurred background, black bars or **follow the face** (slower; the
+     first time it downloads the detector, ~90 MB). It is unticked when the
+     app reopens: it is an occasional step.
    - **Terms…**: your brands and proper names, one per line, so Whisper
      spells them right in the subtitles and the caption. After `=`, the
      ways Whisper gets them wrong; they are fixed automatically:
@@ -128,9 +139,9 @@ TSOTS_LANG=en ./TheSilenceOfTheShorts.command                # force a language
 ## Publish to social networks
 
 From a finished video with a caption, **Publish…** sends it to **TikTok →
-YouTube → Instagram**, in that order. Nothing is published automatically:
-you review the title, caption and hashtags, tick the platforms, press
-**Publish** and confirm. A failure on one platform does not stop the
+YouTube → Instagram → X → Facebook**, in that order. Nothing is published
+automatically: you review the title, caption, hashtags and the text for
+X, tick the platforms, press **Publish** and confirm. A failure on one platform does not stop the
 others; each row shows its progress and, at the end, a link or the error.
 
 TikTok and YouTube only let audited apps post publicly, so TSOTS publishes
@@ -139,10 +150,15 @@ through a service that already has that approval: **Upload-Post**
 uploads a month). Requirements:
 
 1. An Upload-Post account.
-2. In Upload-Post, a **profile** with TikTok, YouTube and Instagram
-   connected. Instagram must be a **professional** account (Business or
-   Creator).
+2. In Upload-Post, a **profile** with your networks connected (TikTok,
+   YouTube, Instagram, X, Facebook: the ones you use). Instagram must be a
+   **professional** account (Business or Creator). On Facebook you can
+   only post to a **Page**, not to a personal profile.
 3. Your Upload-Post **API key**.
+
+It is not clear whether X and Facebook are part of Upload-Post's free
+plan: if they are not, that platform's row shows the service's error and
+the others carry on.
 
 Save them once in **Networks…** (bottom bar, next to the language; always
 visible, also reachable from Publish…): the profile name and
@@ -150,6 +166,24 @@ the API key. The key goes straight to the **macOS Keychain** (service
 `tsots-upload_post`); the app never shows it or writes it to disk. To
 remove it: **Forget key** in the same dialog, or delete the entry in
 Keychain Access.
+
+**Check connection** (in Networks…) asks Upload-Post which accounts you
+have connected and which Facebook Pages you can post to: pick the Page
+there (if there is only one, it is picked for you). When Publish… opens
+it checks again in the background: a network that is not connected is
+disabled ("Not connected in Upload-Post") and one that needs
+reconnecting shows a warning. Offline, the last known result is used.
+
+**X limits.** An X post takes **280 characters** (a URL counts 23 and an
+emoji 2). Publish… suggests a text for X made of the title and the
+hashtags (it drops hashtags from the end and, if needed, shortens the
+title); you can edit it and the counter shows its length. Without
+Premium, X only accepts videos up to **2:20** and **512 MB**: with a
+longer or heavier video, X is disabled with the reason. If your account
+has Premium, tick it in Networks… ("My X account has Premium"): long
+videos and long texts in a single post are then allowed. If Upload-Post
+reports the account as Premium, the box is ticked for you when you check
+the connection.
 
 What each mode does:
 
@@ -160,6 +194,10 @@ What each mode does:
 | YouTube | **Public Short** | Published as a public Short in the category chosen in Networks… (People & Blogs by default). |
 | Instagram | **Trial reel** (default) | Shown to non-followers first; Instagram shares it with your followers only if it performs. |
 | Instagram | **Regular reel** | A normal reel, also shown in your feed. |
+| X | **Public post** | A post with the video and the text for X; never a thread. |
+| Facebook | **Reel** (default) | A reel published on your Page. |
+| Facebook | **Regular video** | A video published on your Page. |
+| Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
 
 TSOTS writes `name_limpio.publicado.json` next to the video (platform,
 date, link, service). If you open Publish again for that video, it warns

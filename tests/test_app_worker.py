@@ -5,6 +5,8 @@ import sys
 import textwrap
 from pathlib import Path
 
+import pytest
+
 from app.worker import EjecutorCola
 
 
@@ -331,3 +333,23 @@ def test_error_estructurado_emite_diagnostico(qtbot, tmp_path):
     # El texto de error empieza por el título legible, no por el mensaje crudo.
     assert terminados[0].startswith("auto-editor no pudo escribir el vídeo")
     assert "Qué hacer: reencodar" in terminados[0]
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    ('"/tmp/out_vertical.mp4"', [(0, "/tmp/out_vertical.mp4")]), ("None", [])])
+def test_done_salida_vertical(qtbot, tmp_path, valor, esperado):
+    script = _runner_falso(
+        tmp_path,
+        f"""
+        import json
+        print(json.dumps({{"done": True, "salida": "/tmp/out.mp4",
+                          "salida_vertical": {valor}}}), flush=True)
+        """,
+    )
+    ejecutor = EjecutorCola()
+    ejecutor.PROGRAMA = [sys.executable, str(script)]
+    verticales = []
+    ejecutor.salida_vertical.connect(lambda f, r: verticales.append((f, r)))
+    with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
+        ejecutor.iniciar([(0, "{}")])
+    assert verticales == esperado
