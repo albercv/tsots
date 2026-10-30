@@ -10,6 +10,7 @@ import pytest
 
 from videopipeline.redes import publicador, upload_post
 from videopipeline.redes.modelo import (
+    Ciudad,
     Cuenta,
     Lugar,
     ModoFacebook,
@@ -945,17 +946,17 @@ def test_consultas_quedan_en_el_registro_sin_la_clave_ni_el_perfil(tmp_path, mon
 
 # --- ubicación ---
 
+# Lugar de TikTok falso: los de verdad son de la cuenta y nunca van al repo.
 MADRID = Lugar("v2_madrid", "Madrid", "Comunidad de Madrid, España")
-UBICACION = Ubicacion("Madrid", tiktok=MADRID, instagram_id="110184922344060",
-                      x_id="01a9a39529b27f36")
+UBICACION = Ubicacion(Ciudad.MADRID, tiktok=MADRID)
 CAMPOS_UBICACION = ("tiktok_location_id", "tiktok_location_name", "location_id",
                     "geo_place_id")
 
 
 @pytest.mark.parametrize("plataforma, esperados", [
     (Plataforma.TIKTOK, {"tiktok_location_id": "v2_madrid", "tiktok_location_name": "Madrid"}),
-    (Plataforma.INSTAGRAM, {"location_id": "110184922344060"}),
-    (Plataforma.X, {"geo_place_id": "01a9a39529b27f36"}),
+    (Plataforma.INSTAGRAM, {"location_id": "106504859386230"}),
+    (Plataforma.X, {"geo_place_id": "206c436ce43a43a3"}),
     (Plataforma.YOUTUBE, {}),
     (Plataforma.FACEBOOK, {}),
 ])
@@ -966,15 +967,16 @@ def test_ubicacion_en_los_campos_de_cada_red(video, plataforma, esperados):
 
 
 @pytest.mark.parametrize("plataforma", list(Plataforma))
-@pytest.mark.parametrize("ubicacion", [
-    Ubicacion(),
-    Ubicacion("Madrid"),  # sin lugar de TikTok elegido: lo busca el publicador
-    Ubicacion(instagram_id="Madrid", x_id="no vale"),
-])
-def test_sin_ubicacion_valida_no_van_campos_de_ubicacion(video, plataforma, ubicacion):
-    datos = upload_post.campos(plataforma, _pub(video), Opciones(ubicacion=ubicacion), "p",
-                               "123")
+def test_sin_ubicacion_no_van_campos_de_ubicacion(video, plataforma):
+    datos = upload_post.campos(plataforma, _pub(video), Opciones(), "p", "123")
     assert not set(CAMPOS_UBICACION) & set(datos)
+
+
+def test_ciudad_sin_lugar_de_tiktok_no_manda_campos_de_tiktok(video):
+    """Sin lugar elegido lo busca el publicador; el proveedor no inventa nada."""
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video),
+                               Opciones(ubicacion=Ubicacion(Ciudad.MADRID)), "p")
+    assert not {"tiktok_location_id", "tiktok_location_name"} & set(datos)
 
 
 def test_ubicacion_llega_en_la_subida(video):
@@ -983,6 +985,28 @@ def test_ubicacion_llega_en_la_subida(video):
     formulario = servidor.formularios[0]
     assert formulario["tiktok_location_id"] == ["v2_madrid"]
     assert formulario["tiktok_location_name"] == ["Madrid"]
+
+
+def test_el_id_de_tiktok_nunca_va_al_registro(video, tmp_path, monkeypatch):
+    """Ni en los campos de la subida ni en la respuesta de la búsqueda."""
+    from videopipeline.redes import diario
+
+    monkeypatch.setattr(diario, "DIR_LOGS", tmp_path / "logs")
+
+    def responder(request, servidor):
+        if "locations" in request.url.path:
+            return httpx.Response(200, json={"locations": [
+                {"location_id": "v2_madrid", "location_name": "Madrid"}]})
+        return _ok_sync(request, servidor)
+
+    d = diario.Diario(video)
+    proveedor = _proveedor(Servidor(responder))
+    assert proveedor.lugares_tiktok("Madrid") == [Lugar("v2_madrid", "Madrid")]
+    proveedor.publicar(Plataforma.TIKTOK, _pub(video), Opciones(ubicacion=UBICACION))
+    d.cerrar()
+    texto = d.ruta.read_text(encoding="utf-8")
+    assert "tiktok_location_name" in texto and "Madrid" in texto
+    assert "v2_madrid" not in texto
 
 
 def test_lugares_tiktok_consulta_y_respuesta():

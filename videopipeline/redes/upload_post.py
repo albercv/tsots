@@ -283,7 +283,8 @@ class ProveedorUploadPost:
                  "campos %s · esperas máx.: "
                  "conexión %.0f s, escritura %.0f s, lectura %.0f s",
                  plataforma.nombre, URL_SUBIDA, datos["external_id"], video, tamano,
-                 {k: v for k, v in datos.items() if k not in ("user", "external_id")},
+                 {k: ("(privado)" if k == "tiktok_location_id" else v)
+                  for k, v in datos.items() if k not in ("user", "external_id")},
                  limites.connect, limites.write, limites.read)
 
         def enviar(http: httpx.Client) -> httpx.Response:
@@ -391,9 +392,11 @@ class ProveedorUploadPost:
         consulta = (texto or "").strip()[:MAX_BUSQUEDA_LUGAR]
         if not consulta:
             raise ErrorConsulta(_("Escribe el lugar que quieres buscar."))
+        # La respuesta lleva los ids de lugar de la cuenta: no va al registro.
         cuerpo = self._consultar(
             "lugares de TikTok", URL_LUGARES_TIKTOK + f"?profile={{perfil}}&q={consulta}",
-            URL_LUGARES_TIKTOK, {"profile": self._perfil, "q": consulta})
+            URL_LUGARES_TIKTOK, {"profile": self._perfil, "q": consulta},
+            registrar_cuerpo=False)
         lista = self._buscar(cuerpo, "locations")
         if not isinstance(lista, list):
             raise ErrorConsulta(_(
@@ -408,11 +411,11 @@ class ProveedorUploadPost:
                 lugares.append(Lugar(ident, nombre,
                                      str(elemento.get("location_address") or "").strip()))
         log.info("Lugares de TikTok para %r: %s", consulta,
-                 ", ".join(f"{l.visible} ({l.id})" for l in lugares) or "(ninguno)")
+                 ", ".join(l.visible for l in lugares) or "(ninguno)")
         return lugares
 
     def _consultar(self, que: str, plantilla: str, url: str,
-                   parametros: dict | None = None) -> Any:
+                   parametros: dict | None = None, registrar_cuerpo: bool = True) -> Any:
         """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
         motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
         if not self._clave:
@@ -432,7 +435,8 @@ class ProveedorUploadPost:
                 tipo=type(e).__name__)) from None
         log.info("Consulta de %s → HTTP %d en %.1f s · cuerpo: %s", que, respuesta.status_code,
                  time.monotonic() - inicio,
-                 diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)")
+                 (diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)") if registrar_cuerpo
+                 or respuesta.status_code >= 400 else "(no se registra: datos de la cuenta)")
         if respuesta.status_code >= 400:
             raise ErrorConsulta(self._mensaje_http(respuesta))
         cuerpo = self._json(respuesta)

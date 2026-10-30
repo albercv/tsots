@@ -199,45 +199,27 @@ What each mode does:
 | Facebook | **Regular video** | A video published on your Page. |
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
 
-**Location.** Posts are tagged with **Madrid** unless you pick another place
-in Networks… (**Location**, under "When publishing", **Change…** button).
-For a single video, press **Change…**
-next to "Location" in the Publish dialog: the usual one stays as it is.
-Only TikTok, Instagram and X support a location:
+**Location.** Posts are tagged with **Madrid** unless you choose otherwise
+in Networks… (**Location** row under "When publishing", **Change…**
+button). For a single video, press **Change…** next to "Location" in the
+Publish dialog: the usual one stays as it is.
 
-- **TikTok:** type the place and press **Search TikTok** to pick it from
-  the list. If you don't pick one, the first place with that exact name is
-  used when publishing; if none has it, TikTok is posted without a
-  location. Your TikTok account needs the location permission: if it
-  lacks it, TSOTS asks you to reconnect it in Upload-Post.
-- **Instagram:** the numeric ID of a Facebook Page or place.
-- **X:** the X place ID (hexadecimal).
+You pick the **city** from a list (or "No location"); you never see or type
+IDs. Only TikTok, Instagram and X support a location:
 
-Madrid already comes with its Instagram and X IDs, so it goes out on all
-three networks with no setup. Those two IDs belong to the place, not to
-your account: they work the same for anyone posting in Madrid. A TikTok
-place ID, on the other hand, is only valid for the account that looked it
-up, which is why TSOTS searches it with yours. Madrid is the only place
-that comes with IDs: typing
-another one clears those IDs (they never tag another place as Madrid), and
-Instagram and X then need that place's own IDs. Left empty, those two go
-out without a location; TikTok finds any place by its name.
+- **Instagram and X:** each city in the list comes with its place IDs.
+  They belong to the place, not to your account: they work the same for
+  anyone posting there. Today the list only has Madrid; adding another city
+  is a change in the app (see `docs/DEVELOPMENT.md`, "Location").
+- **TikTok:** its place belongs to your account, so it is not in the list.
+  When publishing, the place named like the city is looked up; to use a
+  specific one, press **Search TikTok** and pick it. That place is private
+  data: it is only stored in the macOS Keychain, never in the settings, the
+  logs or any repository. Your TikTok account needs the location
+  permission: if it lacks it, TSOTS asks you to reconnect it in
+  Upload-Post.
 
-How to get the IDs of another place:
-
-- **Instagram:** search the city on [wikidata.org](https://www.wikidata.org)
-  and copy its "Facebook location ID". The ID of the place's Facebook page
-  also works (in its information, "Page transparency"). To check it,
-  `facebook.com/<ID>` must open that place.
-- **X:** there is no public lookup. On Wikidata, "X place ID" is rarely
-  filled in; otherwise the ID only comes from a post tagged in that place.
-  To check it, `x.com/search?q=place%3A<ID>` must list posts from there.
-
-A place you use often can be added to the app so it brings its IDs like
-Madrid does (see `docs/DEVELOPMENT.md`, "Location").
-
-Anything missing or invalid is not sent, and the post goes ahead.
-**Remove** posts without a location.
+If anything about the location fails, the post goes ahead without it.
 
 TSOTS writes `name_limpio.publicado.json` next to the video (platform,
 date, link, service). If you open Publish again for that video, it warns

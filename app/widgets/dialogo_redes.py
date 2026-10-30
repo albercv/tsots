@@ -38,6 +38,7 @@ from videopipeline.redes.modelo import (
     ModoTikTok,
     Pagina,
     Plataforma,
+    Ubicacion,
 )
 from videopipeline.redes.textos import MAX_TEXTO_X
 
@@ -45,7 +46,13 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
-from .selector_ubicacion import DialogoUbicacion, aviso_permiso_tiktok, describir_ubicacion
+from .selector_ubicacion import (
+    DialogoUbicacion,
+    aviso_permiso_tiktok,
+    describir_ubicacion,
+    guardar_ubicacion,
+    ubicacion_guardada,
+)
 
 Fabrica = Callable[[str, str, dict], proveedores.Proveedor]
 
@@ -232,7 +239,8 @@ class DialogoRedes(QDialog):
         formulario_defecto.addRow("", self.ayuda_pagina)
         # Una fila que abre el selector aparte: como sección, el diálogo no
         # cabría en la pantalla de un portátil.
-        self._ubicacion = ajustes.ubicacion_de(self.proveedor)
+        # Elegida en Cambiar…; `None`: la guardada, sin tocar (ni leer) el Llavero.
+        self._ubicacion: Ubicacion | None = None
         self._cuenta_tiktok: Cuenta | None = None
         self.etiqueta_ubicacion = QLabel()
         self.etiqueta_ubicacion.setWordWrap(True)
@@ -306,7 +314,7 @@ class DialogoRedes(QDialog):
         self._poner_paginas([pagina] if pagina else [], pagina.id if pagina else "")
         guardadas = (self.ajustes.cuentas_guardadas()
                      if self.proveedor == self.ajustes.proveedor_redes else None)
-        self._ubicacion = self.ajustes.ubicacion_de(self.proveedor)
+        self._ubicacion = None
         self._cuenta_tiktok = guardadas.cuentas.get(Plataforma.TIKTOK) if guardadas else None
         self._refrescar_ubicacion()
         if guardadas is not None:
@@ -437,15 +445,22 @@ class DialogoRedes(QDialog):
     # --- ubicación ---
 
     def _refrescar_ubicacion(self) -> None:
-        self.etiqueta_ubicacion.setText(describir_ubicacion(self._ubicacion))
+        # Para la fila basta la ciudad: el lugar de TikTok no se lee al abrir.
+        ubicacion = (self._ubicacion if self._ubicacion is not None
+                     else Ubicacion(self.ajustes.ciudad))
+        self.etiqueta_ubicacion.setText(describir_ubicacion(ubicacion))
         aviso = (aviso_permiso_tiktok(self._cuenta_tiktok, proveedores.nombre_visible(
-            self.proveedor)) if Plataforma.TIKTOK in self._ubicacion.plataformas() else "")
+            self.proveedor)) if Plataforma.TIKTOK in ubicacion.plataformas() else "")
         self.aviso_ubicacion.setText(aviso)
         self.aviso_ubicacion.setVisible(bool(aviso))
 
     def _cambiar_ubicacion(self) -> None:
+        actual = self._ubicacion
+        if actual is None:
+            actual = ubicacion_guardada(self.ajustes, self.llavero, self.proveedor,
+                                        self.campo_perfil.text().strip())
         dialogo = DialogoUbicacion(
-            self._ubicacion, self._preparar_busqueda, _("Ubicación de siempre"),
+            actual, self._preparar_busqueda, _("Ubicación de siempre"),
             _("Se usa en todas las publicaciones. En Publicar puedes cambiarla para un "
               "solo vídeo."), self)
         dialogo.selector.poner_cuenta_tiktok(self._cuenta_tiktok,
@@ -495,6 +510,14 @@ class DialogoRedes(QDialog):
                 return
             finally:
                 self.campo_clave.clear()
+        # El lugar de TikTok es de la cuenta: va al Llavero, con el perfil escrito.
+        if self._ubicacion is not None:
+            try:
+                guardar_ubicacion(self.ajustes, self.llavero, self.proveedor,
+                                  self.campo_perfil.text().strip(), self._ubicacion)
+            except credenciales.ErrorLlavero as e:
+                QMessageBox.warning(self, _("Llavero"), str(e))
+                return
         self.ajustes.proveedor_redes = self.proveedor
         self.ajustes.guardar_perfil(self.proveedor, self.campo_perfil.text())
         self.ajustes.tiktok_modo = ModoTikTok(self.combo_tiktok.currentData())
@@ -503,7 +526,6 @@ class DialogoRedes(QDialog):
         self.ajustes.x_premium = self.casilla_x_premium.isChecked()
         self.ajustes.facebook_modo = ModoFacebook(self.combo_facebook.currentData())
         self.ajustes.guardar_pagina_facebook(self.proveedor, self.pagina_elegida())
-        self.ajustes.guardar_ubicacion(self.proveedor, self._ubicacion)
         if self._comprobadas is not None and self._comprobadas[0] == self.ajustes.perfil_redes:
             self.ajustes.guardar_cuentas(self._comprobadas[1])
         super().accept()

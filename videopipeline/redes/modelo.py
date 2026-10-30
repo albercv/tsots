@@ -99,12 +99,35 @@ def id_x_valido(texto: str) -> bool:
     return bool(_RE_ID_X.fullmatch((texto or "").strip()))
 
 
+class Ciudad(Enum):
+    """Ciudades que se pueden elegir como ubicación, con sus IDs públicos de
+    lugar: los mismos para cualquier cuenta, por eso pueden ir en el código.
+    Instagram usa el ID de Facebook Places; X, su ID de lugar. Vacío: esa red
+    sale sin ubicación. Los IDs de TikTok no van aquí: son de la cuenta (ver
+    `Lugar`). Añadir una ciudad = una línea, con la fuente de cada ID."""
+
+    # Facebook Places: Wikidata Q2807, propiedad P1997. X: lugar «Madrid,
+    # España», tipo ciudad, tal como lo dan los objetos de lugar de X.
+    MADRID = ("Madrid", "106504859386230", "206c436ce43a43a3")
+
+    def __init__(self, nombre: str, instagram_id: str, x_id: str):
+        self.nombre = nombre
+        self.instagram_id = instagram_id
+        self.x_id = x_id
+
+    @classmethod
+    def de_clave(cls, clave: str) -> Ciudad | None:
+        """La ciudad guardada en ajustes por su clave (`MADRID`), o None."""
+        return cls.__members__.get(clave or "")
+
+
 @dataclass(frozen=True)
 class Lugar:
     """Lugar de TikTok, tal como lo devuelve la búsqueda del proveedor. Su
-    `id` solo vale para la cuenta con que se buscó."""
+    `id` solo vale para la cuenta con que se buscó: es privado, no se
+    muestra, no se registra y solo se guarda en el Llavero."""
 
-    id: str
+    id: str = field(repr=False)
     nombre: str
     direccion: str = ""
 
@@ -115,22 +138,29 @@ class Lugar:
 
 @dataclass(frozen=True)
 class Ubicacion:
-    """Ubicación de una publicación. Solo TikTok, Instagram y X la admiten y
-    cada una la identifica a su manera; lo que falta o no es válido no se
-    envía.
+    """Ubicación de una publicación: una ciudad del catálogo y, para TikTok,
+    el lugar elegido con la cuenta. Solo TikTok, Instagram y X la admiten.
+    Sin `tiktok`, al publicar se busca en TikTok el lugar de la ciudad."""
 
-    `nombre`: lo que escribe el usuario («Madrid»). Si no hay `tiktok`
-    elegido, al publicar se busca en TikTok un lugar que se llame así."""
-
-    nombre: str = ""
+    ciudad: Ciudad | None = None
     tiktok: Lugar | None = None
-    instagram_id: str = ""
-    x_id: str = ""
+
+    @property
+    def nombre(self) -> str:
+        return self.ciudad.nombre if self.ciudad else ""
+
+    @property
+    def instagram_id(self) -> str:
+        return self.ciudad.instagram_id if self.ciudad else ""
+
+    @property
+    def x_id(self) -> str:
+        return self.ciudad.x_id if self.ciudad else ""
 
     def plataformas(self) -> tuple[Plataforma, ...]:
         """Redes en las que irá la ubicación, en el orden de publicación."""
         con = {
-            Plataforma.TIKTOK: self.tiktok is not None or bool(self.nombre.strip()),
+            Plataforma.TIKTOK: self.tiktok is not None or self.ciudad is not None,
             Plataforma.INSTAGRAM: id_instagram_valido(self.instagram_id),
             Plataforma.X: id_x_valido(self.x_id),
         }
@@ -138,23 +168,11 @@ class Ubicacion:
 
     @property
     def visible(self) -> str:
-        return self.nombre.strip() or (self.tiktok.nombre if self.tiktok else "")
+        return self.nombre or (self.tiktok.nombre if self.tiktok else "")
 
 
 # Ubicación con que se etiquetan las publicaciones si el usuario no elige otra.
-# Instagram: ID de Facebook Places de Madrid (Wikidata Q2807, propiedad P1997).
-# X: lugar «Madrid, España» de tipo ciudad. TikTok lo busca por el nombre.
-UBICACION_POR_DEFECTO = Ubicacion("Madrid", instagram_id="106504859386230",
-                                  x_id="206c436ce43a43a3")
-# Lugares cuyos IDs de Instagram y X se rellenan solos al escribir su nombre.
-_CONOCIDAS = (UBICACION_POR_DEFECTO,)
-
-
-def ubicacion_conocida(nombre: str) -> Ubicacion | None:
-    """La ubicación completa de un lugar conocido que se llama `nombre`."""
-    buscado = _normalizado(nombre)
-    return next((u for u in _CONOCIDAS if _normalizado(u.nombre) == buscado and buscado),
-                None)
+UBICACION_POR_DEFECTO = Ubicacion(Ciudad.MADRID)
 
 
 def _normalizado(texto: str) -> str:

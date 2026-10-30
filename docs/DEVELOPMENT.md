@@ -187,7 +187,7 @@ Package `videopipeline/redes/`:
 
 | Module | Role | Knows the provider? |
 |---|---|---|
-| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ubicacion` (typed place name, chosen TikTok `Lugar`, Instagram and X ids; `plataformas()` says which networks get it), `Lugar` (TikTok place from the lookup), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid with its Facebook Places id from Wikidata Q2807/P1997 for Instagram and the X place «Madrid, España»; `ubicacion_conocida` refills those ids when Madrid is typed), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
+| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ciudad` (catalog of cities with their public Instagram and X place ids), `Ubicacion` (a `Ciudad` and the TikTok `Lugar` chosen with the account; `plataformas()` says which networks get it), `Lugar` (TikTok place from the lookup; its id is private and hidden from `repr`), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
 | `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
 | `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
 | `proveedor.py` | `Proveedor` protocol, `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
@@ -209,9 +209,9 @@ in the bottom bar of `app/main.py`, next to the language selector (app
 settings, not per video, so it is always visible; the Publish dialog also
 opens it).
 Settings (QSettings `redes/*`) store the provider id, the profile, the
-default modes, X Premium, the chosen Facebook Page and the location (per
-provider; Madrid until one is saved, and the TikTok place is tied to the
-profile it was looked up with) and the
+default modes, X Premium, the chosen Facebook Page (per provider), the
+location city (`redes/ciudad`; the TikTok place lives in the Keychain, see
+Location) and the
 last successful account lookup (per provider, tied to the profile); never
 the key. The checked platforms are remembered; a list saved before X and
 Facebook existed keeps working (both stay unchecked), and a new user
@@ -264,94 +264,102 @@ they came from a live lookup or the cache.
 Every post can carry a location. Through Upload-Post only three networks
 take one, and each identifies the place its own way:
 
-| Network | What it needs | Lookup in Upload-Post |
-|---|---|---|
-| TikTok | A place id **and** its name, both from TikTok | Yes: `lugares_tiktok(texto)`, up to 20 places |
-| Instagram | The numeric id of a Facebook Page or place (Facebook Places id) | No |
-| X | The X place id (16 hex characters) | No |
-| YouTube, Facebook | Nothing: no location field | — |
+| Network | What it needs | Whose id | Lookup in Upload-Post |
+|---|---|---|---|
+| Instagram | Facebook Places id of the place | Public: the same for every account | No |
+| X | X place id (hexadecimal) | Public: the same for every account | No |
+| TikTok | Place id **and** name, from TikTok | **Private**: only valid for the connected account that looked it up | Yes: `lugares_tiktok(texto)`, up to 20 places |
+| YouTube, Facebook | Nothing: no location field | — | — |
 
-**Model** (`videopipeline/redes/modelo.py`, neutral). `Ubicacion` holds
-the typed name (`nombre`), the TikTok place chosen from a lookup
-(`tiktok: Lugar | None`) and the Instagram and X ids. `plataformas()`
-says which networks will actually get it: TikTok if there is a chosen
-place or at least a name; Instagram and X only with a valid id
-(`id_instagram_valido`: digits; `id_x_valido`: hexadecimal). It travels
-in `Opciones.ubicacion`.
+That split drives the design: public ids ship in the code, the TikTok id
+never does.
 
-**Default and known places.** `UBICACION_POR_DEFECTO` is Madrid with
-both ids filled in, so a new user tags all three networks with no setup:
+**City catalog** (`videopipeline/redes/modelo.py`). The user picks a city
+by name; ids are never shown. `Ciudad` is an Enum whose members carry
+`nombre`, `instagram_id` and `x_id` (empty: that network goes without a
+location). Today it holds Madrid:
 
-- Instagram `106504859386230`: Madrid's Facebook Places id, from
-  Wikidata (Madrid is Q2807; property P1997, "Facebook location ID").
-  Facebook redirects `facebook.com/106504859386230` to its
-  `Madrid-106504859386230` page.
-- X `206c436ce43a43a3`: the X place "Madrid, España", `place_type`
-  city, country ES, as it appears in X's own geo objects (found in public
-  tweet datasets on GitHub; Wikidata's "X place ID", P12431, is not set
-  for Madrid). `x.com/search?q=place%3A206c436ce43a43a3` lists posts
-  tagged there.
+- Instagram `106504859386230`: Madrid's Facebook Places id, from Wikidata
+  (Madrid is Q2807; property P1997, "Facebook location ID"). Facebook
+  redirects `facebook.com/106504859386230` to its `Madrid-106504859386230`
+  page.
+- X `206c436ce43a43a3`: the X place "Madrid, España", `place_type` city,
+  country ES, as it appears in X's own geo objects (found in public tweet
+  datasets on GitHub; Wikidata's "X place ID", P12431, is not set for
+  Madrid). `x.com/search?q=place%3A206c436ce43a43a3` lists posts tagged
+  there.
 
-These two ids are public ids of the place, the same for every account
-that posts there, which is why they can ship in the code. TikTok's are
-not: a TikTok place id is only valid for the connected account that
-looked it up, so it is never hard-coded; it is searched with the user's
-account. Neither id has been confirmed by a real upload yet. `ubicacion_conocida`
-returns the full location of a known place by name (accents and case
-ignored); today `_CONOCIDAS` only holds Madrid. To add another city, put
-its `Ubicacion` with both ids in `_CONOCIDAS`, note in a comment where
-each id comes from, and add it to the tests in
-`tests/test_redes_ubicacion.py`.
+Neither id has been confirmed by a real upload yet.
 
-**Settings** (`app/settings.py`). `ubicacion_de(proveedor)` /
-`guardar_ubicacion` store it per provider as JSON in
-`redes/ubicacion/<provider>`. Nothing saved (or unreadable JSON) means
-`UBICACION_POR_DEFECTO`; a saved empty location stays empty ("Remove").
-The TikTok place is stored with the profile it was looked up with, and is
-dropped when the profile changes: its id is only valid for that account.
+To add a city, add one member to `Ciudad` (`SEVILLA = ("Sevilla",
+"<facebook places id>", "<x place id>")`) with a comment saying where each
+id comes from. `tests/test_redes_ubicacion.py` checks that every member
+has a name and valid ids; nothing else changes. Never add TikTok ids.
 
-**Screens.** The selector (`app/widgets/selector_ubicacion.py`) is the
-same in both dialogs and always opens in its own window
-(`DialogoUbicacion`):
+Finding the ids of a new city:
+
+- Instagram: search the city on wikidata.org and read "Facebook location
+  ID" (P1997), or take the Page id of the place's Facebook page ("Page
+  transparency"). Check: `facebook.com/<id>` must open that place.
+- X: there is no public lookup. Wikidata's "X place ID" (P12431) is rarely
+  filled; otherwise the id has to come from a post geotagged in that place
+  (its `place` object), which is how Madrid's was found. Check:
+  `x.com/search?q=place%3A<id>` must list posts from there. Without an id,
+  leave it empty: X goes out without a location.
+
+**Model.** `Ubicacion(ciudad, tiktok)`: the city, and the TikTok `Lugar`
+chosen with the account (or `None`: looked up when publishing). `nombre`,
+`instagram_id` and `x_id` come from the city. `plataformas()` lists the
+networks that will get it. `Lugar.id` is excluded from `repr`, so it
+cannot leak through a printed `Opciones`. `UBICACION_POR_DEFECTO` is
+`Ubicacion(Ciudad.MADRID)`.
+
+**Where it is stored.**
+
+- The city: `Ajustes.ciudad` (QSettings `redes/ciudad`, the member name).
+  Never saved: Madrid. "No location" is saved as an empty value. A name no
+  longer in the catalog falls back to Madrid.
+- The TikTok place: only in the macOS Keychain
+  (`credenciales.guardar_lugar_tiktok` / `leer_lugar_tiktok`), service
+  `tsots-<provider>`, account `tiktok-lugar-<CITY>-<profile hash>`, value
+  base64 JSON sent through stdin (never in the `ps` argument list). It is
+  per provider, profile and city, so another account never sees it. It is
+  never written to QSettings, files, logs or the repository.
+- `selector_ubicacion.ubicacion_guardada` / `guardar_ubicacion` join both.
+  Reading the place is reading a secret, so it only happens on "Change…"
+  or "Publish", never when a dialog opens (the rows only need the city).
+  A Keychain failure only loses the chosen place: TikTok then looks it up.
+
+**Logs.** The TikTok id never reaches a log: the upload fields log it as
+`(privado)`, the place lookup does not log its response body, the
+publisher and the Publish dialog log only the place name, and the Publish
+dialog also masks the chosen id in its publication log.
+
+**Screens.** The selector (`app/widgets/selector_ubicacion.py`) opens in
+its own window (`DialogoUbicacion`) from both dialogs and only shows
+names: a city drop-down (catalog plus "No location"), the TikTok place
+("Automatic: the place called «Madrid»" or one picked after "Search
+TikTok"), and which networks it will tag. Changing the city drops the TikTok
+results.
 
 - Networks… has a "Location: Madrid (TikTok, Instagram, X) · Change…"
-  row under "When publishing". The choice is saved with Save. If the
-  last account lookup says TikTok lacks the `location` capability
-  (`Cuenta.ubicacion is False`), the row asks to reconnect TikTok.
-- The Publish dialog shows the location in use and "Change…" sets one
-  for that video only (`_ubicacion_propia`); it is never saved. The
-  confirmation and the publication log state the location.
-- In the selector, "Search TikTok" fills a list and picks the place
-  whose name matches exactly; otherwise the user picks one or leaves
-  "Automatic". Editing the name drops the TikTok results and clears the
-  Instagram and X ids, so they never tag a new place with the old ids;
-  typing a known place (Madrid) fills its ids back in. Invalid ids are
-  flagged and never sent.
+  row under "When publishing". Save stores the city and, in the Keychain,
+  the TikTok place (none chosen: the stored one for that city is
+  forgotten). If the last account lookup says TikTok lacks the `location`
+  capability (`Cuenta.ubicacion is False`), the row asks to reconnect it.
+- The Publish dialog shows the location and "Change…" sets one for that
+  video only; it is never saved. The confirmation and the publication log
+  state it.
 
-**Publishing.** With a name but no TikTok place chosen, `publicador`
-looks the name up right before TikTok (`_con_lugar_de_tiktok`) and uses
-the first exact match (`elegir_lugar`: accents, case and a ", country"
-suffix ignored). The other networks get the location unchanged. The
-provider only adds the fields that are valid
-(`tiktok_location_id`/`tiktok_location_name`, `location_id`,
-`geo_place_id`). A location never costs a post: no match, a failed
-lookup or a missing permission post TikTok without one, and a field the
-service refuses is ignored by Upload-Post, which says so in `warnings`
-(kept in the publication log).
-
-**Finding the ids of another place** (what the user does for a city that
-is not known):
-
-- Instagram: the place's Facebook Places id. Easiest: search the city on
-  wikidata.org and read "Facebook location ID" (P1997). Or open the
-  place's Facebook page and take the id from the page information
-  ("Page transparency"). Check: `facebook.com/<id>` must open that
-  place.
-- X: there is no public lookup. Wikidata's "X place ID" (P12431) is
-  rarely filled; otherwise the id has to come from a post geotagged in
-  that place (its `place` object), which is how Madrid's was found.
-  Check: `x.com/search?q=place%3A<id>` must list posts from there.
-  Without an id, X goes out without a location.
+**Publishing.** With a city but no TikTok place chosen, `publicador` looks
+the city up right before TikTok (`_con_lugar_de_tiktok`) and uses the
+first exact match (`elegir_lugar`: accents, case and a ", country" suffix
+ignored). The other networks get the location unchanged. The provider only
+adds the fields that are valid (`tiktok_location_id` +
+`tiktok_location_name`, `location_id`, `geo_place_id`). A location never
+costs a post: no match, a failed lookup or a missing permission post
+TikTok without one, and a field the service refuses is ignored by
+Upload-Post, which says so in `warnings` (kept in the publication log).
 
 ### Provider interface
 

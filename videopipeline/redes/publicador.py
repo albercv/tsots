@@ -61,7 +61,7 @@ def _con_lugar_de_tiktok(proveedor: Proveedor, opciones: Opciones) -> Opciones:
     if lugar is None:
         log.warning("TikTok: ningún lugar se llama %r: se publica sin ubicación", nombre)
         return opciones
-    log.info("TikTok: ubicación %s (%s)", lugar.visible, lugar.id)
+    log.info("TikTok: ubicación %s", lugar.visible)  # el id es de la cuenta: nunca al registro
     return replace(opciones, ubicacion=replace(ubicacion, tiktok=lugar))
 
 

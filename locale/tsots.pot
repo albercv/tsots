@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 11:18+0100\n"
+"POT-Creation-Date: 2026-10-30 11:36+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -153,7 +153,7 @@ msgstr ""
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
 msgstr ""
 
-msgid "Ciudad o lugar, p. ej. Madrid"
+msgid "Ciudad:"
 msgstr ""
 
 #, python-brace-format
@@ -512,15 +512,6 @@ msgstr ""
 msgid "ID de la página (un número)"
 msgstr ""
 
-msgid "ID del lugar en X (opcional)"
-msgstr ""
-
-msgid "ID numérico de una página o lugar de Facebook (opcional)"
-msgstr ""
-
-msgid "IDs propios"
-msgstr ""
-
 msgid "Idioma"
 msgstr ""
 
@@ -589,9 +580,6 @@ msgstr ""
 
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
-msgstr ""
-
-msgid "Lugar:"
 msgstr ""
 
 msgid "Límite de subidas del plan alcanzado (429)."
@@ -696,6 +684,9 @@ msgid ""
 "Instálalas y vuelve a abrir la aplicación."
 msgstr ""
 
+msgid "No se etiqueta en ninguna red."
+msgstr ""
+
 #, python-brace-format
 msgid "No se generó el WAV: {wav}"
 msgstr ""
@@ -741,6 +732,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr ""
 
@@ -756,10 +751,17 @@ msgstr ""
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr ""
 
+msgid "No se pudo guardar el lugar de TikTok en el Llavero."
+msgstr ""
+
 msgid "No se pudo guardar la clave en el Llavero."
 msgstr ""
 
 msgid "No se pudo lanzar el proceso"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
 msgstr ""
 
 #, python-brace-format
@@ -927,9 +929,6 @@ msgstr ""
 msgid "Publicar en redes"
 msgstr ""
 
-msgid "Publicar sin ubicación"
-msgstr ""
-
 msgid "Publicar…"
 msgstr ""
 
@@ -1034,6 +1033,10 @@ msgid "Salida:"
 msgstr ""
 
 msgid "Se está publicando en redes. Espera a que termine para salir."
+msgstr ""
+
+#, python-brace-format
+msgid "Se etiqueta en: {redes}."
 msgstr ""
 
 #, python-brace-format
@@ -1261,7 +1264,7 @@ msgstr ""
 msgid "Ya publicado antes en: {lista}."
 msgstr ""
 
-msgid "YouTube y Facebook no admiten ubicación. Instagram y X la llevan si tienen su ID: Madrid ya lo trae; para otro lugar, escríbelo aquí."
+msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
 msgstr ""
 
 msgid "argumentos inválidos: se requiere --config"
@@ -1398,12 +1401,6 @@ msgid "■ Cancelar"
 msgstr ""
 
 msgid "▶ Procesar"
-msgstr ""
-
-msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
-msgstr ""
-
-msgid "⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): no se enviará."
 msgstr ""
 
 msgid "⚠ El ID de una página solo tiene números."

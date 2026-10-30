@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 11:18+0100\n"
+"POT-Creation-Date: 2026-10-30 11:36+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -152,8 +152,8 @@ msgstr "Science & Technology"
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
 msgstr "Close other applications, or split the video into shorter parts."
 
-msgid "Ciudad o lugar, p. ej. Madrid"
-msgstr "City or place, e.g. Madrid"
+msgid "Ciudad:"
+msgstr "City:"
 
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
@@ -515,15 +515,6 @@ msgstr "Comedy"
 msgid "ID de la página (un número)"
 msgstr "Page ID (a number)"
 
-msgid "ID del lugar en X (opcional)"
-msgstr "X place ID (optional)"
-
-msgid "ID numérico de una página o lugar de Facebook (opcional)"
-msgstr "Numeric ID of a Facebook Page or place (optional)"
-
-msgid "IDs propios"
-msgstr "Custom IDs"
-
 msgid "Idioma"
 msgstr "Language"
 
@@ -593,9 +584,6 @@ msgstr "{app} logo"
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
 msgstr "The last {n} terms don't fit in Whisper's hint. They are still used for corrections and in the caption."
-
-msgid "Lugar:"
-msgstr "Place:"
 
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr "Your plan's upload limit has been reached (429)."
@@ -703,6 +691,9 @@ msgstr ""
 "Not found in PATH: {faltan}\n"
 "Install them and open the application again."
 
+msgid "No se etiqueta en ninguna red."
+msgstr "Not tagged on any network."
+
 #, python-brace-format
 msgid "No se generó el WAV: {wav}"
 msgstr "The WAV was not produced: {wav}"
@@ -748,6 +739,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
 
 #, python-brace-format
+msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
+msgstr "Could not delete the TikTok place from the Keychain (code {codigo})."
+
+#, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr "Could not delete the key from the Keychain (code {codigo})."
 
@@ -763,11 +758,18 @@ msgstr "Could not connect to the service ({tipo})."
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr "Could not confirm whether it was published. Check {plataforma} before publishing again."
 
+msgid "No se pudo guardar el lugar de TikTok en el Llavero."
+msgstr "Could not save the TikTok place in the Keychain."
+
 msgid "No se pudo guardar la clave en el Llavero."
 msgstr "Could not save the key in the Keychain."
 
 msgid "No se pudo lanzar el proceso"
 msgstr "Could not launch the process"
+
+#, python-brace-format
+msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
+msgstr "Could not read the TikTok place from the Keychain (code {codigo})."
 
 #, python-brace-format
 msgid "No se pudo leer el vídeo ({tipo})."
@@ -934,9 +936,6 @@ msgstr "Publish to TikTok, YouTube, Instagram, X and Facebook"
 msgid "Publicar en redes"
 msgstr "Publish to social networks"
 
-msgid "Publicar sin ubicación"
-msgstr "Publish without a location"
-
 msgid "Publicar…"
 msgstr "Publish…"
 
@@ -1042,6 +1041,10 @@ msgstr "Output:"
 
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr "Publishing to social networks is in progress. Wait for it to finish before quitting."
+
+#, python-brace-format
+msgid "Se etiqueta en: {redes}."
+msgstr "Tagged on: {redes}."
 
 #, python-brace-format
 msgid ""
@@ -1271,8 +1274,8 @@ msgstr "X without Premium accepts videos up to {maximo}; this one is {duracion} 
 msgid "Ya publicado antes en: {lista}."
 msgstr "Already published on: {lista}."
 
-msgid "YouTube y Facebook no admiten ubicación. Instagram y X la llevan si tienen su ID: Madrid ya lo trae; para otro lugar, escríbelo aquí."
-msgstr "YouTube and Facebook don't support locations. Instagram and X get one if they have its ID: Madrid already has it; for another place, enter it here."
+msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
+msgstr "YouTube and Facebook don't support locations. The TikTok place belongs to your account: it is only stored in the macOS Keychain."
 
 msgid "argumentos inválidos: se requiere --config"
 msgstr "invalid arguments: --config is required"
@@ -1410,12 +1413,6 @@ msgstr "■ Cancel"
 msgid "▶ Procesar"
 msgstr "▶ Process"
 
-msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
-msgstr "⚠ An Instagram ID only contains digits: it won't be sent."
-
-msgid "⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): no se enviará."
-msgstr "⚠ An X place ID is hexadecimal (e.g. 01a9a39529b27f36): it won't be sent."
-
 msgid "⚠ El ID de una página solo tiene números."
 msgstr "⚠ A Page ID only contains digits."
 
@@ -1460,8 +1457,26 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 #~ msgid "Al publicar, por defecto"
 #~ msgstr "Defaults when publishing"
 
+#~ msgid "Ciudad o lugar, p. ej. Madrid"
+#~ msgstr "City or place, e.g. Madrid"
+
+#~ msgid "ID del lugar en X (opcional)"
+#~ msgstr "X place ID (optional)"
+
+#~ msgid "ID numérico de una página o lugar de Facebook (opcional)"
+#~ msgstr "Numeric ID of a Facebook Page or place (optional)"
+
+#~ msgid "IDs propios"
+#~ msgstr "Custom IDs"
+
+#~ msgid "Lugar:"
+#~ msgstr "Place:"
+
 #~ msgid "Modo"
 #~ msgstr "Mode"
+
+#~ msgid "Publicar sin ubicación"
+#~ msgstr "Publish without a location"
 
 #~ msgid "Página de Facebook en la que se publica"
 #~ msgstr "Facebook Page to post to"
@@ -1477,3 +1492,9 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"
+
+#~ msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
+#~ msgstr "⚠ An Instagram ID only contains digits: it won't be sent."
+
+#~ msgid "⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): no se enviará."
+#~ msgstr "⚠ An X place ID is hexadecimal (e.g. 01a9a39529b27f36): it won't be sent."

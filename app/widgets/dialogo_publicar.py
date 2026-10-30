@@ -58,7 +58,7 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
-from .selector_ubicacion import DialogoUbicacion, describir_ubicacion
+from .selector_ubicacion import DialogoUbicacion, describir_ubicacion, ubicacion_guardada
 
 # Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
 # tests la sustituyen.
@@ -211,7 +211,10 @@ class DialogoPublicar(QDialog):
         self.ruta_log: Path | None = None
         self._en_curso: list[Plataforma] = []
         self._opciones_en_curso = Opciones()
-        # Ubicación cambiada solo para este vídeo; `None`: la de Redes….
+        # La de Redes… (aquí solo la ciudad: el lugar de TikTok, del Llavero,
+        # se lee al pulsar Cambiar… o Publicar) y la cambiada solo para este
+        # vídeo (`None`: la de Redes…).
+        self._ubicacion_global = Ubicacion()
         self._ubicacion_propia: Ubicacion | None = None
         self._procesando: set[Plataforma] = set()
         self.resultados: dict[Plataforma, Resultado] = {}
@@ -387,7 +390,7 @@ class DialogoPublicar(QDialog):
     def ubicacion(self) -> Ubicacion:
         if self._ubicacion_propia is not None:
             return self._ubicacion_propia
-        return self.ajustes.ubicacion
+        return self._ubicacion_global
 
     def publicacion(self) -> Publicacion:
         return Publicacion(
@@ -412,16 +415,22 @@ class DialogoPublicar(QDialog):
         llavero, fabrica = self.llavero, self.fabrica
         return lambda: consulta_cuentas.buscar_lugares(llavero, fabrica, nombre, datos, texto)
 
+    def _guardada(self) -> Ubicacion:
+        return ubicacion_guardada(self.ajustes, self.llavero, self.ajustes.proveedor_redes,
+                                  self.ajustes.perfil_redes)
+
     def _cambiar_ubicacion(self) -> None:
+        guardada = self._guardada()
         dialogo = DialogoUbicacion(
-            self.ubicacion(), self._preparar_busqueda, _("Ubicación de este vídeo"),
+            self._ubicacion_propia or guardada, self._preparar_busqueda,
+            _("Ubicación de este vídeo"),
             _("Solo para este vídeo. La de siempre se cambia en Redes…."), self)
         dialogo.selector.poner_cuenta_tiktok(
             self._cuentas.get(Plataforma.TIKTOK),
             proveedores.nombre_visible(self.ajustes.proveedor_redes))
         if dialogo.exec():
             nueva = dialogo.ubicacion()
-            self._ubicacion_propia = None if nueva == self.ajustes.ubicacion else nueva
+            self._ubicacion_propia = None if nueva == guardada else nueva
             self._refrescar_ubicacion()
 
     # --- texto de X ---
@@ -583,6 +592,7 @@ class DialogoPublicar(QDialog):
         self._fecha_cuentas = guardadas.fecha if guardadas else ""
         self._error_cuentas = ""
         self._refrescar_etiqueta_servicio()
+        self._ubicacion_global = Ubicacion(self.ajustes.ciudad)
         self._refrescar_ubicacion()
         self._consultar_cuentas()
         self._refrescar()
@@ -697,7 +707,8 @@ class DialogoPublicar(QDialog):
             return
         nombre = self.ajustes.proveedor_redes
         plataformas = self.plataformas()
-        opciones = self.opciones()
+        # Con el lugar de TikTok guardado (Llavero), si no se cambió para este vídeo.
+        opciones = replace(self.opciones(), ubicacion=self._ubicacion_propia or self._guardada())
         self._preparar(plataformas, opciones)
         self._registrar_inicio(nombre, plataformas, opciones)
         self._poner_estado(_("Esperando confirmación…"))
@@ -773,6 +784,8 @@ class DialogoPublicar(QDialog):
             etiqueta.setStyleSheet("")
         self._refrescar()  # las demás filas vuelven a mostrar su cuenta
         self._diario = diario.Diario(self.video)
+        if opciones.ubicacion.tiktok is not None:  # el id es de la cuenta
+            self._diario.ocultar(opciones.ubicacion.tiktok.id)
         self.ruta_log = self._diario.ruta
         self.boton_registro.setVisible(self.ruta_log is not None)
         self.boton_registro.setEnabled(self.ruta_log is not None)
@@ -804,12 +817,13 @@ class DialogoPublicar(QDialog):
         if Plataforma.FACEBOOK in plataformas:
             log.info("Página de Facebook: %s", "sí" if self.ajustes.pagina_facebook else "no")
         ubicacion = opciones.ubicacion
-        log.info("Ubicación%s: %r · TikTok: %s · Instagram: %s · X: %s",
+        log.info("Ubicación%s: %s · TikTok: %s · Instagram: %s · X: %s",
                  " (solo este vídeo)" if self._ubicacion_propia is not None else "",
-                 ubicacion.nombre,
-                 f"{ubicacion.tiktok.visible} ({ubicacion.tiktok.id})" if ubicacion.tiktok
-                 else ("se busca al publicar" if ubicacion.nombre.strip() else "no"),
-                 ubicacion.instagram_id or "no", ubicacion.x_id or "no")
+                 ubicacion.nombre or "ninguna",
+                 ubicacion.tiktok.visible if ubicacion.tiktok  # el id de TikTok, nunca
+                 else ("se busca al publicar" if ubicacion.ciudad else "no"),
+                 "sí" if Plataforma.INSTAGRAM in ubicacion.plataformas() else "no",
+                 "sí" if Plataforma.X in ubicacion.plataformas() else "no")
         if self._cuentas_en_vivo:
             log.info("Cuentas (comprobadas a las %s): %s", self._fecha_cuentas,
                      consulta_cuentas.resumen(self._cuentas))

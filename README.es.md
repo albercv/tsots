@@ -200,44 +200,26 @@ Qué hace cada modo:
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
 
 **Ubicación.** Las publicaciones salen etiquetadas en **Madrid** salvo que
-elijas otra en Redes… (**Ubicación**, en «Al publicar», botón
-**Cambiar…**). Para un solo vídeo, pulsa
-**Cambiar…** junto a «Ubicación» en el diálogo Publicar: la de siempre no
-cambia. Solo TikTok, Instagram y X admiten ubicación:
+elijas otra cosa en Redes… (fila **Ubicación** de «Al publicar», botón
+**Cambiar…**). Para un solo vídeo, pulsa **Cambiar…** junto a «Ubicación»
+en el diálogo Publicar: la de siempre no cambia.
 
-- **TikTok:** escribe el lugar y pulsa **Buscar en TikTok** para elegirlo
-  de la lista. Sin elegir, al publicar se usa el primero que se llame igual
-  que lo escrito; si ninguno se llama así, TikTok sale sin ubicación. Tu
-  cuenta de TikTok necesita permiso para ubicaciones: si no lo tiene, TSOTS
-  te pide reconectarla en Upload-Post.
-- **Instagram:** el ID numérico de una página o lugar de Facebook.
-- **X:** el ID del lugar en X (hexadecimal).
+Eliges la **ciudad** en una lista (o «Sin ubicación»); nunca ves ni
+escribes IDs. Solo TikTok, Instagram y X admiten ubicación:
 
-Madrid ya trae los IDs de Instagram y X, así que sale en las tres redes sin
-hacer nada. Esos dos IDs son del lugar, no de tu cuenta: valen igual para
-cualquiera que publique en Madrid. El de TikTok, en cambio, solo vale para
-la cuenta que lo buscó, y por eso TSOTS lo busca con la tuya. Madrid es el
-único lugar que trae los IDs: al escribir otro, esos IDs se
-vacían (no etiquetan otro sitio como Madrid) y, para ese lugar, Instagram y
-X necesitan los suyos. Si los dejas vacíos, esas dos redes salen sin
-ubicación; TikTok encuentra cualquier lugar por su nombre.
+- **Instagram y X:** cada ciudad de la lista trae sus IDs de lugar. Son del
+  lugar, no de tu cuenta: valen igual para cualquiera que publique allí.
+  Hoy la lista solo tiene Madrid; añadir otra ciudad es un cambio en la app
+  (ver `docs/DEVELOPMENT.md`, «Location»).
+- **TikTok:** su lugar es de tu cuenta, así que no viene en la lista. Al
+  publicar se busca el que se llame como la ciudad; si quieres uno
+  concreto, pulsa **Buscar en TikTok** y elígelo. Ese lugar es un dato
+  privado: se guarda solo en el Llavero de macOS, nunca en los ajustes, en
+  los registros ni en ningún repositorio. Tu cuenta de TikTok necesita
+  permiso para ubicaciones: si no lo tiene, TSOTS te pide reconectarla en
+  Upload-Post.
 
-Cómo conseguir los IDs de otro lugar:
-
-- **Instagram:** busca la ciudad en [wikidata.org](https://www.wikidata.org)
-  y copia el «identificador de lugar de Facebook». También vale el ID de la
-  página de Facebook del lugar (en su información, «Transparencia de la
-  página»). Para comprobarlo, `facebook.com/<ID>` debe abrir ese lugar.
-- **X:** no tiene buscador público. En Wikidata, «X place ID» casi nunca
-  está relleno; si no, el ID solo se obtiene de un post etiquetado en ese
-  lugar. Para comprobarlo, `x.com/search?q=place%3A<ID>` debe listar posts
-  de allí.
-
-Si un lugar se repite, puede añadirse a la app para que traiga sus IDs como
-Madrid (ver `docs/DEVELOPMENT.md`, «Location»).
-
-Lo que falta o no es válido no se envía, y la publicación sigue adelante.
-**Quitar** publica sin ubicación.
+Si algo de la ubicación falla, la publicación sigue adelante sin ella.
 
 TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
 vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar

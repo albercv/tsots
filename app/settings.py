@@ -11,14 +11,13 @@ from videopipeline.redes.modelo import (
     ORDEN,
     UBICACION_POR_DEFECTO,
     YOUTUBE_CATEGORIA_POR_DEFECTO,
+    Ciudad,
     Cuenta,
-    Lugar,
     ModoFacebook,
     ModoInstagram,
     ModoTikTok,
     Pagina,
     Plataforma,
-    Ubicacion,
 )
 from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO, PROVEEDORES
 
@@ -167,46 +166,23 @@ class Ajustes:
     def pagina_facebook(self, pagina: Pagina | None) -> None:
         self.guardar_pagina_facebook(self.proveedor_redes, pagina)
 
-    # Ubicación de las publicaciones (no es secreta). El lugar de TikTok se
-    # guarda con el perfil: su id solo vale para la cuenta con que se buscó.
-
-    def ubicacion_de(self, proveedor: str) -> Ubicacion:
-        """La guardada; si nunca se guardó (o no se puede leer), Madrid."""
-        bruto = self._q.value(f"redes/ubicacion/{proveedor}")
-        try:
-            datos = json.loads(str(bruto)) if bruto else None
-        except ValueError:
-            datos = None
-        if not isinstance(datos, dict):
-            return UBICACION_POR_DEFECTO
-        tiktok = datos.get("tiktok")
-        lugar = None
-        if (isinstance(tiktok, dict) and tiktok.get("id") and tiktok.get("nombre")
-                and datos.get("perfil") == self.perfil_de(proveedor)):
-            lugar = Lugar(str(tiktok["id"]), str(tiktok["nombre"]),
-                          str(tiktok.get("direccion") or ""))
-        return Ubicacion(str(datos.get("nombre") or ""), lugar,
-                         str(datos.get("instagram_id") or ""), str(datos.get("x_id") or ""))
-
-    def guardar_ubicacion(self, proveedor: str, ubicacion: Ubicacion) -> None:
-        lugar = ubicacion.tiktok
-        datos = {
-            "nombre": ubicacion.nombre.strip(),
-            "tiktok": None if lugar is None else {
-                "id": lugar.id, "nombre": lugar.nombre, "direccion": lugar.direccion},
-            "perfil": self.perfil_de(proveedor),
-            "instagram_id": ubicacion.instagram_id.strip(),
-            "x_id": ubicacion.x_id.strip(),
-        }
-        self._q.setValue(f"redes/ubicacion/{proveedor}", json.dumps(datos, ensure_ascii=False))
+    # Ubicación de las publicaciones: aquí solo la ciudad, que es pública. El
+    # lugar de TikTok es de la cuenta y va al Llavero (`credenciales`).
 
     @property
-    def ubicacion(self) -> Ubicacion:
-        return self.ubicacion_de(self.proveedor_redes)
+    def ciudad(self) -> Ciudad | None:
+        """Nunca guardada: la de por defecto (Madrid). «Sin ubicación» se
+        guarda vacía. Una que ya no está en el catálogo: la de por defecto."""
+        valor = self._q.value("redes/ciudad")
+        if valor is None:
+            return UBICACION_POR_DEFECTO.ciudad
+        if not str(valor):
+            return None
+        return Ciudad.de_clave(str(valor)) or UBICACION_POR_DEFECTO.ciudad
 
-    @ubicacion.setter
-    def ubicacion(self, ubicacion: Ubicacion) -> None:
-        self.guardar_ubicacion(self.proveedor_redes, ubicacion)
+    @ciudad.setter
+    def ciudad(self, ciudad: Ciudad | None) -> None:
+        self._q.setValue("redes/ciudad", ciudad.name if ciudad else "")
 
     # Cuentas conectadas en el servicio: la última consulta que salió bien,
     # para seguir sin conexión. Solo nombres visibles, nada secreto.

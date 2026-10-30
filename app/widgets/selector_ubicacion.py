@@ -1,5 +1,7 @@
 """Ubicación de las publicaciones: el selector que comparten el diálogo
-Redes… (la de siempre) y el diálogo Publicar (la de un solo vídeo)."""
+Redes… (la de siempre) y el diálogo Publicar (la de un solo vídeo), y dónde
+se guarda la de siempre: la ciudad en los ajustes y el lugar de TikTok, que
+es de la cuenta, en el Llavero."""
 from __future__ import annotations
 
 from typing import Callable
@@ -11,25 +13,15 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QHBoxLayout,
     QLabel,
-    QLineEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
 )
 
 from videopipeline.i18n import _
-from videopipeline.redes.modelo import (
-    Cuenta,
-    Lugar,
-    Plataforma,
-    Ubicacion,
-    elegir_lugar,
-    id_instagram_valido,
-    id_x_valido,
-    ubicacion_conocida,
-)
+from videopipeline.redes.modelo import Ciudad, Cuenta, Lugar, Ubicacion, elegir_lugar
 
-from .. import segundo_plano
+from .. import credenciales, segundo_plano
 from ..cuentas import COLOR_AVISO, COLOR_SECUNDARIO
 
 # Recibe el texto a buscar (en el hilo de la interfaz, donde puede leer los
@@ -38,13 +30,36 @@ from ..cuentas import COLOR_AVISO, COLOR_SECUNDARIO
 PrepararBusqueda = Callable[[str], Callable[[], "tuple[list[Lugar] | None, str]"]]
 
 
+def ubicacion_guardada(ajustes, llavero, proveedor: str, perfil: str) -> Ubicacion:
+    """La de siempre: la ciudad de los ajustes y, si se eligió, el lugar de
+    TikTok de esa cuenta, del Llavero. Lee un secreto: solo al pulsar
+    Cambiar… o Publicar, nunca al abrir un diálogo."""
+    ciudad = ajustes.ciudad
+    if ciudad is None:
+        return Ubicacion()
+    try:
+        lugar = llavero.leer_lugar_tiktok(proveedor, perfil, ciudad.name)
+    except Exception:  # sin el lugar, TikTok lo busca al publicar: nunca bloquea
+        lugar = None
+    return Ubicacion(ciudad, lugar)
+
+
+def guardar_ubicacion(ajustes, llavero, proveedor: str, perfil: str,
+                      ubicacion: Ubicacion) -> None:
+    """Guarda la de siempre. Sin lugar de TikTok elegido, olvida el que hubiera
+    para esa ciudad. Lanza `credenciales.ErrorLlavero` si el Llavero falla."""
+    ajustes.ciudad = ubicacion.ciudad
+    if ubicacion.ciudad is not None:
+        llavero.guardar_lugar_tiktok(proveedor, perfil, ubicacion.ciudad.name, ubicacion.tiktok)
+
+
 def describir_ubicacion(ubicacion: Ubicacion, redes=None) -> str:
-    """«Madrid (TikTok, Instagram)» o «Sin ubicación». `redes`: solo esas."""
+    """«Madrid (TikTok, Instagram, X)» o «Sin ubicación». `redes`: solo esas."""
     con = [p for p in ubicacion.plataformas() if redes is None or p in redes]
     if not con:
         return _("Sin ubicación")
     return _("{lugar} ({redes})").format(
-        lugar=ubicacion.visible or _("IDs propios"), redes=", ".join(p.nombre for p in con))
+        lugar=ubicacion.visible, redes=", ".join(p.nombre for p in con))
 
 
 def aviso_permiso_tiktok(cuenta: Cuenta | None, servicio: str) -> str:
@@ -56,9 +71,10 @@ def aviso_permiso_tiktok(cuenta: Cuenta | None, servicio: str) -> str:
 
 
 class SelectorUbicacion(QWidget):
-    """Un lugar escrito («Madrid»), el lugar de TikTok elegido entre los
-    que devuelve la búsqueda y los IDs de Instagram y X. Sin lugar de TikTok
-    elegido, al publicar se usa el primero que se llame igual que el escrito."""
+    """Una ciudad del catálogo (o ninguna) y el lugar de TikTok elegido entre
+    los que devuelve la búsqueda. Solo muestra nombres: los IDs de Instagram
+    y X salen de la ciudad, y el de TikTok es privado. Sin lugar de TikTok
+    elegido, al publicar se usa el primero que se llame como la ciudad."""
 
     def __init__(self, ubicacion: Ubicacion, preparar_busqueda: PrepararBusqueda,
                  parent=None):
@@ -70,68 +86,57 @@ class SelectorUbicacion(QWidget):
         formulario.setContentsMargins(0, 0, 0, 0)
         formulario.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
 
-        self.campo_nombre = QLineEdit()
-        self.campo_nombre.setPlaceholderText(_("Ciudad o lugar, p. ej. Madrid"))
+        self.combo_ciudad = QComboBox()
+        for ciudad in Ciudad:
+            self.combo_ciudad.addItem(ciudad.nombre, ciudad)
+        self.combo_ciudad.addItem(_("Sin ubicación"), None)
+        formulario.addRow(_("Ciudad:"), self.combo_ciudad)
+
+        self.combo_tiktok = QComboBox()
         self.boton_buscar = QPushButton(_("Buscar en TikTok"))
         self.boton_buscar.setToolTip(_(
             "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"))
-        self.boton_quitar = QPushButton(_("Quitar"))
-        self.boton_quitar.setToolTip(_("Publicar sin ubicación"))
         fila = QHBoxLayout()
-        fila.addWidget(self.campo_nombre, 1)
+        fila.addWidget(self.combo_tiktok, 1)
         fila.addWidget(self.boton_buscar)
-        fila.addWidget(self.boton_quitar)
-        formulario.addRow(_("Lugar:"), fila)
-
-        self.combo_tiktok = QComboBox()
-        formulario.addRow("TikTok:", self.combo_tiktok)
+        formulario.addRow("TikTok:", fila)
         self.aviso_tiktok = QLabel()
         self.aviso_tiktok.setWordWrap(True)
         self.aviso_tiktok.setStyleSheet(f"color: {COLOR_AVISO};")
         self.aviso_tiktok.hide()
         formulario.addRow("", self.aviso_tiktok)
 
-        self.campo_instagram = QLineEdit()
-        self.campo_instagram.setPlaceholderText(_(
-            "ID numérico de una página o lugar de Facebook (opcional)"))
-        formulario.addRow("Instagram:", self.campo_instagram)
-        self.campo_x = QLineEdit()
-        self.campo_x.setPlaceholderText(_("ID del lugar en X (opcional)"))
-        formulario.addRow("X:", self.campo_x)
-        self.aviso_ids = QLabel()
-        self.aviso_ids.setWordWrap(True)
-        self.aviso_ids.setStyleSheet(f"color: {COLOR_AVISO};")
-        self.aviso_ids.hide()
-        formulario.addRow("", self.aviso_ids)
+        self.etiqueta_redes = QLabel()
+        self.etiqueta_redes.setWordWrap(True)
+        formulario.addRow("", self.etiqueta_redes)
         ayuda = QLabel(_(
-            "YouTube y Facebook no admiten ubicación. Instagram y X la llevan si tienen "
-            "su ID: Madrid ya lo trae; para otro lugar, escríbelo aquí."))
+            "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu "
+            "cuenta: se guarda solo en el Llavero de macOS."))
         ayuda.setWordWrap(True)
         ayuda.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
         formulario.addRow("", ayuda)
 
-        self.campo_nombre.textChanged.connect(self._al_editar_nombre)
+        self.combo_ciudad.currentIndexChanged.connect(self._al_cambiar_ciudad)
         self.boton_buscar.clicked.connect(self._buscar)
-        self.boton_quitar.clicked.connect(lambda: self.poner(Ubicacion()))
-        self.campo_instagram.textChanged.connect(self._refrescar_ids)
-        self.campo_x.textChanged.connect(self._refrescar_ids)
         self.poner(ubicacion)
 
     def poner(self, ubicacion: Ubicacion) -> None:
-        self._busqueda_n += 1  # una búsqueda en marcha ya no vale
-        self.boton_buscar.setEnabled(True)
-        self.campo_nombre.setText(ubicacion.nombre)
-        lugar = ubicacion.tiktok
-        self._poner_lugares([lugar] if lugar else [], lugar)
-        self.campo_instagram.setText(ubicacion.instagram_id)
-        self.campo_x.setText(ubicacion.x_id)
-        self._avisar_tiktok("")
+        indice = next((i for i in range(self.combo_ciudad.count())
+                       if self.combo_ciudad.itemData(i) is ubicacion.ciudad),
+                      self.combo_ciudad.count() - 1)
+        self.combo_ciudad.blockSignals(True)
+        self.combo_ciudad.setCurrentIndex(indice)
+        self.combo_ciudad.blockSignals(False)
+        self._al_cambiar_ciudad()
+        if ubicacion.ciudad is not None and ubicacion.tiktok is not None:
+            self._poner_lugares([ubicacion.tiktok], ubicacion.tiktok)
 
     def ubicacion(self) -> Ubicacion:
+        ciudad = self._ciudad()
         lugar = self.combo_tiktok.currentData()
-        return Ubicacion(self.campo_nombre.text().strip(),
-                         lugar if isinstance(lugar, Lugar) else None,
-                         self.campo_instagram.text().strip(), self.campo_x.text().strip())
+        if ciudad is None or not isinstance(lugar, Lugar):
+            lugar = None
+        return Ubicacion(ciudad, lugar)
 
     def poner_cuenta_tiktok(self, cuenta: Cuenta | None, servicio: str) -> None:
         """Avisa si la cuenta de TikTok no tiene permiso para ubicaciones."""
@@ -140,11 +145,28 @@ class SelectorUbicacion(QWidget):
 
     # --- detalles ---
 
+    def _ciudad(self) -> Ciudad | None:
+        dato = self.combo_ciudad.currentData()
+        return dato if isinstance(dato, Ciudad) else None
+
     def _automatico(self) -> str:
-        nombre = self.campo_nombre.text().strip()
-        if not nombre:
+        ciudad = self._ciudad()
+        if ciudad is None:
             return _("Sin ubicación en TikTok")
-        return _("Automático: el lugar que se llame «{nombre}»").format(nombre=nombre)
+        return _("Automático: el lugar que se llame «{nombre}»").format(nombre=ciudad.nombre)
+
+    def _al_cambiar_ciudad(self, *args) -> None:
+        # Los lugares de TikTok de otra ciudad ya no valen.
+        self._busqueda_n += 1
+        hay = self._ciudad() is not None
+        self.combo_tiktok.setEnabled(hay)
+        self.boton_buscar.setEnabled(hay)
+        self._poner_lugares([], None)
+        self._avisar_tiktok("")
+        redes = self.ubicacion().plataformas()
+        self.etiqueta_redes.setText(
+            _("Se etiqueta en: {redes}.").format(redes=", ".join(p.nombre for p in redes))
+            if redes else _("No se etiqueta en ninguna red."))
 
     def _poner_lugares(self, lugares: list[Lugar], elegido: Lugar | None) -> None:
         self.combo_tiktok.clear()
@@ -155,26 +177,15 @@ class SelectorUbicacion(QWidget):
         self.combo_tiktok.setCurrentIndex(indice)
 
     def _avisar_tiktok(self, texto: str) -> None:
-        texto = texto or self._aviso_permiso
+        texto = texto or (self._aviso_permiso if self._ciudad() is not None else "")
         self.aviso_tiktok.setText(texto)
         self.aviso_tiktok.setVisible(bool(texto))
 
-    def _al_editar_nombre(self, *args) -> None:
-        # Los lugares de otra búsqueda y los IDs de Instagram y X son del
-        # lugar anterior: no deben etiquetar el nuevo. Uno conocido trae los suyos.
-        self._busqueda_n += 1
-        self.boton_buscar.setEnabled(True)
-        self._poner_lugares([], None)
-        self._avisar_tiktok("")
-        conocida = ubicacion_conocida(self.campo_nombre.text())
-        self.campo_instagram.setText(conocida.instagram_id if conocida else "")
-        self.campo_x.setText(conocida.x_id if conocida else "")
-
     def _buscar(self) -> None:
-        texto = self.campo_nombre.text().strip()
-        if not texto:
-            self._avisar_tiktok(_("Escribe el lugar que quieres buscar."))
+        ciudad = self._ciudad()
+        if ciudad is None:
             return
+        texto = ciudad.nombre
         self._busqueda_n += 1
         numero = self._busqueda_n
         trabajo = self._preparar_busqueda(texto)
@@ -188,7 +199,7 @@ class SelectorUbicacion(QWidget):
             resultado = (self._busqueda_n, "", (None, type(resultado).__name__))
         numero, texto, (lugares, motivo) = resultado
         if numero != self._busqueda_n:
-            return  # llegó tarde: el nombre cambió o hay otra búsqueda
+            return  # llegó tarde: cambió la ciudad o hay otra búsqueda
         self.boton_buscar.setEnabled(True)
         if lugares is None:
             self._avisar_tiktok(motivo)
@@ -203,18 +214,6 @@ class SelectorUbicacion(QWidget):
                 "publica sin ubicación.").format(texto=texto))
         else:
             self._avisar_tiktok("")
-
-    def _refrescar_ids(self, *args) -> None:
-        avisos = []
-        instagram = self.campo_instagram.text().strip()
-        if instagram and not id_instagram_valido(instagram):
-            avisos.append(_("⚠ El ID de Instagram solo tiene números: no se enviará."))
-        x = self.campo_x.text().strip()
-        if x and not id_x_valido(x):
-            avisos.append(_("⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): "
-                            "no se enviará."))
-        self.aviso_ids.setText("\n".join(avisos))
-        self.aviso_ids.setVisible(bool(avisos))
 
 
 class DialogoUbicacion(QDialog):
