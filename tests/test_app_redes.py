@@ -1237,11 +1237,28 @@ def _cambiar_ubicacion(monkeypatch, cambio, aceptar=True):
     monkeypatch.setattr(DialogoUbicacion, "exec", exec_)
 
 
-def test_dialogo_redes_cabe_en_la_pantalla_de_un_portatil(qtbot, ajustes, llavero_falso):
-    """Con el estilo de macOS, un portátil de 14" deja 1003 px de alto: la
-    ubicación es una fila, no una sección que empuje Guardar fuera."""
+def test_dialogo_redes_cabe_en_la_pantalla_y_guardar_se_ve(qtbot, ajustes, llavero_falso,
+                                                           monkeypatch):
+    """Con cuentas, avisos y página de Facebook el contenido pasa del alto
+    de un portátil: va en una zona con scroll y los botones quedan fijos."""
+    from PySide6.QtCore import QPoint, QRect
+
+    class PantallaBaja:
+        def availableGeometry(self):
+            return QRect(0, 0, 1440, 500)
+
+    monkeypatch.setattr(DialogoRedes, "screen", lambda self: PantallaBaja())
+    _listo(ajustes, llavero_falso)
+    ajustes.guardar_cuentas(_cuentas_variadas())
+    ajustes.pagina_facebook = Pagina("111", "Mi página")
     dialogo = _redes(qtbot, ajustes, ProveedorFalso())
-    assert dialogo.sizeHint().height() <= 900
+    assert dialogo.contenido.sizeHint().height() > 500
+    dialogo.show()
+    qtbot.waitExposed(dialogo)
+    assert dialogo.height() <= 500
+    assert dialogo.boton_guardar.isVisible()
+    abajo = dialogo.boton_guardar.mapTo(dialogo, QPoint(0, dialogo.boton_guardar.height()))
+    assert abajo.y() <= dialogo.height()
 
 
 def test_dialogo_redes_ubicacion_madrid_por_defecto_y_se_guarda(qtbot, ajustes, llavero_falso,

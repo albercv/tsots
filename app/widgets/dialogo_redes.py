@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,7 +17,10 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QStyle,
     QVBoxLayout,
+    QWidget,
 )
 
 from videopipeline.i18n import _
@@ -71,6 +75,12 @@ class DialogoRedes(QDialog):
         self.setWindowTitle(_("Redes sociales"))
         self.setMinimumWidth(600)
         raiz = QVBoxLayout(self)
+        # Todo menos los botones va en una zona con scroll: con cuentas,
+        # avisos y la página de Facebook, el contenido pasa del alto de un
+        # portátil y macOS encogería el diálogo cortando filas y botones.
+        self.contenido = QWidget()
+        cuerpo = QVBoxLayout(self.contenido)
+        cuerpo.setContentsMargins(0, 0, 0, 0)
 
         ayuda = QLabel(_(
             "TSOTS publica a través de un servicio que ya tiene permiso de "
@@ -78,7 +88,7 @@ class DialogoRedes(QDialog):
             "servicio, conecta allí tus redes y pega aquí su API key: se guarda "
             "en el Llavero de macOS, nunca en la app."))
         ayuda.setWordWrap(True)
-        raiz.addWidget(ayuda)
+        cuerpo.addWidget(ayuda)
 
         grupo_cuenta = QGroupBox(_("Cuenta"))
         formulario = QFormLayout(grupo_cuenta)
@@ -121,7 +131,7 @@ class DialogoRedes(QDialog):
         fila_estado.addWidget(self.etiqueta_clave, 1)
         fila_estado.addWidget(self.boton_olvidar)
         formulario.addRow("", fila_estado)
-        raiz.addWidget(grupo_cuenta)
+        cuerpo.addWidget(grupo_cuenta)
 
         grupo_cuentas = QGroupBox(_("Cuentas conectadas"))
         caja_cuentas = QVBoxLayout(grupo_cuentas)
@@ -146,7 +156,7 @@ class DialogoRedes(QDialog):
         fila_consulta.addWidget(self.etiqueta_consulta, 1)
         fila_consulta.addWidget(self.boton_comprobar)
         caja_cuentas.addLayout(fila_consulta)
-        raiz.addWidget(grupo_cuentas)
+        cuerpo.addWidget(grupo_cuentas)
 
 
         grupo_defecto = QGroupBox(_("Al publicar"))
@@ -238,7 +248,14 @@ class DialogoRedes(QDialog):
         self.aviso_ubicacion.setStyleSheet(f"color: {COLOR_AVISO};")
         self.aviso_ubicacion.hide()
         formulario_defecto.addRow("", self.aviso_ubicacion)
-        raiz.addWidget(grupo_defecto)
+        cuerpo.addWidget(grupo_defecto)
+
+        desplazable = QScrollArea()
+        desplazable.setWidgetResizable(True)
+        desplazable.setFrameShape(QScrollArea.Shape.NoFrame)
+        desplazable.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        desplazable.setWidget(self.contenido)
+        raiz.addWidget(desplazable, 1)
 
         botones = QDialogButtonBox()
         self.boton_guardar = botones.addButton(_("Guardar"),
@@ -251,6 +268,19 @@ class DialogoRedes(QDialog):
 
         self.combo_proveedor.currentIndexChanged.connect(self._al_cambiar_proveedor)
         self._al_cambiar_proveedor()
+        self._ajustar_a_la_pantalla(botones)
+
+    def _ajustar_a_la_pantalla(self, botones: QWidget) -> None:
+        """Todo el contenido si cabe; si no, el alto de la pantalla (y scroll)."""
+        margenes = self.layout().contentsMargins()
+        barra = self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        ideal = self.contenido.sizeHint()
+        alto = (ideal.height() + botones.sizeHint().height() + self.layout().spacing()
+                + margenes.top() + margenes.bottom())
+        # Margen para la barra de título, que no cuenta en el alto del diálogo.
+        alto_maximo = self.screen().availableGeometry().height() - 60
+        self.resize(max(self.minimumWidth(), ideal.width() + barra + margenes.left()
+                        + margenes.right()), min(alto, alto_maximo))
 
     @property
     def proveedor(self) -> str:
