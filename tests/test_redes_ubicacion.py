@@ -15,6 +15,7 @@ from videopipeline.redes.modelo import (
     elegir_lugar,
     id_instagram_valido,
     id_x_valido,
+    ubicacion_conocida,
 )
 from videopipeline.redes.proveedor import ErrorConsulta
 
@@ -32,9 +33,22 @@ def pub(tmp_path) -> Publicacion:
     return Publicacion(video=video, titulo="t", caption="c", hashtags=("#a",))
 
 
-def test_madrid_por_defecto():
-    assert UBICACION_POR_DEFECTO == "Madrid"
+def test_madrid_por_defecto_en_las_tres_redes():
+    # Facebook Places de Madrid (Wikidata Q2807, P1997) y lugar de X «Madrid, España».
+    assert UBICACION_POR_DEFECTO == Ubicacion("Madrid", instagram_id="106504859386230",
+                                              x_id="206c436ce43a43a3")
+    assert UBICACION_POR_DEFECTO.plataformas() == (T, I, X)
     assert Opciones().ubicacion == Ubicacion()
+
+
+@pytest.mark.parametrize("nombre", ["Madrid", "  madrid ", "MADRID"])
+def test_madrid_es_un_lugar_conocido(nombre):
+    assert ubicacion_conocida(nombre) == UBICACION_POR_DEFECTO
+
+
+@pytest.mark.parametrize("nombre", ["Sevilla", "", "Madrid centro"])
+def test_otros_lugares_no_son_conocidos(nombre):
+    assert ubicacion_conocida(nombre) is None
 
 
 @pytest.mark.parametrize("ubicacion, plataformas", [

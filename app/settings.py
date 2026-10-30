@@ -178,7 +178,7 @@ class Ajustes:
         except ValueError:
             datos = None
         if not isinstance(datos, dict):
-            return Ubicacion(UBICACION_POR_DEFECTO)
+            return UBICACION_POR_DEFECTO
         tiktok = datos.get("tiktok")
         lugar = None
         if (isinstance(tiktok, dict) and tiktok.get("id") and tiktok.get("nombre")

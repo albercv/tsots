@@ -24,6 +24,7 @@ from videopipeline.redes.modelo import (
     ModoTikTok,
     Pagina,
     Plataforma,
+    UBICACION_POR_DEFECTO,
     Resultado,
     Ubicacion,
 )
@@ -1196,17 +1197,17 @@ SOL = Lugar("v2_sol", "Puerta del Sol", "Madrid")
 
 
 def test_ubicacion_por_defecto_madrid_y_por_proveedor(ajustes):
-    assert ajustes.ubicacion == Ubicacion("Madrid")
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO
     ajustes.perfil_redes = "yo"
     propia = Ubicacion("Sevilla", tiktok=SOL, instagram_id="123", x_id="ab12")
     ajustes.ubicacion = propia
     assert ajustes.ubicacion == propia
-    assert ajustes.ubicacion_de("otro") == Ubicacion("Madrid")
+    assert ajustes.ubicacion_de("otro") == UBICACION_POR_DEFECTO
     # Quitarla queda quitada: no vuelve Madrid.
     ajustes.ubicacion = Ubicacion()
     assert ajustes.ubicacion == Ubicacion()
     ajustes._q.setValue(f"redes/ubicacion/{PROVEEDOR_POR_DEFECTO}", "{no es json")
-    assert ajustes.ubicacion == Ubicacion("Madrid")
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO
 
 
 def test_lugar_de_tiktok_ligado_al_perfil(ajustes):
@@ -1267,7 +1268,7 @@ def test_dialogo_redes_ubicacion_madrid_por_defecto_y_se_guarda(qtbot, ajustes, 
     proveedor = ProveedorFalso(lugares=[SOL, MADRID])
     capturado: dict = {}
     dialogo = _redes(qtbot, ajustes, proveedor, capturado)
-    assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok)"
+    assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok, Instagram, X)"
     vistos: dict = {}
 
     def cambio(selector):
@@ -1288,7 +1289,7 @@ def test_dialogo_redes_ubicacion_madrid_por_defecto_y_se_guarda(qtbot, ajustes, 
     assert proveedor.consultas == ["lugares:Madrid"]
     assert capturado["clave"] == CLAVE and capturado["datos"]["perfil"] == "mi_perfil"
     assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok, Instagram, X)"
-    assert ajustes.ubicacion == Ubicacion("Madrid")  # hasta Guardar, nada
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO  # hasta Guardar, nada
     dialogo.accept()
     assert ajustes.ubicacion == Ubicacion("Madrid", tiktok=SOL, instagram_id="110184922344060",
                                           x_id="01a9a39529b27f36")
@@ -1307,7 +1308,7 @@ def test_dialogo_redes_cancelar_no_guarda_la_ubicacion(qtbot, ajustes, llavero_f
     dialogo.boton_ubicacion.click()
     assert "Sevilla" in dialogo.etiqueta_ubicacion.text()
     dialogo.reject()
-    assert ajustes.ubicacion == Ubicacion("Madrid")
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO
 
 
 def test_dialogo_redes_quitar_ubicacion(qtbot, ajustes, llavero_falso, monkeypatch):
@@ -1339,6 +1340,19 @@ def test_selector_cambiar_el_nombre_vuelve_a_automatico(qtbot, ajustes, llavero_
     assert selector.combo_tiktok.currentData() is None
     assert "Sevilla" in selector.combo_tiktok.currentText()
     assert selector.ubicacion() == Ubicacion("Sevilla")
+
+
+def test_selector_otro_lugar_vacia_los_ids_y_madrid_los_rellena(qtbot, ajustes, llavero_falso):
+    """Los IDs de Instagram y X son de un lugar: al escribir otro no deben
+    seguir etiquetando Madrid. Madrid los rellena solo."""
+    selector = _selector(qtbot, ajustes, ProveedorFalso(), UBICACION_POR_DEFECTO)
+    assert selector.ubicacion() == UBICACION_POR_DEFECTO
+    selector.campo_nombre.setText("Sevilla")
+    assert selector.campo_instagram.text() == "" and selector.campo_x.text() == ""
+    selector.campo_instagram.setText("123")
+    selector.campo_nombre.setText("madrid")
+    assert selector.campo_instagram.text() == UBICACION_POR_DEFECTO.instagram_id
+    assert selector.campo_x.text() == UBICACION_POR_DEFECTO.x_id
 
 
 @pytest.mark.parametrize("lugares, texto", [
@@ -1433,7 +1447,7 @@ def test_publicar_ubicacion_de_un_video_no_cambia_la_global(qtbot, video, ajuste
     dialogo.publicar()
     qtbot.waitUntil(lambda: not dialogo.publicando, timeout=5000)
     assert "lugares:Sevilla" in proveedor.consultas
-    assert ajustes.ubicacion == Ubicacion("Madrid")
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO
 
 
 def test_publicar_quitar_ubicacion_solo_para_este_video(qtbot, video, ajustes, llavero_falso,
@@ -1447,7 +1461,7 @@ def test_publicar_quitar_ubicacion_solo_para_este_video(qtbot, video, ajustes, l
     qtbot.waitUntil(lambda: not dialogo.publicando, timeout=5000)
     assert "Ubicación" not in preguntas[0]
     assert not any(c.startswith("lugares") for c in proveedor.consultas)
-    assert ajustes.ubicacion == Ubicacion("Madrid")
+    assert ajustes.ubicacion == UBICACION_POR_DEFECTO
 
 
 def test_publicar_cancelar_el_cambio_de_ubicacion_no_toca_nada(qtbot, video, ajustes,
@@ -1455,11 +1469,22 @@ def test_publicar_cancelar_el_cambio_de_ubicacion_no_toca_nada(qtbot, video, aju
     dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso)
     _cambiar_ubicacion(monkeypatch, lambda s: s.campo_nombre.setText("Sevilla"), aceptar=False)
     dialogo.boton_ubicacion.click()
-    assert dialogo.opciones().ubicacion == Ubicacion("Madrid")
+    assert dialogo.opciones().ubicacion == UBICACION_POR_DEFECTO
     assert "este vídeo" not in dialogo.etiqueta_ubicacion.text()
 
 
 def test_publicar_sin_redes_con_ubicacion_lo_dice(qtbot, video, ajustes, llavero_falso):
     dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, F))
     assert "YouTube" not in dialogo.etiqueta_ubicacion.text()
-    assert "TikTok" in dialogo.etiqueta_ubicacion.text()  # se dice dónde iría
+    # Se dice dónde iría: por defecto, Madrid en las tres redes que la admiten.
+    assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok, Instagram, X)"
+
+
+def test_publicar_por_defecto_madrid_llega_a_instagram_y_x(qtbot, video, ajustes,
+                                                            llavero_falso, monkeypatch):
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(I, X))
+    _confirmar(monkeypatch)
+    dialogo.publicar()
+    qtbot.waitUntil(lambda: not dialogo.publicando, timeout=5000)
+    enviadas = {c[1]: c[3].ubicacion for c in proveedor.llamadas if c[0] == "publicar"}
+    assert enviadas[I] == enviadas[X] == UBICACION_POR_DEFECTO

@@ -213,6 +213,11 @@ Only TikTok, Instagram and X support a location:
 - **Instagram:** the numeric ID of a Facebook Page or place.
 - **X:** the X place ID (hexadecimal).
 
+Madrid already comes with its Instagram and X IDs, so it goes out on all
+three networks with no setup. Typing another place clears those IDs (they
+never tag another place as Madrid); Instagram and X then need that place's
+own IDs.
+
 Anything missing or invalid is not sent, and the post goes ahead.
 **Remove** posts without a location.
 

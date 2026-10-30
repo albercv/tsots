@@ -26,6 +26,7 @@ from videopipeline.redes.modelo import (
     elegir_lugar,
     id_instagram_valido,
     id_x_valido,
+    ubicacion_conocida,
 )
 
 from .. import segundo_plano
@@ -103,8 +104,8 @@ class SelectorUbicacion(QWidget):
         self.aviso_ids.hide()
         formulario.addRow("", self.aviso_ids)
         ayuda = QLabel(_(
-            "YouTube y Facebook no admiten ubicación. Instagram y X solo la llevan si "
-            "pones su ID."))
+            "YouTube y Facebook no admiten ubicación. Instagram y X la llevan si tienen "
+            "su ID: Madrid ya lo trae; para otro lugar, escríbelo aquí."))
         ayuda.setWordWrap(True)
         ayuda.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
         formulario.addRow("", ayuda)
@@ -159,11 +160,15 @@ class SelectorUbicacion(QWidget):
         self.aviso_tiktok.setVisible(bool(texto))
 
     def _al_editar_nombre(self, *args) -> None:
-        # Los lugares de otra búsqueda ya no valen para el nombre nuevo.
+        # Los lugares de otra búsqueda y los IDs de Instagram y X son del
+        # lugar anterior: no deben etiquetar el nuevo. Uno conocido trae los suyos.
         self._busqueda_n += 1
         self.boton_buscar.setEnabled(True)
         self._poner_lugares([], None)
         self._avisar_tiktok("")
+        conocida = ubicacion_conocida(self.campo_nombre.text())
+        self.campo_instagram.setText(conocida.instagram_id if conocida else "")
+        self.campo_x.setText(conocida.x_id if conocida else "")
 
     def _buscar(self) -> None:
         texto = self.campo_nombre.text().strip()

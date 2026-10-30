@@ -86,9 +86,6 @@ CATEGORIAS_YOUTUBE = {
 }
 
 
-# Ubicación con que se etiquetan las publicaciones si el usuario no elige otra.
-UBICACION_POR_DEFECTO = "Madrid"
-
 _RE_ID_X = re.compile(r"[0-9a-fA-F]+")
 
 
@@ -142,6 +139,22 @@ class Ubicacion:
     @property
     def visible(self) -> str:
         return self.nombre.strip() or (self.tiktok.nombre if self.tiktok else "")
+
+
+# Ubicación con que se etiquetan las publicaciones si el usuario no elige otra.
+# Instagram: ID de Facebook Places de Madrid (Wikidata Q2807, propiedad P1997).
+# X: lugar «Madrid, España» de tipo ciudad. TikTok lo busca por el nombre.
+UBICACION_POR_DEFECTO = Ubicacion("Madrid", instagram_id="106504859386230",
+                                  x_id="206c436ce43a43a3")
+# Lugares cuyos IDs de Instagram y X se rellenan solos al escribir su nombre.
+_CONOCIDAS = (UBICACION_POR_DEFECTO,)
+
+
+def ubicacion_conocida(nombre: str) -> Ubicacion | None:
+    """La ubicación completa de un lugar conocido que se llama `nombre`."""
+    buscado = _normalizado(nombre)
+    return next((u for u in _CONOCIDAS if _normalizado(u.nombre) == buscado and buscado),
+                None)
 
 
 def _normalizado(texto: str) -> str:

@@ -213,6 +213,10 @@ cambia. Solo TikTok, Instagram y X admiten ubicación:
 - **Instagram:** el ID numérico de una página o lugar de Facebook.
 - **X:** el ID del lugar en X (hexadecimal).
 
+Madrid ya trae los IDs de Instagram y X, así que sale en las tres redes sin
+hacer nada. Al escribir otro lugar esos IDs se vacían (no etiquetan otro
+sitio como Madrid) y, para ese lugar, Instagram y X necesitan los suyos.
+
 Lo que falta o no es válido no se envía, y la publicación sigue adelante.
 **Quitar** publica sin ubicación.
 
