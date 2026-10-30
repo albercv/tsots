@@ -209,8 +209,12 @@ IDs. Only TikTok, Instagram and X support a location:
 
 - **Instagram and X:** each city in the list comes with its place IDs.
   They belong to the place, not to your account: they work the same for
-  anyone posting there. Today the list only has Madrid; adding another city
-  is a change in the app (see `docs/DEVELOPMENT.md`, "Location").
+  anyone posting there. The list has the 15 biggest Spanish cities:
+  Madrid, Barcelona, Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma,
+  Las Palmas de Gran Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo
+  and Granada. All of them carry Instagram and X except Murcia, which only
+  carries X. Adding another city is a change in the app (see
+  `docs/DEVELOPMENT.md`, "Location").
 - **TikTok:** its place belongs to your account, so it is not in the list.
   When publishing, the place named like the city is looked up; to use a
   specific one, press **Search TikTok** and pick it. That place is private

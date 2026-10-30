@@ -106,9 +106,28 @@ class Ciudad(Enum):
     sale sin ubicación. Los IDs de TikTok no van aquí: son de la cuenta (ver
     `Lugar`). Añadir una ciudad = una línea, con la fuente de cada ID."""
 
-    # Facebook Places: Wikidata Q2807, propiedad P1997. X: lugar «Madrid,
-    # España», tipo ciudad, tal como lo dan los objetos de lugar de X.
-    MADRID = ("Madrid", "106504859386230", "206c436ce43a43a3")
+    # Instagram: «identificador de lugar de Facebook» (P1997) de la ciudad en
+    # Wikidata (su Q, al final de la línea); facebook.com/<id> redirige a la
+    # página de esa ciudad. X: id del lugar en datos de la API de X publicados
+    # en GitHub, con country Spain y full_name «<Ciudad>, Spain»; Madrid,
+    # Barcelona, Alicante, Palma y Vigo, también en una segunda fuente. Murcia
+    # no tiene id de Facebook en Wikidata. Verificado el 2026-10-30.
+    MADRID = ("Madrid", "106504859386230", "206c436ce43a43a3")  # Q2807
+    BARCELONA = ("Barcelona", "106287062743373", "1a27537478dd8e38")  # Q1492
+    VALENCIA = ("Valencia", "271963079548530", "071a52d3a927a1b8")  # Q8818
+    SEVILLA = ("Sevilla", "111812165504902", "8c86b8b4cb716103")  # Q8717
+    ZARAGOZA = ("Zaragoza", "106252896078918", "3afc29d1fe76301f")  # Q10305
+    MALAGA = ("Málaga", "114807985198048", "507a015cba6ef518")  # Q8851
+    MURCIA = ("Murcia", "", "cbdb0e7018443220")  # Q12225
+    PALMA = ("Palma", "106466316056863", "6c1be133511970bc")  # Q8826
+    LAS_PALMAS = ("Las Palmas de Gran Canaria", "111529002197764",
+                  "00ab08eef1b62e92")  # Q11974
+    ALICANTE = ("Alicante", "110390408990276", "2e858e47881ddc48")  # Q11959
+    BILBAO = ("Bilbao", "110875455606568", "cd43ea85d651af92")  # Q8692
+    CORDOBA = ("Córdoba", "108957072462073", "4ecb58704564d392")  # Q5818
+    VALLADOLID = ("Valladolid", "108236755863231", "2afe3164f39d1b83")  # Q8356
+    VIGO = ("Vigo", "111561865529958", "0df6ac4d361d4e0e")  # Q8745
+    GRANADA = ("Granada", "110664458955950", "387b00909c2e7031")  # Q8810
 
     def __init__(self, nombre: str, instagram_id: str, x_id: str):
         self.nombre = nombre

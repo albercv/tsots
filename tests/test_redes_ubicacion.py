@@ -54,6 +54,14 @@ def test_cada_ciudad_del_catalogo_es_valida(ciudad):
     assert not ciudad.x_id or id_x_valido(ciudad.x_id)
 
 
+def test_catalogo_con_las_ciudades_grandes_de_espana():
+    nombres = {c.nombre for c in Ciudad}
+    assert {"Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza", "Málaga"} <= nombres
+    # Al menos diez con los dos IDs, y ninguna sin ninguno.
+    assert sum(1 for c in Ciudad if c.instagram_id and c.x_id) >= 10
+    assert all(c.instagram_id or c.x_id for c in Ciudad)
+
+
 def test_nombres_del_catalogo_sin_repetir():
     nombres = [c.nombre.casefold() for c in Ciudad]
     assert len(nombres) == len(set(nombres))

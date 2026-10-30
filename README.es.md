@@ -209,8 +209,11 @@ escribes IDs. Solo TikTok, Instagram y X admiten ubicación:
 
 - **Instagram y X:** cada ciudad de la lista trae sus IDs de lugar. Son del
   lugar, no de tu cuenta: valen igual para cualquiera que publique allí.
-  Hoy la lista solo tiene Madrid; añadir otra ciudad es un cambio en la app
-  (ver `docs/DEVELOPMENT.md`, «Location»).
+  La lista tiene las 15 ciudades más grandes de España: Madrid, Barcelona,
+  Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma, Las Palmas de Gran
+  Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo y Granada. Todas
+  llevan Instagram y X salvo Murcia, que solo lleva X. Añadir otra ciudad
+  es un cambio en la app (ver `docs/DEVELOPMENT.md`, «Location»).
 - **TikTok:** su lugar es de tu cuenta, así que no viene en la lista. Al
   publicar se busca el que se llame como la ciudad; si quieres uno
   concreto, pulsa **Buscar en TikTok** y elígelo. Ese lugar es un dato

@@ -277,19 +277,26 @@ never does.
 **City catalog** (`videopipeline/redes/modelo.py`). The user picks a city
 by name; ids are never shown. `Ciudad` is an Enum whose members carry
 `nombre`, `instagram_id` and `x_id` (empty: that network goes without a
-location). Today it holds Madrid:
+location). It holds the 15 biggest Spanish cities with known ids: Madrid,
+Barcelona, Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma, Las Palmas
+de Gran Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo and Granada
+(all with both ids except Murcia, which has no Facebook Places id in
+Wikidata, so Instagram goes without a location there). Where the ids come
+from, checked on 2026-10-30:
 
-- Instagram `106504859386230`: Madrid's Facebook Places id, from Wikidata
-  (Madrid is Q2807; property P1997, "Facebook location ID"). Facebook
-  redirects `facebook.com/106504859386230` to its `Madrid-106504859386230`
-  page.
-- X `206c436ce43a43a3`: the X place "Madrid, España", `place_type` city,
-  country ES, as it appears in X's own geo objects (found in public tweet
-  datasets on GitHub; Wikidata's "X place ID", P12431, is not set for
-  Madrid). `x.com/search?q=place%3A206c436ce43a43a3` lists posts tagged
-  there.
+- Instagram: each city's "Facebook location ID" (P1997) in Wikidata; the
+  Wikidata item is noted next to each member. Every id was checked:
+  `facebook.com/<id>` redirects to that city's page (for example
+  `Madrid-106504859386230`, `Córdoba-España-108957072462073`).
+- X: there is no public lookup, so the ids come from raw X API data
+  published on GitHub (tweet datasets whose `places` objects carry
+  `country`, `full_name` and `id`). An id was only accepted from an object
+  with country Spain and `full_name` "<City>, Spain"; each name maps to a
+  single id across all the files. Madrid, Barcelona, Alicante, Palma and
+  Vigo also appear in a second, independent object (`place_type` city,
+  country ES). `x.com/search?q=place%3A<id>` lists the posts tagged there.
 
-Neither id has been confirmed by a real upload yet.
+None of these ids has been confirmed by a real upload yet.
 
 To add a city, add one member to `Ciudad` (`SEVILLA = ("Sevilla",
 "<facebook places id>", "<x place id>")`) with a comment saying where each
