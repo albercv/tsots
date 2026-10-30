@@ -214,8 +214,27 @@ cambia. Solo TikTok, Instagram y X admiten ubicación:
 - **X:** el ID del lugar en X (hexadecimal).
 
 Madrid ya trae los IDs de Instagram y X, así que sale en las tres redes sin
-hacer nada. Al escribir otro lugar esos IDs se vacían (no etiquetan otro
-sitio como Madrid) y, para ese lugar, Instagram y X necesitan los suyos.
+hacer nada. Esos dos IDs son del lugar, no de tu cuenta: valen igual para
+cualquiera que publique en Madrid. El de TikTok, en cambio, solo vale para
+la cuenta que lo buscó, y por eso TSOTS lo busca con la tuya. Madrid es el
+único lugar que trae los IDs: al escribir otro, esos IDs se
+vacían (no etiquetan otro sitio como Madrid) y, para ese lugar, Instagram y
+X necesitan los suyos. Si los dejas vacíos, esas dos redes salen sin
+ubicación; TikTok encuentra cualquier lugar por su nombre.
+
+Cómo conseguir los IDs de otro lugar:
+
+- **Instagram:** busca la ciudad en [wikidata.org](https://www.wikidata.org)
+  y copia el «identificador de lugar de Facebook». También vale el ID de la
+  página de Facebook del lugar (en su información, «Transparencia de la
+  página»). Para comprobarlo, `facebook.com/<ID>` debe abrir ese lugar.
+- **X:** no tiene buscador público. En Wikidata, «X place ID» casi nunca
+  está relleno; si no, el ID solo se obtiene de un post etiquetado en ese
+  lugar. Para comprobarlo, `x.com/search?q=place%3A<ID>` debe listar posts
+  de allí.
+
+Si un lugar se repite, puede añadirse a la app para que traiga sus IDs como
+Madrid (ver `docs/DEVELOPMENT.md`, «Location»).
 
 Lo que falta o no es válido no se envía, y la publicación sigue adelante.
 **Quitar** publica sin ubicación.

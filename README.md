@@ -214,9 +214,27 @@ Only TikTok, Instagram and X support a location:
 - **X:** the X place ID (hexadecimal).
 
 Madrid already comes with its Instagram and X IDs, so it goes out on all
-three networks with no setup. Typing another place clears those IDs (they
-never tag another place as Madrid); Instagram and X then need that place's
-own IDs.
+three networks with no setup. Those two IDs belong to the place, not to
+your account: they work the same for anyone posting in Madrid. A TikTok
+place ID, on the other hand, is only valid for the account that looked it
+up, which is why TSOTS searches it with yours. Madrid is the only place
+that comes with IDs: typing
+another one clears those IDs (they never tag another place as Madrid), and
+Instagram and X then need that place's own IDs. Left empty, those two go
+out without a location; TikTok finds any place by its name.
+
+How to get the IDs of another place:
+
+- **Instagram:** search the city on [wikidata.org](https://www.wikidata.org)
+  and copy its "Facebook location ID". The ID of the place's Facebook page
+  also works (in its information, "Page transparency"). To check it,
+  `facebook.com/<ID>` must open that place.
+- **X:** there is no public lookup. On Wikidata, "X place ID" is rarely
+  filled in; otherwise the ID only comes from a post tagged in that place.
+  To check it, `x.com/search?q=place%3A<ID>` must list posts from there.
+
+A place you use often can be added to the app so it brings its IDs like
+Madrid does (see `docs/DEVELOPMENT.md`, "Location").
 
 Anything missing or invalid is not sent, and the post goes ahead.
 **Remove** posts without a location.
