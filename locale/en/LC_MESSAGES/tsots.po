@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-27 14:40+0100\n"
+"POT-Creation-Date: 2026-10-30 11:36+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -80,6 +80,10 @@ msgstr ""
 msgid "Autodetectar"
 msgstr "Auto-detect"
 
+#, python-brace-format
+msgid "Automático: el lugar que se llame «{nombre}»"
+msgstr "Automatic: the place called “{nombre}”"
+
 msgid "Añadir subtítulos"
 msgstr "Add subtitles"
 
@@ -92,11 +96,20 @@ msgstr "Draft (finish it in Facebook)"
 msgid "Borrador (lo terminas en la app)"
 msgstr "Draft (finish it in the app)"
 
+msgid "Buscando…"
+msgstr "Searching…"
+
+msgid "Buscar en TikTok"
+msgstr "Search TikTok"
+
 msgid "Caja blanca"
 msgstr "White box"
 
 msgid "Caja negra"
 msgstr "Black box"
+
+msgid "Cambia la ubicación solo para este vídeo"
+msgstr "Changes the location for this video only"
 
 msgid "Cambiar…"
 msgstr "Change…"
@@ -138,6 +151,9 @@ msgstr "Science & Technology"
 
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
 msgstr "Close other applications, or split the video into shorter parts."
+
+msgid "Ciudad:"
+msgstr "City:"
 
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
@@ -349,6 +365,10 @@ msgstr "Choose videos"
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr "Choose a finished video with a caption in the queue."
 
+#, python-brace-format
+msgid "Elige uno de la lista: ninguno se llama «{texto}». Sin elegir, TikTok se publica sin ubicación."
+msgstr "Pick one from the list: none is called “{texto}”. If you don't pick one, TikTok is published without a location."
+
 msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.upload-post.com/manage-users), donde conectaste tus redes. No es el email de tu cuenta."
 msgstr "In Upload-Post this is the profile name shown in Manage Users (app.upload-post.com/manage-users), where you connected your networks. It is not your account email."
 
@@ -376,6 +396,10 @@ msgid "Error inesperado ({tipo}). Detalles en el registro: {fichero}"
 msgstr "Unexpected error ({tipo}). Details in the log: {fichero}"
 
 #, python-brace-format
+msgid "Error inesperado al buscar el lugar ({tipo})."
+msgstr "Unexpected error while searching for the place ({tipo})."
+
+#, python-brace-format
 msgid "Error inesperado al consultar las cuentas ({tipo})."
 msgstr "Unexpected error while checking the accounts ({tipo})."
 
@@ -393,6 +417,9 @@ msgstr "Error: see the summary"
 #, python-brace-format
 msgid "Error: {titulo}"
 msgstr "Error: {titulo}"
+
+msgid "Escribe el lugar que quieres buscar."
+msgstr "Type the place you want to search for."
 
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
@@ -529,6 +556,9 @@ msgstr "The model's response is not valid: missing fields or wrong types"
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr "The transcript is empty; there is no text for the caption"
 
+msgid "La ubicación con que se publica cada vídeo"
+msgstr "The location every video is posted with"
+
 msgid "Leyendo la API key del Llavero…"
 msgstr "Reading the API key from the Keychain…"
 
@@ -661,6 +691,9 @@ msgstr ""
 "Not found in PATH: {faltan}\n"
 "Install them and open the application again."
 
+msgid "No se etiqueta en ninguna red."
+msgstr "Not tagged on any network."
+
 #, python-brace-format
 msgid "No se generó el WAV: {wav}"
 msgstr "The WAV was not produced: {wav}"
@@ -706,6 +739,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
 
 #, python-brace-format
+msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
+msgstr "Could not delete the TikTok place from the Keychain (code {codigo})."
+
+#, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr "Could not delete the key from the Keychain (code {codigo})."
 
@@ -721,11 +758,18 @@ msgstr "Could not connect to the service ({tipo})."
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr "Could not confirm whether it was published. Check {plataforma} before publishing again."
 
+msgid "No se pudo guardar el lugar de TikTok en el Llavero."
+msgstr "Could not save the TikTok place in the Keychain."
+
 msgid "No se pudo guardar la clave en el Llavero."
 msgstr "Could not save the key in the Keychain."
 
 msgid "No se pudo lanzar el proceso"
 msgstr "Could not launch the process"
+
+#, python-brace-format
+msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
+msgstr "Could not read the TikTok place from the Keychain (code {codigo})."
 
 #, python-brace-format
 msgid "No se pudo leer el vídeo ({tipo})."
@@ -844,6 +888,9 @@ msgstr "Public post"
 msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Facebook"
 msgstr "Asks the service which accounts you have connected and your Facebook Pages"
 
+msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
+msgstr "Asks the service which TikTok places have this name, so you can pick one"
+
 msgid "Preparación del audio"
 msgstr "Audio preparation"
 
@@ -917,6 +964,10 @@ msgstr "Who you are, who you talk to, tone, usual call to action, hashtags you a
 msgid "Qué hacer: {solucion}"
 msgstr "What to do: {solucion}"
 
+#, python-brace-format
+msgid "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones."
+msgstr "Reconnect TikTok in {servicio} to tag locations."
+
 msgid "Recortando silencios"
 msgstr "Cutting silences"
 
@@ -960,6 +1011,9 @@ msgstr "Unexpected response from the service: it does not include the connected 
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr "Unexpected response from the service: it does not include the Facebook Pages."
 
+msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
+msgstr "Unexpected response from the service: it does not include the TikTok places."
+
 #, python-brace-format
 msgid "Respuesta inesperada del servicio: no trae resultado para {plataforma}."
 msgstr "Unexpected response from the service: no result for {plataforma}."
@@ -989,6 +1043,10 @@ msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr "Publishing to social networks is in progress. Wait for it to finish before quitting."
 
 #, python-brace-format
+msgid "Se etiqueta en: {redes}."
+msgstr "Tagged on: {redes}."
+
+#, python-brace-format
 msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
@@ -997,6 +1055,9 @@ msgstr ""
 "“{titulo}” will be published to:\n"
 "\n"
 "{resumen}"
+
+msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
+msgstr "Used for every post. In Publish you can change it for a single video."
 
 msgid "Seguir la cara"
 msgstr "Follow the face"
@@ -1057,8 +1118,17 @@ msgstr "No permission to read or write"
 msgid "Sin pista de audio"
 msgstr "No audio track"
 
+msgid "Sin ubicación"
+msgstr "No location"
+
+msgid "Sin ubicación en TikTok"
+msgstr "No location on TikTok"
+
 msgid "Sistema"
 msgstr "System"
+
+msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
+msgstr "Only for this video. Change the usual one in Networks…."
 
 #, python-brace-format
 msgid "Subiendo a {plataforma} ({n} de {total})…"
@@ -1110,6 +1180,10 @@ msgstr "Text for X:"
 msgid "Textos"
 msgstr "Texts"
 
+#, python-brace-format
+msgid "TikTok no encuentra «{texto}»."
+msgstr "TikTok can't find “{texto}”."
+
 msgid "Transcribiendo"
 msgstr "Transcribing"
 
@@ -1128,6 +1202,19 @@ msgstr "Title, caption and hashtags"
 
 msgid "Título:"
 msgstr "Title:"
+
+msgid "Ubicación de este vídeo"
+msgstr "Location for this video"
+
+msgid "Ubicación de siempre"
+msgstr "Usual location"
+
+msgid "Ubicación:"
+msgstr "Location:"
+
+#, python-brace-format
+msgid "Ubicación: {ubicacion}"
+msgstr "Location: {ubicacion}"
 
 msgid "Umbral:"
 msgstr "Threshold:"
@@ -1186,6 +1273,9 @@ msgstr "X without Premium accepts videos up to {maximo}; this one is {duracion} 
 #, python-brace-format
 msgid "Ya publicado antes en: {lista}."
 msgstr "Already published on: {lista}."
+
+msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
+msgstr "YouTube and Facebook don't support locations. The TikTok place belongs to your account: it is only stored in the macOS Keychain."
 
 msgid "argumentos inválidos: se requiere --config"
 msgstr "invalid arguments: --config is required"
@@ -1264,12 +1354,19 @@ msgstr "unknown signal {numero}"
 msgid "small (rápido)"
 msgstr "small (fast)"
 
+msgid "solo este vídeo"
+msgstr "this video only"
+
 msgid "turbo (recomendado)"
 msgstr "turbo (recommended)"
 
 #, python-brace-format
 msgid "{descripcion} falló (código {codigo})"
 msgstr "{descripcion} failed (code {codigo})"
+
+#, python-brace-format
+msgid "{lugar} ({redes})"
+msgstr "{lugar} ({redes})"
 
 #, python-brace-format
 msgid "{modelo} (no instalado)"
@@ -1327,6 +1424,10 @@ msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá
 msgstr "⚠ This video was already published: {lista}. Publishing it again will create a duplicate."
 
 #, python-brace-format
+msgid "⚠ Reconecta TikTok en {servicio}: tu cuenta no tiene permiso para etiquetar ubicaciones."
+msgstr "⚠ Reconnect TikTok in {servicio}: your account isn't allowed to tag locations."
+
+#, python-brace-format
 msgid "⚠ Reconecta {plataforma} en {servicio}"
 msgstr "⚠ Reconnect {plataforma} in {servicio}"
 
@@ -1356,8 +1457,26 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 #~ msgid "Al publicar, por defecto"
 #~ msgstr "Defaults when publishing"
 
+#~ msgid "Ciudad o lugar, p. ej. Madrid"
+#~ msgstr "City or place, e.g. Madrid"
+
+#~ msgid "ID del lugar en X (opcional)"
+#~ msgstr "X place ID (optional)"
+
+#~ msgid "ID numérico de una página o lugar de Facebook (opcional)"
+#~ msgstr "Numeric ID of a Facebook Page or place (optional)"
+
+#~ msgid "IDs propios"
+#~ msgstr "Custom IDs"
+
+#~ msgid "Lugar:"
+#~ msgstr "Place:"
+
 #~ msgid "Modo"
 #~ msgstr "Mode"
+
+#~ msgid "Publicar sin ubicación"
+#~ msgstr "Publish without a location"
 
 #~ msgid "Página de Facebook en la que se publica"
 #~ msgstr "Facebook Page to post to"
@@ -1368,5 +1487,14 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 #~ msgid "Solo limpiar audio"
 #~ msgstr "Clean audio only"
 
+#~ msgid "Ubicación"
+#~ msgstr "Location"
+
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"
+
+#~ msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
+#~ msgstr "⚠ An Instagram ID only contains digits: it won't be sent."
+
+#~ msgid "⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): no se enviará."
+#~ msgstr "⚠ An X place ID is hexadecimal (e.g. 01a9a39529b27f36): it won't be sent."

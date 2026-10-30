@@ -199,6 +199,31 @@ Qué hace cada modo:
 | Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
 
+**Ubicación.** Las publicaciones salen etiquetadas en **Madrid** salvo que
+elijas otra cosa en Redes… (fila **Ubicación** de «Al publicar», botón
+**Cambiar…**). Para un solo vídeo, pulsa **Cambiar…** junto a «Ubicación»
+en el diálogo Publicar: la de siempre no cambia.
+
+Eliges la **ciudad** en una lista (o «Sin ubicación»); nunca ves ni
+escribes IDs. Solo TikTok, Instagram y X admiten ubicación:
+
+- **Instagram y X:** cada ciudad de la lista trae sus IDs de lugar. Son del
+  lugar, no de tu cuenta: valen igual para cualquiera que publique allí.
+  La lista tiene las 15 ciudades más grandes de España: Madrid, Barcelona,
+  Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma, Las Palmas de Gran
+  Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo y Granada. Todas
+  llevan Instagram y X salvo Murcia, que solo lleva X. Añadir otra ciudad
+  es un cambio en la app (ver `docs/DEVELOPMENT.md`, «Location»).
+- **TikTok:** su lugar es de tu cuenta, así que no viene en la lista. Al
+  publicar se busca el que se llame como la ciudad; si quieres uno
+  concreto, pulsa **Buscar en TikTok** y elígelo. Ese lugar es un dato
+  privado: se guarda solo en el Llavero de macOS, nunca en los ajustes, en
+  los registros ni en ningún repositorio. Tu cuenta de TikTok necesita
+  permiso para ubicaciones: si no lo tiene, TSOTS te pide reconectarla en
+  Upload-Post.
+
+Si algo de la ubicación falla, la publicación sigue adelante sin ella.
+
 TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
 vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar
 con ese vídeo, avisa de que ya se publicó.

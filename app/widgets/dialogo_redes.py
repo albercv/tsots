@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Callable
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -16,7 +17,10 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
+    QStyle,
     QVBoxLayout,
+    QWidget,
 )
 
 from videopipeline.i18n import _
@@ -34,6 +38,7 @@ from videopipeline.redes.modelo import (
     ModoTikTok,
     Pagina,
     Plataforma,
+    Ubicacion,
 )
 from videopipeline.redes.textos import MAX_TEXTO_X
 
@@ -41,6 +46,13 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
+from .selector_ubicacion import (
+    DialogoUbicacion,
+    aviso_permiso_tiktok,
+    describir_ubicacion,
+    guardar_ubicacion,
+    ubicacion_guardada,
+)
 
 Fabrica = Callable[[str, str, dict], proveedores.Proveedor]
 
@@ -70,6 +82,12 @@ class DialogoRedes(QDialog):
         self.setWindowTitle(_("Redes sociales"))
         self.setMinimumWidth(600)
         raiz = QVBoxLayout(self)
+        # Todo menos los botones va en una zona con scroll: con cuentas,
+        # avisos y la página de Facebook, el contenido pasa del alto de un
+        # portátil y macOS encogería el diálogo cortando filas y botones.
+        self.contenido = QWidget()
+        cuerpo = QVBoxLayout(self.contenido)
+        cuerpo.setContentsMargins(0, 0, 0, 0)
 
         ayuda = QLabel(_(
             "TSOTS publica a través de un servicio que ya tiene permiso de "
@@ -77,7 +95,7 @@ class DialogoRedes(QDialog):
             "servicio, conecta allí tus redes y pega aquí su API key: se guarda "
             "en el Llavero de macOS, nunca en la app."))
         ayuda.setWordWrap(True)
-        raiz.addWidget(ayuda)
+        cuerpo.addWidget(ayuda)
 
         grupo_cuenta = QGroupBox(_("Cuenta"))
         formulario = QFormLayout(grupo_cuenta)
@@ -120,7 +138,7 @@ class DialogoRedes(QDialog):
         fila_estado.addWidget(self.etiqueta_clave, 1)
         fila_estado.addWidget(self.boton_olvidar)
         formulario.addRow("", fila_estado)
-        raiz.addWidget(grupo_cuenta)
+        cuerpo.addWidget(grupo_cuenta)
 
         grupo_cuentas = QGroupBox(_("Cuentas conectadas"))
         caja_cuentas = QVBoxLayout(grupo_cuentas)
@@ -145,7 +163,7 @@ class DialogoRedes(QDialog):
         fila_consulta.addWidget(self.etiqueta_consulta, 1)
         fila_consulta.addWidget(self.boton_comprobar)
         caja_cuentas.addLayout(fila_consulta)
-        raiz.addWidget(grupo_cuentas)
+        cuerpo.addWidget(grupo_cuentas)
 
 
         grupo_defecto = QGroupBox(_("Al publicar"))
@@ -219,7 +237,33 @@ class DialogoRedes(QDialog):
         self.ayuda_pagina.setWordWrap(True)
         self.ayuda_pagina.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
         formulario_defecto.addRow("", self.ayuda_pagina)
-        raiz.addWidget(grupo_defecto)
+        # Una fila que abre el selector aparte: como sección, el diálogo no
+        # cabría en la pantalla de un portátil.
+        # Elegida en Cambiar…; `None`: la guardada, sin tocar (ni leer) el Llavero.
+        self._ubicacion: Ubicacion | None = None
+        self._cuenta_tiktok: Cuenta | None = None
+        self.etiqueta_ubicacion = QLabel()
+        self.etiqueta_ubicacion.setWordWrap(True)
+        self.boton_ubicacion = QPushButton(_("Cambiar…"))
+        self.boton_ubicacion.setToolTip(_("La ubicación con que se publica cada vídeo"))
+        self.boton_ubicacion.clicked.connect(self._cambiar_ubicacion)
+        fila_ubicacion = QHBoxLayout()
+        fila_ubicacion.addWidget(self.etiqueta_ubicacion, 1)
+        fila_ubicacion.addWidget(self.boton_ubicacion)
+        formulario_defecto.addRow(_("Ubicación:"), fila_ubicacion)
+        self.aviso_ubicacion = QLabel()
+        self.aviso_ubicacion.setWordWrap(True)
+        self.aviso_ubicacion.setStyleSheet(f"color: {COLOR_AVISO};")
+        self.aviso_ubicacion.hide()
+        formulario_defecto.addRow("", self.aviso_ubicacion)
+        cuerpo.addWidget(grupo_defecto)
+
+        desplazable = QScrollArea()
+        desplazable.setWidgetResizable(True)
+        desplazable.setFrameShape(QScrollArea.Shape.NoFrame)
+        desplazable.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        desplazable.setWidget(self.contenido)
+        raiz.addWidget(desplazable, 1)
 
         botones = QDialogButtonBox()
         self.boton_guardar = botones.addButton(_("Guardar"),
@@ -232,6 +276,19 @@ class DialogoRedes(QDialog):
 
         self.combo_proveedor.currentIndexChanged.connect(self._al_cambiar_proveedor)
         self._al_cambiar_proveedor()
+        self._ajustar_a_la_pantalla(botones)
+
+    def _ajustar_a_la_pantalla(self, botones: QWidget) -> None:
+        """Todo el contenido si cabe; si no, el alto de la pantalla (y scroll)."""
+        margenes = self.layout().contentsMargins()
+        barra = self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        ideal = self.contenido.sizeHint()
+        alto = (ideal.height() + botones.sizeHint().height() + self.layout().spacing()
+                + margenes.top() + margenes.bottom())
+        # Margen para la barra de título, que no cuenta en el alto del diálogo.
+        alto_maximo = self.screen().availableGeometry().height() - 60
+        self.resize(max(self.minimumWidth(), ideal.width() + barra + margenes.left()
+                        + margenes.right()), min(alto, alto_maximo))
 
     @property
     def proveedor(self) -> str:
@@ -257,6 +314,9 @@ class DialogoRedes(QDialog):
         self._poner_paginas([pagina] if pagina else [], pagina.id if pagina else "")
         guardadas = (self.ajustes.cuentas_guardadas()
                      if self.proveedor == self.ajustes.proveedor_redes else None)
+        self._ubicacion = None
+        self._cuenta_tiktok = guardadas.cuentas.get(Plataforma.TIKTOK) if guardadas else None
+        self._refrescar_ubicacion()
         if guardadas is not None:
             self._mostrar_cuentas(guardadas.cuentas)
             try:
@@ -351,6 +411,8 @@ class DialogoRedes(QDialog):
         self._comprobadas = (perfil, consulta.cuentas)
         self._mostrar_cuentas(consulta.cuentas)
         self._poner_consulta(_("Comprobado ahora."), COLOR_OK)
+        self._cuenta_tiktok = consulta.cuentas.get(Plataforma.TIKTOK)
+        self._refrescar_ubicacion()
         cuenta_x = consulta.cuentas.get(Plataforma.X)
         if cuenta_x is not None and cuenta_x.premium:
             self.casilla_x_premium.setChecked(True)
@@ -379,6 +441,43 @@ class DialogoRedes(QDialog):
             self.aviso_pagina.setText(_("Facebook no está conectada en {servicio}.").format(
                 servicio=servicio))
             self.aviso_pagina.show()
+
+    # --- ubicación ---
+
+    def _refrescar_ubicacion(self) -> None:
+        # Para la fila basta la ciudad: el lugar de TikTok no se lee al abrir.
+        ubicacion = (self._ubicacion if self._ubicacion is not None
+                     else Ubicacion(self.ajustes.ciudad))
+        self.etiqueta_ubicacion.setText(describir_ubicacion(ubicacion))
+        aviso = (aviso_permiso_tiktok(self._cuenta_tiktok, proveedores.nombre_visible(
+            self.proveedor)) if Plataforma.TIKTOK in ubicacion.plataformas() else "")
+        self.aviso_ubicacion.setText(aviso)
+        self.aviso_ubicacion.setVisible(bool(aviso))
+
+    def _cambiar_ubicacion(self) -> None:
+        actual = self._ubicacion
+        if actual is None:
+            actual = ubicacion_guardada(self.ajustes, self.llavero, self.proveedor,
+                                        self.campo_perfil.text().strip())
+        dialogo = DialogoUbicacion(
+            actual, self._preparar_busqueda, _("Ubicación de siempre"),
+            _("Se usa en todas las publicaciones. En Publicar puedes cambiarla para un "
+              "solo vídeo."), self)
+        dialogo.selector.poner_cuenta_tiktok(self._cuenta_tiktok,
+                                             proveedores.nombre_visible(self.proveedor))
+        if dialogo.exec():
+            self._ubicacion = dialogo.ubicacion()
+            self._refrescar_ubicacion()
+
+    def _preparar_busqueda(self, texto: str):
+        """Búsqueda de lugares de TikTok con el perfil y la clave que hay
+        escritos (o la del Llavero): se lee aquí, en el hilo de la interfaz."""
+        nombre, perfil = self.proveedor, self.campo_perfil.text().strip()
+        clave = self.campo_clave.text().strip() or None
+        llavero, fabrica = self.llavero, self.fabrica
+        datos = {"perfil": perfil, "pagina_facebook": ""}
+        return lambda: consulta_cuentas.buscar_lugares(llavero, fabrica, nombre, datos, texto,
+                                                       clave=clave)
 
     def _refrescar_perfil(self, *args) -> None:
         self.aviso_perfil.setVisible(
@@ -411,6 +510,14 @@ class DialogoRedes(QDialog):
                 return
             finally:
                 self.campo_clave.clear()
+        # El lugar de TikTok es de la cuenta: va al Llavero, con el perfil escrito.
+        if self._ubicacion is not None:
+            try:
+                guardar_ubicacion(self.ajustes, self.llavero, self.proveedor,
+                                  self.campo_perfil.text().strip(), self._ubicacion)
+            except credenciales.ErrorLlavero as e:
+                QMessageBox.warning(self, _("Llavero"), str(e))
+                return
         self.ajustes.proveedor_redes = self.proveedor
         self.ajustes.guardar_perfil(self.proveedor, self.campo_perfil.text())
         self.ajustes.tiktok_modo = ModoTikTok(self.combo_tiktok.currentData())

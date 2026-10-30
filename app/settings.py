@@ -9,7 +9,9 @@ from PySide6.QtCore import QSettings
 
 from videopipeline.redes.modelo import (
     ORDEN,
+    UBICACION_POR_DEFECTO,
     YOUTUBE_CATEGORIA_POR_DEFECTO,
+    Ciudad,
     Cuenta,
     ModoFacebook,
     ModoInstagram,
@@ -44,18 +46,20 @@ def _cuenta_a_dict(cuenta: Cuenta | None) -> dict | None:
         return None
     return {"nombre": cuenta.nombre, "usuario": cuenta.usuario,
             "reconectar": cuenta.reconectar, "capacidades": list(cuenta.capacidades),
-            "premium": cuenta.premium}
+            "premium": cuenta.premium, "ubicacion": cuenta.ubicacion}
 
 
 def _cuenta_de_dict(plataforma: Plataforma, datos) -> Cuenta | None:
     if not isinstance(datos, dict):
         return None
     premium = datos.get("premium")
+    ubicacion = datos.get("ubicacion")
     return Cuenta(plataforma, nombre=str(datos.get("nombre") or ""),
                   usuario=str(datos.get("usuario") or ""),
                   reconectar=bool(datos.get("reconectar")),
                   capacidades=tuple(str(c) for c in datos.get("capacidades") or ()),
-                  premium=premium if isinstance(premium, bool) else None)
+                  premium=premium if isinstance(premium, bool) else None,
+                  ubicacion=ubicacion if isinstance(ubicacion, bool) else None)
 
 
 class Ajustes:
@@ -161,6 +165,24 @@ class Ajustes:
     @pagina_facebook.setter
     def pagina_facebook(self, pagina: Pagina | None) -> None:
         self.guardar_pagina_facebook(self.proveedor_redes, pagina)
+
+    # Ubicación de las publicaciones: aquí solo la ciudad, que es pública. El
+    # lugar de TikTok es de la cuenta y va al Llavero (`credenciales`).
+
+    @property
+    def ciudad(self) -> Ciudad | None:
+        """Nunca guardada: la de por defecto (Madrid). «Sin ubicación» se
+        guarda vacía. Una que ya no está en el catálogo: la de por defecto."""
+        valor = self._q.value("redes/ciudad")
+        if valor is None:
+            return UBICACION_POR_DEFECTO.ciudad
+        if not str(valor):
+            return None
+        return Ciudad.de_clave(str(valor)) or UBICACION_POR_DEFECTO.ciudad
+
+    @ciudad.setter
+    def ciudad(self, ciudad: Ciudad | None) -> None:
+        self._q.setValue("redes/ciudad", ciudad.name if ciudad else "")
 
     # Cuentas conectadas en el servicio: la última consulta que salió bien,
     # para seguir sin conexión. Solo nombres visibles, nada secreto.

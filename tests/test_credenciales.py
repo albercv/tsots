@@ -6,6 +6,7 @@ import subprocess
 import pytest
 
 from app import credenciales
+from videopipeline.redes.modelo import Lugar
 
 from tests.secretos_falsos import jwt_falso
 
@@ -125,3 +126,32 @@ def test_red_bloqueada_en_tests():
 
     with pytest.raises(RuntimeError, match="Red bloqueada"):
         httpx.get("https://example.com")
+
+
+# --- lugar de TikTok: es de la cuenta, va al Llavero y nunca en claro ---
+
+SOL = Lugar("v2_sol", "Puerta del Sol", "Madrid, España")  # falso
+
+
+def test_lugar_de_tiktok_en_el_llavero_por_proveedor_perfil_y_ciudad(llavero_falso):
+    assert credenciales.leer_lugar_tiktok("prov", "mi perfil/1", "MADRID") is None
+    credenciales.guardar_lugar_tiktok("prov", "mi perfil/1", "MADRID", SOL)
+    assert credenciales.leer_lugar_tiktok("prov", "mi perfil/1", "MADRID") == SOL
+    assert credenciales.leer_lugar_tiktok("prov", "otro", "MADRID") is None
+    assert credenciales.leer_lugar_tiktok("otro", "mi perfil/1", "MADRID") is None
+    assert credenciales.leer_lugar_tiktok("prov", "mi perfil/1", "SEVILLA") is None
+    assert not credenciales.hay_clave("prov")  # no se mezcla con la API key
+    # Ni en los argumentos de `security` (los ve `ps`) ni en claro por stdin.
+    for args, entrada in llavero_falso.llamadas:
+        assert not any("v2_sol" in a or "mi perfil" in a for a in args)
+        assert "v2_sol" not in (entrada or "")
+    credenciales.guardar_lugar_tiktok("prov", "mi perfil/1", "MADRID", None)
+    assert credenciales.leer_lugar_tiktok("prov", "mi perfil/1", "MADRID") is None
+    credenciales.guardar_lugar_tiktok("prov", "mi perfil/1", "MADRID", None)  # ya borrado
+
+
+def test_lugar_de_tiktok_ilegible_es_como_si_no_hubiera(llavero_falso):
+    credenciales.guardar_lugar_tiktok("prov", "yo", "MADRID", SOL)
+    clave = next(iter(llavero_falso.elementos))
+    llavero_falso.elementos[clave] = "no-es-base64-ni-json"
+    assert credenciales.leer_lugar_tiktok("prov", "yo", "MADRID") is None

@@ -32,6 +32,15 @@ API (docs y openapi.json consultados el 2026-09-23):
 - Páginas de Facebook: `GET /api/uploadposts/facebook/pages?profile=` →
   lista de `{page_id, page_name, profile}` (se aceptan envoltorios como
   `{"pages": [...]}`).
+- Ubicación (docs consultadas el 2026-10-30): TikTok `tiktok_location_id` +
+  `tiktok_location_name` (los dos o ninguno), Instagram `location_id` (ID
+  numérico de una página o lugar de Facebook) y X `geo_place_id`. YouTube y
+  Facebook no tienen campo. Un campo de ubicación que el servicio no acepta
+  se ignora: publica igual y avisa en `warnings` (queda en el registro).
+- Lugares de TikTok: `GET /api/uploadposts/tiktok/locations?profile=&q=`
+  (`q` ≤ 100 caracteres) → `{"locations": [{location_id, location_name,
+  location_address}]}`, hasta 20. El id solo vale para esa cuenta. Sin el
+  permiso `location` en `capabilities`: 400 `tiktok_reconnect_required`.
 
 Cada petición, su código HTTP, su cuerpo (limpio y acotado) y cada sondeo
 se anotan con `logging` en el registro de la publicación (`diario`).
@@ -67,6 +76,7 @@ from ..i18n import N_, _
 from . import diario
 from .modelo import (
     Cuenta,
+    Lugar,
     ModoFacebook,
     ModoInstagram,
     ModoTikTok,
@@ -75,6 +85,8 @@ from .modelo import (
     Plataforma,
     Publicacion,
     Resultado,
+    id_instagram_valido,
+    id_x_valido,
 )
 from .proveedor import ErrorConsulta
 from .textos import MAX_TEXTO_X, etiquetas_youtube, longitud_x, texto_para, titulo_para
@@ -91,6 +103,8 @@ URL_SUBIDA = f"{URL_API}/upload"
 URL_ESTADO = f"{URL_API}/uploadposts/status"
 URL_USUARIOS = f"{URL_API}/uploadposts/users"
 URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
+URL_LUGARES_TIKTOK = f"{URL_API}/uploadposts/tiktok/locations"
+MAX_BUSQUEDA_LUGAR = 100
 # Las consultas de cuentas y páginas se hacen al abrir los diálogos: si el
 # servicio no responde pronto, la app sigue con lo último que sabía.
 ESPERA_CONSULTA = httpx.Timeout(10.0, connect=5.0)
@@ -182,6 +196,10 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
             datos["privacy_level"] = "PUBLIC_TO_EVERYONE"
         else:
             datos["post_mode"] = "MEDIA_UPLOAD"
+        lugar = opciones.ubicacion.tiktok
+        if lugar is not None and lugar.id.strip() and lugar.nombre.strip():
+            datos["tiktok_location_id"] = lugar.id.strip()
+            datos["tiktok_location_name"] = lugar.nombre.strip()
     elif plataforma == Plataforma.YOUTUBE:
         datos["youtube_title"] = titulo_para(Plataforma.YOUTUBE, publicacion)
         datos["youtube_description"] = texto
@@ -200,12 +218,16 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
             datos["share_to_feed"] = "true"
         else:
             datos["share_mode"] = "TRIAL_REELS_SHARE_TO_FOLLOWERS_IF_LIKED"
+        if id_instagram_valido(opciones.ubicacion.instagram_id):
+            datos["location_id"] = opciones.ubicacion.instagram_id.strip()
     elif plataforma == Plataforma.X:
         # Sin Premium, `texto_para` ya lo deja en 280: nunca sale un hilo.
         datos["x_title"] = texto
         largo = opciones.x_premium and longitud_x(texto) > MAX_TEXTO_X
         datos["x_long_text_as_post"] = "true" if largo else "false"
         datos["made_with_ai"] = "false"
+        if id_x_valido(opciones.ubicacion.x_id):
+            datos["geo_place_id"] = opciones.ubicacion.x_id.strip()
     elif plataforma == Plataforma.FACEBOOK:
         datos["facebook_page_id"] = pagina_facebook
         datos["facebook_title"] = titulo_para(Plataforma.FACEBOOK, publicacion)
@@ -261,7 +283,8 @@ class ProveedorUploadPost:
                  "campos %s · esperas máx.: "
                  "conexión %.0f s, escritura %.0f s, lectura %.0f s",
                  plataforma.nombre, URL_SUBIDA, datos["external_id"], video, tamano,
-                 {k: v for k, v in datos.items() if k not in ("user", "external_id")},
+                 {k: ("(privado)" if k == "tiktok_location_id" else v)
+                  for k, v in datos.items() if k not in ("user", "external_id")},
                  limites.connect, limites.write, limites.read)
 
         def enviar(http: httpx.Client) -> httpx.Response:
@@ -365,8 +388,34 @@ class ProveedorUploadPost:
                  ", ".join(p.visible for p in paginas) or "(ninguna)")
         return paginas
 
+    def lugares_tiktok(self, texto: str) -> list[Lugar]:
+        consulta = (texto or "").strip()[:MAX_BUSQUEDA_LUGAR]
+        if not consulta:
+            raise ErrorConsulta(_("Escribe el lugar que quieres buscar."))
+        # La respuesta lleva los ids de lugar de la cuenta: no va al registro.
+        cuerpo = self._consultar(
+            "lugares de TikTok", URL_LUGARES_TIKTOK + f"?profile={{perfil}}&q={consulta}",
+            URL_LUGARES_TIKTOK, {"profile": self._perfil, "q": consulta},
+            registrar_cuerpo=False)
+        lista = self._buscar(cuerpo, "locations")
+        if not isinstance(lista, list):
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae los lugares de TikTok."))
+        lugares: list[Lugar] = []
+        for elemento in lista:
+            if not isinstance(elemento, dict):
+                continue
+            ident = str(elemento.get("location_id") or "").strip()
+            nombre = str(elemento.get("location_name") or "").strip()
+            if ident and nombre:
+                lugares.append(Lugar(ident, nombre,
+                                     str(elemento.get("location_address") or "").strip()))
+        log.info("Lugares de TikTok para %r: %s", consulta,
+                 ", ".join(l.visible for l in lugares) or "(ninguno)")
+        return lugares
+
     def _consultar(self, que: str, plantilla: str, url: str,
-                   parametros: dict | None = None) -> Any:
+                   parametros: dict | None = None, registrar_cuerpo: bool = True) -> Any:
         """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
         motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
         if not self._clave:
@@ -386,7 +435,8 @@ class ProveedorUploadPost:
                 tipo=type(e).__name__)) from None
         log.info("Consulta de %s → HTTP %d en %.1f s · cuerpo: %s", que, respuesta.status_code,
                  time.monotonic() - inicio,
-                 diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)")
+                 (diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)") if registrar_cuerpo
+                 or respuesta.status_code >= 400 else "(no se registra: datos de la cuenta)")
         if respuesta.status_code >= 400:
             raise ErrorConsulta(self._mensaje_http(respuesta))
         cuerpo = self._json(respuesta)
@@ -432,9 +482,14 @@ class ProveedorUploadPost:
         premium = None
         if plataforma == Plataforma.X and any(_RE_PREMIUM.search(c) for c in capacidades):
             premium = True
+        # TikTok necesita el permiso `location` para etiquetar lugares. Si el
+        # servicio no da capacidades, no se sabe.
+        ubicacion = None
+        if plataforma == Plataforma.TIKTOK and bruto is not None:
+            ubicacion = any(c.lower() == "location" for c in capacidades)
         return Cuenta(plataforma, nombre=nombre, usuario=usuario,
                       reconectar=_verdadero(valor.get("reauth_required")),
-                      capacidades=tuple(capacidades), premium=premium)
+                      capacidades=tuple(capacidades), premium=premium, ubicacion=ubicacion)
 
     def _interpretar_estado(self, plataforma: Plataforma, referencia: str,
                             respuesta: httpx.Response) -> Resultado:
@@ -674,6 +729,10 @@ class ProveedorUploadPost:
             detalle = self._texto(cuerpo)
         if _RE_PERFIL_DESCONOCIDO.search(detalle):
             return self._limpiar(f"{self._perfil_desconocido()} ({codigo}: {detalle})")
+        if "tiktok_reconnect_required" in detalle:
+            return self._limpiar(_(
+                "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.").format(
+                servicio=NOMBRE))
         if codigo == 401:
             base = _("La API key no es válida o ha caducado (401). Revísala en Redes…")
         elif codigo == 403:
