@@ -1,18 +1,27 @@
-"""API keys de los proveedores de publicación en el Llavero de macOS.
+"""API keys de los proveedores de publicación, y lugares de TikTok, en el
+Llavero de macOS.
 
 Usa el comando `security` (sin dependencias nuevas). Servicio
 `tsots-<proveedor>`, cuenta `api-key`. La clave nunca se escribe en
 QSettings, ficheros, logs ni mensajes de error.
+
+El lugar de TikTok elegido para una ciudad también va aquí (cuenta
+`tiktok-lugar-<CIUDAD>-<huella del perfil>`): su id solo vale para la
+cuenta de TikTok conectada, así que es un dato privado como la clave.
 
 Para guardarla, la orden va por la entrada estándar de `security -i` y no
 como argumento: así no aparece en la lista de procesos (`ps`).
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import re
 import subprocess
 
 from videopipeline.i18n import _
+from videopipeline.redes.modelo import Lugar
 
 SECURITY = "/usr/bin/security"
 CUENTA = "api-key"
@@ -85,3 +94,47 @@ def borrar(proveedor: str) -> bool:
         raise ErrorLlavero(_("No se pudo borrar la clave del Llavero (código {codigo}).").format(
             codigo=resultado.returncode))
     return True
+
+
+def _cuenta_lugar(perfil: str, ciudad: str) -> str:
+    # El perfil puede llevar espacios o barras: va resumido, para que la
+    # orden de `security -i` no necesite comillas y no se lea en claro.
+    huella = hashlib.sha256(perfil.strip().encode("utf-8")).hexdigest()[:16]
+    return f"tiktok-lugar-{ciudad}-{huella}"
+
+
+def guardar_lugar_tiktok(proveedor: str, perfil: str, ciudad: str, lugar: Lugar | None) -> None:
+    """Lugar de TikTok elegido para `ciudad` (su clave, p. ej. `MADRID`) con
+    la cuenta de ese perfil. `None` lo olvida. Va codificado en base64, por
+    la entrada estándar, como la clave."""
+    cuenta = _cuenta_lugar(perfil, ciudad)
+    if lugar is None:
+        resultado = _ejecutar(["delete-generic-password", "-s", servicio(proveedor), "-a", cuenta])
+        if resultado.returncode not in (0, NO_ENCONTRADO):
+            raise ErrorLlavero(_(
+                "No se pudo borrar el lugar de TikTok del Llavero (código {codigo}).").format(
+                codigo=resultado.returncode))
+        return
+    datos = {"id": lugar.id, "nombre": lugar.nombre, "direccion": lugar.direccion}
+    valor = base64.b64encode(json.dumps(datos, ensure_ascii=False).encode("utf-8")).decode()
+    orden = f"add-generic-password -U -s {servicio(proveedor)} -a {cuenta} -w {valor}\n"
+    resultado = _ejecutar(["-i"], entrada=orden)
+    if resultado.returncode != 0 or leer_lugar_tiktok(proveedor, perfil, ciudad) != lugar:
+        raise ErrorLlavero(_("No se pudo guardar el lugar de TikTok en el Llavero."))
+
+
+def leer_lugar_tiktok(proveedor: str, perfil: str, ciudad: str) -> Lugar | None:
+    """El lugar guardado, o None si no hay (o no se puede entender)."""
+    resultado = _ejecutar(["find-generic-password", "-s", servicio(proveedor),
+                           "-a", _cuenta_lugar(perfil, ciudad), "-w"])
+    if resultado.returncode == NO_ENCONTRADO:
+        return None
+    if resultado.returncode != 0:
+        raise ErrorLlavero(_(
+            "No se pudo leer el lugar de TikTok del Llavero (código {codigo}).").format(
+            codigo=resultado.returncode))
+    try:
+        datos = json.loads(base64.b64decode(resultado.stdout.strip(), validate=True))
+        return Lugar(str(datos["id"]), str(datos["nombre"]), str(datos.get("direccion") or ""))
+    except (ValueError, KeyError, TypeError):
+        return None

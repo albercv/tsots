@@ -187,26 +187,31 @@ Package `videopipeline/redes/`:
 
 | Module | Role | Knows the provider? |
 |---|---|---|
-| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known), `Pagina` (Facebook Page) | No |
+| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ciudad` (catalog of cities with their public Instagram and X place ids), `Ubicacion` (a `Ciudad` and the TikTok `Lugar` chosen with the account; `plataformas()` says which networks get it), `Lugar` (TikTok place from the lookup; its id is private and hidden from `repr`), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
 | `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
 | `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
 | `proveedor.py` | `Proveedor` protocol, `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
-| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account and Facebook Page lookups | Yes, the only one |
-| `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry | No |
+| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups | Yes, the only one |
+| `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry. Before TikTok, looks up the place by name when none was chosen (no exact match or a failed lookup: TikTok goes out without a location) | No |
 | `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode. Never the key | No |
 
 GUI: `app/widgets/dialogo_publicar.py` (texts, the X text with its live
 counter, platforms, modes, confirmation, upload in a `QThread`,
 per-platform status and links), `app/widgets/dialogo_redes.py` (provider,
 profile, API key, **Check connection**, X Premium, Facebook Page, default
-modes), `app/cuentas.py` (account lookup shared by both dialogs, always in
-the background through `app/segundo_plano.py`),
+modes, location), `app/widgets/selector_ubicacion.py` (the location
+selector, opened in its own window from both dialogs; inline it pushed
+Networks… past a 14" laptop screen),
+`app/cuentas.py` (account and TikTok place lookups shared by both dialogs,
+always in the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button
 in the bottom bar of `app/main.py`, next to the language selector (app
 settings, not per video, so it is always visible; the Publish dialog also
 opens it).
 Settings (QSettings `redes/*`) store the provider id, the profile, the
-default modes, X Premium, the chosen Facebook Page (per provider) and the
+default modes, X Premium, the chosen Facebook Page (per provider), the
+location city (`redes/ciudad`; the TikTok place lives in the Keychain, see
+Location) and the
 last successful account lookup (per provider, tied to the profile); never
 the key. The checked platforms are remembered; a list saved before X and
 Facebook existed keeps working (both stay unchecked), and a new user
@@ -254,6 +259,115 @@ it keeps the cached result, or leaves everything enabled when there is
 none. The publication log records which accounts were used and whether
 they came from a live lookup or the cache.
 
+### Location
+
+Every post can carry a location. Through Upload-Post only three networks
+take one, and each identifies the place its own way:
+
+| Network | What it needs | Whose id | Lookup in Upload-Post |
+|---|---|---|---|
+| Instagram | Facebook Places id of the place | Public: the same for every account | No |
+| X | X place id (hexadecimal) | Public: the same for every account | No |
+| TikTok | Place id **and** name, from TikTok | **Private**: only valid for the connected account that looked it up | Yes: `lugares_tiktok(texto)`, up to 20 places |
+| YouTube, Facebook | Nothing: no location field | — | — |
+
+That split drives the design: public ids ship in the code, the TikTok id
+never does.
+
+**City catalog** (`videopipeline/redes/modelo.py`). The user picks a city
+by name; ids are never shown. `Ciudad` is an Enum whose members carry
+`nombre`, `instagram_id` and `x_id` (empty: that network goes without a
+location). It holds the 15 biggest Spanish cities with known ids: Madrid,
+Barcelona, Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma, Las Palmas
+de Gran Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo and Granada
+(all with both ids except Murcia, which has no Facebook Places id in
+Wikidata, so Instagram goes without a location there). Where the ids come
+from, checked on 2026-10-30:
+
+- Instagram: each city's "Facebook location ID" (P1997) in Wikidata; the
+  Wikidata item is noted next to each member. Every id was checked:
+  `facebook.com/<id>` redirects to that city's page (for example
+  `Madrid-106504859386230`, `Córdoba-España-108957072462073`).
+- X: there is no public lookup, so the ids come from raw X API data
+  published on GitHub (tweet datasets whose `places` objects carry
+  `country`, `full_name` and `id`). An id was only accepted from an object
+  with country Spain and `full_name` "<City>, Spain"; each name maps to a
+  single id across all the files. Madrid, Barcelona, Alicante, Palma and
+  Vigo also appear in a second, independent object (`place_type` city,
+  country ES). `x.com/search?q=place%3A<id>` lists the posts tagged there.
+
+None of these ids has been confirmed by a real upload yet.
+
+To add a city, add one member to `Ciudad` (`SEVILLA = ("Sevilla",
+"<facebook places id>", "<x place id>")`) with a comment saying where each
+id comes from. `tests/test_redes_ubicacion.py` checks that every member
+has a name and valid ids; nothing else changes. Never add TikTok ids.
+
+Finding the ids of a new city:
+
+- Instagram: search the city on wikidata.org and read "Facebook location
+  ID" (P1997), or take the Page id of the place's Facebook page ("Page
+  transparency"). Check: `facebook.com/<id>` must open that place.
+- X: there is no public lookup. Wikidata's "X place ID" (P12431) is rarely
+  filled; otherwise the id has to come from a post geotagged in that place
+  (its `place` object), which is how Madrid's was found. Check:
+  `x.com/search?q=place%3A<id>` must list posts from there. Without an id,
+  leave it empty: X goes out without a location.
+
+**Model.** `Ubicacion(ciudad, tiktok)`: the city, and the TikTok `Lugar`
+chosen with the account (or `None`: looked up when publishing). `nombre`,
+`instagram_id` and `x_id` come from the city. `plataformas()` lists the
+networks that will get it. `Lugar.id` is excluded from `repr`, so it
+cannot leak through a printed `Opciones`. `UBICACION_POR_DEFECTO` is
+`Ubicacion(Ciudad.MADRID)`.
+
+**Where it is stored.**
+
+- The city: `Ajustes.ciudad` (QSettings `redes/ciudad`, the member name).
+  Never saved: Madrid. "No location" is saved as an empty value. A name no
+  longer in the catalog falls back to Madrid.
+- The TikTok place: only in the macOS Keychain
+  (`credenciales.guardar_lugar_tiktok` / `leer_lugar_tiktok`), service
+  `tsots-<provider>`, account `tiktok-lugar-<CITY>-<profile hash>`, value
+  base64 JSON sent through stdin (never in the `ps` argument list). It is
+  per provider, profile and city, so another account never sees it. It is
+  never written to QSettings, files, logs or the repository.
+- `selector_ubicacion.ubicacion_guardada` / `guardar_ubicacion` join both.
+  Reading the place is reading a secret, so it only happens on "Change…"
+  or "Publish", never when a dialog opens (the rows only need the city).
+  A Keychain failure only loses the chosen place: TikTok then looks it up.
+
+**Logs.** The TikTok id never reaches a log: the upload fields log it as
+`(privado)`, the place lookup does not log its response body, the
+publisher and the Publish dialog log only the place name, and the Publish
+dialog also masks the chosen id in its publication log.
+
+**Screens.** The selector (`app/widgets/selector_ubicacion.py`) opens in
+its own window (`DialogoUbicacion`) from both dialogs and only shows
+names: a city drop-down (catalog plus "No location"), the TikTok place
+("Automatic: the place called «Madrid»" or one picked after "Search
+TikTok"), and which networks it will tag. Changing the city drops the TikTok
+results.
+
+- Networks… has a "Location: Madrid (TikTok, Instagram, X) · Change…"
+  row under "When publishing". Save stores the city and, in the Keychain,
+  the TikTok place (none chosen: the stored one for that city is
+  forgotten). If the last account lookup says TikTok lacks the `location`
+  capability (`Cuenta.ubicacion is False`), the row asks to reconnect it.
+- The Publish dialog shows the location and "Change…" sets one for that
+  video only; it is never saved. The confirmation and the publication log
+  state it.
+
+**Publishing.** With a city but no TikTok place chosen, `publicador` looks
+the city up right before TikTok (`_con_lugar_de_tiktok`) and uses the
+first exact match (`elegir_lugar`: accents, case and a ", country" suffix
+ignored). The other networks get the location unchanged. The provider only
+adds the fields that are valid (`tiktok_location_id` +
+`tiktok_location_name`, `location_id`, `geo_place_id`). A location never
+costs a post: no match, a failed lookup or a missing permission post
+TikTok without one, and a field the service refuses is ignored by
+Upload-Post, which says so in `warnings` (kept in the publication log).
+
 ### Provider interface
 
 ```python
@@ -263,6 +377,7 @@ class Proveedor(Protocol):
     def estado(self, plataforma, referencia) -> Resultado: ...
     def cuentas(self) -> dict[Plataforma, Cuenta | None]: ...
     def paginas_facebook(self) -> list[Pagina]: ...
+    def lugares_tiktok(self, texto) -> list[Lugar]: ...
 ```
 
 - `publicar` uploads to one platform. It never raises for network or
@@ -270,7 +385,7 @@ class Proveedor(Protocol):
   `pendiente=True` plus an opaque `referencia` when the service keeps
   processing. Error texts never contain the key.
 - `estado` checks a pending upload with that `referencia`, same rules.
-- `cuentas` and `paginas_facebook` are lookups: they raise `ErrorConsulta`
+- `cuentas`, `paginas_facebook` and `lugares_tiktok` are lookups: they raise `ErrorConsulta`
   with a readable message (never the key) and no other exception.
 
 A provider module exposes `NOMBRE` (display name), `USA_PERFIL` (whether it
@@ -344,6 +459,14 @@ thread, for the account lookups (when the Publish dialog opens and on
 - Facebook Pages: `GET /api/uploadposts/facebook/pages?profile=` → list of
   `{page_id, page_name, profile}`, also inside `{"pages": [...]}` or
   `{"data": [...]}`; entries of another profile are dropped.
+- Location: TikTok `tiktok_location_id` + `tiktok_location_name` (both or
+  none), Instagram `location_id` (numeric Facebook Page/place id), X
+  `geo_place_id`; YouTube and Facebook have no field. TikTok places come
+  from `GET /api/uploadposts/tiktok/locations?profile=&q=` (`q` ≤ 100,
+  up to 20 results, ids valid only for that account); without the
+  `location` capability it answers 400 `tiktok_reconnect_required`. A
+  location field the service rejects is ignored: it publishes anyway and
+  says so in `warnings` (kept in the publication log).
 
 ## App bundle (Dock icon)
 

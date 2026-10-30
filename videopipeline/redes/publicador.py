@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import replace
 from enum import Enum
 from typing import Callable, Iterable
 
 from ..i18n import _
 from . import registro
-from .modelo import ORDEN, Opciones, Plataforma, Publicacion, Resultado
-from .proveedor import Proveedor
+from .modelo import ORDEN, Opciones, Plataforma, Publicacion, Resultado, elegir_lugar
+from .proveedor import ErrorConsulta, Proveedor
 
 
 class Estado(str, Enum):
@@ -39,6 +40,29 @@ def modo_de(plataforma: Plataforma, opciones: Opciones) -> str:
     if plataforma == Plataforma.FACEBOOK:
         return opciones.facebook_modo.value
     return "publico"
+
+
+def _con_lugar_de_tiktok(proveedor: Proveedor, opciones: Opciones) -> Opciones:
+    """Si la ubicación tiene nombre pero ningún lugar de TikTok elegido, lo
+    busca. Sin un lugar que se llame igual, o si la búsqueda falla, TikTok
+    se publica sin ubicación: nunca se pierde la publicación por ella."""
+    ubicacion = opciones.ubicacion
+    nombre = ubicacion.nombre.strip()
+    if ubicacion.tiktok is not None or not nombre:
+        return opciones
+    try:
+        lugar = elegir_lugar(proveedor.lugares_tiktok(nombre), nombre)
+    except Exception as e:  # solo se pierde la ubicación
+        # El mensaje de una excepción ajena podría llevar datos sensibles: solo el tipo.
+        motivo = str(e) if isinstance(e, ErrorConsulta) else type(e).__name__
+        log.warning("TikTok: no se pudo buscar el lugar %r (%s): se publica sin ubicación",
+                    nombre, motivo)
+        return opciones
+    if lugar is None:
+        log.warning("TikTok: ningún lugar se llama %r: se publica sin ubicación", nombre)
+        return opciones
+    log.info("TikTok: ubicación %s", lugar.visible)  # el id es de la cuenta: nunca al registro
+    return replace(opciones, ubicacion=replace(ubicacion, tiktok=lugar))
 
 
 def _fallo(plataforma: Plataforma, excepcion: BaseException) -> Resultado:
@@ -108,8 +132,10 @@ def publicar(
         avisar(plataforma, Estado.SUBIENDO, None)
         log.info("%s: enviando (modo %s)", plataforma.nombre, modo_de(plataforma, opciones))
         inicio = reloj()
+        propias = (_con_lugar_de_tiktok(proveedor, opciones)
+                   if plataforma == Plataforma.TIKTOK else opciones)
         try:
-            resultado = proveedor.publicar(plataforma, publicacion, opciones)
+            resultado = proveedor.publicar(plataforma, publicacion, propias)
         except Exception as e:  # un proveedor no debería lanzar; si lo hace, se aísla
             log.exception("%s: excepción inesperada del proveedor", plataforma.nombre)
             resultado = _fallo(plataforma, e)

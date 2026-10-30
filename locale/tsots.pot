@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-27 14:40+0100\n"
+"POT-Creation-Date: 2026-10-30 11:36+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -81,6 +81,10 @@ msgstr ""
 msgid "Autodetectar"
 msgstr ""
 
+#, python-brace-format
+msgid "Automático: el lugar que se llame «{nombre}»"
+msgstr ""
+
 msgid "Añadir subtítulos"
 msgstr ""
 
@@ -93,10 +97,19 @@ msgstr ""
 msgid "Borrador (lo terminas en la app)"
 msgstr ""
 
+msgid "Buscando…"
+msgstr ""
+
+msgid "Buscar en TikTok"
+msgstr ""
+
 msgid "Caja blanca"
 msgstr ""
 
 msgid "Caja negra"
+msgstr ""
+
+msgid "Cambia la ubicación solo para este vídeo"
 msgstr ""
 
 msgid "Cambiar…"
@@ -138,6 +151,9 @@ msgid "Ciencia y tecnología"
 msgstr ""
 
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
+msgstr ""
+
+msgid "Ciudad:"
 msgstr ""
 
 #, python-brace-format
@@ -348,6 +364,10 @@ msgstr ""
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr ""
 
+#, python-brace-format
+msgid "Elige uno de la lista: ninguno se llama «{texto}». Sin elegir, TikTok se publica sin ubicación."
+msgstr ""
+
 msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.upload-post.com/manage-users), donde conectaste tus redes. No es el email de tu cuenta."
 msgstr ""
 
@@ -375,6 +395,10 @@ msgid "Error inesperado ({tipo}). Detalles en el registro: {fichero}"
 msgstr ""
 
 #, python-brace-format
+msgid "Error inesperado al buscar el lugar ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "Error inesperado al consultar las cuentas ({tipo})."
 msgstr ""
 
@@ -391,6 +415,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Error: {titulo}"
+msgstr ""
+
+msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
 msgid "Escribe el perfil del servicio para comprobarlo."
@@ -526,6 +553,9 @@ msgstr ""
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr ""
 
+msgid "La ubicación con que se publica cada vídeo"
+msgstr ""
+
 msgid "Leyendo la API key del Llavero…"
 msgstr ""
 
@@ -654,6 +684,9 @@ msgid ""
 "Instálalas y vuelve a abrir la aplicación."
 msgstr ""
 
+msgid "No se etiqueta en ninguna red."
+msgstr ""
+
 #, python-brace-format
 msgid "No se generó el WAV: {wav}"
 msgstr ""
@@ -699,6 +732,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr ""
 
@@ -714,10 +751,17 @@ msgstr ""
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr ""
 
+msgid "No se pudo guardar el lugar de TikTok en el Llavero."
+msgstr ""
+
 msgid "No se pudo guardar la clave en el Llavero."
 msgstr ""
 
 msgid "No se pudo lanzar el proceso"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
 msgstr ""
 
 #, python-brace-format
@@ -837,6 +881,9 @@ msgstr ""
 msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Facebook"
 msgstr ""
 
+msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
+msgstr ""
+
 msgid "Preparación del audio"
 msgstr ""
 
@@ -910,6 +957,10 @@ msgstr ""
 msgid "Qué hacer: {solucion}"
 msgstr ""
 
+#, python-brace-format
+msgid "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones."
+msgstr ""
+
 msgid "Recortando silencios"
 msgstr ""
 
@@ -953,6 +1004,9 @@ msgstr ""
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr ""
 
+msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
+msgstr ""
+
 #, python-brace-format
 msgid "Respuesta inesperada del servicio: no trae resultado para {plataforma}."
 msgstr ""
@@ -982,10 +1036,17 @@ msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr ""
 
 #, python-brace-format
+msgid "Se etiqueta en: {redes}."
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
 "{resumen}"
+msgstr ""
+
+msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr ""
 
 msgid "Seguir la cara"
@@ -1047,7 +1108,16 @@ msgstr ""
 msgid "Sin pista de audio"
 msgstr ""
 
+msgid "Sin ubicación"
+msgstr ""
+
+msgid "Sin ubicación en TikTok"
+msgstr ""
+
 msgid "Sistema"
+msgstr ""
+
+msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
 msgstr ""
 
 #, python-brace-format
@@ -1100,6 +1170,10 @@ msgstr ""
 msgid "Textos"
 msgstr ""
 
+#, python-brace-format
+msgid "TikTok no encuentra «{texto}»."
+msgstr ""
+
 msgid "Transcribiendo"
 msgstr ""
 
@@ -1117,6 +1191,19 @@ msgid "Título, caption y hashtags"
 msgstr ""
 
 msgid "Título:"
+msgstr ""
+
+msgid "Ubicación de este vídeo"
+msgstr ""
+
+msgid "Ubicación de siempre"
+msgstr ""
+
+msgid "Ubicación:"
+msgstr ""
+
+#, python-brace-format
+msgid "Ubicación: {ubicacion}"
 msgstr ""
 
 msgid "Umbral:"
@@ -1175,6 +1262,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Ya publicado antes en: {lista}."
+msgstr ""
+
+msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
 msgstr ""
 
 msgid "argumentos inválidos: se requiere --config"
@@ -1254,11 +1344,18 @@ msgstr ""
 msgid "small (rápido)"
 msgstr ""
 
+msgid "solo este vídeo"
+msgstr ""
+
 msgid "turbo (recomendado)"
 msgstr ""
 
 #, python-brace-format
 msgid "{descripcion} falló (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "{lugar} ({redes})"
 msgstr ""
 
 #, python-brace-format
@@ -1314,6 +1411,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá repetido."
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ Reconecta TikTok en {servicio}: tu cuenta no tiene permiso para etiquetar ubicaciones."
 msgstr ""
 
 #, python-brace-format

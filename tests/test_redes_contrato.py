@@ -125,7 +125,7 @@ def test_consultas_fallidas_lanzan_error_consulta_sin_la_clave(nombre, responder
     peticiones: list = []
     p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(responder, peticiones))
-    for consulta in (p.cuentas, p.paginas_facebook):
+    for consulta in (p.cuentas, p.paginas_facebook, lambda: p.lugares_tiktok("Madrid")):
         with pytest.raises(ErrorConsulta) as error:
             consulta()
         assert str(error.value)
@@ -152,7 +152,8 @@ PROHIBIDAS = re.compile(
     r"MEDIA_UPLOAD|DIRECT_POST|PUBLIC_TO_EVERYONE|TRIAL_REELS|uploadposts|"
     r"x_title|x_long_text_as_post|made_with_ai|facebook_page_id|facebook_title|"
     r"facebook_description|facebook_media_type|facebook_is_ai_generated|video_state|"
-    r"social_accounts|reauth_required|display_name|page_id|page_name",
+    r"social_accounts|reauth_required|display_name|page_id|page_name|"
+    r"location_id|location_name|location_address|geo_place_id|tiktok/locations",
     re.IGNORECASE,
 )
 
@@ -204,7 +205,8 @@ def test_el_modulo_del_proveedor_contiene_lo_especifico():
     for cadena in ("api.upload-post.com", "Apikey", "post_mode", "share_mode",
                    "privacyStatus", "x_title", "x_long_text_as_post", "facebook_page_id",
                    "facebook_media_type", "video_state", "social_accounts",
-                   "reauth_required", "facebook/pages"):
+                   "reauth_required", "facebook/pages", "tiktok_location_id",
+                   "tiktok_location_name", "geo_place_id", "tiktok/locations"):
         assert cadena in texto
 
 

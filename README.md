@@ -199,6 +199,32 @@ What each mode does:
 | Facebook | **Regular video** | A video published on your Page. |
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
 
+**Location.** Posts are tagged with **Madrid** unless you choose otherwise
+in Networks… (**Location** row under "When publishing", **Change…**
+button). For a single video, press **Change…** next to "Location" in the
+Publish dialog: the usual one stays as it is.
+
+You pick the **city** from a list (or "No location"); you never see or type
+IDs. Only TikTok, Instagram and X support a location:
+
+- **Instagram and X:** each city in the list comes with its place IDs.
+  They belong to the place, not to your account: they work the same for
+  anyone posting there. The list has the 15 biggest Spanish cities:
+  Madrid, Barcelona, Valencia, Sevilla, Zaragoza, Málaga, Murcia, Palma,
+  Las Palmas de Gran Canaria, Alicante, Bilbao, Córdoba, Valladolid, Vigo
+  and Granada. All of them carry Instagram and X except Murcia, which only
+  carries X. Adding another city is a change in the app (see
+  `docs/DEVELOPMENT.md`, "Location").
+- **TikTok:** its place belongs to your account, so it is not in the list.
+  When publishing, the place named like the city is looked up; to use a
+  specific one, press **Search TikTok** and pick it. That place is private
+  data: it is only stored in the macOS Keychain, never in the settings, the
+  logs or any repository. Your TikTok account needs the location
+  permission: if it lacks it, TSOTS asks you to reconnect it in
+  Upload-Post.
+
+If anything about the location fails, the post goes ahead without it.
+
 TSOTS writes `name_limpio.publicado.json` next to the video (platform,
 date, link, service). If you open Publish again for that video, it warns
 you that it was already published.
