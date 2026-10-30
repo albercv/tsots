@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from videopipeline.redes.modelo import (
     Cuenta,
+    Lugar,
     Opciones,
     Pagina,
     Plataforma,
@@ -21,17 +22,19 @@ class ProveedorFalso:
     `publicar` (o una excepción a lanzar); `estados[plataforma]` la lista de
     Resultados que devuelve `estado` en cada consulta. `cuentas_conectadas` y
     `paginas` son lo que devuelven `cuentas()` y `paginas_facebook()` (o una
-    excepción a lanzar); se anotan en `consultas`, no en `llamadas`."""
+    excepción a lanzar); `lugares`, lo que devuelve `lugares_tiktok()`. Se
+    anotan en `consultas`, no en `llamadas`."""
 
     nombre = "Falso"
 
     def __init__(self, respuestas=None, estados=None, cuentas_conectadas=None,
-                 paginas=None):
+                 paginas=None, lugares=None):
         self.respuestas = dict(respuestas or {})
         self.estados = {p: list(v) for p, v in (estados or {}).items()}
         self.cuentas_conectadas = (todas_conectadas() if cuentas_conectadas is None
                                    else cuentas_conectadas)
         self.paginas = [Pagina("111", "Mi página")] if paginas is None else paginas
+        self.lugares = [Lugar("v2_madrid", "Madrid")] if lugares is None else lugares
         self.llamadas: list[tuple] = []
         self.consultas: list[str] = []
 
@@ -46,6 +49,12 @@ class ProveedorFalso:
         if isinstance(self.paginas, BaseException):
             raise self.paginas
         return list(self.paginas)
+
+    def lugares_tiktok(self, texto: str):
+        self.consultas.append(f"lugares:{texto}")
+        if isinstance(self.lugares, BaseException):
+            raise self.lugares
+        return list(self.lugares)
 
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:

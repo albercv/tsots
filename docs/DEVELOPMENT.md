@@ -187,26 +187,30 @@ Package `videopipeline/redes/`:
 
 | Module | Role | Knows the provider? |
 |---|---|---|
-| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known), `Pagina` (Facebook Page) | No |
+| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ubicacion` (typed place name, chosen TikTok `Lugar`, Instagram and X ids; `plataformas()` says which networks get it), `Lugar` (TikTok place from the lookup), `elegir_lugar` (exact-name match, accents and case ignored), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
 | `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
 | `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
 | `proveedor.py` | `Proveedor` protocol, `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
-| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account and Facebook Page lookups | Yes, the only one |
-| `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry | No |
+| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups | Yes, the only one |
+| `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry. Before TikTok, looks up the place by name when none was chosen (no exact match or a failed lookup: TikTok goes out without a location) | No |
 | `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode. Never the key | No |
 
 GUI: `app/widgets/dialogo_publicar.py` (texts, the X text with its live
 counter, platforms, modes, confirmation, upload in a `QThread`,
 per-platform status and links), `app/widgets/dialogo_redes.py` (provider,
 profile, API key, **Check connection**, X Premium, Facebook Page, default
-modes), `app/cuentas.py` (account lookup shared by both dialogs, always in
-the background through `app/segundo_plano.py`),
+modes, location), `app/widgets/selector_ubicacion.py` (the location
+selector both dialogs share, and the one-video location dialog),
+`app/cuentas.py` (account and TikTok place lookups shared by both dialogs,
+always in the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button
 in the bottom bar of `app/main.py`, next to the language selector (app
 settings, not per video, so it is always visible; the Publish dialog also
 opens it).
 Settings (QSettings `redes/*`) store the provider id, the profile, the
-default modes, X Premium, the chosen Facebook Page (per provider) and the
+default modes, X Premium, the chosen Facebook Page and the location (per
+provider; Madrid until one is saved, and the TikTok place is tied to the
+profile it was looked up with) and the
 last successful account lookup (per provider, tied to the profile); never
 the key. The checked platforms are remembered; a list saved before X and
 Facebook existed keeps working (both stay unchecked), and a new user
@@ -263,6 +267,7 @@ class Proveedor(Protocol):
     def estado(self, plataforma, referencia) -> Resultado: ...
     def cuentas(self) -> dict[Plataforma, Cuenta | None]: ...
     def paginas_facebook(self) -> list[Pagina]: ...
+    def lugares_tiktok(self, texto) -> list[Lugar]: ...
 ```
 
 - `publicar` uploads to one platform. It never raises for network or
@@ -270,7 +275,7 @@ class Proveedor(Protocol):
   `pendiente=True` plus an opaque `referencia` when the service keeps
   processing. Error texts never contain the key.
 - `estado` checks a pending upload with that `referencia`, same rules.
-- `cuentas` and `paginas_facebook` are lookups: they raise `ErrorConsulta`
+- `cuentas`, `paginas_facebook` and `lugares_tiktok` are lookups: they raise `ErrorConsulta`
   with a readable message (never the key) and no other exception.
 
 A provider module exposes `NOMBRE` (display name), `USA_PERFIL` (whether it
@@ -344,6 +349,14 @@ thread, for the account lookups (when the Publish dialog opens and on
 - Facebook Pages: `GET /api/uploadposts/facebook/pages?profile=` → list of
   `{page_id, page_name, profile}`, also inside `{"pages": [...]}` or
   `{"data": [...]}`; entries of another profile are dropped.
+- Location: TikTok `tiktok_location_id` + `tiktok_location_name` (both or
+  none), Instagram `location_id` (numeric Facebook Page/place id), X
+  `geo_place_id`; YouTube and Facebook have no field. TikTok places come
+  from `GET /api/uploadposts/tiktok/locations?profile=&q=` (`q` ≤ 100,
+  up to 20 results, ids valid only for that account); without the
+  `location` capability it answers 400 `tiktok_reconnect_required`. A
+  location field the service rejects is ignored: it publishes anyway and
+  says so in `warnings` (kept in the publication log).
 
 ## App bundle (Dock icon)
 

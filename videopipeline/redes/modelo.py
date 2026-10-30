@@ -1,6 +1,8 @@
 """Tipos neutros de la publicación: no saben nada del proveedor."""
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -84,6 +86,83 @@ CATEGORIAS_YOUTUBE = {
 }
 
 
+# Ubicación con que se etiquetan las publicaciones si el usuario no elige otra.
+UBICACION_POR_DEFECTO = "Madrid"
+
+_RE_ID_X = re.compile(r"[0-9a-fA-F]+")
+
+
+def id_instagram_valido(texto: str) -> bool:
+    """Instagram etiqueta con el ID numérico de una página o lugar de Facebook."""
+    return (texto or "").strip().isdigit()
+
+
+def id_x_valido(texto: str) -> bool:
+    """Los lugares de X tienen un ID hexadecimal (p. ej. 01a9a39529b27f36)."""
+    return bool(_RE_ID_X.fullmatch((texto or "").strip()))
+
+
+@dataclass(frozen=True)
+class Lugar:
+    """Lugar de TikTok, tal como lo devuelve la búsqueda del proveedor. Su
+    `id` solo vale para la cuenta con que se buscó."""
+
+    id: str
+    nombre: str
+    direccion: str = ""
+
+    @property
+    def visible(self) -> str:
+        return f"{self.nombre} · {self.direccion}" if self.direccion else self.nombre
+
+
+@dataclass(frozen=True)
+class Ubicacion:
+    """Ubicación de una publicación. Solo TikTok, Instagram y X la admiten y
+    cada una la identifica a su manera; lo que falta o no es válido no se
+    envía.
+
+    `nombre`: lo que escribe el usuario («Madrid»). Si no hay `tiktok`
+    elegido, al publicar se busca en TikTok un lugar que se llame así."""
+
+    nombre: str = ""
+    tiktok: Lugar | None = None
+    instagram_id: str = ""
+    x_id: str = ""
+
+    def plataformas(self) -> tuple[Plataforma, ...]:
+        """Redes en las que irá la ubicación, en el orden de publicación."""
+        con = {
+            Plataforma.TIKTOK: self.tiktok is not None or bool(self.nombre.strip()),
+            Plataforma.INSTAGRAM: id_instagram_valido(self.instagram_id),
+            Plataforma.X: id_x_valido(self.x_id),
+        }
+        return tuple(p for p in ORDEN if con.get(p))
+
+    @property
+    def visible(self) -> str:
+        return self.nombre.strip() or (self.tiktok.nombre if self.tiktok else "")
+
+
+def _normalizado(texto: str) -> str:
+    sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", texto)
+                         if not unicodedata.combining(c))
+    return " ".join(sin_tildes.casefold().split())
+
+
+def elegir_lugar(lugares: list[Lugar], nombre: str) -> Lugar | None:
+    """El primer lugar que se llama `nombre` (sin distinguir mayúsculas ni
+    tildes; «Madrid, Spain» vale por «Madrid»). Ninguno: `None`, sin adivinar."""
+    buscado = _normalizado(nombre)
+    if not buscado:
+        return None
+    for lugar in lugares:
+        propio = _normalizado(lugar.nombre)
+        if buscado in (propio, propio.split(",")[0].strip()):
+            return lugar
+    return None
+
+
 @dataclass(frozen=True)
 class Publicacion:
     video: Path
@@ -105,6 +184,7 @@ class Opciones:
     # textos de más de 280 caracteres en un solo post.
     x_premium: bool = False
     facebook_modo: ModoFacebook = ModoFacebook.REEL
+    ubicacion: Ubicacion = Ubicacion()
 
 
 @dataclass(frozen=True)
@@ -130,7 +210,9 @@ class Cuenta:
     """Cuenta de una plataforma conectada en el proveedor.
 
     `premium`: solo X. `True` si el proveedor lo indica claramente, `None`
-    si no lo sabe (nunca se deduce que no lo tenga)."""
+    si no lo sabe (nunca se deduce que no lo tenga).
+    `ubicacion`: solo TikTok, que pide un permiso propio para etiquetar
+    lugares. `None` si el proveedor no lo dice."""
 
     plataforma: Plataforma
     nombre: str = ""
@@ -138,6 +220,7 @@ class Cuenta:
     reconectar: bool = False
     capacidades: tuple[str, ...] = ()
     premium: bool | None = None
+    ubicacion: bool | None = None
 
     @property
     def visible(self) -> str:

@@ -199,6 +199,22 @@ Qué hace cada modo:
 | Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
 
+**Ubicación.** Las publicaciones salen etiquetadas en **Madrid** salvo que
+elijas otra en Redes… (sección **Ubicación**). Para un solo vídeo, pulsa
+**Cambiar…** junto a «Ubicación» en el diálogo Publicar: la de siempre no
+cambia. Solo TikTok, Instagram y X admiten ubicación:
+
+- **TikTok:** escribe el lugar y pulsa **Buscar en TikTok** para elegirlo
+  de la lista. Sin elegir, al publicar se usa el primero que se llame igual
+  que lo escrito; si ninguno se llama así, TikTok sale sin ubicación. Tu
+  cuenta de TikTok necesita permiso para ubicaciones: si no lo tiene, TSOTS
+  te pide reconectarla en Upload-Post.
+- **Instagram:** el ID numérico de una página o lugar de Facebook.
+- **X:** el ID del lugar en X (hexadecimal).
+
+Lo que falta o no es válido no se envía, y la publicación sigue adelante.
+**Quitar** publica sin ubicación.
+
 TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
 vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar
 con ese vídeo, avisa de que ya se publicó.

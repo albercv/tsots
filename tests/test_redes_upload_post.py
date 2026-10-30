@@ -11,6 +11,7 @@ import pytest
 from videopipeline.redes import publicador, upload_post
 from videopipeline.redes.modelo import (
     Cuenta,
+    Lugar,
     ModoFacebook,
     ModoInstagram,
     ModoTikTok,
@@ -18,6 +19,7 @@ from videopipeline.redes.modelo import (
     Pagina,
     Plataforma,
     Publicacion,
+    Ubicacion,
 )
 from videopipeline.redes.proveedor import ErrorConsulta
 from videopipeline.redes.textos import longitud_x
@@ -830,7 +832,8 @@ def test_cuentas_formas_de_respuesta(envoltorio):
     assert peticion.headers["authorization"] == f"Apikey {CLAVE}"
     assert set(cuentas) == set(Plataforma)
     assert cuentas[Plataforma.TIKTOK] == Cuenta(
-        Plataforma.TIKTOK, nombre="Mi TikTok", usuario="yo_tt", capacidades=("video",))
+        Plataforma.TIKTOK, nombre="Mi TikTok", usuario="yo_tt", capacidades=("video",),
+        ubicacion=False)
     assert cuentas[Plataforma.YOUTUBE] is None  # "" = no conectada
     assert cuentas[Plataforma.INSTAGRAM].reconectar is True
     assert cuentas[Plataforma.INSTAGRAM].visible == "@yo_ig"
@@ -938,3 +941,107 @@ def test_consultas_quedan_en_el_registro_sin_la_clave_ni_el_perfil(tmp_path, mon
     assert "HTTP 200" in texto
     assert CLAVE not in texto
     assert "perfil_secreto" not in texto.split("cuerpo:")[0]
+
+
+# --- ubicación ---
+
+MADRID = Lugar("v2_madrid", "Madrid", "Comunidad de Madrid, España")
+UBICACION = Ubicacion("Madrid", tiktok=MADRID, instagram_id="110184922344060",
+                      x_id="01a9a39529b27f36")
+CAMPOS_UBICACION = ("tiktok_location_id", "tiktok_location_name", "location_id",
+                    "geo_place_id")
+
+
+@pytest.mark.parametrize("plataforma, esperados", [
+    (Plataforma.TIKTOK, {"tiktok_location_id": "v2_madrid", "tiktok_location_name": "Madrid"}),
+    (Plataforma.INSTAGRAM, {"location_id": "110184922344060"}),
+    (Plataforma.X, {"geo_place_id": "01a9a39529b27f36"}),
+    (Plataforma.YOUTUBE, {}),
+    (Plataforma.FACEBOOK, {}),
+])
+def test_ubicacion_en_los_campos_de_cada_red(video, plataforma, esperados):
+    datos = upload_post.campos(plataforma, _pub(video), Opciones(ubicacion=UBICACION), "p",
+                               "123")
+    assert {c: datos[c] for c in CAMPOS_UBICACION if c in datos} == esperados
+
+
+@pytest.mark.parametrize("plataforma", list(Plataforma))
+@pytest.mark.parametrize("ubicacion", [
+    Ubicacion(),
+    Ubicacion("Madrid"),  # sin lugar de TikTok elegido: lo busca el publicador
+    Ubicacion(instagram_id="Madrid", x_id="no vale"),
+])
+def test_sin_ubicacion_valida_no_van_campos_de_ubicacion(video, plataforma, ubicacion):
+    datos = upload_post.campos(plataforma, _pub(video), Opciones(ubicacion=ubicacion), "p",
+                               "123")
+    assert not set(CAMPOS_UBICACION) & set(datos)
+
+
+def test_ubicacion_llega_en_la_subida(video):
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video), Opciones(ubicacion=UBICACION))
+    formulario = servidor.formularios[0]
+    assert formulario["tiktok_location_id"] == ["v2_madrid"]
+    assert formulario["tiktok_location_name"] == ["Madrid"]
+
+
+def test_lugares_tiktok_consulta_y_respuesta():
+    cuerpo = {"success": True, "locations": [
+        {"location_id": "v2_madrid", "location_name": "Madrid",
+         "location_address": "Comunidad de Madrid, España"},
+        {"location_id": "v2_sol", "location_name": "Puerta del Sol"},
+        {"location_name": "sin id"},
+        "basura",
+    ]}
+    servidor = Servidor(_responder_json(cuerpo))
+    lugares = _proveedor(servidor).lugares_tiktok("  Madrid ")
+    assert lugares == [MADRID, Lugar("v2_sol", "Puerta del Sol")]
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert peticion.url.path == "/api/uploadposts/tiktok/locations"
+    assert peticion.url.params["profile"] == "mi_perfil"
+    assert peticion.url.params["q"] == "Madrid"
+    assert peticion.headers["authorization"] == f"Apikey {CLAVE}"
+
+
+def test_lugares_tiktok_texto_largo_se_acota_y_vacio_no_consulta():
+    servidor = Servidor(_responder_json({"locations": []}))
+    assert _proveedor(servidor).lugares_tiktok("a" * 150) == []
+    assert servidor.peticiones[0].url.params["q"] == "a" * 100
+    with pytest.raises(ErrorConsulta):
+        _proveedor(servidor).lugares_tiktok("   ")
+    assert len(servidor.peticiones) == 1
+
+
+def test_lugares_tiktok_sin_permiso_de_ubicacion_pide_reconectar():
+    cuerpo = {"success": False, "error": "tiktok_reconnect_required",
+              "message": "Missing location capability"}
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, 400))).lugares_tiktok("Madrid")
+    assert "Reconecta TikTok" in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+@pytest.mark.parametrize("codigo, cuerpo", [(500, {"error": "x"}), (200, {"raro": 1}),
+                                            (404, {"error": "PROFILE_NOT_FOUND"})])
+def test_lugares_tiktok_errores(codigo, cuerpo):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, codigo))).lugares_tiktok("Madrid")
+    assert str(error.value) and CLAVE not in str(error.value)
+
+
+@pytest.mark.parametrize("capacidades, esperado", [
+    (["video", "location"], True),
+    ({"video": True, "location": True}, True),
+    (["video"], False),
+    ({"location": False}, False),
+    (None, None),  # el servicio no dice nada: no se sabe
+])
+def test_cuenta_de_tiktok_dice_si_admite_ubicacion(capacidades, esperado):
+    tiktok = {"handle": "yo"}
+    if capacidades is not None:
+        tiktok["capabilities"] = capacidades
+    sa = _cuentas_json(tiktok=tiktok, x={"handle": "yo", "capabilities": ["location"]})
+    cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()
+    assert cuentas[Plataforma.TIKTOK].ubicacion is esperado
+    assert cuentas[Plataforma.X].ubicacion is None  # solo TikTok lo exige

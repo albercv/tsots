@@ -199,6 +199,22 @@ What each mode does:
 | Facebook | **Regular video** | A video published on your Page. |
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
 
+**Location.** Posts are tagged with **Madrid** unless you pick another place
+in Networks… (**Location** section). For a single video, press **Change…**
+next to "Location" in the Publish dialog: the usual one stays as it is.
+Only TikTok, Instagram and X support a location:
+
+- **TikTok:** type the place and press **Search TikTok** to pick it from
+  the list. If you don't pick one, the first place with that exact name is
+  used when publishing; if none has it, TikTok is posted without a
+  location. Your TikTok account needs the location permission: if it
+  lacks it, TSOTS asks you to reconnect it in Upload-Post.
+- **Instagram:** the numeric ID of a Facebook Page or place.
+- **X:** the X place ID (hexadecimal).
+
+Anything missing or invalid is not sent, and the post goes ahead.
+**Remove** posts without a location.
+
 TSOTS writes `name_limpio.publicado.json` next to the video (platform,
 date, link, service). If you open Publish again for that video, it warns
 you that it was already published.

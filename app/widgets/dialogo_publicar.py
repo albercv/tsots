@@ -43,6 +43,7 @@ from videopipeline.redes.modelo import (
     Plataforma,
     Publicacion,
     Resultado,
+    Ubicacion,
 )
 from videopipeline.redes.publicador import Estado
 from videopipeline.redes.textos import (
@@ -57,6 +58,7 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
+from .selector_ubicacion import DialogoUbicacion
 
 # Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
 # tests la sustituyen.
@@ -209,6 +211,8 @@ class DialogoPublicar(QDialog):
         self.ruta_log: Path | None = None
         self._en_curso: list[Plataforma] = []
         self._opciones_en_curso = Opciones()
+        # Ubicación cambiada solo para este vídeo; `None`: la de Redes….
+        self._ubicacion_propia: Ubicacion | None = None
         self._procesando: set[Plataforma] = set()
         self.resultados: dict[Plataforma, Resultado] = {}
         self.setWindowTitle(_("Publicar en redes"))
@@ -294,6 +298,17 @@ class DialogoPublicar(QDialog):
             rejilla.addWidget(estado, fila, 2)
         raiz.addWidget(grupo_plataformas)
 
+        fila_ubicacion = QHBoxLayout()
+        fila_ubicacion.addWidget(QLabel(_("Ubicación:")))
+        self.etiqueta_ubicacion = QLabel()
+        self.etiqueta_ubicacion.setWordWrap(True)
+        fila_ubicacion.addWidget(self.etiqueta_ubicacion, 1)
+        self.boton_ubicacion = QPushButton(_("Cambiar…"))
+        self.boton_ubicacion.setToolTip(_("Cambia la ubicación solo para este vídeo"))
+        self.boton_ubicacion.clicked.connect(self._cambiar_ubicacion)
+        fila_ubicacion.addWidget(self.boton_ubicacion)
+        raiz.addLayout(fila_ubicacion)
+
         # Indeterminada mientras se publica. Sin altura máxima: con el estilo de
         # macOS una barra de 6 px no se dibuja.
         self.barra = QProgressBar()
@@ -366,7 +381,13 @@ class DialogoPublicar(QDialog):
             youtube_categoria=self.ajustes.youtube_categoria,
             x_premium=self.ajustes.x_premium,
             facebook_modo=ModoFacebook(self.combo_facebook.currentData()),
+            ubicacion=self.ubicacion(),
         )
+
+    def ubicacion(self) -> Ubicacion:
+        if self._ubicacion_propia is not None:
+            return self._ubicacion_propia
+        return self.ajustes.ubicacion
 
     def publicacion(self) -> Publicacion:
         return Publicacion(
@@ -377,6 +398,38 @@ class DialogoPublicar(QDialog):
             palabras_clave=self._palabras_clave,
             texto_x=self.campo_x.toPlainText().strip(),
         )
+
+    # --- ubicación ---
+
+    def _texto_ubicacion(self, redes: tuple[Plataforma, ...] | None = None) -> str:
+        """«Madrid (TikTok, Instagram)» o «Sin ubicación». `redes`: solo esas."""
+        ubicacion = self.ubicacion()
+        con = [p for p in ubicacion.plataformas() if redes is None or p in redes]
+        if not con:
+            return _("Sin ubicación")
+        return _("{lugar} ({redes})").format(
+            lugar=ubicacion.visible or _("IDs propios"), redes=", ".join(p.nombre for p in con))
+
+    def _refrescar_ubicacion(self) -> None:
+        texto = self._texto_ubicacion()
+        if self._ubicacion_propia is not None:
+            texto += " · " + _("solo este vídeo")
+        self.etiqueta_ubicacion.setText(texto)
+
+    def _preparar_busqueda(self, texto: str):
+        nombre, datos = self.ajustes.proveedor_redes, self.ajustes.ajustes_proveedor()
+        llavero, fabrica = self.llavero, self.fabrica
+        return lambda: consulta_cuentas.buscar_lugares(llavero, fabrica, nombre, datos, texto)
+
+    def _cambiar_ubicacion(self) -> None:
+        dialogo = DialogoUbicacion(self.ubicacion(), self._preparar_busqueda, self)
+        dialogo.selector.poner_cuenta_tiktok(
+            self._cuentas.get(Plataforma.TIKTOK),
+            proveedores.nombre_visible(self.ajustes.proveedor_redes))
+        if dialogo.exec():
+            nueva = dialogo.ubicacion()
+            self._ubicacion_propia = None if nueva == self.ajustes.ubicacion else nueva
+            self._refrescar_ubicacion()
 
     # --- texto de X ---
 
@@ -537,6 +590,7 @@ class DialogoPublicar(QDialog):
         self._fecha_cuentas = guardadas.fecha if guardadas else ""
         self._error_cuentas = ""
         self._refrescar_etiqueta_servicio()
+        self._refrescar_ubicacion()
         self._consultar_cuentas()
         self._refrescar()
 
@@ -621,6 +675,9 @@ class DialogoPublicar(QDialog):
         dudosas = [p.nombre for p in ORDEN if p in ultimas and ultimas[p].sin_confirmar]
         texto = _("Se publicará «{titulo}» en:\n\n{resumen}").format(
             titulo=self.campo_titulo.text().strip(), resumen=self._resumen())
+        if set(self.ubicacion().plataformas()) & elegidas:
+            texto += "\n\n" + _("Ubicación: {ubicacion}").format(
+                ubicacion=self._texto_ubicacion(tuple(elegidas)))
         if confirmadas:
             texto += "\n\n" + _("Ya publicado antes en: {lista}.").format(
                 lista=", ".join(confirmadas))
@@ -753,6 +810,13 @@ class DialogoPublicar(QDialog):
                      self.tamano if self.tamano is not None else "?")
         if Plataforma.FACEBOOK in plataformas:
             log.info("Página de Facebook: %s", "sí" if self.ajustes.pagina_facebook else "no")
+        ubicacion = opciones.ubicacion
+        log.info("Ubicación%s: %r · TikTok: %s · Instagram: %s · X: %s",
+                 " (solo este vídeo)" if self._ubicacion_propia is not None else "",
+                 ubicacion.nombre,
+                 f"{ubicacion.tiktok.visible} ({ubicacion.tiktok.id})" if ubicacion.tiktok
+                 else ("se busca al publicar" if ubicacion.nombre.strip() else "no"),
+                 ubicacion.instagram_id or "no", ubicacion.x_id or "no")
         if self._cuentas_en_vivo:
             log.info("Cuentas (comprobadas a las %s): %s", self._fecha_cuentas,
                      consulta_cuentas.resumen(self._cuentas))
@@ -811,6 +875,7 @@ class DialogoPublicar(QDialog):
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
                        self.campo_x, self.combo_tiktok, self.combo_instagram,
                        self.combo_facebook, self.boton_redes, self.boton_cerrar,
+                       self.boton_ubicacion,
                        *self.casillas.values()):
             widget.setEnabled(not bloqueado)
         self.barra.setVisible(bloqueado)

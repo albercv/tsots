@@ -20,7 +20,7 @@ from types import ModuleType
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..i18n import _
-from .modelo import Cuenta, Opciones, Pagina, Plataforma, Publicacion, Resultado
+from .modelo import Cuenta, Lugar, Opciones, Pagina, Plataforma, Publicacion, Resultado
 
 
 class ErrorConsulta(Exception):
@@ -52,6 +52,11 @@ class Proveedor(Protocol):
 
     def paginas_facebook(self) -> list[Pagina]:
         """Páginas de Facebook a las que puede publicar. Lanza `ErrorConsulta`."""
+        ...
+
+    def lugares_tiktok(self, texto: str) -> list[Lugar]:
+        """Lugares de TikTok que coinciden con `texto`, para etiquetar la
+        ubicación. Lanza `ErrorConsulta`."""
         ...
 
 

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-27 14:40+0100\n"
+"POT-Creation-Date: 2026-10-30 10:31+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -81,6 +81,10 @@ msgstr ""
 msgid "Autodetectar"
 msgstr ""
 
+#, python-brace-format
+msgid "Automático: el lugar que se llame «{nombre}»"
+msgstr ""
+
 msgid "Añadir subtítulos"
 msgstr ""
 
@@ -93,10 +97,19 @@ msgstr ""
 msgid "Borrador (lo terminas en la app)"
 msgstr ""
 
+msgid "Buscando…"
+msgstr ""
+
+msgid "Buscar en TikTok"
+msgstr ""
+
 msgid "Caja blanca"
 msgstr ""
 
 msgid "Caja negra"
+msgstr ""
+
+msgid "Cambia la ubicación solo para este vídeo"
 msgstr ""
 
 msgid "Cambiar…"
@@ -138,6 +151,9 @@ msgid "Ciencia y tecnología"
 msgstr ""
 
 msgid "Cierra otras aplicaciones, o divide el vídeo en partes más cortas."
+msgstr ""
+
+msgid "Ciudad o lugar, p. ej. Madrid"
 msgstr ""
 
 #, python-brace-format
@@ -348,6 +364,10 @@ msgstr ""
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr ""
 
+#, python-brace-format
+msgid "Elige uno de la lista: ninguno se llama «{texto}». Sin elegir, TikTok se publica sin ubicación."
+msgstr ""
+
 msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.upload-post.com/manage-users), donde conectaste tus redes. No es el email de tu cuenta."
 msgstr ""
 
@@ -375,6 +395,10 @@ msgid "Error inesperado ({tipo}). Detalles en el registro: {fichero}"
 msgstr ""
 
 #, python-brace-format
+msgid "Error inesperado al buscar el lugar ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "Error inesperado al consultar las cuentas ({tipo})."
 msgstr ""
 
@@ -391,6 +415,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Error: {titulo}"
+msgstr ""
+
+msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
 msgid "Escribe el perfil del servicio para comprobarlo."
@@ -485,6 +512,15 @@ msgstr ""
 msgid "ID de la página (un número)"
 msgstr ""
 
+msgid "ID del lugar en X (opcional)"
+msgstr ""
+
+msgid "ID numérico de una página o lugar de Facebook (opcional)"
+msgstr ""
+
+msgid "IDs propios"
+msgstr ""
+
 msgid "Idioma"
 msgstr ""
 
@@ -550,6 +586,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
+msgstr ""
+
+msgid "Lugar:"
 msgstr ""
 
 msgid "Límite de subidas del plan alcanzado (429)."
@@ -837,6 +876,9 @@ msgstr ""
 msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Facebook"
 msgstr ""
 
+msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
+msgstr ""
+
 msgid "Preparación del audio"
 msgstr ""
 
@@ -882,6 +924,9 @@ msgstr ""
 msgid "Publicar en redes"
 msgstr ""
 
+msgid "Publicar sin ubicación"
+msgstr ""
+
 msgid "Publicar…"
 msgstr ""
 
@@ -908,6 +953,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "Qué hacer: {solucion}"
+msgstr ""
+
+#, python-brace-format
+msgid "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones."
 msgstr ""
 
 msgid "Recortando silencios"
@@ -951,6 +1000,9 @@ msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
 msgstr ""
 
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
 msgstr ""
 
 #, python-brace-format
@@ -1047,7 +1099,16 @@ msgstr ""
 msgid "Sin pista de audio"
 msgstr ""
 
+msgid "Sin ubicación"
+msgstr ""
+
+msgid "Sin ubicación en TikTok"
+msgstr ""
+
 msgid "Sistema"
+msgstr ""
+
+msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
 msgstr ""
 
 #, python-brace-format
@@ -1100,6 +1161,10 @@ msgstr ""
 msgid "Textos"
 msgstr ""
 
+#, python-brace-format
+msgid "TikTok no encuentra «{texto}»."
+msgstr ""
+
 msgid "Transcribiendo"
 msgstr ""
 
@@ -1117,6 +1182,19 @@ msgid "Título, caption y hashtags"
 msgstr ""
 
 msgid "Título:"
+msgstr ""
+
+msgid "Ubicación"
+msgstr ""
+
+msgid "Ubicación de este vídeo"
+msgstr ""
+
+msgid "Ubicación:"
+msgstr ""
+
+#, python-brace-format
+msgid "Ubicación: {ubicacion}"
 msgstr ""
 
 msgid "Umbral:"
@@ -1175,6 +1253,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Ya publicado antes en: {lista}."
+msgstr ""
+
+msgid "YouTube y Facebook no admiten ubicación. Instagram y X solo la llevan si pones su ID."
 msgstr ""
 
 msgid "argumentos inválidos: se requiere --config"
@@ -1254,11 +1335,18 @@ msgstr ""
 msgid "small (rápido)"
 msgstr ""
 
+msgid "solo este vídeo"
+msgstr ""
+
 msgid "turbo (recomendado)"
 msgstr ""
 
 #, python-brace-format
 msgid "{descripcion} falló (código {codigo})"
+msgstr ""
+
+#, python-brace-format
+msgid "{lugar} ({redes})"
 msgstr ""
 
 #, python-brace-format
@@ -1306,6 +1394,12 @@ msgstr ""
 msgid "▶ Procesar"
 msgstr ""
 
+msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
+msgstr ""
+
+msgid "⚠ El ID de X es hexadecimal (p. ej. 01a9a39529b27f36): no se enviará."
+msgstr ""
+
 msgid "⚠ El ID de una página solo tiene números."
 msgstr ""
 
@@ -1314,6 +1408,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá repetido."
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ Reconecta TikTok en {servicio}: tu cuenta no tiene permiso para etiquetar ubicaciones."
 msgstr ""
 
 #, python-brace-format

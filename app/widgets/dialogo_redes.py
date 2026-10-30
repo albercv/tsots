@@ -41,6 +41,7 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
+from .selector_ubicacion import SelectorUbicacion
 
 Fabrica = Callable[[str, str, dict], proveedores.Proveedor]
 
@@ -221,6 +222,13 @@ class DialogoRedes(QDialog):
         formulario_defecto.addRow("", self.ayuda_pagina)
         raiz.addWidget(grupo_defecto)
 
+        grupo_ubicacion = QGroupBox(_("Ubicación"))
+        caja_ubicacion = QVBoxLayout(grupo_ubicacion)
+        self.selector_ubicacion = SelectorUbicacion(
+            ajustes.ubicacion_de(self.proveedor), self._preparar_busqueda)
+        caja_ubicacion.addWidget(self.selector_ubicacion)
+        raiz.addWidget(grupo_ubicacion)
+
         botones = QDialogButtonBox()
         self.boton_guardar = botones.addButton(_("Guardar"),
                                                QDialogButtonBox.ButtonRole.AcceptRole)
@@ -255,8 +263,12 @@ class DialogoRedes(QDialog):
         self.aviso_pagina.hide()
         pagina = self.ajustes.pagina_facebook_de(self.proveedor)
         self._poner_paginas([pagina] if pagina else [], pagina.id if pagina else "")
+        self.selector_ubicacion.poner(self.ajustes.ubicacion_de(self.proveedor))
         guardadas = (self.ajustes.cuentas_guardadas()
                      if self.proveedor == self.ajustes.proveedor_redes else None)
+        self.selector_ubicacion.poner_cuenta_tiktok(
+            guardadas.cuentas.get(Plataforma.TIKTOK) if guardadas else None,
+            proveedores.nombre_visible(self.proveedor))
         if guardadas is not None:
             self._mostrar_cuentas(guardadas.cuentas)
             try:
@@ -351,6 +363,8 @@ class DialogoRedes(QDialog):
         self._comprobadas = (perfil, consulta.cuentas)
         self._mostrar_cuentas(consulta.cuentas)
         self._poner_consulta(_("Comprobado ahora."), COLOR_OK)
+        self.selector_ubicacion.poner_cuenta_tiktok(consulta.cuentas.get(Plataforma.TIKTOK),
+                                                    proveedores.nombre_visible(self.proveedor))
         cuenta_x = consulta.cuentas.get(Plataforma.X)
         if cuenta_x is not None and cuenta_x.premium:
             self.casilla_x_premium.setChecked(True)
@@ -379,6 +393,16 @@ class DialogoRedes(QDialog):
             self.aviso_pagina.setText(_("Facebook no está conectada en {servicio}.").format(
                 servicio=servicio))
             self.aviso_pagina.show()
+
+    def _preparar_busqueda(self, texto: str):
+        """Búsqueda de lugares de TikTok con el perfil y la clave que hay
+        escritos (o la del Llavero): se lee aquí, en el hilo de la interfaz."""
+        nombre, perfil = self.proveedor, self.campo_perfil.text().strip()
+        clave = self.campo_clave.text().strip() or None
+        llavero, fabrica = self.llavero, self.fabrica
+        datos = {"perfil": perfil, "pagina_facebook": ""}
+        return lambda: consulta_cuentas.buscar_lugares(llavero, fabrica, nombre, datos, texto,
+                                                       clave=clave)
 
     def _refrescar_perfil(self, *args) -> None:
         self.aviso_perfil.setVisible(
@@ -419,6 +443,7 @@ class DialogoRedes(QDialog):
         self.ajustes.x_premium = self.casilla_x_premium.isChecked()
         self.ajustes.facebook_modo = ModoFacebook(self.combo_facebook.currentData())
         self.ajustes.guardar_pagina_facebook(self.proveedor, self.pagina_elegida())
+        self.ajustes.guardar_ubicacion(self.proveedor, self.selector_ubicacion.ubicacion())
         if self._comprobadas is not None and self._comprobadas[0] == self.ajustes.perfil_redes:
             self.ajustes.guardar_cuentas(self._comprobadas[1])
         super().accept()

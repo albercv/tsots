@@ -10,7 +10,7 @@ from typing import Callable
 
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes.modelo import Cuenta, Pagina, Plataforma
+from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma
 
 from . import credenciales
 
@@ -42,19 +42,9 @@ def consultar(llavero, fabrica: Fabrica, nombre: str, datos: dict, *,
     `clave`: la API key recién escrita; si falta, se lee del Llavero.
     `paginas`: `True` las pide siempre, `False` nunca y `None` solo si
     Facebook está conectada."""
-    try:
-        if not clave:
-            clave = llavero.leer(nombre)
-        if not clave:
-            return Consulta(error=_("Falta la API key del servicio: guárdala en Redes…"))
-        servicio = fabrica(nombre, clave, datos)
-    except credenciales.ErrorLlavero as e:  # su mensaje nunca lleva la clave
-        return Consulta(error=str(e))
-    except Exception as e:  # el mensaje de otra excepción podría llevarla: solo el tipo
-        return Consulta(error=_("No se pudo preparar la consulta ({tipo}).").format(
-            tipo=type(e).__name__))
-    finally:
-        clave = None
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, clave)
+    if servicio is None:
+        return Consulta(error=error)
     try:
         cuentas = servicio.cuentas()
     except proveedores.ErrorConsulta as e:
@@ -71,6 +61,41 @@ def consultar(llavero, fabrica: Fabrica, nombre: str, datos: dict, *,
     except Exception as e:
         return Consulta(cuentas=cuentas, error_paginas=_(
             "Error inesperado al consultar las páginas ({tipo}).").format(tipo=type(e).__name__))
+
+
+def buscar_lugares(llavero, fabrica: Fabrica, nombre: str, datos: dict, texto: str, *,
+                   clave: str | None = None) -> tuple[list[Lugar] | None, str]:
+    """Lugares de TikTok que se llaman como `texto`: `(lugares, "")` o
+    `(None, motivo)`. Como `consultar`, para fuera del hilo de la interfaz:
+    nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, clave)
+    if servicio is None:
+        return None, error
+    try:
+        return servicio.lugares_tiktok(texto), ""
+    except proveedores.ErrorConsulta as e:
+        return None, str(e)
+    except Exception as e:
+        return None, _("Error inesperado al buscar el lugar ({tipo}).").format(
+            tipo=type(e).__name__)
+
+
+def _servicio(llavero, fabrica: Fabrica, nombre: str, datos: dict,
+              clave: str | None) -> tuple[proveedores.Proveedor | None, str]:
+    """El proveedor listo para consultar, o `None` y el motivo."""
+    try:
+        if not clave:
+            clave = llavero.leer(nombre)
+        if not clave:
+            return None, _("Falta la API key del servicio: guárdala en Redes…")
+        return fabrica(nombre, clave, datos), ""
+    except credenciales.ErrorLlavero as e:  # su mensaje nunca lleva la clave
+        return None, str(e)
+    except Exception as e:  # el mensaje de otra excepción podría llevarla: solo el tipo
+        return None, _("No se pudo preparar la consulta ({tipo}).").format(
+            tipo=type(e).__name__)
+    finally:
+        clave = None
 
 
 def describir(plataforma: Plataforma, cuenta: Cuenta | None, servicio: str) -> tuple[str, str]:
