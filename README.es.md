@@ -200,7 +200,8 @@ Qué hace cada modo:
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
 
 **Ubicación.** Las publicaciones salen etiquetadas en **Madrid** salvo que
-elijas otra en Redes… (sección **Ubicación**). Para un solo vídeo, pulsa
+elijas otra en Redes… (**Ubicación**, en «Al publicar», botón
+**Cambiar…**). Para un solo vídeo, pulsa
 **Cambiar…** junto a «Ubicación» en el diálogo Publicar: la de siempre no
 cambia. Solo TikTok, Instagram y X admiten ubicación:
 

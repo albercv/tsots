@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 10:31+0100\n"
+"POT-Creation-Date: 2026-10-30 10:53+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -565,6 +565,9 @@ msgstr "The model's response is not valid: missing fields or wrong types"
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr "The transcript is empty; there is no text for the caption"
 
+msgid "La ubicación con que se publica cada vídeo"
+msgstr "The location every video is posted with"
+
 msgid "Leyendo la API key del Llavero…"
 msgstr "Reading the API key from the Keychain…"
 
@@ -1050,6 +1053,9 @@ msgstr ""
 "\n"
 "{resumen}"
 
+msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
+msgstr "Used for every post. In Publish you can change it for a single video."
+
 msgid "Seguir la cara"
 msgstr "Follow the face"
 
@@ -1194,11 +1200,11 @@ msgstr "Title, caption and hashtags"
 msgid "Título:"
 msgstr "Title:"
 
-msgid "Ubicación"
-msgstr "Location"
-
 msgid "Ubicación de este vídeo"
 msgstr "Location for this video"
+
+msgid "Ubicación de siempre"
+msgstr "Usual location"
 
 msgid "Ubicación:"
 msgstr "Location:"
@@ -1465,6 +1471,9 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 
 #~ msgid "Solo limpiar audio"
 #~ msgstr "Clean audio only"
+
+#~ msgid "Ubicación"
+#~ msgstr "Location"
 
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"

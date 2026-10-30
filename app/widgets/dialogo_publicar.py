@@ -58,7 +58,7 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
-from .selector_ubicacion import DialogoUbicacion
+from .selector_ubicacion import DialogoUbicacion, describir_ubicacion
 
 # Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
 # tests la sustituyen.
@@ -401,17 +401,8 @@ class DialogoPublicar(QDialog):
 
     # --- ubicación ---
 
-    def _texto_ubicacion(self, redes: tuple[Plataforma, ...] | None = None) -> str:
-        """«Madrid (TikTok, Instagram)» o «Sin ubicación». `redes`: solo esas."""
-        ubicacion = self.ubicacion()
-        con = [p for p in ubicacion.plataformas() if redes is None or p in redes]
-        if not con:
-            return _("Sin ubicación")
-        return _("{lugar} ({redes})").format(
-            lugar=ubicacion.visible or _("IDs propios"), redes=", ".join(p.nombre for p in con))
-
     def _refrescar_ubicacion(self) -> None:
-        texto = self._texto_ubicacion()
+        texto = describir_ubicacion(self.ubicacion())
         if self._ubicacion_propia is not None:
             texto += " · " + _("solo este vídeo")
         self.etiqueta_ubicacion.setText(texto)
@@ -422,7 +413,9 @@ class DialogoPublicar(QDialog):
         return lambda: consulta_cuentas.buscar_lugares(llavero, fabrica, nombre, datos, texto)
 
     def _cambiar_ubicacion(self) -> None:
-        dialogo = DialogoUbicacion(self.ubicacion(), self._preparar_busqueda, self)
+        dialogo = DialogoUbicacion(
+            self.ubicacion(), self._preparar_busqueda, _("Ubicación de este vídeo"),
+            _("Solo para este vídeo. La de siempre se cambia en Redes…."), self)
         dialogo.selector.poner_cuenta_tiktok(
             self._cuentas.get(Plataforma.TIKTOK),
             proveedores.nombre_visible(self.ajustes.proveedor_redes))
@@ -677,7 +670,7 @@ class DialogoPublicar(QDialog):
             titulo=self.campo_titulo.text().strip(), resumen=self._resumen())
         if set(self.ubicacion().plataformas()) & elegidas:
             texto += "\n\n" + _("Ubicación: {ubicacion}").format(
-                ubicacion=self._texto_ubicacion(tuple(elegidas)))
+                ubicacion=describir_ubicacion(self.ubicacion(), elegidas))
         if confirmadas:
             texto += "\n\n" + _("Ya publicado antes en: {lista}.").format(
                 lista=", ".join(confirmadas))

@@ -1225,51 +1225,103 @@ def _buscar_en(selector, qtbot, texto):
     _esperar_consultas(qtbot)
 
 
-def test_dialogo_redes_ubicacion_madrid_por_defecto_y_se_guarda(qtbot, ajustes, llavero_falso):
+def _cambiar_ubicacion(monkeypatch, cambio, aceptar=True):
+    """Sustituye el diálogo modal de ubicación: aplica `cambio` al selector
+    y lo acepta (o lo cancela)."""
+    from app.widgets.selector_ubicacion import DialogoUbicacion
+
+    def exec_(self):
+        cambio(self.selector)
+        return 1 if aceptar else 0
+
+    monkeypatch.setattr(DialogoUbicacion, "exec", exec_)
+
+
+def test_dialogo_redes_cabe_en_la_pantalla_de_un_portatil(qtbot, ajustes, llavero_falso):
+    """Con el estilo de macOS, un portátil de 14" deja 1003 px de alto: la
+    ubicación es una fila, no una sección que empuje Guardar fuera."""
+    dialogo = _redes(qtbot, ajustes, ProveedorFalso())
+    assert dialogo.sizeHint().height() <= 900
+
+
+def test_dialogo_redes_ubicacion_madrid_por_defecto_y_se_guarda(qtbot, ajustes, llavero_falso,
+                                                                monkeypatch):
     _listo(ajustes, llavero_falso)
     proveedor = ProveedorFalso(lugares=[SOL, MADRID])
     capturado: dict = {}
     dialogo = _redes(qtbot, ajustes, proveedor, capturado)
-    selector = dialogo.selector_ubicacion
-    assert selector.campo_nombre.text() == "Madrid"
-    assert selector.combo_tiktok.currentData() is None  # automático
-    assert "Madrid" in selector.combo_tiktok.currentText()
-    _buscar_en(selector, qtbot, "Madrid")
+    assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok)"
+    vistos: dict = {}
+
+    def cambio(selector):
+        assert selector.campo_nombre.text() == "Madrid"
+        assert selector.combo_tiktok.currentData() is None  # automático
+        assert "Madrid" in selector.combo_tiktok.currentText()
+        _buscar_en(selector, qtbot, "Madrid")
+        # Se elige solo el que se llama igual; el resto queda en la lista.
+        vistos["elegido"] = selector.combo_tiktok.currentData()
+        vistos["opciones"] = selector.combo_tiktok.count()
+        selector.combo_tiktok.setCurrentIndex(selector.combo_tiktok.findData(SOL))
+        selector.campo_instagram.setText("110184922344060")
+        selector.campo_x.setText("01a9a39529b27f36")
+
+    _cambiar_ubicacion(monkeypatch, cambio)
+    dialogo.boton_ubicacion.click()
+    assert vistos == {"elegido": MADRID, "opciones": 3}
     assert proveedor.consultas == ["lugares:Madrid"]
     assert capturado["clave"] == CLAVE and capturado["datos"]["perfil"] == "mi_perfil"
-    # Se elige solo el que se llama igual; el resto queda en la lista.
-    assert selector.combo_tiktok.currentData() == MADRID
-    assert selector.combo_tiktok.count() == 3
-    selector.combo_tiktok.setCurrentIndex(selector.combo_tiktok.findData(SOL))
-    selector.campo_instagram.setText("110184922344060")
-    selector.campo_x.setText("01a9a39529b27f36")
+    assert dialogo.etiqueta_ubicacion.text() == "Madrid (TikTok, Instagram, X)"
+    assert ajustes.ubicacion == Ubicacion("Madrid")  # hasta Guardar, nada
     dialogo.accept()
     assert ajustes.ubicacion == Ubicacion("Madrid", tiktok=SOL, instagram_id="110184922344060",
                                           x_id="01a9a39529b27f36")
     # Al volver a abrir, el lugar elegido sigue ahí.
     dialogo = _redes(qtbot, ajustes, proveedor)
-    assert dialogo.selector_ubicacion.combo_tiktok.currentData() == SOL
+    _cambiar_ubicacion(monkeypatch,
+                       lambda s: vistos.update(otra_vez=s.combo_tiktok.currentData()))
+    dialogo.boton_ubicacion.click()
+    assert vistos["otra_vez"] == SOL
+
+
+def test_dialogo_redes_cancelar_no_guarda_la_ubicacion(qtbot, ajustes, llavero_falso,
+                                                        monkeypatch):
+    dialogo = _redes(qtbot, ajustes, ProveedorFalso())
+    _cambiar_ubicacion(monkeypatch, lambda s: s.campo_nombre.setText("Sevilla"))
+    dialogo.boton_ubicacion.click()
+    assert "Sevilla" in dialogo.etiqueta_ubicacion.text()
+    dialogo.reject()
+    assert ajustes.ubicacion == Ubicacion("Madrid")
+
+
+def test_dialogo_redes_quitar_ubicacion(qtbot, ajustes, llavero_falso, monkeypatch):
+    ajustes.ubicacion = Ubicacion("Madrid", tiktok=MADRID, instagram_id="1", x_id="ab")
+    dialogo = _redes(qtbot, ajustes, ProveedorFalso())
+    _cambiar_ubicacion(monkeypatch, lambda s: s.boton_quitar.click())
+    dialogo.boton_ubicacion.click()
+    assert dialogo.etiqueta_ubicacion.text() == "Sin ubicación"
+    dialogo.accept()
+    assert ajustes.ubicacion == Ubicacion()
+
+
+def _selector(qtbot, ajustes, proveedor, ubicacion=Ubicacion("Madrid")):
+    """Selector suelto, con la búsqueda del diálogo Redes…."""
+    from app.widgets.selector_ubicacion import SelectorUbicacion
+
+    redes = _redes(qtbot, ajustes, proveedor)
+    selector = SelectorUbicacion(ubicacion, redes._preparar_busqueda)
+    qtbot.addWidget(selector)
+    return selector
 
 
 def test_selector_cambiar_el_nombre_vuelve_a_automatico(qtbot, ajustes, llavero_falso):
     _listo(ajustes, llavero_falso)
-    dialogo = _redes(qtbot, ajustes, ProveedorFalso(lugares=[MADRID]))
-    selector = dialogo.selector_ubicacion
+    selector = _selector(qtbot, ajustes, ProveedorFalso(lugares=[MADRID]))
     _buscar_en(selector, qtbot, "Madrid")
     assert selector.combo_tiktok.currentData() == MADRID
     selector.campo_nombre.setText("Sevilla")
     assert selector.combo_tiktok.currentData() is None
     assert "Sevilla" in selector.combo_tiktok.currentText()
     assert selector.ubicacion() == Ubicacion("Sevilla")
-
-
-def test_selector_quitar_ubicacion(qtbot, ajustes, llavero_falso):
-    ajustes.ubicacion = Ubicacion("Madrid", tiktok=MADRID, instagram_id="1", x_id="ab")
-    dialogo = _redes(qtbot, ajustes, ProveedorFalso())
-    dialogo.selector_ubicacion.boton_quitar.click()
-    assert dialogo.selector_ubicacion.ubicacion() == Ubicacion()
-    dialogo.accept()
-    assert ajustes.ubicacion == Ubicacion()
 
 
 @pytest.mark.parametrize("lugares, texto", [
@@ -1281,8 +1333,7 @@ def test_selector_quitar_ubicacion(qtbot, ajustes, llavero_falso):
 def test_selector_busqueda_sin_lugar_claro_lo_explica(qtbot, ajustes, llavero_falso,
                                                       lugares, texto):
     _listo(ajustes, llavero_falso)
-    dialogo = _redes(qtbot, ajustes, ProveedorFalso(lugares=lugares))
-    selector = dialogo.selector_ubicacion
+    selector = _selector(qtbot, ajustes, ProveedorFalso(lugares=lugares))
     _buscar_en(selector, qtbot, "Madrid")
     assert selector.combo_tiktok.currentData() is None
     assert texto in selector.aviso_tiktok.text()
@@ -1292,15 +1343,14 @@ def test_selector_busqueda_sin_lugar_claro_lo_explica(qtbot, ajustes, llavero_fa
 def test_selector_sin_clave_no_busca(qtbot, ajustes, llavero_falso):
     ajustes.perfil_redes = "mi_perfil"
     proveedor = ProveedorFalso()
-    dialogo = _redes(qtbot, ajustes, proveedor)
-    _buscar_en(dialogo.selector_ubicacion, qtbot, "Madrid")
+    selector = _selector(qtbot, ajustes, proveedor)
+    _buscar_en(selector, qtbot, "Madrid")
     assert proveedor.consultas == []
-    assert "API key" in dialogo.selector_ubicacion.aviso_tiktok.text()
+    assert "API key" in selector.aviso_tiktok.text()
 
 
 def test_selector_avisa_de_ids_que_no_valen(qtbot, ajustes, llavero_falso):
-    dialogo = _redes(qtbot, ajustes, ProveedorFalso())
-    selector = dialogo.selector_ubicacion
+    selector = _selector(qtbot, ajustes, ProveedorFalso())
     assert selector.aviso_ids.isHidden()
     selector.campo_instagram.setText("Madrid")
     assert "Instagram" in selector.aviso_ids.text() and not selector.aviso_ids.isHidden()
@@ -1312,31 +1362,28 @@ def test_selector_avisa_de_ids_que_no_valen(qtbot, ajustes, llavero_falso):
 
 
 def test_dialogo_redes_avisa_si_tiktok_no_tiene_permiso_de_ubicacion(qtbot, ajustes,
-                                                                     llavero_falso):
+                                                                     llavero_falso,
+                                                                     monkeypatch):
     _listo(ajustes, llavero_falso)
     cuentas = todas_conectadas()
     cuentas[T] = Cuenta(T, usuario="yo_tt", ubicacion=False)
     dialogo = _redes(qtbot, ajustes, ProveedorFalso(cuentas_conectadas=cuentas))
-    assert dialogo.selector_ubicacion.aviso_tiktok.isHidden()
+    assert dialogo.aviso_ubicacion.isHidden()
     dialogo.boton_comprobar.click()
     _esperar_consultas(qtbot)
-    aviso = dialogo.selector_ubicacion.aviso_tiktok
-    assert "Reconecta TikTok" in aviso.text() and not aviso.isHidden()
+    assert "Reconecta TikTok" in dialogo.aviso_ubicacion.text()
+    assert not dialogo.aviso_ubicacion.isHidden()
+    vistos: dict = {}
+    _cambiar_ubicacion(monkeypatch, lambda s: vistos.update(aviso=s.aviso_tiktok.text()))
+    dialogo.boton_ubicacion.click()
+    assert "Reconecta TikTok" in vistos["aviso"]
+    # Sin ubicación en TikTok, no hace falta el permiso.
+    _cambiar_ubicacion(monkeypatch, lambda s: s.boton_quitar.click())
+    dialogo.boton_ubicacion.click()
+    assert dialogo.aviso_ubicacion.isHidden()
 
 
 # --- ubicación en el diálogo Publicar ---
-
-
-def _cambiar_ubicacion(monkeypatch, cambio, aceptar=True):
-    """Sustituye el diálogo modal de ubicación: aplica `cambio` al selector
-    y lo acepta (o lo cancela)."""
-    from app.widgets.selector_ubicacion import DialogoUbicacion
-
-    def exec_(self):
-        cambio(self.selector)
-        return 1 if aceptar else 0
-
-    monkeypatch.setattr(DialogoUbicacion, "exec", exec_)
 
 
 def test_publicar_usa_la_ubicacion_global(qtbot, video, ajustes, llavero_falso, monkeypatch):

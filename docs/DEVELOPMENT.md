@@ -200,7 +200,8 @@ counter, platforms, modes, confirmation, upload in a `QThread`,
 per-platform status and links), `app/widgets/dialogo_redes.py` (provider,
 profile, API key, **Check connection**, X Premium, Facebook Page, default
 modes, location), `app/widgets/selector_ubicacion.py` (the location
-selector both dialogs share, and the one-video location dialog),
+selector, opened in its own window from both dialogs; inline it pushed
+Networks… past a 14" laptop screen),
 `app/cuentas.py` (account and TikTok place lookups shared by both dialogs,
 always in the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button

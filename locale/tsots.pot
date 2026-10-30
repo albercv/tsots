@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 10:31+0100\n"
+"POT-Creation-Date: 2026-10-30 10:53+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -562,6 +562,9 @@ msgstr ""
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr ""
 
+msgid "La ubicación con que se publica cada vídeo"
+msgstr ""
+
 msgid "Leyendo la API key del Llavero…"
 msgstr ""
 
@@ -1040,6 +1043,9 @@ msgid ""
 "{resumen}"
 msgstr ""
 
+msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
+msgstr ""
+
 msgid "Seguir la cara"
 msgstr ""
 
@@ -1184,10 +1190,10 @@ msgstr ""
 msgid "Título:"
 msgstr ""
 
-msgid "Ubicación"
+msgid "Ubicación de este vídeo"
 msgstr ""
 
-msgid "Ubicación de este vídeo"
+msgid "Ubicación de siempre"
 msgstr ""
 
 msgid "Ubicación:"

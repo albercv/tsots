@@ -200,7 +200,8 @@ What each mode does:
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
 
 **Location.** Posts are tagged with **Madrid** unless you pick another place
-in Networks… (**Location** section). For a single video, press **Change…**
+in Networks… (**Location**, under "When publishing", **Change…** button).
+For a single video, press **Change…**
 next to "Location" in the Publish dialog: the usual one stays as it is.
 Only TikTok, Instagram and X support a location:
 

@@ -21,6 +21,7 @@ from videopipeline.i18n import _
 from videopipeline.redes.modelo import (
     Cuenta,
     Lugar,
+    Plataforma,
     Ubicacion,
     elegir_lugar,
     id_instagram_valido,
@@ -34,6 +35,23 @@ from ..cuentas import COLOR_AVISO, COLOR_SECUNDARIO
 # controles) y devuelve el trabajo que corre en segundo plano y nunca lanza:
 # `() -> (lugares | None, motivo)`.
 PrepararBusqueda = Callable[[str], Callable[[], "tuple[list[Lugar] | None, str]"]]
+
+
+def describir_ubicacion(ubicacion: Ubicacion, redes=None) -> str:
+    """«Madrid (TikTok, Instagram)» o «Sin ubicación». `redes`: solo esas."""
+    con = [p for p in ubicacion.plataformas() if redes is None or p in redes]
+    if not con:
+        return _("Sin ubicación")
+    return _("{lugar} ({redes})").format(
+        lugar=ubicacion.visible or _("IDs propios"), redes=", ".join(p.nombre for p in con))
+
+
+def aviso_permiso_tiktok(cuenta: Cuenta | None, servicio: str) -> str:
+    """Aviso si la cuenta de TikTok no tiene permiso para ubicaciones, o ""."""
+    if cuenta is None or cuenta.ubicacion is not False:
+        return ""
+    return _("⚠ Reconecta TikTok en {servicio}: tu cuenta no tiene permiso para "
+             "etiquetar ubicaciones.").format(servicio=servicio)
 
 
 class SelectorUbicacion(QWidget):
@@ -116,11 +134,7 @@ class SelectorUbicacion(QWidget):
 
     def poner_cuenta_tiktok(self, cuenta: Cuenta | None, servicio: str) -> None:
         """Avisa si la cuenta de TikTok no tiene permiso para ubicaciones."""
-        self._aviso_permiso = ""
-        if cuenta is not None and cuenta.ubicacion is False:
-            self._aviso_permiso = _(
-                "⚠ Reconecta TikTok en {servicio}: tu cuenta no tiene permiso para "
-                "etiquetar ubicaciones.").format(servicio=servicio)
+        self._aviso_permiso = aviso_permiso_tiktok(cuenta, servicio)
         self._avisar_tiktok("")
 
     # --- detalles ---
@@ -199,15 +213,16 @@ class SelectorUbicacion(QWidget):
 
 
 class DialogoUbicacion(QDialog):
-    """La ubicación de un solo vídeo, desde el diálogo Publicar."""
+    """El selector en su propia ventana: la ubicación de siempre (Redes…)
+    o la de un solo vídeo (Publicar)."""
 
     def __init__(self, ubicacion: Ubicacion, preparar_busqueda: PrepararBusqueda,
-                 parent=None):
+                 titulo: str, nota: str, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(_("Ubicación de este vídeo"))
+        self.setWindowTitle(titulo)
         self.setMinimumWidth(520)
         raiz = QVBoxLayout(self)
-        nota = QLabel(_("Solo para este vídeo. La de siempre se cambia en Redes…."))
+        nota = QLabel(nota)
         nota.setWordWrap(True)
         nota.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
         raiz.addWidget(nota)
