@@ -305,6 +305,23 @@ def _ficha_de_legado(salida: Path) -> Ficha:
     return ficha
 
 
+def _de_nadie(ruta: Path, fichas: list[Ficha]) -> bool:
+    return all(ruta.resolve() not in ficha._salidas() for ficha in fichas)
+
+
+def _adoptar(ficha: Ficha, original: Huella, fichas: list[Ficha]) -> Ficha:
+    """El original pasa a ser de la salida antigua `ficha`. Su vertical antiguo
+    también, si no es de otra; como no se sabe cómo se hizo, desactualizado."""
+    ficha.original, ficha.legado = original, False
+    vertical = ficha.ruta_vertical()
+    if (ficha.hay_horizontal() and vertical.is_file()
+            and _de_nadie(vertical, [f for f in fichas if f.id != ficha.id])):
+        ficha.vertical = Huella.de(vertical)
+        ficha.desactualizado.add("vertical")
+    guardar(ficha)
+    return ficha
+
+
 def _ficha_de_original(original: Path, carpeta_salida: Path,
                        fichas: list[Ficha]) -> Ficha:
     nueva = Ficha(id=_nueva_id(), nombre=original.stem,
@@ -317,19 +334,13 @@ def _ficha_de_original(original: Path, carpeta_salida: Path,
         for ficha in fichas:
             if (ficha.original is None and ficha.final is not None
                     and ficha.final.ruta == salida.resolve()):
-                ficha.original, ficha.legado = nueva.original, False
-                guardar(ficha)
-                return ficha
+                return _adoptar(ficha, nueva.original, fichas)
 
     # Su salida ya está en disco y no es de ninguna ficha (de antes de las
     # fichas, o de una olvidada): se adopta como si se hubiera arrastrado antes.
     for salida in (nueva.ruta_final(True), nueva.ruta_final(False)):
-        if salida.is_file() and all(salida.resolve() not in ficha._salidas()
-                                    for ficha in fichas):
-            ficha = _ficha_de_legado(salida)
-            ficha.original, ficha.legado = nueva.original, False
-            guardar(ficha)
-            return ficha
+        if salida.is_file() and _de_nadie(salida, fichas):
+            return _adoptar(_ficha_de_legado(salida), nueva.original, fichas)
 
     # Otro original con el mismo nombre ya usa esas salidas: no se pisan.
     nombre, n = nueva.nombre, 1

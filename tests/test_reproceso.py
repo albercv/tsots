@@ -16,7 +16,7 @@ from videopipeline.ficha import (
 )
 from videopipeline.reproceso import ejecutar
 from videopipeline.reproceso_plan import (
-    Accion, Decisiones, ajustes_silencios, planificar,
+    Accion, Decisiones, ajustes_silencios, planificar, revisar,
 )
 from videopipeline.steps import PasoFallido
 
@@ -519,3 +519,19 @@ def test_salida_antigua_sin_ficha_se_adopta_y_se_reprocesa(
 
     assert ficha.final.ruta == antigua.resolve()
     assert ficha.final.coincide(antigua)
+
+
+def test_vertical_antiguo_adoptado_se_regenera_sin_preguntar(tmp_path):
+    salida = tmp_path / "salida"
+    salida.mkdir()
+    (salida / "charla_limpio.mp4").write_bytes(b"ANTIGUA")
+    vertical = salida / "charla_limpio_vertical.mp4"
+    vertical.write_bytes(b"VERTICAL ANTIGUO")
+    ficha = _ficha(tmp_path)
+    assert revisar(ficha, _panel(paso_vertical=True)) == []  # sin «ya tiene vertical»
+
+    ficha = _pasada(ficha, [A.VERTICAL], paso_vertical=True)
+
+    assert vertical.read_bytes() == b"VERTICAL"
+    assert ficha.vertical.coincide(vertical)
+    assert ficha.desactualizado == set()

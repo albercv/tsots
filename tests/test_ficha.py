@@ -465,6 +465,36 @@ def test_ficha_nueva_no_adopta_la_salida_de_otra_ficha(tmp_path):
     assert cargar(primera.id) == primera
 
 
+@pytest.mark.parametrize("con_ficha_de_legado", [True, False],
+                         ids=["legado_con_ficha", "salida_sin_ficha"])
+def test_adoptar_una_salida_antigua_adopta_tambien_su_vertical(
+        tmp_path, con_ficha_de_legado):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_limpio.mp4")
+    vertical = _archivo(salida / "x_limpio_vertical.mp4")
+    if con_ficha_de_legado:
+        reconocer(antigua, None)
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert ficha.final == Huella.de(antigua)
+    assert ficha.vertical == Huella.de(vertical)
+    assert ficha.desactualizado == {"vertical"}  # no se sabe cómo se hizo
+    assert cargar(ficha.id) == ficha and len(todas()) == 1
+
+
+def test_adoptar_una_salida_antigua_no_adopta_el_vertical_de_otra_ficha(tmp_path):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_limpio.mp4")
+    otra, _ = reconocer(_archivo(salida / "x_limpio_vertical.mp4"), None)
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert ficha.final == Huella.de(antigua)
+    assert ficha.vertical is None and ficha.desactualizado == set()
+    assert cargar(otra.id) == otra
+
+
 def test_mismo_nombre_otra_carpeta_no_pisa_salidas(tmp_path):
     salida = tmp_path / "salida"
     a = _archivo(tmp_path / "a" / "x.mov")
