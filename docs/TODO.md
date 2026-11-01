@@ -57,6 +57,12 @@ Pending work, most urgent first. Remove an item when it is merged into
       user: Task 6 of `docs/superpowers/plans/2026-09-23-publicar-x.md`
       (free plan, single post instead of a thread, Premium detection,
       Facebook draft, real shape of the accounts and Pages responses).
+- [ ] **List of processed videos.** Today a video removed from the queue is
+      reprocessed by dragging the original or one of its outputs again; its
+      record in `fichas/` is kept until **Forget this video**. Add a way to
+      see and reopen processed videos without looking for the file. The form
+      (window, panel, menu…) is still to be decided with the user.
+      `ficha.todas()` already lists the records.
 
 ## Improvements
 
