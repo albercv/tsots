@@ -14,8 +14,13 @@ from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
 from app.settings import Ajustes
 from videopipeline.caption import leer_md
+from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    CAPTION, VERTICAL, Artefacto, Huella, cargar, guardar, ocupa, reconocer,
+    BASE, CAPTION, VERTICAL, Artefacto, Huella, cargar, guardar, ocupa,
+    olvidar, reconocer,
+)
+from videopipeline.reproceso_plan import (
+    Decisiones, ajustes_audio, ajustes_silencios,
 )
 
 
@@ -1129,3 +1134,232 @@ def test_cancelar_limpia_temporales_de_la_ficha(qtbot, tmp_path, monkeypatch):
     assert not parcial.parent.exists()
     assert not temporal.exists()
     assert ficha.final.ruta.is_file() and cargar(ficha.id) is not None
+
+
+# --- procesar: avisos de lo que ya está hecho y «solo caption» ---
+
+
+def _solo_caption(ventana):
+    ventana.panel.check_audio.setChecked(False)
+    ventana.panel.check_silencios.setChecked(False)
+    ventana.panel.check_caption.setChecked(True)
+
+
+def _con_audio_y_silencios(ventana, tmp_path, con_caption=False):
+    """a.mp4 procesado: audio y silencios hechos con los ajustes del panel."""
+    ficha = _ficha_hecha(tmp_path, con_caption=con_caption)
+    config = PipelineConfig(video=ficha.original.ruta, **ventana.panel.valores())
+    ficha.artefactos[BASE] = Artefacto("k", None, {
+        "audio": ajustes_audio(config),
+        "silencios": ajustes_silencios(config)}, "linea")
+    guardar(ficha)
+    return ficha
+
+
+def _preguntando(monkeypatch, respuesta):
+    """Sustituye el diálogo; devuelve las (consultas, hay_vertical) recibidas.
+    `respuesta` es None (cancelar) o una función de las consultas."""
+    llamadas = []
+
+    def preguntar(padre, consultas, hay_vertical):
+        llamadas.append((consultas, hay_vertical))
+        return None if respuesta is None else respuesta(consultas)
+
+    monkeypatch.setattr("app.main.preguntar_reproceso", preguntar)
+    return llamadas
+
+
+def _mantener(consultas):
+    return {ficha_id: Decisiones() for ficha_id in consultas}
+
+
+def _sin_preguntar(monkeypatch):
+    def no_debe_preguntar(*args):
+        raise AssertionError("no hay nada que preguntar")
+
+    monkeypatch.setattr("app.main.preguntar_reproceso", no_debe_preguntar)
+
+
+def _lanzando(ventana, monkeypatch):
+    """Sustituye al ejecutor; devuelve los (fila, json) lanzados."""
+    lanzados = []
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lanzados.extend)
+    return lanzados
+
+
+def test_procesar_pregunta_si_ya_tiene_pasos(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _con_audio_y_silencios(ventana, tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    llamadas = _preguntando(monkeypatch, lambda consultas: {
+        ficha.id: Decisiones(frozenset({"audio"}))})
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    [(consultas, hay_vertical)] = llamadas
+    nombre, lista = consultas[ficha.id]
+    assert nombre == "a.mp4"
+    assert [(c.paso, c.tipo) for c in lista] == [
+        ("audio", "hecho"), ("silencios", "hecho")]
+    assert hay_vertical == set()
+    [(fila, texto)] = lanzados  # la decisión llega al runner
+    assert json.loads(texto)["reproceso"] == {
+        "ficha": ficha.id, "rehacer": ["audio"], "regenerar_vertical": False}
+    assert ventana._procesando
+
+
+def test_procesar_ofrece_regenerar_el_vertical_si_puede_cambiar(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path, con_caption=False)
+    vertical = ficha.final.ruta.with_name("a_limpio_vertical.mp4")
+    vertical.write_bytes(b"VERTICAL")
+    ficha.vertical = Huella.de(vertical)  # sin artefacto: no hay nada que preguntar
+    guardar(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    llamadas = _preguntando(monkeypatch, lambda c: {
+        ficha.id: Decisiones(regenerar_vertical=True)})
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()  # audio y silencios: el vertical podría quedar viejo
+    [(consultas, hay_vertical)] = llamadas
+    assert consultas == {ficha.id: ("a.mp4", [])} and hay_vertical == {ficha.id}
+    assert json.loads(lanzados[0][1])["reproceso"]["regenerar_vertical"] is True
+    # Con solo caption el vertical no cambia: ni se pregunta.
+    _solo_caption(ventana)
+    _sin_preguntar(monkeypatch)
+    ventana.procesar()
+
+
+def test_procesar_cancelado_no_lanza(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _con_audio_y_silencios(ventana, tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _preguntando(monkeypatch, None)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert lanzados == [] and not ventana._procesando
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.ESPERA
+    assert "Procesar" in ventana.boton_procesar.text()
+
+
+def test_procesar_plan_vacio_avisa_y_no_lanza(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha_a = _ficha_hecha(tmp_path)  # caption hecho y con vídeo final
+    [b] = _videos(tmp_path, "b.mp4")
+    ficha_b, _aviso = reconocer(b, tmp_path / "salidas")  # caption sin final
+    _md_ejemplo(ficha_b.ruta("caption.md"))
+    ficha_b.artefactos[CAPTION] = Artefacto("k", "caption.md")
+    guardar(ficha_b)
+    ventana.anadir_videos([tmp_path / "a.mp4", b])
+    _solo_caption(ventana)
+    _preguntando(monkeypatch, _mantener)  # Mantener: no queda nada que hacer
+    informaciones = _capturando(monkeypatch, "information")
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert lanzados == [] and not ventana._procesando
+    [(_padre, _titulo, texto)] = informaciones  # un solo aviso
+    assert texto == "Nada que hacer en: a.mp4, b.mp4"
+    trabajo_a, trabajo_b = (ventana.modelo_cola.trabajo(f) for f in (0, 1))
+    assert trabajo_a.estado == EstadoTrabajo.HECHO  # tiene vídeo que mostrar
+    assert trabajo_a.salida == ficha_a.final.ruta
+    assert trabajo_b.estado == EstadoTrabajo.ESPERA  # no hay nada que mostrar
+
+
+def test_procesar_solo_caption_sin_final_marca_error(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
+    # b ya tiene vídeo procesado; a no.
+    ficha_b = cargar(ventana.modelo_cola.trabajo(1).ficha_id)
+    final = tmp_path / "salidas" / "b_limpio.mp4"
+    final.parent.mkdir()
+    final.write_bytes(b"FINAL")
+    ficha_b.final = Huella.de(final)
+    guardar(ficha_b)
+    _solo_caption(ventana)
+    _sin_preguntar(monkeypatch)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    a = ventana.modelo_cola.trabajo(0)
+    assert a.estado == EstadoTrabajo.ERROR
+    assert "aún no tiene vídeo procesado" in a.error
+    assert [fila for fila, _texto in lanzados] == [1]  # la otra fila sigue
+    assert ventana._procesando
+
+
+def test_procesar_json_lleva_reproceso(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path, con_caption=False)
+    ventana.anadir_videos([ficha.final.ruta])  # arrastrada la salida, no el original
+    assert ventana.modelo_cola.trabajo(0).ruta.name == "a_limpio.mp4"
+    _solo_caption(ventana)
+    _sin_preguntar(monkeypatch)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    [(fila, texto)] = lanzados
+    datos = json.loads(texto)
+    assert datos["reproceso"] == {
+        "ficha": ficha.id, "rehacer": [], "regenerar_vertical": False}
+    assert (datos["caption_seo"], datos["paso_audio"]) == (True, False)
+
+
+def test_procesar_fila_sin_ficha_usa_el_json_de_siempre(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ventana.modelo_cola.actualizar(0, ficha_id=None)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    [(fila, texto)] = lanzados
+    datos = json.loads(texto)
+    assert "reproceso" not in datos and datos["video"].endswith("a.mp4")
+
+
+def test_procesar_ficha_sin_salidas_toma_la_carpeta_actual(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "uno"
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ficha_id = ventana.modelo_cola.trabajo(0).ficha_id
+    assert cargar(ficha_id).carpeta_salida == tmp_path / "uno"
+    _lanzando(ventana, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "dos"
+    ventana.procesar()
+    assert cargar(ficha_id).carpeta_salida == tmp_path / "dos"
+    ventana.ajustes.carpeta_salida = None  # junto al original
+    ventana.procesar()
+    assert cargar(ficha_id).carpeta_salida == tmp_path
+
+
+def test_procesar_ficha_con_salidas_conserva_su_carpeta(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ajustes.carpeta_salida = tmp_path / "otra"
+    _preguntando(monkeypatch, _mantener)
+    _capturando(monkeypatch, "information")
+    _lanzando(ventana, monkeypatch)
+    _solo_caption(ventana)
+    ventana.procesar()
+    assert cargar(ficha.id).carpeta_salida == ficha.carpeta_salida
+
+
+def test_procesar_ficha_perdida_se_lanza_igual_por_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ficha_id = ventana.modelo_cola.trabajo(0).ficha_id
+    olvidar(cargar(ficha_id))  # alguien borró su carpeta; la fila aún la nombra
+    _sin_preguntar(monkeypatch)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    # El runner explica que falta la ficha; no se procesa como un original.
+    [(fila, texto)] = lanzados
+    assert json.loads(texto)["reproceso"]["ficha"] == ficha_id
+
+
+def test_boton_procesar_con_solo_caption_habilitado(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ventana.panel.check_audio.setChecked(False)
+    ventana.panel.check_silencios.setChecked(False)
+    assert not ventana.boton_procesar.isEnabled()
+    assert ventana.boton_procesar.toolTip() == "Marca al menos un paso."
+    ventana.panel.check_caption.setChecked(True)
+    assert ventana.boton_procesar.isEnabled()
+    assert ventana.boton_procesar.toolTip() == ""

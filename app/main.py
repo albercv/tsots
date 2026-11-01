@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -31,10 +32,12 @@ from videopipeline import i18n
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.ficha import (
-    CAPTION, Ficha, cargar, limpiar_temporales, ocupa, olvidar, reconocer,
+    CAPTION, Ficha, cargar, guardar, limpiar_temporales, ocupa, olvidar,
+    reconocer,
 )
 from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
+from videopipeline.reproceso_plan import Consulta, Decisiones, planificar, revisar
 
 from .queue_model import EstadoTrabajo, ModeloCola, resumen_de
 from .settings import Ajustes
@@ -44,6 +47,7 @@ from .widgets.dialogo_marca import DialogoMarca
 from .widgets import dialogo_publicar
 from .widgets.dialogo_publicar import DialogoPublicar
 from .widgets.dialogo_redes import DialogoRedes
+from .widgets.dialogo_reproceso import preguntar_reproceso
 from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
 from .widgets.vista_previa import VistaPrevia
@@ -612,7 +616,7 @@ class VentanaPrincipal(QMainWindow):
             "modo": modo_equivalente(valores["paso_audio"], valores["paso_silencios"]),
         })
         carpeta = self.ajustes.carpeta_salida
-        trabajos: list[tuple[int, str]] = []
+        filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
         for fila in pendientes:
             trabajo = self.modelo_cola.trabajo(fila)
             config = PipelineConfig(
@@ -623,10 +627,78 @@ class VentanaPrincipal(QMainWindow):
                 idioma_ui=i18n.idioma_actual(),
                 **valores,
             )
-            trabajos.append((fila, config.to_json()))
+            ficha = self._ficha_de(trabajo)
+            if ficha is not None and ficha.final is None and ficha.vertical is None:
+                # Aún sin salidas: van a la carpeta de ahora. Las demás fichas
+                # conservan la suya, que es donde están sus archivos.
+                ficha.carpeta_salida = carpeta or (
+                    ficha.original.ruta.parent if ficha.original
+                    else ficha.carpeta_salida)
+                guardar(ficha)
+            filas.append((fila, config, ficha))
+
+        decisiones = self._preguntar_reproceso(filas)
+        if decisiones is None:
+            return
+        trabajos: list[tuple[int, str]] = []
+        sin_nada: list[str] = []
+        for fila, config, ficha in filas:
+            trabajo = self.modelo_cola.trabajo(fila)
+            datos = json.loads(config.to_json())
+            if trabajo.ficha_id is not None:
+                # Siempre por la ficha: una fila arrastrada desde una salida se
+                # llama como ella, pero su original es el de la ficha.
+                decision = decisiones.get(trabajo.ficha_id, Decisiones())
+                if ficha is not None:
+                    plan = planificar(ficha, config, decision)
+                    if plan.error:
+                        self.modelo_cola.actualizar(
+                            fila, estado=EstadoTrabajo.ERROR, error=plan.error,
+                            percent=None, etiqueta="")
+                        continue
+                    if plan.vacio:
+                        sin_nada.append(trabajo.ruta.name)
+                        if ficha.final is not None:  # lo que ya hay es el resultado
+                            self._al_terminar_trabajo(
+                                fila, True, str(ficha.final.ruta), "")
+                        continue
+                datos["reproceso"] = {
+                    "ficha": trabajo.ficha_id,
+                    "rehacer": sorted(decision.rehacer),
+                    "regenerar_vertical": decision.regenerar_vertical,
+                }
+            trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
+        if sin_nada:
+            QMessageBox.information(
+                self, _("Nada que hacer"),
+                _("Nada que hacer en: {nombres}").format(nombres=", ".join(sin_nada)))
+        if not trabajos:
+            return
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _preguntar_reproceso(
+        self, filas: list[tuple[int, PipelineConfig, Ficha | None]]
+    ) -> dict[str, Decisiones] | None:
+        """Avisa de lo que los vídeos ya tienen. None si el usuario cancela;
+        sin nada que avisar, ni se pregunta (todo se mantiene)."""
+        consultas: dict[str, tuple[str, list[Consulta]]] = {}
+        hay_vertical: set[str] = set()
+        for fila, config, ficha in filas:
+            if ficha is None:
+                continue
+            lista = revisar(ficha, config)
+            # Si cambia el audio, los silencios o los subtítulos, el vertical que
+            # ya hay puede quedar desactualizado: se ofrece regenerarlo (R7).
+            if ficha.vertical is not None and (
+                    config.paso_audio or config.paso_silencios or config.subtitulos):
+                hay_vertical.add(ficha.id)
+            if lista or ficha.id in hay_vertical:
+                consultas[ficha.id] = (self.modelo_cola.trabajo(fila).ruta.name, lista)
+        if not consultas:
+            return {}
+        return preguntar_reproceso(self, consultas, hay_vertical)
 
     def _procesar_o_cancelar(self) -> None:
         if self._procesando:
@@ -721,13 +793,13 @@ class VentanaPrincipal(QMainWindow):
             self.boton_procesar.setEnabled(True)
         else:
             self.boton_procesar.setText(_("▶ Procesar"))
-            hay_pasos = self.panel.hay_pasos_de_video()
+            hay_pasos = self.panel.hay_pasos()
             self.boton_procesar.setEnabled(
                 bool(self.modelo_cola.pendientes()) and hay_pasos
             )
             self.boton_procesar.setToolTip(
                 "" if hay_pasos else
-                _("Marca al menos un paso: audio, silencios, subtítulos o vertical.")
+                _("Marca al menos un paso.")
             )
         self.boton_quitar.setEnabled(not self._procesando)
         self.boton_limpiar.setEnabled(not self._procesando)
