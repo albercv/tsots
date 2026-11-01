@@ -814,3 +814,43 @@ def test_procesar_guarda_modo_equivalente(qtbot, tmp_path, monkeypatch):
     guardado = ventana.ajustes.cargar_panel()
     assert guardado["modo"] == "solo_silencios"
     assert str(guardado["paso_audio"]).lower() in ("false", "0")
+
+
+@pytest.fixture
+def traductores_qt(qapp):
+    """Quita los traductores de Qt que instale el test, para no cambiar los
+    botones de los demás."""
+    from PySide6.QtCore import QTranslator
+
+    antes = set(qapp.findChildren(QTranslator))
+    yield
+    for traductor in set(qapp.findChildren(QTranslator)) - antes:
+        qapp.removeTranslator(traductor)
+        traductor.setParent(None)
+
+
+def test_la_aplicacion_lleva_el_logo(qapp, traductores_qt):
+    """En macOS el icono de la aplicación es el de los avisos nativos y el
+    del Dock: sin él sale el de Python al arrancar sin el bundle .app."""
+    from PySide6.QtGui import QIcon
+
+    from app.main import preparar_aplicacion
+
+    qapp.setWindowIcon(QIcon())
+    preparar_aplicacion(qapp)
+    assert not qapp.windowIcon().pixmap(64, 64).isNull()
+
+
+@pytest.mark.parametrize("idioma, si, cancelar", [("es", "&Sí", "Cancelar"),
+                                                  ("en", "&Yes", "Cancel")])
+def test_botones_de_qt_en_el_idioma_de_la_interfaz(qapp, traductores_qt, idioma, si, cancelar):
+    from videopipeline import i18n
+
+    from app.main import preparar_aplicacion
+
+    i18n.instalar(idioma)
+    preparar_aplicacion(qapp)
+    caja = QMessageBox()
+    caja.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+    assert caja.button(QMessageBox.StandardButton.Yes).text() == si
+    assert caja.button(QMessageBox.StandardButton.Cancel).text() == cancelar
