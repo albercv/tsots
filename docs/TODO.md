@@ -60,6 +60,17 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Improvements
 
+- [ ] **Reprocessing edge cases.** None loses data:
+      - A record left with no original and no outputs (the original was
+        edited outside the app) still reserves its output names, so another
+        video with the same name gets "(2)". `Ficha._salidas()` in
+        `videopipeline/ficha.py` should return nothing for it.
+      - When **Process** adopts an old `x_limpio.mp4` by name, the warning
+        appears but the job started by the same click still runs
+        (`procesar()` in `app/main.py`).
+      - An edited original can adopt a stray `x_limpio_vertical.mp4`
+        without a warning.
+
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
       `videopipeline/steps.py` encodes with `libx264` on the CPU. Try
       `h264_videotoolbox` (already used for re-encoding) with `-q:v` around
