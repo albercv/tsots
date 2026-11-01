@@ -13,9 +13,23 @@ from PySide6.QtWidgets import QMessageBox
 from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
 from app.settings import Ajustes
+from videopipeline.caption import leer_md
+from videopipeline.ficha import (
+    CAPTION, VERTICAL, Artefacto, Huella, cargar, guardar, ocupa, reconocer,
+)
+
+
+def _videos(tmp_path, *nombres) -> list[Path]:
+    """Vídeos de mentira en tmp_path: la ficha necesita que existan."""
+    rutas = [tmp_path / nombre for nombre in nombres]
+    for ruta in rutas:
+        ruta.write_bytes(b"VIDEO")
+    return rutas
 
 
 def _ventana(qtbot, tmp_path, monkeypatch) -> VentanaPrincipal:
+    # Las fichas de los tests nunca van al proyecto.
+    monkeypatch.setattr("videopipeline.ficha.DIR_FICHAS", tmp_path / "fichas")
     ajustes = Ajustes(
         QSettings(str(tmp_path / "test.ini"), QSettings.Format.IniFormat)
     )
@@ -27,7 +41,7 @@ def _ventana(qtbot, tmp_path, monkeypatch) -> VentanaPrincipal:
 
 def test_anadir_videos_encola(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mov"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mov"))
     assert ventana.modelo_cola.rowCount() == 2
     assert ventana.boton_procesar.isEnabled()
 
@@ -49,7 +63,7 @@ def test_sin_audio_no_encola(qtbot, tmp_path, monkeypatch):
 def test_procesar_construye_configs(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.ajustes.carpeta_salida = tmp_path / "salidas"
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     lanzado = {}
     monkeypatch.setattr(
         ventana.ejecutor, "iniciar", lambda trabajos: lanzado.setdefault("t", trabajos)
@@ -72,7 +86,7 @@ def test_procesar_construye_configs(qtbot, tmp_path, monkeypatch):
 
 def test_progreso_actualiza_cola(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.ejecutor.progreso.emit(
         0, {"step": 2, "total": 4, "label": "Limpiando audio", "percent": 50.0}
     )
@@ -83,7 +97,7 @@ def test_progreso_actualiza_cola(qtbot, tmp_path, monkeypatch):
 
 def test_trabajo_terminado_ok_y_error(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     ventana.ejecutor.trabajo_terminado.emit(0, True, "/tmp/a_limpio.mp4", "")
     ventana.ejecutor.trabajo_terminado.emit(1, False, "", "explotó")
     assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.HECHO
@@ -95,7 +109,7 @@ def test_trabajo_terminado_ok_y_error(qtbot, tmp_path, monkeypatch):
 def test_cancelado_limpia_temporal(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.ajustes.carpeta_salida = tmp_path
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     temporal = tmp_path / ".a_limpio_tmp.mp4"
     temporal.write_bytes(b"MEDIO")
     temporal_subs = tmp_path / ".a_limpio_subs_tmp.mp4"
@@ -108,7 +122,7 @@ def test_cancelado_limpia_temporal(qtbot, tmp_path, monkeypatch):
 
 def test_boton_alterna_procesar_cancelar(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda t: None)
     ventana.procesar()
     assert "Cancelar" in ventana.boton_procesar.text()
@@ -118,7 +132,7 @@ def test_boton_alterna_procesar_cancelar(qtbot, tmp_path, monkeypatch):
 
 def test_quitar_y_limpiar_bloqueados_durante_proceso(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda t: None)
     ventana.procesar()
 
@@ -134,14 +148,20 @@ def test_quitar_y_limpiar_bloqueados_durante_proceso(qtbot, tmp_path, monkeypatc
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     ventana._quitar_seleccionado()
     assert ventana.modelo_cola.rowCount() == 2
+    ventana._reprocesar_seleccionado()
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.HECHO
 
     assert not ventana.boton_quitar.isEnabled()
     assert not ventana.boton_limpiar.isEnabled()
+    assert not ventana.boton_reprocesar.isEnabled()
+    assert not ventana.boton_olvidar.isEnabled()
 
     ventana.ejecutor.cola_terminada.emit()
 
     assert ventana.boton_quitar.isEnabled()
     assert ventana.boton_limpiar.isEnabled()
+    assert ventana.boton_reprocesar.isEnabled()
+    assert ventana.boton_olvidar.isEnabled()
 
     # Guard lifted: the still-HECHO row can now be cleared.
     ventana._limpiar_hechos()
@@ -150,7 +170,7 @@ def test_quitar_y_limpiar_bloqueados_durante_proceso(qtbot, tmp_path, monkeypatc
 
 def test_limpiar_hechos_funciona_en_reposo(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     ventana.ejecutor.trabajo_terminado.emit(0, True, "/tmp/x.mp4", "")
 
     ventana._limpiar_hechos()
@@ -160,7 +180,7 @@ def test_limpiar_hechos_funciona_en_reposo(qtbot, tmp_path, monkeypatch):
 
 def test_aviso_actualiza_fila(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.ejecutor.aviso.emit(0, "subs fallaron")
     assert ventana.modelo_cola.trabajo(0).aviso == "subs fallaron"
 
@@ -172,14 +192,14 @@ def test_seleccion_cola_alimenta_preview(qtbot, tmp_path, monkeypatch):
         ventana.vista_previa, "establecer_video",
         lambda ruta: recibido.append(ruta),
     )
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     assert recibido and recibido[-1] == tmp_path / "a.mp4"
 
 
 def test_diagnostico_se_guarda_y_dialogo_lo_muestra(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     log = tmp_path / "a_x.log"
     log.write_text("log", encoding="utf-8")
     diag = {"titulo": "auto-editor no pudo escribir el vídeo",
@@ -204,7 +224,7 @@ def test_diagnostico_se_guarda_y_dialogo_lo_muestra(qtbot, tmp_path, monkeypatch
 
 def test_doble_clic_en_error_abre_dialogo(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.ejecutor.trabajo_terminado.emit(0, False, "", "explotó")
     mostrados = []
     monkeypatch.setattr(ventana, "_mostrar_error",
@@ -221,7 +241,7 @@ def _md_ejemplo(ruta: Path) -> None:
 
 def test_seleccion_de_hecho_muestra_caption(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     salida_a = tmp_path / "a_limpio.mp4"
     salida_a.write_bytes(b"MP4")
     _md_ejemplo(tmp_path / "a_limpio.md")
@@ -238,7 +258,7 @@ def test_seleccion_de_hecho_muestra_caption(qtbot, tmp_path, monkeypatch):
 
 def test_terminar_trabajo_seleccionado_refresca_caption(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     assert ventana.panel_caption.caption is None
     _md_ejemplo(tmp_path / "a_limpio.md")
@@ -273,7 +293,7 @@ def test_procesar_incluye_marca_y_modelo_caption(qtbot, tmp_path, monkeypatch):
     ventana.ajustes.contexto_marca = "Soy Alberto"
     ventana.ajustes.modelo_caption = "qwen3.5:9b-q8_0"
     ventana.panel.check_caption.setChecked(True)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     capturado = {}
     monkeypatch.setattr(ventana.ejecutor, "iniciar",
                         lambda trabajos: capturado.setdefault("t", trabajos))
@@ -331,7 +351,7 @@ def test_ventana_pobla_modelos_y_persiste_seleccion(qtbot, tmp_path, monkeypatch
     assert ventana.ajustes.modelo_caption == "b:2"
     ventana.panel.boton_refrescar_modelos.click()
     assert llamadas["n"] == 2
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     capturado = {}
     monkeypatch.setattr(ventana.ejecutor, "iniciar",
                         lambda trabajos: capturado.setdefault("t", trabajos))
@@ -413,7 +433,7 @@ def test_procesar_incluye_idioma_ui_en_config(qtbot, tmp_path, monkeypatch):
     from videopipeline import i18n
 
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     capturado = {}
     monkeypatch.setattr(
         ventana.ejecutor, "iniciar",
@@ -470,7 +490,7 @@ def test_editar_glosario_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
 def test_procesar_incluye_glosario(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.ajustes.glosario = "Anthropic"
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     capturado = {}
     monkeypatch.setattr(ventana.ejecutor, "iniciar",
                         lambda trabajos: capturado.setdefault("t", trabajos))
@@ -521,7 +541,7 @@ class _DialogoFalso:
 
 
 def _hecho_con_caption(ventana, tmp_path):
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     salida = tmp_path / "a_limpio.mp4"
     salida.write_bytes(b"MP4")
     _md_ejemplo(tmp_path / "a_limpio.md")
@@ -698,7 +718,7 @@ def test_pestanas_siempre_presentes_con_marcador(qtbot, tmp_path, monkeypatch):
 
 def test_seleccion_cambia_de_pestana_segun_caption(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     salida_a = tmp_path / "a_limpio.mp4"
     salida_a.write_bytes(b"MP4")
     _md_ejemplo(tmp_path / "a_limpio.md")
@@ -711,7 +731,7 @@ def test_seleccion_cambia_de_pestana_segun_caption(qtbot, tmp_path, monkeypatch)
 
 def test_terminar_con_caption_muestra_pestana_caption(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4", tmp_path / "b.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     assert ventana.pestanas.currentWidget() is ventana.vista_previa
     # Termina otro vídeo (no el seleccionado): no cambia nada.
@@ -767,7 +787,7 @@ def test_abrir_seccion_la_desplaza_a_la_vista(qtbot, tmp_path, monkeypatch):
 
 def test_procesar_deshabilitado_sin_pasos(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     assert ventana.boton_procesar.isEnabled()
     ventana.panel.check_audio.setChecked(False)
     ventana.panel.check_silencios.setChecked(False)
@@ -779,7 +799,7 @@ def test_procesar_deshabilitado_sin_pasos(qtbot, tmp_path, monkeypatch):
 
 def test_salida_vertical_actualiza_fila(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.ejecutor.salida_vertical.emit(0, str(tmp_path / "a_limpio_vertical.mp4"))
     ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
     assert ventana.modelo_cola.trabajo(0).salida_vertical == (
@@ -789,7 +809,7 @@ def test_salida_vertical_actualiza_fila(qtbot, tmp_path, monkeypatch):
 def test_cancelado_limpia_temporales_vertical(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.ajustes.carpeta_salida = tmp_path
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     horizontal = tmp_path / "a_limpio.mp4"
     horizontal.write_bytes(b"OK")
     temporales = [tmp_path / ".a_limpio_vertical_tmp.mp4",
@@ -807,7 +827,7 @@ def test_procesar_guarda_modo_equivalente(qtbot, tmp_path, monkeypatch):
     # Al cerrar con _procesando=True se abre un diálogo modal: responderlo.
     monkeypatch.setattr("app.main.QMessageBox.question",
                         lambda *a, **k: QMessageBox.StandardButton.Yes)
-    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda trabajos: None)
     ventana.panel.check_audio.setChecked(False)  # solo silencios
     ventana.procesar()
@@ -854,3 +874,258 @@ def test_botones_de_qt_en_el_idioma_de_la_interfaz(qapp, traductores_qt, idioma,
     caja.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
     assert caja.button(QMessageBox.StandardButton.Yes).text() == si
     assert caja.button(QMessageBox.StandardButton.Cancel).text() == cancelar
+
+
+# --- fichas: reconocer, volver a procesar, olvidar, caption y Publicar ---
+
+
+def _ficha_hecha(tmp_path, con_caption=True):
+    """La ficha de a.mp4 ya procesado: con su final y, si se pide, el caption
+    en la ficha pero sin `.md` junto al final."""
+    [original] = _videos(tmp_path, "a.mp4")
+    ficha, _aviso = reconocer(original, tmp_path / "salidas")
+    final = tmp_path / "salidas" / "a_limpio.mp4"
+    final.parent.mkdir()
+    final.write_bytes(b"FINAL")
+    ficha.final = Huella.de(final)
+    if con_caption:
+        _md_ejemplo(ficha.ruta("caption.md"))
+        ficha.artefactos[CAPTION] = Artefacto("k", "caption.md")
+    guardar(ficha)
+    return ficha
+
+
+def _respondiendo(monkeypatch, respuesta):
+    """Sustituye QMessageBox.question; devuelve las preguntas hechas."""
+    preguntas = []
+
+    def pregunta(*args, **kwargs):
+        preguntas.append(args)
+        return respuesta
+
+    monkeypatch.setattr("app.main.QMessageBox.question", pregunta)
+    return preguntas
+
+
+def _capturando(monkeypatch, estatico):
+    """Sustituye un QMessageBox estático; devuelve los argumentos recibidos."""
+    recibidos = []
+    monkeypatch.setattr(f"app.main.QMessageBox.{estatico}",
+                        lambda *args, **kwargs: recibidos.append(args))
+    return recibidos
+
+
+def test_anadir_dos_veces_el_mismo_video_no_duplica(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "a.mp4")
+    ventana.anadir_videos([video])
+    ventana.anadir_videos([video])
+    assert ventana.modelo_cola.rowCount() == 1
+    ficha_id = ventana.modelo_cola.trabajo(0).ficha_id
+    assert ficha_id is not None and cargar(ficha_id) is not None
+    # Terminado, arrastrarlo otra vez lo vuelve a poner en espera.
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    ventana.anadir_videos([video])
+    assert ventana.modelo_cola.rowCount() == 1
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.ESPERA
+
+
+def test_anadir_salida_reconoce_su_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([ficha.final.ruta])
+    assert ventana.modelo_cola.rowCount() == 1
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.ficha_id == ficha.id
+    assert trabajo.resumen == "✓ caption"
+    assert trabajo.ocupa == ocupa(ficha) > 0
+    # El original y la salida son el mismo vídeo: sigue habiendo una fila.
+    ventana.anadir_videos([tmp_path / "a.mp4", ficha.final.ruta])
+    assert ventana.modelo_cola.rowCount() == 1
+
+
+def test_anadir_sin_poder_reconocer_salta_ese_archivo(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+
+    def reconocer_roto(ruta, carpeta):
+        if ruta.name == "mala.mp4":
+            raise OSError("disco roto")
+        return reconocer(ruta, carpeta)
+
+    monkeypatch.setattr("app.main.reconocer", reconocer_roto)
+    avisos = _capturando(monkeypatch, "warning")
+    ventana.anadir_videos(_videos(tmp_path, "mala.mp4", "buena.mp4"))
+    nombres = [ventana.modelo_cola.trabajo(f).ruta.name
+               for f in range(ventana.modelo_cola.rowCount())]
+    assert nombres == ["buena.mp4"]
+    [(_padre, _titulo, texto)] = avisos
+    assert "mala.mp4" in texto and "disco roto" in texto
+
+
+def test_anadir_videos_editados_avisa_junto_y_no_duplica(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    a, b = _videos(tmp_path, "a.mp4", "b.mp4")
+    ventana.anadir_videos([a, b])
+    antes = [ventana.modelo_cola.trabajo(f).ficha_id for f in (0, 1)]
+    a.write_bytes(b"EDITADO A")
+    b.write_bytes(b"EDITADO B, MAS LARGO")
+    informaciones = _capturando(monkeypatch, "information")
+    ventana.anadir_videos([a, b])
+    [(_padre, _titulo, texto)] = informaciones  # un solo aviso con los dos
+    assert "a.mp4" in texto and "b.mp4" in texto
+    assert ventana.modelo_cola.rowCount() == 2
+    despues = [ventana.modelo_cola.trabajo(f).ficha_id for f in (0, 1)]
+    assert set(despues).isdisjoint(antes)
+    assert all(cargar(ficha_id) is not None for ficha_id in despues)
+
+
+def test_volver_a_procesar_pone_en_espera(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(tmp_path / "a_limpio.mp4"), "")
+    ventana.ejecutor.trabajo_terminado.emit(1, False, "", "explotó")
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    ventana.boton_reprocesar.click()
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.ESPERA
+    assert ventana.modelo_cola.trabajo(1).estado == EstadoTrabajo.ERROR  # no estaba seleccionada
+
+
+def test_olvidar_borra_datos_tras_confirmar(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ficha.ruta("audio.flac").write_bytes(b"x" * 2_000_000)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert ventana.modelo_cola.trabajo(0).ocupa > 2_000_000
+    preguntas = _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)
+    ventana.boton_olvidar.click()
+    [(_padre, _titulo, texto, _botones, por_defecto)] = preguntas
+    assert '"a.mp4"' in texto and "2 MB" in texto and "no se tocan" in texto
+    assert por_defecto == QMessageBox.StandardButton.No
+    assert not ficha.carpeta.exists()
+    assert ficha.final.ruta.is_file()  # las salidas no se tocan
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert (trabajo.ficha_id, trabajo.resumen, trabajo.ocupa) == (None, "", 0)
+
+
+def test_olvidar_cancelado_no_borra(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    _respondiendo(monkeypatch, QMessageBox.StandardButton.No)
+    ventana.boton_olvidar.click()
+    assert ficha.carpeta.exists()
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.ficha_id == ficha.id and trabajo.ocupa > 0
+
+
+def test_olvidar_avisa_si_el_original_vive_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    antiguo = ficha.ruta("a_antiguo.mov")  # una versión anterior movida a la ficha
+    antiguo.write_bytes(b"VIEJO")
+    ficha.original = Huella.de(antiguo)
+    guardar(ficha)
+    ventana.anadir_videos([ficha.final.ruta])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    preguntas = _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)
+    ventana.boton_olvidar.click()
+    assert "a_antiguo.mov" in preguntas[0][2]
+    assert not antiguo.exists()
+
+
+def test_olvidar_y_arrastrar_otra_vez_no_duplica_la_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "a.mp4")
+    ventana.anadir_videos([video])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)
+    ventana.boton_olvidar.click()
+    assert ventana.modelo_cola.trabajo(0).ficha_id is None
+    ventana.anadir_videos([video])
+    assert ventana.modelo_cola.rowCount() == 1
+    assert ventana.modelo_cola.trabajo(0).ficha_id is not None
+
+
+def test_publicar_disponible_con_caption_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    md = ficha.final.ruta.with_suffix(".md")
+    assert not md.exists()
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.ESPERA
+    assert ventana.panel_caption.caption.titulo == "Título X"
+    assert ventana.panel_caption.video == ficha.final.ruta
+    assert ventana.panel_caption.boton_publicar.isEnabled()
+    assert ventana.pestanas.currentWidget() is ventana.panel_caption
+    assert leer_md(md).titulo == "Título X"  # se vuelve a escribir junto al final
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    [(video, caption, _ajustes)] = Falso.abiertos
+    assert video == ficha.final.ruta and caption.titulo == "Título X"
+
+
+def test_caption_de_la_ficha_no_pisa_el_md_existente(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    md = ficha.final.ruta.with_suffix(".md")
+    md.write_text("editado a mano", encoding="utf-8")
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    assert ventana._caption_de(ventana.modelo_cola.trabajo(0)).titulo == "Título X"
+    assert md.read_text(encoding="utf-8") == "editado a mano"
+
+
+def test_procesando_no_muestra_caption(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.trabajo_iniciado.emit(0)
+    assert ventana._caption_de(ventana.modelo_cola.trabajo(0)) is None
+
+
+def test_terminar_trabajo_recarga_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "a.mp4")
+    ventana.anadir_videos([video])
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert (trabajo.resumen, trabajo.salida_vertical) == ("", None)
+    # Lo que la pasada deja en la ficha.
+    ficha = cargar(trabajo.ficha_id)
+    salidas = tmp_path / "salidas"
+    salidas.mkdir()
+    final, vertical = salidas / "a_limpio.mp4", salidas / "a_limpio_vertical.mp4"
+    final.write_bytes(b"FINAL")
+    vertical.write_bytes(b"VERTICAL")
+    ficha.final, ficha.vertical = Huella.de(final), Huella.de(vertical)
+    ficha.artefactos[CAPTION] = Artefacto("k", "caption.md")
+    ficha.artefactos[VERTICAL] = Artefacto("k", None)
+    guardar(ficha)
+    ventana.ejecutor.trabajo_terminado.emit(0, True, "/otra/ruta.mp4", "")
+    assert trabajo.estado == EstadoTrabajo.HECHO
+    assert trabajo.salida == ficha.final.ruta
+    assert trabajo.salida_vertical == ficha.vertical.ruta
+    assert trabajo.resumen == "✓ caption · vertical"
+    assert trabajo.ocupa == ocupa(ficha) > 0
+
+
+def test_cancelar_limpia_temporales_de_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    parcial = ficha.carpeta / "tmp" / "parcial.wav"
+    parcial.parent.mkdir()
+    parcial.write_bytes(b"MEDIO")
+    # La carpeta de salida es la de la ficha, no la de los ajustes (sin fijar).
+    temporal = ficha.carpeta_salida / ".a_limpio_tmp.mp4"
+    temporal.write_bytes(b"MEDIO")
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "Cancelado")
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.CANCELADO
+    assert not parcial.parent.exists()
+    assert not temporal.exists()
+    assert ficha.final.ruta.is_file() and cargar(ficha.id) is not None
