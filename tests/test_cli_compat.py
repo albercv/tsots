@@ -210,3 +210,14 @@ def test_cli_glosario_inexistente_sale_1(tmp_path, monkeypatch, capsys):
     assert salida.value.code == 1
     assert "no.txt" in capsys.readouterr().err
     assert "config" not in capturado
+
+
+def test_desinstalar_borra_fichas():
+    """Las fichas viven en la carpeta de la app: el desinstalador las borra como
+    borra audio_procesado/, y lo dice en su comentario."""
+    script = (Path(__file__).resolve().parent.parent / "desinstalar.command").read_text(
+        encoding="utf-8")
+    linea_rm = next(l for l in script.splitlines() if l.startswith("rm -rf"))
+    assert "fichas" in linea_rm.split()
+    comentario = script.split("set -euo pipefail")[0]
+    assert "fichas/" in comentario

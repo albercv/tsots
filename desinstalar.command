@@ -3,8 +3,10 @@
 #
 # Borra: el entorno Python (.venv-clearvoice), la app construida
 # (TheSilenceOfTheShorts.app/Contents/MacOS), los logs, los intermedios de
-# audio_procesado/ y la entrada del Dock. Conserva: el código, el checkpoint
-# descargado (checkpoints/) y tus vídeos. No toca Homebrew ni Ollama.
+# audio_procesado/, las fichas de fichas/ (lo que la app recuerda de cada vídeo:
+# audio limpio, base, transcripción) y la entrada del Dock. Conserva: el código,
+# el checkpoint descargado (checkpoints/) y tus vídeos, con sus .md y .srt. No
+# toca Homebrew ni Ollama.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -13,8 +15,8 @@ echo "  $(pwd)"
 read -r -p "¿Continuar? [s/N] " respuesta
 [[ "${respuesta:-n}" =~ ^[sS]$ ]] || { echo "Cancelado."; exit 0; }
 
-rm -rf .venv-clearvoice TheSilenceOfTheShorts.app/Contents/MacOS logs audio_procesado
-echo "Entorno, app, logs e intermedios borrados."
+rm -rf .venv-clearvoice TheSilenceOfTheShorts.app/Contents/MacOS logs audio_procesado fichas
+echo "Entorno, app, logs, intermedios y fichas borrados."
 
 # Entrada del Dock (si existe).
 python3 - <<'EOF'
