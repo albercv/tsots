@@ -1,6 +1,6 @@
 # Reprocesar un vídeo sin perder trabajo — diseño
 
-Fecha: 2026-11-01. Estado: pendiente de aprobación del usuario. Base: `develop`
+Fecha: 2026-11-01. Estado: aprobado por el usuario. Base: `develop`
 (`f5a6cf9`).
 
 Las reglas marcadas *(decisión mía)* no las ha pedido el usuario: son
