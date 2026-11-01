@@ -11,6 +11,7 @@ import pytest
 from videopipeline import steps
 from videopipeline.steps import (
     PasoFallido,
+    cmd_a_flac,
     cmd_cortar_silencios,
     cmd_extraer_audio,
     cmd_remux,
@@ -49,6 +50,13 @@ def test_cmd_remux_intermedio_usa_pcm():
     assert cmd[cmd.index("-c:a") + 1] == "pcm_s16le"
     assert "aac" not in cmd
     assert cmd[cmd.index("-c:v") + 1] == "copy"
+
+
+def test_cmd_a_flac():
+    cmd = cmd_a_flac("ffmpeg", Path("limpio.wav"), Path("audio.flac"))
+    assert cmd[cmd.index("-i") + 1] == "limpio.wav"
+    assert cmd[cmd.index("-c:a") + 1] == "flac"
+    assert cmd[-1] == "audio.flac"
 
 
 def test_cmd_rellenar_huecos_audio():
