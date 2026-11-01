@@ -4,9 +4,10 @@
 # Borra: el entorno Python (.venv-clearvoice), la app construida
 # (TheSilenceOfTheShorts.app/Contents/MacOS), los logs, los intermedios de
 # audio_procesado/, las fichas de fichas/ (lo que la app recuerda de cada vídeo:
-# audio limpio, base, transcripción) y la entrada del Dock. Conserva: el código,
-# el checkpoint descargado (checkpoints/) y tus vídeos, con sus .md y .srt. No
-# toca Homebrew ni Ollama.
+# audio limpio, base, transcripción, y la versión anterior de un resultado antiguo
+# que la app sobrescribió) y la entrada del Dock. Conserva: el código, el
+# checkpoint descargado (checkpoints/) y tus vídeos actuales, con sus .md y .srt.
+# No toca Homebrew ni Ollama.
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -153,9 +153,12 @@ de silencios que se te olvidó) sin perder lo que ya tiene y sin acabar con
 `fichas/` de la app, con lo que cuesta rehacer: el audio limpio, el vídeo
 sin subtítulos (solo si el resultado lleva subtítulos quemados), la
 transcripción, el caption y el seguimiento de la cara, además de los
-ajustes con que se hizo cada cosa. Tus vídeos no se guardan ahí. Cada fila
-de la cola muestra los pasos que ya tiene el vídeo (por ejemplo
-«✓ audio · silencios · subtítulos · caption») y cuánto ocupan sus datos.
+ajustes con que se hizo cada cosa. Tus vídeos no se guardan ahí, salvo una
+excepción: cuando la app sobrescribe por primera vez un resultado antiguo
+(ver «Vídeos procesados antes de esta función»), guarda en la ficha la
+versión anterior. Cada fila de la cola muestra los pasos que ya tiene el
+vídeo (por ejemplo «✓ audio · silencios · subtítulos · caption») y cuánto
+ocupan sus datos.
 
 **Qué no se repite.**
 
@@ -202,9 +205,11 @@ marca son siempre los de ahora.
 
 **Olvidar este vídeo** borra la ficha de la fila seleccionada (base, audio
 limpio, transcripción, seguimiento y copia del caption) y libera su
-espacio. No toca los vídeos ni sus `.md` y `.srt`. Los datos de una ficha
-se guardan hasta que la olvidas; `desinstalar.command` borra `fichas/`
-entera.
+espacio. Nunca toca los resultados actuales ni sus `.md` y `.srt`, pero si
+la ficha guarda la versión anterior de un resultado antiguo que se
+sobrescribió, esa versión se borra con ella (la app te lo dice al pedir
+confirmación). Los datos de una ficha se guardan hasta que la olvidas;
+`desinstalar.command` borra `fichas/` entera, con esa versión incluida.
 
 **Un vídeo cambiado o movido.** La app reconoce un archivo por su ruta,
 tamaño y fecha. Si lo editas fuera de la app, avisa y empieza una ficha
@@ -215,7 +220,8 @@ solo se aplica a los vídeos sin resultados; los demás siguen escribiendo
 donde ya están.
 
 **Vídeos procesados antes de esta función.** No tienen ficha, así que la
-app no sabe qué pasos se hicieron y no marca ninguno con ✓.
+app no sabe qué pasos se hicieron y no marca ninguno con ✓, salvo caption si
+encontró su `.md` junto al vídeo.
 
 - Si arrastras el original de un vídeo cuyo resultado ya está junto a él
   (`x_limpio.mp4`), la app adopta ese resultado: lo sobrescribirá en vez de
@@ -226,6 +232,8 @@ app no sabe qué pasos se hicieron y no marca ninguno con ✓.
 - Si arrastras un resultado antiguo sin su original (`x_limpio.mp4`,
   `x_vertical.mp4`, `x_limpio_limpio.mp4`…), pasa a ser el resultado de ese
   vídeo y se sobrescribe a sí mismo; nunca escribe en otra versión antigua.
+  La primera vez que lo sobrescribe, guarda su versión anterior en la
+  ficha (es la excepción de arriba).
 - En ese caso, si junto al resultado hay un `.srt`, la app da por hecho que los
   subtítulos están quemados y que no existe una versión sin ellos: no puede
   rehacerlos ni hacer un vertical con subtítulos hasta que arrastres el

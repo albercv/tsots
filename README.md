@@ -153,9 +153,12 @@ up with `x_limpio_limpio.mp4`. There are two ways to repeat a video:
 app's `fichas/` folder, holding what is costly to redo: the cleaned audio,
 the video without subtitles (only when the result has subtitles burned
 in), the transcript, the caption and the face tracking, plus the settings
-each one was made with. Your videos are not stored there. Each queue row
-shows the steps the video already has (for example "✓ audio · silences ·
-subtitles · caption") and how much its data takes up.
+each one was made with. Your videos are not stored there, with one
+exception: when the app overwrites an old result for the first time (see
+"Videos processed before this feature"), it keeps the previous version in
+the record. Each queue row shows the steps the video already has (for
+example "✓ audio · silences · subtitles · caption") and how much its data
+takes up.
 
 **What is not repeated.**
 
@@ -203,9 +206,12 @@ are always the current ones.
 
 **Forget this video** deletes the record of the selected row (base, cleaned
 audio, transcript, tracking and the caption copy) and frees its space. It
-does not touch the videos or their `.md` and `.srt`. A record's data is
-kept until you forget it; `desinstalar.command` deletes the whole `fichas/`
-folder.
+never touches the current results or their `.md` and `.srt`, but if the
+record holds the previous version of an old result that was overwritten,
+that version is deleted with it (the app tells you when it asks for
+confirmation). A record's data is kept until you forget it;
+`desinstalar.command` deletes the whole `fichas/` folder, that version
+included.
 
 **A video that was changed or moved.** The app recognises a file by its
 path, size and date. If you edit it outside the app, it warns you and
@@ -216,7 +222,8 @@ folder you change in the app only applies to videos without results; the
 others keep writing where they already are.
 
 **Videos processed before this feature.** They have no record, so the app
-does not know which steps were done and ticks none with ✓.
+does not know which steps were done and ticks none with ✓, except caption
+when it found its `.md` next to the video.
 
 - If you drag in the original of a video whose result is already next to
   it (`x_limpio.mp4`), the app adopts that result: it will overwrite it
@@ -226,7 +233,9 @@ does not know which steps were done and ticks none with ✓.
   original with no earlier result is a new video, like any other.
 - If you drag in an old result without its original (`x_limpio.mp4`,
   `x_vertical.mp4`, `x_limpio_limpio.mp4`…), it becomes that video's result
-  and overwrites itself; it never writes into another old version.
+  and overwrites itself; it never writes into another old version. The
+  first time it overwrites it, it keeps the previous version in the record
+  (the exception above).
 - In that case, if there is an `.srt` next to the result, the app assumes
   the subtitles are burned in and that no version without them exists: it
   cannot redo them or make a vertical with subtitles until you drag in the
