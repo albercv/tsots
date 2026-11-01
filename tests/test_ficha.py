@@ -68,6 +68,81 @@ def test_cargar_ficha_danada_devuelve_none_y_avisa_en_el_log(caplog):
     assert caplog.text == ""
 
 
+def _ficha_json_valida(tmp_path) -> dict:
+    """El contenido de un `ficha.json` correcto, para estropearlo luego."""
+    ficha = Ficha(
+        id="mala", nombre="x", carpeta_salida=tmp_path,
+        original=Huella.de(_archivo(tmp_path / "x.mov")),
+        desactualizado={"vertical"},
+        artefactos={BASE: Artefacto("k", None, {"audio": {}}, "lt")},
+    )
+    guardar(ficha)
+    return json.loads(ficha.ruta("ficha.json").read_text(encoding="utf-8"))
+
+
+# Cada caso cambia una parte de la ficha por algo del tipo equivocado.
+FORMAS_ERRONEAS = [
+    ("artefactos", []),
+    ("artefactos", None),
+    ("artefactos", {"base": 5}),
+    ("artefactos", {"base": {"clave": 5, "archivo": None, "ajustes": {},
+                             "linea_tiempo": ""}}),
+    ("artefactos", {"base": {"clave": "k", "archivo": None, "ajustes": 5,
+                             "linea_tiempo": ""}}),
+    ("artefactos", {"base": {"clave": "k"}}),
+    ("original", 5),
+    ("original", "x.mov"),
+    ("original", {"ruta": "x", "tamano": "grande", "mtime_ns": 1}),
+    ("final", []),
+    ("desactualizado", 5),
+    ("desactualizado", None),
+    ("desactualizado", [5]),
+    ("legado", "si"),
+    ("subs_quemados_sin_base", None),
+    ("carpeta_salida", None),
+    ("nombre", 5),
+    ("id", None),
+]
+
+
+def _escribir_ficha_mala(datos) -> None:
+    carpeta = modulo.DIR_FICHAS / "mala"
+    carpeta.mkdir(parents=True, exist_ok=True)
+    (carpeta / "ficha.json").write_text(json.dumps(datos), encoding="utf-8")
+
+
+@pytest.mark.parametrize("clave, valor", FORMAS_ERRONEAS)
+def test_cargar_json_valido_de_otra_forma_devuelve_none(tmp_path, clave, valor):
+    datos = _ficha_json_valida(tmp_path)
+    datos[clave] = valor
+    _escribir_ficha_mala(datos)
+
+    assert cargar("mala") is None
+
+
+@pytest.mark.parametrize("datos", [[], None, 5, "ficha", {}])
+def test_cargar_json_que_no_es_una_ficha_devuelve_none(datos):
+    _escribir_ficha_mala(datos)
+
+    assert cargar("mala") is None
+
+
+@pytest.mark.parametrize("clave, valor", FORMAS_ERRONEAS)
+def test_todas_y_reconocer_siguen_con_una_ficha_de_forma_erronea(
+        tmp_path, clave, valor):
+    datos = _ficha_json_valida(tmp_path)
+    datos[clave] = valor
+    _escribir_ficha_mala(datos)
+    buena = Ficha(id="buena", nombre="y", carpeta_salida=tmp_path)
+    guardar(buena)
+
+    assert todas() == [buena]
+    nueva, aviso = reconocer(_archivo(tmp_path / "z.mov"), None)
+    assert aviso == ""
+    assert nueva.nombre == "z"
+    assert {f.id for f in todas()} == {"buena", nueva.id}
+
+
 def test_cargar_ficha_con_otro_id_devuelve_none(tmp_path):
     ficha = Ficha(id="uno", nombre="x", carpeta_salida=tmp_path)
     guardar(ficha)
@@ -195,6 +270,42 @@ def test_legado_limpio_limpio_es_su_propio_final(tmp_path):
     assert reconocer(salida, None)[0].id == ficha.id
 
 
+@pytest.mark.parametrize("nombre", ["foo_limpio.mov", "foo_limpio.MOV",
+                                    "foo_limpio.mkv", "foo_vertical.mov"])
+def test_original_con_sufijo_de_salida_pero_otra_extension_es_un_original(
+        tmp_path, nombre):
+    fuente = _archivo(tmp_path / "orig" / nombre)
+
+    ficha, aviso = reconocer(fuente, tmp_path / "salida")
+
+    assert aviso == ""
+    assert ficha.legado is False
+    assert ficha.nombre == fuente.stem
+    assert ficha.original == Huella.de(fuente)
+    assert ficha.final is None
+    assert ficha.carpeta_salida == tmp_path / "salida"
+    assert ficha.ruta_final(True) != fuente
+    assert ficha.ruta_final(True).name == f"{fuente.stem}_limpio.mp4"
+
+
+def test_original_foo_limpio_mov_nunca_es_su_propio_final(tmp_path):
+    fuente = _archivo(tmp_path / "foo_limpio.mov")
+
+    ficha, _ = reconocer(fuente, None)
+
+    assert ficha.nombre == "foo_limpio"
+    assert ficha.ruta_final(True).name == "foo_limpio_limpio.mp4"
+    assert ficha.ruta_final(True) != fuente
+
+
+@pytest.mark.parametrize("nombre", ["x_limpio.MP4", "x_vertical.Mp4"])
+def test_salida_antigua_con_mp4_en_mayusculas_es_legado(tmp_path, nombre):
+    ficha, _ = reconocer(_archivo(tmp_path / nombre), None)
+
+    assert ficha.legado is True
+    assert ficha.nombre == "x"
+
+
 def test_legado_vertical_solo(tmp_path):
     salida = _archivo(tmp_path / "x_vertical.mp4")
 
@@ -265,6 +376,47 @@ def test_original_adopta_ficha_de_legado(tmp_path):
     assert ficha.final.ruta == antigua
     assert len(todas()) == 1
     assert cargar(ficha.id) == ficha
+
+
+def test_original_adopta_ficha_de_legado_solo_vertical(tmp_path):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_vertical.mp4")
+    legado, _ = reconocer(antigua, None)
+    original = _archivo(tmp_path / "orig" / "x.mov")
+
+    ficha, aviso = reconocer(original, salida)
+
+    assert aviso == ""
+    assert ficha.id == legado.id
+    assert ficha.original == Huella.de(original)
+    assert ficha.legado is False
+    assert ficha.final.ruta == antigua
+    assert not ficha.hay_horizontal()
+    assert len(todas()) == 1
+    assert cargar(ficha.id) == ficha
+
+
+def test_original_no_adopta_legado_de_otra_carpeta_de_salida(tmp_path):
+    antigua = _archivo(tmp_path / "salida" / "x_vertical.mp4")
+    legado, _ = reconocer(antigua, None)
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"),
+                         tmp_path / "otra_salida")
+
+    assert ficha.id != legado.id
+    assert ficha.legado is False
+    assert len(todas()) == 2
+
+
+def test_original_adopta_primero_el_legado_horizontal(tmp_path):
+    salida = tmp_path / "salida"
+    vertical, _ = reconocer(_archivo(salida / "x_vertical.mp4"), None)
+    horizontal, _ = reconocer(_archivo(salida / "x_limpio.mp4"), None)
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert ficha.id == horizontal.id
+    assert cargar(vertical.id).original is None
 
 
 def test_mismo_nombre_otra_carpeta_no_pisa_salidas(tmp_path):

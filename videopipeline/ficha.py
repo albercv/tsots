@@ -146,10 +146,30 @@ def _huella_a_dict(huella: Huella | None) -> dict | None:
             "mtime_ns": huella.mtime_ns}
 
 
+def _tipo(valor, *tipos):
+    """Un `ficha.json` puede ser JSON válido y no ser una ficha: se comprueba
+    cada tipo para que `cargar` falle con TypeError y no más tarde, usándola."""
+    if not isinstance(valor, tipos):
+        raise TypeError(f"{valor!r} no es {' o '.join(t.__name__ for t in tipos)}")
+    return valor
+
+
 def _huella_de_dict(datos: dict | None) -> Huella | None:
     if datos is None:
         return None
-    return Huella(Path(datos["ruta"]), datos["tamano"], datos["mtime_ns"])
+    _tipo(datos, dict)
+    return Huella(Path(_tipo(datos["ruta"], str)), _tipo(datos["tamano"], int),
+                  _tipo(datos["mtime_ns"], int))
+
+
+def _artefacto_de_dict(datos: dict) -> Artefacto:
+    _tipo(datos, dict)
+    return Artefacto(
+        clave=_tipo(datos["clave"], str),
+        archivo=_tipo(datos["archivo"], str, type(None)),
+        ajustes=_tipo(datos["ajustes"], dict),
+        linea_tiempo=_tipo(datos["linea_tiempo"], str),
+    )
 
 
 def _a_dict(ficha: Ficha) -> dict:
@@ -168,17 +188,19 @@ def _a_dict(ficha: Ficha) -> dict:
 
 
 def _de_dict(datos: dict) -> Ficha:
+    _tipo(datos, dict)
     return Ficha(
-        id=datos["id"],
-        nombre=datos["nombre"],
-        carpeta_salida=Path(datos["carpeta_salida"]),
+        id=_tipo(datos["id"], str),
+        nombre=_tipo(datos["nombre"], str),
+        carpeta_salida=Path(_tipo(datos["carpeta_salida"], str)),
         original=_huella_de_dict(datos["original"]),
         final=_huella_de_dict(datos["final"]),
         vertical=_huella_de_dict(datos["vertical"]),
-        legado=datos["legado"],
-        subs_quemados_sin_base=datos["subs_quemados_sin_base"],
-        desactualizado=set(datos["desactualizado"]),
-        artefactos={k: Artefacto(**a) for k, a in datos["artefactos"].items()},
+        legado=_tipo(datos["legado"], bool),
+        subs_quemados_sin_base=_tipo(datos["subs_quemados_sin_base"], bool),
+        desactualizado={_tipo(d, str) for d in _tipo(datos["desactualizado"], list)},
+        artefactos={_tipo(k, str): _artefacto_de_dict(a)
+                    for k, a in _tipo(datos["artefactos"], dict).items()},
     )
 
 
@@ -243,6 +265,13 @@ def _nueva_id() -> str:
     return uuid4().hex[:12]
 
 
+def _es_salida_antigua(ruta: Path) -> bool:
+    """La app solo escribió .mp4: un `foo_limpio.mov` es un original de verdad
+    y nunca puede ser el final (que se sobrescribe) de una ficha."""
+    return (ruta.suffix.lower() == ".mp4"
+            and any(ruta.stem.endswith(sufijo) for sufijo in SUFIJOS_SALIDA))
+
+
 def _ficha_de_legado(salida: Path) -> Ficha:
     """Una salida de antes de las fichas es su propio final y se sobrescribe a
     sí misma. Si al lado tiene el .md y el .srt, se importan."""
@@ -279,15 +308,16 @@ def _ficha_de_original(original: Path, carpeta_salida: Path,
     nueva = Ficha(id=_nueva_id(), nombre=original.stem,
                   carpeta_salida=carpeta_salida, original=Huella.de(original))
 
-    # Su salida es el final de una salida antigua sin original: el original
-    # pasa a ser de esa ficha en vez de crear otra con la misma salida.
-    horizontal = nueva.ruta_final(True).resolve()
-    for ficha in fichas:
-        if (ficha.original is None and ficha.final is not None
-                and ficha.final.ruta == horizontal):
-            ficha.original, ficha.legado = nueva.original, False
-            guardar(ficha)
-            return ficha
+    # Su salida (horizontal, o si no vertical único) es el final de una salida
+    # antigua sin original: el original pasa a ser de esa ficha en vez de crear
+    # otra con la misma salida.
+    for salida in (nueva.ruta_final(True), nueva.ruta_final(False)):
+        for ficha in fichas:
+            if (ficha.original is None and ficha.final is not None
+                    and ficha.final.ruta == salida.resolve()):
+                ficha.original, ficha.legado = nueva.original, False
+                guardar(ficha)
+                return ficha
 
     # Otro original con el mismo nombre ya usa esas salidas: no se pisan.
     nombre, n = nueva.nombre, 1
@@ -328,7 +358,7 @@ def reconocer(ruta: Path, carpeta_salida: Path | None) -> tuple[Ficha, str]:
         aviso = _('"{nombre}" ha cambiado fuera de la app: '
                   'se empieza una ficha nueva').format(nombre=ruta.name)
 
-    if any(ruta.stem.endswith(sufijo) for sufijo in SUFIJOS_SALIDA):
+    if _es_salida_antigua(ruta):
         return _ficha_de_legado(ruta), aviso
     carpeta = ruta.parent if carpeta_salida is None else carpeta_salida
     return _ficha_de_original(ruta, carpeta, fichas), aviso
