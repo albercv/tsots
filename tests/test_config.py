@@ -220,6 +220,22 @@ def test_sin_pasos_de_video_invalido():
         c.validar()
 
 
+def test_validar_permite_solo_caption():
+    c = PipelineConfig(video=Path("/v/a.mp4"), paso_audio=False,
+                       paso_silencios=False, caption_seo=True)
+    c.validar(exigir_paso_de_video=False)
+    with pytest.raises(ValueError, match="encuadre"):
+        PipelineConfig(video=Path("/v/a.mp4"), paso_audio=False,
+                       encuadre="zoom").validar(exigir_paso_de_video=False)
+
+
+def test_from_datos_no_modifica_el_dict():
+    datos = {"video": "/v/a.mp4", "salida": "/out"}
+    c = PipelineConfig.from_datos(datos)
+    assert (c.video, c.salida) == (Path("/v/a.mp4"), Path("/out"))
+    assert datos == {"video": "/v/a.mp4", "salida": "/out"}
+
+
 @pytest.mark.parametrize("salida, principal, vertical", [
     (None, "/v/a_limpio.mp4", "/v/a_limpio_vertical.mp4"),
     (Path("/out"), "/out/a_limpio.mp4", "/out/a_limpio_vertical.mp4"),

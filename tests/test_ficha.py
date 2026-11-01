@@ -374,6 +374,7 @@ def test_original_adopta_ficha_de_legado(tmp_path):
     assert ficha.original == Huella.de(original)
     assert ficha.legado is False
     assert ficha.final.ruta == antigua
+    assert ficha.hay_horizontal()  # sin artefacto HORIZONTAL: lo dice el final
     assert len(todas()) == 1
     assert cargar(ficha.id) == ficha
 

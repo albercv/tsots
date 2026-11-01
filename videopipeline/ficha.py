@@ -106,9 +106,11 @@ class Ficha:
         return [paso for paso in PASOS if hechos[paso]]
 
     def hay_horizontal(self) -> bool:
+        # Sin artefacto (salida antigua, adoptada o no) lo dice el nombre del
+        # final: las salidas son siempre `_limpio.mp4` o `_vertical.mp4`.
         if HORIZONTAL in self.artefactos:
             return True
-        return self.legado and self.final is not None and not _es_vertical(self.final)
+        return self.final is not None and not _es_vertical(self.final)
 
     def ruta_final(self, horizontal: bool) -> Path:
         """Donde está, o estará, el final de ese tipo. Una salida antigua
