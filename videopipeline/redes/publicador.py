@@ -73,6 +73,9 @@ def _fallo(plataforma: Plataforma, excepcion: BaseException) -> Resultado:
 
 
 def _describir(resultado: Resultado) -> str:
+    if resultado.programada is not None:
+        return (f"programada para {resultado.programada.isoformat(timespec='minutes')} "
+                f"(referencia {resultado.referencia or '-'})")
     if resultado.ok:
         return f"OK {resultado.url or '(sin enlace)'}"
     if resultado.pendiente:
@@ -117,7 +120,9 @@ def publicar(
             try:
                 registro.anotar(publicacion.video, plataforma, resultado.url,
                                 nombre_proveedor, modo_de(plataforma, opciones),
-                                sin_confirmar=not resultado.ok)
+                                sin_confirmar=not resultado.ok,
+                                programada=resultado.programada,
+                                referencia=resultado.referencia if resultado.programada else "")
             except OSError:
                 # El vídeo ya está publicado; perder la nota no es grave.
                 log.warning("%s: no se pudo anotar en el registro local", plataforma.nombre,

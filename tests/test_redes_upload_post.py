@@ -1,9 +1,11 @@
 """Proveedor Upload-Post contra un transporte HTTP falso: nunca sale a la red."""
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from email.parser import BytesParser
 from email.policy import HTTP
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -1069,3 +1071,160 @@ def test_cuenta_de_tiktok_dice_si_admite_ubicacion(capacidades, esperado):
     cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()
     assert cuentas[Plataforma.TIKTOK].ubicacion is esperado
     assert cuentas[Plataforma.X].ubicacion is None  # solo TikTok lo exige
+
+
+# --- programar ---
+
+ZONA_MADRID = ZoneInfo("Europe/Madrid")
+CUANDO = datetime(2026, 11, 3, 18, 0, tzinfo=ZONA_MADRID)
+
+
+def _programado(request, servidor):
+    return httpx.Response(202, json={"success": True, "job_id": "job-1",
+                                     "scheduled_date": "2026-11-03T17:00:00Z"})
+
+
+def test_programar_envia_fecha_local_y_zona_sin_async(video):
+    servidor = Servidor(_programado)
+    _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video), Opciones(programada=CUANDO))
+    campos = servidor.formularios[-1]
+    assert campos["scheduled_date"] == ["2026-11-03T18:00:00"]
+    assert campos["timezone"] == ["Europe/Madrid"]
+    assert "async_upload" not in campos
+    assert "add_to_queue" not in campos
+
+
+def test_sin_programar_no_lleva_fecha(video):
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video), Opciones())
+    campos = servidor.formularios[-1]
+    assert "scheduled_date" not in campos and "timezone" not in campos
+    assert campos["async_upload"] == ["true"]
+
+
+def test_programar_con_desfase_fijo_va_en_utc(video):
+    servidor = Servidor(_programado)
+    cuando = datetime(2026, 11, 3, 18, 0, tzinfo=timezone(timedelta(hours=1)))
+    _proveedor(servidor).publicar(Plataforma.YOUTUBE, _pub(video), Opciones(programada=cuando))
+    campos = servidor.formularios[-1]
+    assert campos["scheduled_date"] == ["2026-11-03T17:00:00"]
+    assert campos["timezone"] == ["UTC"]
+
+
+def test_respuesta_programada_es_ok_con_job_id(video):
+    servidor = Servidor(_programado)
+    proveedor = _proveedor(servidor)
+    r = proveedor.publicar(Plataforma.TIKTOK, _pub(video), Opciones(programada=CUANDO))
+    assert r.ok and not r.pendiente and r.url == ""
+    assert r.programada == CUANDO and r.referencia == "job-1"
+    final = publicador.publicar(proveedor, _pub(video), Opciones(programada=CUANDO),
+                                [Plataforma.TIKTOK], registrar=False,
+                                espera=lambda s: pytest.fail("no debe sondear"))
+    assert final[Plataforma.TIKTOK].programada == CUANDO
+    assert [r.method for r in servidor.peticiones] == ["POST", "POST"]
+
+
+def test_programada_con_solo_request_id_queda_programada_sin_referencia(video):
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "request_id": "req-7", "total_platforms": 1}))
+    r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
+                                      Opciones(programada=CUANDO))
+    assert r.ok and not r.pendiente
+    assert r.programada == CUANDO and r.referencia == ""
+
+
+def test_programar_rechazado_es_error(video):
+    servidor = Servidor(lambda req, s: httpx.Response(400, json={
+        "success": False, "error": "scheduled_date must be in the future"}))
+    r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
+                                      Opciones(programada=CUANDO))
+    assert not r.ok and not r.pendiente and r.programada is None
+    assert "must be in the future" in r.error
+
+
+def _lista(cuerpo):
+    def responder(request, servidor):
+        assert request.method == "GET"
+        assert str(request.url).startswith(
+            "https://api.upload-post.com/api/uploadposts/schedule")
+        assert request.url.params["profile_username"] == "mi_perfil"
+        assert request.headers["authorization"] == f"Apikey {CLAVE}"
+        return httpx.Response(200, json=cuerpo)
+    return Servidor(responder)
+
+
+def test_lista_de_programadas():
+    servidor = _lista({"scheduled_posts": [
+        {"job_id": "j1", "scheduled_date": "2026-11-03T17:00:00+00:00",
+         "platforms": ["tiktok"], "title": "Uno", "fields": {"post_mode": "MEDIA_UPLOAD"}},
+        {"job_id": "j2", "scheduled_date": "2026-11-05T09:30:00Z",
+         "platforms": ["youtube", "linkedin", "twitter"], "title": "Dos"},
+        {"job_id": "j3", "scheduled_date": "mañana", "platforms": ["tiktok"]},
+        {"job_id": "j4", "scheduled_date": "2026-11-06T09:30:00Z", "platforms": ["linkedin"]},
+        {"scheduled_date": "2026-11-06T09:30:00Z", "platforms": ["tiktok"]},
+        "basura",
+    ], "total": 6})
+    lista = _proveedor(servidor).programadas()
+    assert [p.referencia for p in lista] == ["j1", "j2"]
+    uno, dos = lista
+    assert uno.fecha == datetime(2026, 11, 3, 17, 0, tzinfo=timezone.utc)
+    assert uno.plataformas == (Plataforma.TIKTOK,) and uno.titulo == "Uno"
+    assert uno.modos == {Plataforma.TIKTOK: ModoTikTok.BORRADOR.value}
+    assert dos.plataformas == (Plataforma.YOUTUBE, Plataforma.X)
+    assert dos.fecha.utcoffset() == timedelta(0)
+
+
+def test_lista_de_programadas_vacia_o_rara():
+    assert _proveedor(_lista({"scheduled_posts": [], "total": 0})).programadas() == []
+    with pytest.raises(ErrorConsulta):
+        _proveedor(_lista({"foo": 1})).programadas()
+
+
+def test_lista_de_programadas_modo_publico_de_tiktok():
+    servidor = _lista({"scheduled_posts": [
+        {"job_id": "j1", "scheduled_date": "2026-11-03T17:00:00Z", "platforms": ["tiktok"],
+         "fields": {"post_mode": "DIRECT_POST"}}]})
+    [p] = _proveedor(servidor).programadas()
+    assert p.modos == {Plataforma.TIKTOK: ModoTikTok.PUBLICO.value}
+
+
+def test_cancelar_borra_y_404_cuenta_como_cancelada():
+    vistas = []
+
+    def responder(request, servidor):
+        vistas.append((request.method, str(request.url)))
+        if request.url.path.endswith("/ya-no"):
+            return httpx.Response(404, json={"success": False, "error": "Job not found"})
+        return httpx.Response(200, json={"success": True, "credits_refunded": 1})
+
+    proveedor = _proveedor(Servidor(responder))
+    assert proveedor.cancelar("j 1") is None
+    assert proveedor.cancelar("ya-no") is None
+    assert vistas == [
+        ("DELETE", "https://api.upload-post.com/api/uploadposts/schedule/j%201"),
+        ("DELETE", "https://api.upload-post.com/api/uploadposts/schedule/ya-no")]
+
+
+@pytest.mark.parametrize("respuesta", [
+    httpx.Response(500, json={"error": f"fallo {CLAVE}"}),
+    httpx.Response(409, json={"success": False, "error_code": "scheduled_post_in_progress"}),
+    httpx.Response(200, json={"success": False, "error": "nope"}),
+])
+def test_cancelar_error_lanza_error_consulta_sin_clave(respuesta):
+    proveedor = _proveedor(Servidor(lambda req, s: respuesta))
+    with pytest.raises(ErrorConsulta) as error:
+        proveedor.cancelar("j1")
+    assert str(error.value) and CLAVE not in str(error.value)
+
+
+def test_cancelar_en_curso_lo_explica():
+    proveedor = _proveedor(Servidor(lambda req, s: httpx.Response(409, json={
+        "success": False, "error_code": "scheduled_post_in_progress"})))
+    with pytest.raises(ErrorConsulta, match="menos de un minuto"):
+        proveedor.cancelar("j1")
+
+
+def test_cancelar_sin_referencia_no_envia_nada():
+    servidor = Servidor(lambda req, s: pytest.fail("no debe enviar"))
+    with pytest.raises(ErrorConsulta):
+        _proveedor(servidor).cancelar("")

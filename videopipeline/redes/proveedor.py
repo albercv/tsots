@@ -20,7 +20,16 @@ from types import ModuleType
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..i18n import _
-from .modelo import Cuenta, Lugar, Opciones, Pagina, Plataforma, Publicacion, Resultado
+from .modelo import (
+    Cuenta,
+    Lugar,
+    Opciones,
+    Pagina,
+    Plataforma,
+    Programada,
+    Publicacion,
+    Resultado,
+)
 
 
 class ErrorConsulta(Exception):
@@ -37,7 +46,8 @@ class Proveedor(Protocol):
         """Sube el vídeo a una plataforma. Nunca lanza por errores de red o
         del servicio: devuelve un `Resultado` con `ok=False` y `error`, o con
         `pendiente=True` y una `referencia` para `estado`. El texto de error
-        nunca contiene la clave."""
+        nunca contiene la clave. Con `opciones.programada`, el servicio lo
+        publicará en esa fecha: `Resultado(ok=True, programada=…)`."""
         ...
 
     def estado(self, plataforma: Plataforma, referencia: str) -> Resultado:
@@ -57,6 +67,16 @@ class Proveedor(Protocol):
     def lugares_tiktok(self, texto: str) -> list[Lugar]:
         """Lugares de TikTok que coinciden con `texto`, para etiquetar la
         ubicación. Lanza `ErrorConsulta`."""
+        ...
+
+    def programadas(self) -> list[Programada]:
+        """Publicaciones pendientes en el servicio (también las programadas
+        fuera de la app). Lanza `ErrorConsulta`."""
+        ...
+
+    def cancelar(self, referencia: str) -> None:
+        """Cancela una publicación programada. Si ya no existe, no lanza.
+        Lanza `ErrorConsulta` si no se pudo cancelar."""
         ...
 
 

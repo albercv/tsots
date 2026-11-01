@@ -201,3 +201,21 @@ def test_modo_de_x_y_facebook_en_el_registro(pub, modo):
                         nombre_proveedor="falso", espera=lambda s: None)
     modos = {e.plataforma: e.modo for e in registro.leer(pub.video)}
     assert modos == {X: "publico", F: modo.value}
+
+
+def test_programada_no_se_sondea_y_se_anota_con_fecha_y_referencia(pub):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    cuando = datetime(2026, 11, 3, 18, 0, tzinfo=ZoneInfo("Europe/Madrid"))
+    proveedor = ProveedorFalso(respuestas={
+        T: Resultado(T, ok=True, programada=cuando, referencia="j1"),
+        Y: Resultado(Y, ok=True, programada=cuando)})
+    resultados, eventos = _publicar(proveedor, pub, [T, Y],
+                                    espera=lambda s: pytest.fail("no debe sondear"))
+    assert resultados[T].programada == cuando and resultados[Y].programada == cuando
+    assert [c[0] for c in proveedor.llamadas] == ["publicar", "publicar"]
+    assert (T, Estado.HECHO) in eventos and (Y, Estado.HECHO) in eventos
+    tiktok, youtube = registro.leer(pub.video)
+    assert tiktok.programada == "2026-11-03T18:00:00+01:00" and tiktok.referencia == "j1"
+    assert youtube.programada and youtube.referencia == ""
+    assert not tiktok.sin_confirmar and tiktok.url == ""
