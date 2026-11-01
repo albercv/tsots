@@ -424,7 +424,7 @@ def test_estado_trabajo_display_usa_traduccion(qtbot):
     from app.queue_model import EstadoTrabajo, ModeloCola
 
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert EstadoTrabajo.ESPERA.value in texto  # español = idioma fuente
 

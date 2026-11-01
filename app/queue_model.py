@@ -3,11 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt
 from PySide6.QtGui import QBrush, QColor
 
 from videopipeline.i18n import N_, _
+
+if TYPE_CHECKING:
+    from videopipeline.ficha import Ficha
 
 
 class EstadoTrabajo(Enum):
@@ -16,6 +20,29 @@ class EstadoTrabajo(Enum):
     HECHO = N_("hecho")
     ERROR = N_("error")
     CANCELADO = N_("cancelado")
+
+
+_TERMINADOS = (EstadoTrabajo.HECHO, EstadoTrabajo.ERROR, EstadoTrabajo.CANCELADO)
+_ACTIVOS = (EstadoTrabajo.ESPERA, EstadoTrabajo.PROCESANDO)
+_NOMBRE_PASO = {
+    "audio": N_("audio"),
+    "silencios": N_("silencios"),
+    "subtitulos": N_("subtítulos"),
+    "caption": N_("caption"),
+    "vertical": N_("vertical"),
+}
+
+
+def resumen_de(ficha: Ficha) -> str:
+    """Lo que el vídeo ya tiene: «✓ audio · silencios · subtítulos · caption»."""
+    desactualizado = "vertical" in ficha.desactualizado
+    partes = [
+        _(_NOMBRE_PASO[paso]) for paso in ficha.pasos_hechos()
+        if not (desactualizado and paso == "vertical")  # se avisa abajo, una vez
+    ]
+    if desactualizado:
+        partes.append(_("vertical desactualizado"))
+    return "✓ " + " · ".join(partes) if partes else ""
 
 
 @dataclass
@@ -29,6 +56,9 @@ class Trabajo:
     salida: Path | None = None
     salida_vertical: Path | None = None
     diagnostico: dict | None = None  # titulo, causa, solucion, detalle, paso, log
+    ficha_id: str | None = None
+    resumen: str = ""
+    ocupa: int = 0  # bytes de la ficha
 
 
 class ModeloCola(QAbstractListModel):
@@ -55,6 +85,10 @@ class ModeloCola(QAbstractListModel):
                 partes.append(f"· {trabajo.error.splitlines()[0]}")
             if trabajo.estado == EstadoTrabajo.HECHO and trabajo.salida_vertical:
                 partes.append(_("+ vertical"))
+            if trabajo.resumen:
+                partes.append(trabajo.resumen)
+            if trabajo.ocupa > 0:
+                partes.append(f"· {round(trabajo.ocupa / 1_000_000)} MB")
             if trabajo.aviso:
                 partes.append("⚠")
             return " ".join(partes)
@@ -73,23 +107,39 @@ class ModeloCola(QAbstractListModel):
     def trabajo(self, fila: int) -> Trabajo:
         return self._trabajos[fila]
 
-    def anadir(self, rutas: list[Path]) -> list[Path]:
-        existentes = {
-            t.ruta for t in self._trabajos
-            if t.estado in (EstadoTrabajo.ESPERA, EstadoTrabajo.PROCESANDO)
-        }
-        nuevas = []
-        for r in rutas:
-            if r not in existentes:
-                nuevas.append(r)
-                existentes.add(r)  # Track within this call to dedupe
-        if not nuevas:
-            return []
-        inicio = len(self._trabajos)
-        self.beginInsertRows(QModelIndex(), inicio, inicio + len(nuevas) - 1)
-        self._trabajos.extend(Trabajo(ruta=r) for r in nuevas)
-        self.endInsertRows()
-        return nuevas
+    def anadir(self, entradas: list[tuple[Path, str | None]]) -> list[int]:
+        """Añade (ruta, ficha_id). Devuelve las filas nuevas o reactivadas."""
+        filas = []
+        for ruta, ficha_id in entradas:
+            fila = None if ficha_id is None else self.fila_de_ficha(ficha_id)
+            if fila is not None:
+                # Ya está en la cola: si terminó se repite; si espera, no se toca.
+                if self._trabajos[fila].estado in _TERMINADOS:
+                    self.volver_a_espera([fila])
+                    filas.append(fila)
+                continue
+            if ficha_id is None and any(
+                t.ruta == ruta and t.estado in _ACTIVOS for t in self._trabajos
+            ):
+                continue
+            fila = len(self._trabajos)
+            self.beginInsertRows(QModelIndex(), fila, fila)
+            self._trabajos.append(Trabajo(ruta=ruta, ficha_id=ficha_id))
+            self.endInsertRows()
+            filas.append(fila)
+        return filas
+
+    def fila_de_ficha(self, ficha_id: str) -> int | None:
+        return next(
+            (f for f, t in enumerate(self._trabajos) if t.ficha_id == ficha_id), None)
+
+    def volver_a_espera(self, filas: list[int]) -> None:
+        """Repite los trabajos terminados; los que esperan o procesan no se tocan."""
+        for fila in filas:
+            if self._trabajos[fila].estado in _TERMINADOS:
+                self.actualizar(
+                    fila, estado=EstadoTrabajo.ESPERA, error="", aviso="",
+                    percent=None, diagnostico=None)
 
     def quitar(self, fila: int) -> None:
         if not 0 <= fila < len(self._trabajos):

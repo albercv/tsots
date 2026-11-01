@@ -308,7 +308,7 @@ class VentanaPrincipal(QMainWindow):
                 ).format(nombres=nombres),
             )
         if con_audio:
-            self.modelo_cola.anadir(con_audio)
+            self.modelo_cola.anadir([(r, None) for r in con_audio])
 
     def _quitar_seleccionado(self) -> None:
         if self._procesando:
