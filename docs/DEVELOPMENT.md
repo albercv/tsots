@@ -189,14 +189,18 @@ outputs. The folder holds:
 - the artifact files below, and `tmp/` for the pass in progress (emptied
   at the start, deleted at the end, whatever the outcome).
 - `original.<ext>`: only for an old output that has no known original and
-  is about to be overwritten; it is moved here first.
+  is about to be overwritten; it is moved here first. It stays when the
+  real original is adopted later, and "Forget this video" names any
+  `original.*` it is about to delete.
 
 **Artifacts and keys.** `Ficha.artefactos` maps a key to an `Artefacto`
 (`clave`, `archivo`, `ajustes`, `linea_tiempo`). An artifact is valid if
 its file exists and its `clave` (and `linea_tiempo`, where it applies)
 equals what the planner computes now. `clave()` is a short hash of the
-settings that matter. The timeline of the base is `"original"` when
-nothing was cut, or `clave(audio, silencios)`.
+settings that matter. The timeline of the base is `clave(audio, silencios)`
+when it was cut and, uncut, `Ficha.linea_original()`: `"original"` with a
+real original, `"legado"` when the old final (or its copy in the record)
+stands in for it. Planner and executor use the same helper.
 
 | Key | File in `fichas/<id>/` | `clave` hashes | `ajustes` holds |
 |---|---|---|---|
@@ -231,16 +235,32 @@ the plan says); numbers match comments in the code.
 
 **Recognition (`reconocer`).** A dragged file belongs to a record if its
 real path is the original's or an output's and size and mtime match. If
-the path matches but the fingerprint does not, the stale record is
-forgotten, the user is warned, and a new one starts. Outputs written
-before records existed (`*_limpio.mp4`, `*_vertical.mp4`) become a *legacy*
-record: the file is its own final and overwrites itself, and a `.md` /
-`.srt` next to it are imported as caption and transcript (an `.srt` also
-sets `subs_quemados_sin_base`, which blocks subtitles and subtitled
-verticals until the original is dragged in). Dragging the real original
-later adopts that record (`_adoptar`) instead of creating a second one with
-the same outputs. Two originals with the same name and output folder get
-`name (2)`, so their outputs never collide.
+the path matches but the fingerprint does not (edited outside the app),
+the user is warned and the record drops that fingerprint and what only
+described that file (`_soltar`); nothing else is deleted. An edited
+original is adopted back into its record; an edited output starts a new
+legacy record. Outputs written before records existed (`*_limpio.mp4`,
+`*_vertical.mp4`) become a *legacy* record: the file is its own final and
+overwrites itself, and a `.md` / `.srt` next to it are imported as caption
+and transcript (an `.srt` also sets `subs_quemados_sin_base`, which blocks
+subtitles and subtitled verticals until the original is dragged in).
+
+Dragging the real original later adopts (`_adoptar`) the record whose final
+is its computed output (horizontal, vertical-only, or else the companion
+`x_limpio_vertical.mp4`) when that record has no real original
+(`Ficha.original_verdadero()`: `original` missing, `legado`, or the copy in
+the record folder), instead of creating a second one with the same
+outputs. An output on disk that no record owns is adopted the same way,
+with a warning (it may be another video's), unless it is more than 1 s
+longer than the original (`duracion_video`; adopted if it cannot be
+measured). Adopting drops `audio`, `base`, `seguimiento`, `horizontal`,
+`vertical` and any transcript not on the `"legado"` timeline: they were
+made from the old final. A dropped horizontal with subtitles sets
+`subs_quemados_sin_base`; an existing vertical is marked `desactualizado`.
+A record without outputs gets `name (2)` when another record uses its
+outputs or a file it does not own is in the way (`_nombre_libre`), both
+when it is created and when Process moves it to the current output folder
+(`mover_salidas`).
 
 **Writes.** Outputs are written to a hidden temp (`.{stem}_tmp{suffix}`)
 and replace the previous file only when complete; moves across folders use
@@ -248,14 +268,16 @@ and replace the previous file only when complete; moves across folders use
 saved after each action with only what finished, so a cancelled or failed
 pass leaves the earlier outputs and record as they were.
 `_comprobar_propio` refuses to replace or delete a file the record does
-not list or that changed outside the app. Degradation is unchanged: a
+not list or that changed outside the app; `ejecutar` checks every
+destination once before the first action, and again when replacing it. Degradation is unchanged: a
 failed caption or vertical leaves a warning, and failed subtitles with
 other steps save the video without them.
 
 **Runner protocol.** The job JSON passed with `--config` is a
 `PipelineConfig` as before; without the `reproceso` key the runner calls
-`pipeline.run` exactly as it always did (a row without `ficha_id`, e.g.
-after "Forget this video", still takes this path). With it:
+`pipeline.run` exactly as it always did. The GUI never sends that: a row
+without `ficha_id` (e.g. after "Forget this video") is recognised again
+with `reconocer` before planning. With it:
 
 ```json
 { "video": "…", "caption_seo": true, "…": "…",
@@ -289,7 +311,8 @@ their `msgstr`s must work as bare nouns.
 
 **Testing.** No test needs ffmpeg or a model:
 `tests/falsos_pipeline.py` replaces the steps in both `pipeline` and
-`reproceso`.
+`reproceso`, and `tests/conftest.py` makes `ficha.duracion_video` return
+0.0 ("could not measure") unless a test sets durations.
 
 - `tests/test_ficha.py`: storage, damaged files, recognition, legacy
   outputs, same-name originals.

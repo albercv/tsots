@@ -212,8 +212,12 @@ confirmación). Los datos de una ficha se guardan hasta que la olvidas;
 `desinstalar.command` borra `fichas/` entera, con esa versión incluida.
 
 **Un vídeo cambiado o movido.** La app reconoce un archivo por su ruta,
-tamaño y fecha. Si lo editas fuera de la app, avisa y empieza una ficha
-nueva. Si lo mueves o lo renombras, ya no lo reconoce. Nunca sobrescribe ni
+tamaño y fecha. Si lo editas fuera de la app, te avisa y deja de usar lo
+que se hizo a partir de él, pero no borra nada de su ficha. Un original
+editado sigue en su ficha: se mantienen el caption y los resultados, y lo
+demás se rehace desde el original nuevo. Un resultado editado empieza una
+ficha nueva, y la anterior conserva todo lo demás (también una versión
+anterior guardada). Si lo mueves o lo renombras, ya no lo reconoce. Nunca sobrescribe ni
 borra un archivo que no escribió ella o que has cambiado: te dice cuál es
 para que lo muevas o lo borres. La carpeta de salida que cambies en la app
 solo se aplica a los vídeos sin resultados; los demás siguen escribiendo
@@ -226,9 +230,15 @@ encontró su `.md` junto al vídeo.
 - Si arrastras el original de un vídeo cuyo resultado ya está junto a él
   (`x_limpio.mp4`), la app adopta ese resultado: lo sobrescribirá en vez de
   crear una copia, y usa su `.md` y su `.srt`, si existen, como caption y
-  transcripción. Un `x_limpio_vertical.mp4` de antes también se adopta,
-  marcado como desactualizado porque no se sabe cómo se hizo. Un original
-  sin resultado previo es un vídeo nuevo, igual que cualquier otro.
+  transcripción. Un `x_limpio_vertical.mp4` de antes también se adopta
+  (aunque ya no esté el `x_limpio.mp4`), marcado como desactualizado porque
+  no se sabe cómo se hizo. Un original sin resultado previo es un vídeo
+  nuevo, igual que cualquier otro.
+- Ese resultado puede ser de otro vídeo con el mismo nombre (las cámaras
+  repiten nombres), así que la app avisa de que usará su caption. Si no es
+  de este vídeo, muévelo a otra carpeta y usa **Olvidar este vídeo**. Un
+  resultado que dura más que el original (más de un segundo) no puede ser
+  suyo: no se adopta y el vídeo nuevo se llama `x (2)` para no pisarlo.
 - Si arrastras un resultado antiguo sin su original (`x_limpio.mp4`,
   `x_vertical.mp4`, `x_limpio_limpio.mp4`…), pasa a ser el resultado de ese
   vídeo y se sobrescribe a sí mismo; nunca escribe en otra versión antigua.
@@ -240,7 +250,11 @@ encontró su `.md` junto al vídeo.
   original («Arrastra el original para rehacerlos»). Lo demás sí se
   permite; recortar silencios corta imagen y subtítulos a la vez. Si luego
   arrastras el original verdadero, se une a ese resultado en vez de crear
-  otro, y entonces sí puede rehacerlos.
+  otro, aunque la app ya lo haya sobrescrito, y entonces sí puede
+  rehacerlos. La versión anterior guardada se queda en la ficha. Lo que se
+  calculó a partir del resultado antiguo (audio limpio, recorte,
+  transcripción, seguimiento de la cara) tiene sus tiempos y se rehace
+  desde el original; el caption se mantiene.
 - Las copias duplicadas que ya tengas (`x_limpio_limpio.mp4`…) no se
   borran: bórralas tú.
 

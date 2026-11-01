@@ -214,8 +214,12 @@ confirmation). A record's data is kept until you forget it;
 included.
 
 **A video that was changed or moved.** The app recognises a file by its
-path, size and date. If you edit it outside the app, it warns you and
-starts a new record. If you move or rename it, it no longer recognises it.
+path, size and date. If you edit it outside the app, it warns you and stops
+using what was made from it, but deletes nothing from its record. An edited
+original stays in its record: the caption and the results are kept, and the
+rest is redone from the new original. An edited result starts a new record,
+and the earlier one keeps everything else (a saved previous version too).
+If you move or rename it, it no longer recognises it.
 It never overwrites or deletes a file it did not write or that you have
 changed: it tells you which one, so you can move or delete it. The output
 folder you change in the app only applies to videos without results; the
@@ -229,8 +233,15 @@ when it found its `.md` next to the video.
   it (`x_limpio.mp4`), the app adopts that result: it will overwrite it
   instead of creating a copy, and uses its `.md` and `.srt`, if they exist,
   as the caption and transcript. An older `x_limpio_vertical.mp4` is also
-  adopted, marked out of date because nobody knows how it was made. An
-  original with no earlier result is a new video, like any other.
+  adopted (even when the `x_limpio.mp4` is gone), marked out of date
+  because nobody knows how it was made. An original with no earlier result
+  is a new video, like any other.
+- That result may belong to another video with the same name (cameras
+  reuse names), so the app warns that it will use its caption. If it is
+  not from this video, move it to another folder and use **Forget this
+  video**. A result longer than the original (by more than a second) cannot
+  be its own: it is not adopted, and the new video is named `x (2)` so it
+  does not overwrite it.
 - If you drag in an old result without its original (`x_limpio.mp4`,
   `x_vertical.mp4`, `x_limpio_limpio.mp4`…), it becomes that video's result
   and overwrites itself; it never writes into another old version. The
@@ -242,7 +253,11 @@ when it found its `.md` next to the video.
   original ("Drag in the original to redo them"). Everything else is
   allowed; cutting silences cuts the picture and the subtitles together. If
   you later drag in the real original, it joins that result instead of
-  creating another one, and then it can redo them.
+  creating another one, even after the app has overwritten it, and then it
+  can redo them. The saved previous version stays in the record. What was
+  computed from the old result (cleaned audio, cut, transcript, face
+  tracking) has its timing and is redone from the original; the caption is
+  kept.
 - The duplicate copies you already have (`x_limpio_limpio.mp4`…) are not
   deleted: delete them yourself.
 
