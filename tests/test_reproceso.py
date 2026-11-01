@@ -535,3 +535,173 @@ def test_vertical_antiguo_adoptado_se_regenera_sin_preguntar(tmp_path):
     assert vertical.read_bytes() == b"VERTICAL"
     assert ficha.vertical.coincide(vertical)
     assert ficha.desactualizado == set()
+
+
+# --- Revisión final -----------------------------------------------------------
+
+def _antigua(tmp_path, nombre="charla_limpio.mp4", con_srt=False) -> Path:
+    """Una salida de antes de las fichas en `salida/`, con su .md (y su .srt)."""
+    antigua = tmp_path / "salida" / nombre
+    antigua.parent.mkdir(exist_ok=True)
+    antigua.write_bytes(b"ANTIGUA")
+    antigua.with_suffix(".md").write_text(
+        "# T\n\n## Caption\nC\n\n## Hashtags\n#a\n\n## Palabras clave\n- k\n",
+        encoding="utf-8")
+    if con_srt:
+        antigua.with_suffix(".srt").write_text(
+            "1\n00:00:00,000 --> 00:00:01,000\nhola mundo\n", encoding="utf-8")
+    return antigua
+
+
+def test_original_tras_reprocesar_una_salida_antigua_se_une_a_ella(tmp_path):
+    legado = _pasada(reconocer(_antigua(tmp_path, con_srt=True), None)[0],
+                     [A.CORTAR, A.ESCRIBIR_FINAL], paso_silencios=True)
+    guardado = legado.original.ruta
+    assert guardado.parent == legado.carpeta.resolve()
+
+    # «Arrastra el original para rehacerlos»: se une a la misma ficha.
+    ficha = _ficha(tmp_path)
+
+    assert ficha.id == legado.id
+    assert ficha.original.ruta == (tmp_path / "charla.mov").resolve()
+    assert not ficha.legado and guardado.is_file()
+    plan = planificar(ficha, _panel(subtitulos=True), Decisiones())
+    assert plan.avisos == [] and A.QUEMAR in plan.acciones
+
+
+def test_editar_fuera_una_salida_antigua_no_borra_la_version_guardada(tmp_path):
+    antigua = _antigua(tmp_path, con_srt=True)
+    legado = _pasada(reconocer(antigua, None)[0], [A.CORTAR, A.ESCRIBIR_FINAL],
+                     paso_silencios=True)
+    guardado = legado.original.ruta
+
+    antigua.write_bytes(b"RECORTADO EN QUICKTIME")
+    nueva, aviso = reconocer(antigua, None)
+
+    assert aviso and nueva.id != legado.id
+    assert nueva.final.coincide(antigua)
+    assert guardado.read_bytes() == b"ANTIGUA"
+    guardada = cargar(legado.id)
+    assert guardada.original == legado.original and guardada.final is None
+    assert CAPTION in guardada.artefactos
+
+
+@pytest.mark.parametrize("nombre", ["charla_limpio.mp4", "charla_vertical.mp4"])
+def test_transcripcion_de_una_salida_antigua_es_de_su_linea(tmp_path, nombre):
+    (tmp_path / "salida").mkdir()
+    antigua = tmp_path / "salida" / nombre
+    antigua.write_bytes(b"ANTIGUA RECORTADA")
+    legado, _ = reconocer(antigua, None)
+
+    legado = _pasada(legado, [A.TRANSCRIBIR, A.CAPTION], caption_seo=True)
+
+    assert legado.artefactos[TRANSCRIPCION].linea_tiempo == "legado"
+
+
+def test_transcripcion_de_una_salida_antigua_no_vale_para_el_original(tmp_path):
+    (tmp_path / "salida").mkdir()
+    antigua = tmp_path / "salida" / "charla_limpio.mp4"
+    antigua.write_bytes(b"ANTIGUA RECORTADA")
+    _pasada(reconocer(antigua, None)[0], [A.TRANSCRIBIR, A.CAPTION],
+            caption_seo=True)
+
+    ficha = _ficha(tmp_path)  # el original se une a ella
+
+    # La transcripción tiene los tiempos de la salida antigua: subtítulos
+    # sincronizados piden transcribir el original; el caption se queda.
+    plan = planificar(ficha, _panel(paso_audio=True, subtitulos=True), Decisiones())
+    assert A.TRANSCRIBIR in plan.acciones
+    assert ficha.artefactos[TRANSCRIPCION].linea_tiempo == "legado"
+    assert CAPTION in ficha.artefactos
+
+
+def test_seguimiento_de_una_salida_antigua_no_vale_para_el_original(tmp_path):
+    (tmp_path / "salida").mkdir()
+    antigua = tmp_path / "salida" / "charla_limpio.mp4"
+    antigua.write_bytes(b"ANTIGUA RECORTADA")
+    _pasada(reconocer(antigua, None)[0], [A.SEGUIMIENTO, A.VERTICAL],
+            paso_vertical=True, encuadre="cara")
+
+    ficha = _ficha(tmp_path)
+
+    assert SEGUIMIENTO not in ficha.artefactos
+    plan = planificar(ficha, _panel(paso_audio=True, paso_vertical=True,
+                                    encuadre="cara"),
+                      Decisiones(regenerar_vertical=True))
+    assert A.SEGUIMIENTO in plan.acciones
+
+
+def test_limpiar_el_audio_de_una_salida_antigua_no_vuelve_a_transcribir(
+        falsos, tmp_path):
+    # Sin recorte la línea de tiempo no cambia: planificador y ejecutor la
+    # llaman igual ("legado") y la transcripción sigue valiendo.
+    (tmp_path / "salida").mkdir()
+    antigua = tmp_path / "salida" / "charla_limpio.mp4"
+    antigua.write_bytes(b"ANTIGUA")
+    legado = _pasada(reconocer(antigua, None)[0], [A.TRANSCRIBIR, A.QUEMAR],
+                     subtitulos=True)
+    falsos.clear()
+
+    legado = _pasada(legado, [A.LIMPIAR_AUDIO_ORIGINAL, A.PONER_AUDIO, A.QUEMAR],
+                     paso_audio=True)
+
+    assert not any(l.startswith("transcribir:") for l in falsos)
+    assert legado.artefactos[BASE].linea_tiempo == "legado"
+    assert _sin_restos(legado)
+
+
+@pytest.mark.parametrize("con_ficha", [True, False])
+def test_vertical_antiguo_como_unica_salida_gana_un_horizontal(tmp_path, con_ficha):
+    salida = tmp_path / "salida"
+    salida.mkdir()
+    vertical = salida / "charla_limpio_vertical.mp4"
+    vertical.write_bytes(b"VERTICAL ANTIGUO")
+    if con_ficha:
+        reconocer(vertical, None)
+    ficha = _ficha(tmp_path)
+    assert ficha.final.coincide(vertical)
+
+    # R10 con el vertical ya en su sitio: se sustituye, sin avisos de ajeno.
+    ficha = _pasada(ficha, [A.LIMPIAR_AUDIO_ORIGINAL, A.PONER_AUDIO,
+                            A.ESCRIBIR_FINAL, A.VERTICAL, A.RETIRAR_VERTICAL_UNICO],
+                    paso_audio=True, paso_vertical=True)
+
+    assert ficha.final.ruta == (salida / "charla_limpio.mp4").resolve()
+    assert vertical.read_bytes() == b"VERTICAL" and ficha.vertical.coincide(vertical)
+    assert ficha.desactualizado == set()
+    assert _sin_restos(ficha)
+
+
+def test_comprueba_los_destinos_antes_de_empezar(falsos, tmp_path):
+    ficha = _ficha(tmp_path)
+    plan = planificar(ficha, _panel(paso_silencios=True, paso_vertical=True),
+                      Decisiones())
+    assert A.VERTICAL in plan.acciones
+    ajeno = tmp_path / "salida" / "charla_limpio_vertical.mp4"
+    ajeno.parent.mkdir()
+    ajeno.write_bytes(b"AJENO")
+    falsos.clear()
+
+    with pytest.raises(PasoFallido, match="fuera de la app"):
+        ejecutar(ficha, plan)
+
+    assert falsos == []  # ni auto-editor ni conversión: nada caro
+    assert ajeno.read_bytes() == b"AJENO"
+    assert cargar(ficha.id).final is None
+
+
+def test_audio_limpio_a_medias_no_queda_registrado(tmp_path):
+    ficha = _pasada(_ficha(tmp_path),
+                    [A.LIMPIAR_AUDIO_ORIGINAL, A.PONER_AUDIO, A.ESCRIBIR_FINAL],
+                    paso_audio=True)
+    # Un directorio donde va el FLAC: sustituirlo falla.
+    flac = ficha.ruta("audio_limpio.flac")
+    flac.unlink()
+    (flac / "ocupado").mkdir(parents=True)
+    plan = planificar(ficha, _panel(paso_audio=True),
+                      Decisiones(rehacer=frozenset({"audio"})))
+
+    with pytest.raises(OSError):
+        ejecutar(ficha, plan)
+
+    assert "audio" not in cargar(ficha.id).artefactos

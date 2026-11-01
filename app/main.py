@@ -32,7 +32,7 @@ from videopipeline import i18n
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.ficha import (
-    CAPTION, Ficha, cargar, guardar, limpiar_temporales, ocupa, olvidar,
+    CAPTION, Ficha, cargar, limpiar_temporales, mover_salidas, ocupa, olvidar,
     reconocer,
 )
 from videopipeline.i18n import _
@@ -399,14 +399,14 @@ class VentanaPrincipal(QMainWindow):
                 'Se borrarán los datos guardados para rehacer pasos de '
                 '"{nombre}" ({mb} MB). Los vídeos y su caption no se tocan.'
             ).format(nombre=trabajo.ruta.name, mb=round(ocupa(ficha) / 1_000_000))
-            # Una versión antigua del original que se movió a la ficha se
-            # borra con ella.
-            if (ficha.original is not None
-                    and ficha.original.ruta.parent == ficha.carpeta.resolve()):
+            # La versión anterior de una salida antigua que se guardó en la
+            # ficha antes de sobrescribirla se borra con ella, aunque después
+            # se adoptara el original verdadero.
+            for guardada in sorted(ficha.carpeta.glob("original.*")):
                 texto += " " + _(
                     'La versión anterior del vídeo que se guardó ahí '
                     '("{archivo}") también se borra.'
-                ).format(archivo=ficha.original.ruta.name)
+                ).format(archivo=guardada.name)
             respuesta = QMessageBox.question(
                 self,
                 _("Olvidar este vídeo"),
@@ -617,8 +617,11 @@ class VentanaPrincipal(QMainWindow):
         })
         carpeta = self.ajustes.carpeta_salida
         filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
+        avisos = []
         for fila in pendientes:
             trabajo = self.modelo_cola.trabajo(fila)
+            if trabajo.ficha_id is None and not self._reconocer_fila(fila, avisos):
+                continue
             config = PipelineConfig(
                 video=trabajo.ruta, salida=carpeta,
                 contexto_marca=self.ajustes.contexto_marca,
@@ -631,11 +634,10 @@ class VentanaPrincipal(QMainWindow):
             if ficha is not None and ficha.final is None and ficha.vertical is None:
                 # Aún sin salidas: van a la carpeta de ahora. Las demás fichas
                 # conservan la suya, que es donde están sus archivos.
-                ficha.carpeta_salida = carpeta or (
-                    ficha.original.ruta.parent if ficha.original
-                    else ficha.carpeta_salida)
-                guardar(ficha)
+                mover_salidas(ficha, carpeta)
             filas.append((fila, config, ficha))
+        if avisos:
+            QMessageBox.information(self, _("Aviso"), "\n".join(avisos))
 
         decisiones = self._preguntar_reproceso(filas)
         if decisiones is None:
@@ -645,28 +647,27 @@ class VentanaPrincipal(QMainWindow):
         for fila, config, ficha in filas:
             trabajo = self.modelo_cola.trabajo(fila)
             datos = json.loads(config.to_json())
-            if trabajo.ficha_id is not None:
-                # Siempre por la ficha: una fila arrastrada desde una salida se
-                # llama como ella, pero su original es el de la ficha.
-                decision = decisiones.get(trabajo.ficha_id, Decisiones())
-                if ficha is not None:
-                    plan = planificar(ficha, config, decision)
-                    if plan.error:
-                        self.modelo_cola.actualizar(
-                            fila, estado=EstadoTrabajo.ERROR, error=plan.error,
-                            percent=None, etiqueta="")
-                        continue
-                    if plan.vacio:
-                        sin_nada.append(trabajo.ruta.name)
-                        if ficha.final is not None:  # lo que ya hay es el resultado
-                            self._al_terminar_trabajo(
-                                fila, True, str(ficha.final.ruta), "")
-                        continue
-                datos["reproceso"] = {
-                    "ficha": trabajo.ficha_id,
-                    "rehacer": sorted(decision.rehacer),
-                    "regenerar_vertical": decision.regenerar_vertical,
-                }
+            # Siempre por la ficha: una fila arrastrada desde una salida se
+            # llama como ella, pero su original es el de la ficha.
+            decision = decisiones.get(trabajo.ficha_id, Decisiones())
+            if ficha is not None:
+                plan = planificar(ficha, config, decision)
+                if plan.error:
+                    self.modelo_cola.actualizar(
+                        fila, estado=EstadoTrabajo.ERROR, error=plan.error,
+                        percent=None, etiqueta="")
+                    continue
+                if plan.vacio:
+                    sin_nada.append(trabajo.ruta.name)
+                    if ficha.final is not None:  # lo que ya hay es el resultado
+                        self._al_terminar_trabajo(
+                            fila, True, str(ficha.final.ruta), "")
+                    continue
+            datos["reproceso"] = {
+                "ficha": trabajo.ficha_id,
+                "rehacer": sorted(decision.rehacer),
+                "regenerar_vertical": decision.regenerar_vertical,
+            }
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -677,6 +678,24 @@ class VentanaPrincipal(QMainWindow):
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:
+        """Una fila sin ficha (p. ej. tras «Olvidar este vídeo») se reconoce
+        como al arrastrarla: nunca se procesa como un vídeo nuevo, que
+        escribiría `x_limpio_limpio` o borraría el caption de una salida."""
+        trabajo = self.modelo_cola.trabajo(fila)
+        try:
+            ficha, aviso = reconocer(trabajo.ruta, self.ajustes.carpeta_salida)
+        except Exception as error:  # noqa: BLE001 — un archivo no frena a los demás
+            self.modelo_cola.actualizar(
+                fila, estado=EstadoTrabajo.ERROR, percent=None, etiqueta="",
+                error=f"{trabajo.ruta.name}: {error}")
+            return False
+        if aviso:
+            avisos.append(aviso)
+        self.modelo_cola.actualizar(
+            fila, ficha_id=ficha.id, resumen=resumen_de(ficha), ocupa=ocupa(ficha))
+        return True
 
     def _preguntar_reproceso(
         self, filas: list[tuple[int, PipelineConfig, Ficha | None]]

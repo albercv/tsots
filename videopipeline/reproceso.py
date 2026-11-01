@@ -48,6 +48,9 @@ def ejecutar(ficha: Ficha, plan: Plan, on_progress: Progreso | None = None) -> P
     if plan.error:
         raise PasoFallido(plan.error)
     pasada = _Pasada(ficha, plan, on_progress)
+    # Antes de lo caro: no se sustituye nada ajeno (se vuelve a mirar al final).
+    for destino in pasada.destinos():
+        pasada._comprobar_propio(destino)
     ficha.carpeta_salida.mkdir(parents=True, exist_ok=True)
     shutil.rmtree(pasada.tmp, ignore_errors=True)
     pasada.tmp.mkdir(parents=True)
@@ -79,7 +82,7 @@ class _Pasada:
         self.tmp = ficha.carpeta / "tmp"
         base = ficha.artefactos.get(BASE)
         if base is None:  # sin audio ni silencios, la base es el original
-            self.base, self.linea = self.fuente, "original"
+            self.base, self.linea = self.fuente, ficha.linea_original()
         else:
             self.base = ficha.ruta(base.archivo) if base.archivo else ficha.final.ruta
             self.linea = base.linea_tiempo
@@ -102,6 +105,19 @@ class _Pasada:
     def fuente(self) -> Path:
         """El original o, en una salida antigua sin él, el propio final."""
         return (self.ficha.original or self.ficha.final).ruta
+
+    def destinos(self) -> set[Path]:
+        """Los vídeos que esta pasada sustituirá."""
+        ficha, acciones = self.ficha, set(self.acciones)
+        crea_final = bool({Accion.QUEMAR, Accion.ESCRIBIR_FINAL} & acciones)
+        destinos = {ficha.ruta_final(True)} if crea_final else set()
+        if Accion.VERTICAL in acciones:
+            destinos.add(ficha.ruta_vertical()
+                         if ficha.hay_horizontal() or crea_final
+                         else ficha.ruta_final(False))
+        if Accion.RENOMBRAR_VERTICAL in acciones:
+            destinos |= {self.vertical_unico.ruta, ficha.ruta_vertical()}
+        return destinos
 
     def _paso(self, paso: int, etiqueta: str, porcentaje: float | None = None) -> None:
         _emitir(self.on_progress, paso, self.total, etiqueta, porcentaje)
@@ -186,13 +202,16 @@ class _Pasada:
                    else _("Descargando modelo y limpiando audio"))
         limpiar_audio(wav, limpio, c.tarea, c.modelo)
         a_flac(limpio, flac)
+        # La ficha nunca describe con la clave vieja un FLAC a medio sustituir.
+        if self.ficha.artefactos.pop(AUDIO, None) is not None:
+            guardar(self.ficha)
         flac.replace(self.ficha.ruta(FLAC))
         ajustes = ajustes_audio(c)
         self.ficha.artefactos[AUDIO] = Artefacto(clave(ajustes), FLAC, ajustes, linea)
         guardar(self.ficha)
 
     def limpiar_audio_original(self, paso: int) -> None:
-        self._limpiar_audio(paso, self.fuente, "original")
+        self._limpiar_audio(paso, self.fuente, self.ficha.linea_original())
 
     def limpiar_audio_base(self, paso: int) -> None:
         # La base ya recortada conserva sus cortes: su línea de tiempo no cambia.
@@ -211,7 +230,8 @@ class _Pasada:
         self._paso(paso, _("Sustituyendo pista de audio"))
         audio = self.ficha.artefactos[AUDIO]
         # Sobre el vídeo del que salió ese audio: el original o la base recortada.
-        video = self.fuente if audio.linea_tiempo == "original" else self.base
+        video = (self.fuente if audio.linea_tiempo == self.ficha.linea_original()
+                 else self.base)
         salida = self.tmp / "base.mp4"
         remux(video, self.ficha.ruta(FLAC), salida)
         self._nueva_base(salida, audio.linea_tiempo)
@@ -453,7 +473,9 @@ class _Pasada:
             return self.renombrar_vertical(paso)
         self._paso(paso, _("Ordenando las salidas"))
         viejo = self.vertical_unico
-        if viejo.coincide(viejo.ruta):  # solo se borra lo que la ficha registró
+        if viejo.ruta == self.ficha.vertical.ruta:
+            pass  # un vertical antiguo que ya estaba en su sitio: se ha sustituido
+        elif viejo.coincide(viejo.ruta):  # solo se borra lo que la ficha registró
             viejo.ruta.unlink()
         elif viejo.ruta.exists():
             _avisar(self.on_progress, _ajeno(viejo.ruta))

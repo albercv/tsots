@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from .caption import leer_md
 from .i18n import _
-from .steps import BASE_DIR
+from .steps import BASE_DIR, PasoFallido, duracion_video
 from .subtitles import leer_srt
 
 log = logging.getLogger(__name__)
@@ -104,6 +104,18 @@ class Ficha:
             "vertical": vertical is not None,
         }
         return [paso for paso in PASOS if hechos[paso]]
+
+    def original_verdadero(self) -> bool:
+        """El original es el que arrastró el usuario. Sin él, hace de original
+        el final antiguo (de antes de las fichas) o la copia que la app guardó
+        de él en la ficha antes de sobrescribirlo."""
+        return (self.original is not None and not self.legado
+                and self.original.ruta.parent != self.carpeta.resolve())
+
+    def linea_original(self) -> str:
+        """La línea de tiempo del vídeo del que sale la base sin recorte: la del
+        original, o la de la salida antigua que hace de original."""
+        return "original" if self.original_verdadero() else "legado"
 
     def hay_horizontal(self) -> bool:
         # Sin artefacto (salida antigua, adoptada o no) lo dice el nombre del
@@ -309,55 +321,135 @@ def _de_nadie(ruta: Path, fichas: list[Ficha]) -> bool:
     return all(ruta.resolve() not in ficha._salidas() for ficha in fichas)
 
 
-def _adoptar(ficha: Ficha, original: Huella, fichas: list[Ficha]) -> Ficha:
-    """El original pasa a ser de la salida antigua `ficha`. Su vertical antiguo
-    también, si no es de otra; como no se sabe cómo se hizo, desactualizado."""
+def _soltar(ficha: Ficha, ruta: Path) -> None:
+    """`ruta` cambió fuera de la app y deja de ser de `ficha`, que conserva todo
+    lo demás: nunca se borra una ficha sin preguntar. Solo se quita lo que
+    describía ese archivo."""
+    if ficha.original is not None and ficha.original.ruta == ruta:
+        ficha.original = None
+    if ficha.vertical is not None and ficha.vertical.ruta == ruta:
+        ficha.vertical = None
+        ficha.artefactos.pop(VERTICAL, None)
+        ficha.desactualizado.discard("vertical")
+    if ficha.final is not None and ficha.final.ruta == ruta:
+        ficha.artefactos.pop(HORIZONTAL if ficha.hay_horizontal() else VERTICAL, None)
+        base = ficha.artefactos.get(BASE)
+        if base is not None and base.archivo is None:  # la base era ese final (R3)
+            del ficha.artefactos[BASE]
+        # Su vertical, si lo hay, queda como la única salida.
+        ficha.final, ficha.vertical = ficha.vertical, None
+    guardar(ficha)
+
+
+# Lo que se hizo desde el final antiguo tiene su línea de tiempo, no la del
+# original verdadero: al adoptarlo se descarta.
+_DEL_FINAL_ANTIGUO = (AUDIO, BASE, SEGUIMIENTO, HORIZONTAL, VERTICAL)
+
+
+def _adoptar(ficha: Ficha, original: Huella, fichas: list[Ficha],
+             nombre: str | None = None) -> Ficha:
+    """El original verdadero pasa a ser de `ficha`, que no lo tenía (salida
+    antigua, o ficha cuyo original se editó fuera). Se quedan el caption y la
+    transcripción importada (R5); el vertical, desactualizado. Su vertical
+    antiguo también se adopta si no es de otra: no se sabe cómo se hizo."""
+    salida = ficha.artefactos.get(HORIZONTAL if ficha.hay_horizontal() else VERTICAL)
+    if salida is not None and "subtitulos" in salida.ajustes:
+        ficha.subs_quemados_sin_base = True  # el final los lleva; la base, no
+    for tipo in _DEL_FINAL_ANTIGUO:
+        ficha.artefactos.pop(tipo, None)
+    transcripcion = ficha.artefactos.get(TRANSCRIPCION)
+    if transcripcion is not None and transcripcion.linea_tiempo != "legado":
+        del ficha.artefactos[TRANSCRIPCION]
     ficha.original, ficha.legado = original, False
+    if nombre is not None:  # un `x_limpio_vertical.mp4` se llamaba «x_limpio»
+        ficha.nombre = nombre
     vertical = ficha.ruta_vertical()
-    if (ficha.hay_horizontal() and vertical.is_file()
+    if (ficha.vertical is None and ficha.hay_horizontal() and vertical.is_file()
             and _de_nadie(vertical, [f for f in fichas if f.id != ficha.id])):
         ficha.vertical = Huella.de(vertical)
+    if ficha.vertical is not None or (ficha.final is not None
+                                      and not ficha.hay_horizontal()):
         ficha.desactualizado.add("vertical")
     guardar(ficha)
     return ficha
 
 
+def _mas_larga(salida: Path, original: Path) -> bool:
+    """Una salida nunca dura más que su original (+1 s de margen): si dura
+    más, es de otro vídeo con el mismo nombre. Sin poder medirlo, no lo es."""
+    try:
+        duracion, la_del_original = duracion_video(salida), duracion_video(original)
+    except (OSError, PasoFallido):  # sin ffprobe
+        return False
+    return 0 < la_del_original < duracion - 1
+
+
+def _nombre_libre(ficha: Ficha, fichas: list[Ficha]) -> None:
+    """Para una ficha aún sin salidas: si otra ya usa las suyas, o en su sitio
+    hay un archivo de otro vídeo con el mismo nombre, se le añade «(n)»."""
+    otras = [f for f in fichas if f.id != ficha.id]
+    nombre, n = ficha.nombre, 1
+    while (any(f._salidas() & ficha._salidas() for f in otras)
+           or any(ruta.is_file() for ruta in ficha._salidas())):
+        n += 1
+        ficha.nombre = f"{nombre} ({n})"
+
+
+def mover_salidas(ficha: Ficha, carpeta: Path | None) -> None:
+    """Una ficha aún sin salidas pasa a escribirlas en `carpeta` (None: junto
+    al original), sin pisar las de otra."""
+    if ficha.original is None:
+        return  # sin original ni salidas no puede escribir nada
+    ficha.carpeta_salida = carpeta or ficha.original.ruta.parent
+    ficha.nombre = ficha.original.ruta.stem
+    _nombre_libre(ficha, todas())
+    guardar(ficha)
+
+
 def _ficha_de_original(original: Path, carpeta_salida: Path,
-                       fichas: list[Ficha]) -> Ficha:
+                       fichas: list[Ficha]) -> tuple[Ficha, str]:
     nueva = Ficha(id=_nueva_id(), nombre=original.stem,
                   carpeta_salida=carpeta_salida, original=Huella.de(original))
 
-    # Su salida (horizontal, o si no vertical único) es el final de una salida
-    # antigua sin original: el original pasa a ser de esa ficha en vez de crear
-    # otra con la misma salida.
-    for salida in (nueva.ruta_final(True), nueva.ruta_final(False)):
+    # Su salida (horizontal, vertical único o, sin ellos, el vertical que
+    # acompañaría al horizontal) ya existe. Nunca hay dos fichas con la misma.
+    for salida in (nueva.ruta_final(True), nueva.ruta_final(False),
+                   nueva.ruta_vertical()):
+        salida = salida.resolve()
+        # Es el final de una ficha sin original verdadero: el original pasa a
+        # ser de esa ficha.
         for ficha in fichas:
-            if (ficha.original is None and ficha.final is not None
-                    and ficha.final.ruta == salida.resolve()):
-                return _adoptar(ficha, nueva.original, fichas)
-
-    # Su salida ya está en disco y no es de ninguna ficha (de antes de las
-    # fichas, o de una olvidada): se adopta como si se hubiera arrastrado antes.
-    for salida in (nueva.ruta_final(True), nueva.ruta_final(False)):
+            if (not ficha.original_verdadero() and ficha.final is not None
+                    and ficha.final.ruta == salida):
+                return _adoptar(ficha, nueva.original, fichas, nueva.nombre), ""
+        # No es de ninguna ficha (de antes de las fichas, o de una olvidada):
+        # se adopta como si se hubiera arrastrado antes, salvo que sea de otro
+        # vídeo con el mismo nombre.
         if salida.is_file() and _de_nadie(salida, fichas):
-            return _adoptar(_ficha_de_legado(salida), nueva.original, fichas)
+            if _mas_larga(salida, original):
+                break
+            aviso = _('"{salida}" ya estaba en la carpeta de salida: se toma '
+                      'como el vídeo procesado de "{original}", con su caption '
+                      'si lo tiene. Si no es de este vídeo, muévelo a otra '
+                      'carpeta y usa «Olvidar este vídeo».').format(
+                salida=salida.name, original=original.name)
+            return (_adoptar(_ficha_de_legado(salida), nueva.original, fichas,
+                             nueva.nombre), aviso)
 
-    # Otro original con el mismo nombre ya usa esas salidas: no se pisan.
-    nombre, n = nueva.nombre, 1
-    while any(ficha._salidas() & nueva._salidas() for ficha in fichas):
-        n += 1
-        nueva.nombre = f"{nombre} ({n})"
+    _nombre_libre(nueva, fichas)
     guardar(nueva)
-    return nueva
+    return nueva, ""
 
 
 def reconocer(ruta: Path, carpeta_salida: Path | None) -> tuple[Ficha, str]:
     """La ficha del vídeo arrastrado y un aviso para el usuario ("" si no hay).
 
     Si `ruta` es el original o una salida de una ficha (misma ruta real,
-    tamaño y fecha), es esa ficha. Si no, se crea una nueva. `ruta` tiene que
-    existir. `carpeta_salida` solo cuenta para fichas nuevas: las demás
-    conservan la suya.
+    tamaño y fecha), es esa ficha. Si no, se crea una nueva o se adopta una
+    salida antigua. Si coincide la ruta pero no la huella (editado fuera), esa
+    ficha lo suelta sin borrar nada; un original editado vuelve a ella. `ruta`
+    tiene que existir. `carpeta_salida` solo cuenta para fichas nuevas: las
+    demás conservan la suya.
     """
     ruta = ruta.resolve()
     fichas = todas()
@@ -371,17 +463,24 @@ def reconocer(ruta: Path, carpeta_salida: Path | None) -> tuple[Ficha, str]:
         if huellas:
             obsoletas.append(ficha)
 
-    aviso = ""
+    avisos, editada = [], None
     if obsoletas:
-        # Editado fuera de la app: ya no vale lo que se sabía. Se olvida la
-        # ficha para que no haya dos con las mismas salidas.
+        # Editado fuera de la app: lo que se hizo a partir de él ya no vale.
         for ficha in obsoletas:
-            olvidar(ficha)
-        fichas = [f for f in fichas if all(f.id != o.id for o in obsoletas)]
-        aviso = _('"{nombre}" ha cambiado fuera de la app: '
-                  'se empieza una ficha nueva').format(nombre=ruta.name)
+            if ficha.original is not None and ficha.original.ruta == ruta:
+                editada = ficha
+            _soltar(ficha, ruta)
+        avisos.append(_('"{nombre}" ha cambiado fuera de la app: lo que se hizo '
+                        'a partir de él se rehará. No se borra nada de lo '
+                        'guardado.').format(nombre=ruta.name))
 
-    if _es_salida_antigua(ruta):
-        return _ficha_de_legado(ruta), aviso
-    carpeta = ruta.parent if carpeta_salida is None else carpeta_salida
-    return _ficha_de_original(ruta, carpeta, fichas), aviso
+    if editada is not None:
+        # El mismo original, editado: sigue en su ficha (con sus salidas).
+        ficha = _adoptar(editada, Huella.de(ruta), fichas)
+    elif _es_salida_antigua(ruta):
+        ficha = _ficha_de_legado(ruta)
+    else:
+        carpeta = ruta.parent if carpeta_salida is None else carpeta_salida
+        ficha, aviso = _ficha_de_original(ruta, carpeta, fichas)
+        avisos.append(aviso)
+    return ficha, "\n".join(aviso for aviso in avisos if aviso)

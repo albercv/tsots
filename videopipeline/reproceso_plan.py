@@ -17,10 +17,13 @@ guarda en cada uno:
 - SEGUIMIENTO: clave = línea de tiempo de la base; la imagen solo depende de
   los cortes, no del audio.
 
-Línea de tiempo de la base: "original" sin recorte, y
+Línea de tiempo de la base: `ficha.linea_original()` sin recorte, y
 `clave(ajustes_audio o None, ajustes_silencios)` al recortar (sobre el audio
 limpio o sobre el del original). Sin BASE, la base es el original o, en una
-salida antigua sin él, el propio final.
+salida antigua sin él, el propio final. `linea_original()` es "original" con
+un original verdadero y "legado" si hace de original el final antiguo (o su
+copia en la ficha): lo hecho a partir de él no vale para el original
+verdadero cuando se adopta, que lo descarta (`ficha._adoptar`).
 """
 from __future__ import annotations
 
@@ -91,7 +94,7 @@ def ajustes_caption(c: PipelineConfig) -> dict:
 
 class Accion(str, Enum):
     # En orden de ejecución: el plan las devuelve siempre así.
-    LIMPIAR_AUDIO_ORIGINAL = "limpiar_audio_original"   # audio del original entero → AUDIO(linea "original")
+    LIMPIAR_AUDIO_ORIGINAL = "limpiar_audio_original"   # audio del original entero → AUDIO(linea_original)
     LIMPIAR_AUDIO_BASE = "limpiar_audio_base"           # audio de la base recortada → AUDIO(linea de la base)
     PONER_AUDIO = "poner_audio"                         # remux sin recodificar → BASE
     CORTAR = "cortar"                                   # auto-editor → BASE
@@ -224,9 +227,7 @@ def _base_vale(ficha: Ficha) -> bool:
 def _subs_bloqueados(ficha: Ficha) -> bool:
     """Subtítulos quemados sin base limpia ni original del que rehacerla. Un
     original dentro de la ficha es el propio final antiguo, que los lleva."""
-    return ficha.subs_quemados_sin_base and (
-        ficha.original is None or ficha.legado
-        or ficha.original.ruta.parent == ficha.carpeta.resolve())
+    return ficha.subs_quemados_sin_base and not ficha.original_verdadero()
 
 
 def _subs_heredados(ficha: Ficha) -> bool:
@@ -343,7 +344,7 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     # 2. ¿Cambia la base? Rehacer un paso de base invalida lo que depende de ella.
     audio_antes, silencios_antes = _hecho(ficha, "audio"), _hecho(ficha, "silencios")
     base = ficha.artefactos.get(BASE)
-    linea_antes = base.linea_tiempo if base is not None else "original"
+    linea_antes = base.linea_tiempo if base is not None else ficha.linea_original()
     base_rehecha = bool(rehacer & set(_DE_BASE))
     cambia_base = (audio != audio_antes or silencios != silencios_antes
                    or base_rehecha)
@@ -410,10 +411,11 @@ def planificar(ficha: Ficha, config: PipelineConfig,
             elegidas.add(Accion.PONER_AUDIO)
         else:
             usa_fuente = True
-            if audio is not None and not audio_vale("original"):  # R9
+            if audio is not None and not audio_vale(ficha.linea_original()):  # R9
                 elegidas.add(Accion.LIMPIAR_AUDIO_ORIGINAL)
             if silencios is None:
-                linea = "original"  # y, sin audio, la base es el propio original
+                # La del original y, sin audio, la base es el propio original.
+                linea = ficha.linea_original()
                 if audio is not None:
                     elegidas.add(Accion.PONER_AUDIO)
             else:

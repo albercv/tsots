@@ -218,26 +218,41 @@ def test_reconocer_el_vertical_devuelve_su_ficha(tmp_path):
     assert reconocer(vertical, None) == (ficha, "")
 
 
-def test_archivo_editado_fuera_crea_ficha_nueva_y_avisa(tmp_path):
+@pytest.mark.parametrize("con_salida", [False, True], ids=["sin_salida", "con_salida"])
+def test_original_editado_fuera_sigue_en_su_ficha_sin_borrar_nada(
+        tmp_path, con_salida):
     video = _archivo(tmp_path / "charla.mov")
     vieja, _ = reconocer(video, None)
+    _archivo(vieja.ruta("audio_limpio.flac"), b"FLAC")
+    vieja.artefactos[AUDIO] = Artefacto("a", "audio_limpio.flac", {}, "original")
+    escribir_md(_caption(), vieja.ruta("caption.md"))
+    vieja.artefactos[CAPTION] = Artefacto("c", "caption.md")
+    if con_salida:
+        vieja.final = Huella.de(_archivo(tmp_path / "charla_limpio.mp4"))
+    guardar(vieja)
 
     video.write_bytes(b"editado fuera de la app y mas largo")
     nueva, aviso = reconocer(video, None)
 
-    assert nueva.id != vieja.id
     assert aviso
     assert "charla.mov" in aviso
-    assert not vieja.carpeta.exists()
+    # El mismo vídeo: su ficha no se borra ni se duplica. Lo que dependía del
+    # vídeo de antes ya no vale; el caption sí (R4).
+    assert nueva.id == vieja.id and nueva.nombre == "charla"
     assert nueva.original == Huella.de(video)
-    assert [f.id for f in todas()] == [nueva.id]
+    assert AUDIO not in nueva.artefactos and CAPTION in nueva.artefactos
+    assert vieja.ruta("audio_limpio.flac").is_file()
+    assert nueva.final == vieja.final
+    assert cargar(nueva.id) == nueva and len(todas()) == 1
 
 
-def test_salida_editada_fuera_crea_ficha_nueva_y_avisa(tmp_path):
+def test_salida_editada_fuera_crea_ficha_nueva_y_conserva_la_vieja(tmp_path):
     video = _archivo(tmp_path / "charla.mov")
     vieja, _ = reconocer(video, None)
     salida = _archivo(tmp_path / "charla_limpio.mp4")
     vieja.final = Huella.de(salida)
+    escribir_md(_caption(), vieja.ruta("caption.md"))
+    vieja.artefactos[CAPTION] = Artefacto("c", "caption.md")
     guardar(vieja)
 
     salida.write_bytes(b"recortado a mano en otro programa")
@@ -245,10 +260,38 @@ def test_salida_editada_fuera_crea_ficha_nueva_y_avisa(tmp_path):
 
     assert nueva.id != vieja.id
     assert aviso
-    assert not vieja.carpeta.exists()
     # Sin original conocido: pasa a ser una salida antigua que se sobrescribe a sí misma.
     assert nueva.legado
     assert nueva.final == Huella.de(salida)
+    # La ficha vieja ya no tiene esa salida, pero conserva todo lo demás.
+    guardada = cargar(vieja.id)
+    assert guardada.final is None and guardada.original == vieja.original
+    assert guardada.ruta("caption.md").is_file() and CAPTION in guardada.artefactos
+    assert reconocer(video, None)[0].id == vieja.id
+
+
+def test_salida_editada_fuera_deja_su_vertical_como_unica_salida(tmp_path):
+    video = _archivo(tmp_path / "charla.mov")
+    vieja, _ = reconocer(video, None)
+    salida = _archivo(tmp_path / "charla_limpio.mp4")
+    vertical = _archivo(tmp_path / "charla_limpio_vertical.mp4")
+    vieja.final, vieja.vertical = Huella.de(salida), Huella.de(vertical)
+    vieja.artefactos.update({
+        AUDIO: Artefacto("a", "audio_limpio.flac", {}, "original"),
+        BASE: Artefacto("b", None, {"audio": {}}, "original"),  # la base era el final
+        HORIZONTAL: Artefacto("h", None, {}),
+        VERTICAL: Artefacto("v", None, {"vertical": {}}),
+    })
+    guardar(vieja)
+
+    salida.write_bytes(b"recortado a mano")
+    reconocer(salida, None)
+
+    guardada = cargar(vieja.id)
+    # Lo que describía esa salida se va; el resto se queda.
+    assert set(guardada.artefactos) == {AUDIO, VERTICAL}
+    assert guardada.final == Huella.de(vertical) and guardada.vertical is None
+    assert not guardada.hay_horizontal()
 
 
 def test_legado_limpio_limpio_es_su_propio_final(tmp_path):
@@ -432,7 +475,8 @@ def test_original_adopta_su_salida_antigua_sin_ficha(tmp_path):
 
     ficha, aviso = reconocer(original, salida)
 
-    assert aviso == ""
+    # Nadie la arrastró: puede ser de otro vídeo con el mismo nombre.
+    assert '"x_limpio.mp4"' in aviso and "Olvidar este vídeo" in aviso
     assert ficha.final == Huella.de(antigua)
     assert ficha.original == Huella.de(original)
     assert ficha.legado is False
@@ -452,6 +496,123 @@ def test_original_adopta_su_vertical_unico_antiguo_sin_ficha(tmp_path):
     assert ficha.final == Huella.de(antigua)
     assert not ficha.hay_horizontal()
     assert ficha.artefactos == {}
+
+
+def _duraciones(monkeypatch, **segundos) -> None:
+    """Duración falsa de cada vídeo, por su nombre; 0.0 = no se pudo medir."""
+    monkeypatch.setattr(modulo, "duracion_video",
+                        lambda ruta: segundos.get(ruta.stem, 0.0))
+
+
+def test_salida_antigua_sin_ficha_mas_larga_que_el_original_no_se_adopta(
+        tmp_path, monkeypatch):
+    # Es de otro vídeo con el mismo nombre (otra cámara, otro día).
+    salida = tmp_path / "salida"
+    ajena = _archivo(salida / "x_limpio.mp4", b"OTRO VIDEO")
+    _archivo(salida / "x_limpio_vertical.mp4", b"SU VERTICAL")
+    _duraciones(monkeypatch, x=60.0, x_limpio=90.0)
+
+    ficha, aviso = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert aviso == ""
+    assert ficha.final is None and ficha.vertical is None
+    assert ficha.nombre == "x (2)"  # no pisa la otra
+    assert ficha.ruta_final(True).name == "x (2)_limpio.mp4"
+    assert ajena.read_bytes() == b"OTRO VIDEO"
+
+
+@pytest.mark.parametrize("duracion", [60.8, 30.0, 0.0],
+                         ids=["casi_igual", "recortada", "sin_medir"])
+def test_salida_antigua_sin_ficha_que_no_dura_mas_se_adopta_y_avisa(
+        tmp_path, monkeypatch, duracion):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_limpio.mp4")
+    _duraciones(monkeypatch, x=60.0, x_limpio=duracion)
+
+    ficha, aviso = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert ficha.final == Huella.de(antigua) and ficha.nombre == "x"
+    assert '"x_limpio.mp4"' in aviso and "Olvidar este vídeo" in aviso
+
+
+@pytest.mark.parametrize("con_ficha", [True, False],
+                         ids=["vertical_con_ficha", "vertical_sin_ficha"])
+def test_original_se_une_a_su_vertical_antiguo_sin_horizontal(
+        tmp_path, con_ficha):
+    # La v1.1 escribía x_limpio.mp4 y x_limpio_vertical.mp4; si solo queda el
+    # vertical, el original no acaba en «x (2)» al lado de él.
+    salida = tmp_path / "salida"
+    vertical = _archivo(salida / "x_limpio_vertical.mp4")
+    legado = reconocer(vertical, None)[0] if con_ficha else None
+    original = _archivo(tmp_path / "orig" / "x.mov")
+
+    ficha, aviso = reconocer(original, salida)
+
+    if con_ficha:
+        assert ficha.id == legado.id and aviso == ""
+    else:
+        assert '"x_limpio_vertical.mp4"' in aviso
+    assert ficha.nombre == "x"
+    assert ficha.original == Huella.de(original) and not ficha.legado
+    assert ficha.final == Huella.de(vertical) and not ficha.hay_horizontal()
+    assert ficha.desactualizado == {"vertical"}  # no se sabe cómo se hizo
+    assert ficha.ruta_final(True) == salida / "x_limpio.mp4"
+    assert cargar(ficha.id) == ficha and len(todas()) == 1
+
+
+@pytest.mark.parametrize("legado", [True, False])
+def test_original_se_une_a_la_ficha_que_guardo_su_final_antiguo(
+        tmp_path, legado):
+    # Tras reprocesar una salida antigua, su final antiguo vive en la ficha
+    # como original; el original verdadero se une a ella, no crea «x (2)».
+    salida = tmp_path / "salida"
+    vieja, _ = reconocer(_archivo(salida / "x_limpio.mp4"), None)
+    guardado = _archivo(vieja.ruta("original.mp4"), b"VERSION ANTERIOR")
+    vieja.original, vieja.legado = Huella.de(guardado), legado
+    guardar(vieja)
+    original = _archivo(tmp_path / "orig" / "x.mov")
+
+    ficha, aviso = reconocer(original, salida)
+
+    assert aviso == ""
+    assert ficha.id == vieja.id and ficha.nombre == "x"
+    assert ficha.original == Huella.de(original) and ficha.legado is False
+    assert guardado.read_bytes() == b"VERSION ANTERIOR"  # se queda en la ficha
+    assert cargar(ficha.id) == ficha and len(todas()) == 1
+
+
+@pytest.mark.parametrize("linea, se_queda", [("legado", True), ("corte", False)])
+def test_adoptar_el_original_descarta_lo_hecho_desde_el_final_antiguo(
+        tmp_path, linea, se_queda):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_limpio.mp4")
+    vertical = _archivo(salida / "x_limpio_vertical.mp4")
+    vieja, _ = reconocer(antigua, None)
+    # Lo que la app hizo después a partir de esa salida antigua.
+    vieja.vertical = Huella.de(vertical)
+    vieja.artefactos.update({
+        AUDIO: Artefacto("a", "audio_limpio.flac", {}, "legado"),
+        BASE: Artefacto("b", "base.mp4", {"silencios": {}}, "corte"),
+        TRANSCRIPCION: Artefacto("t", "transcripcion.json", {}, linea),
+        SEGUIMIENTO: Artefacto("corte", "cara.cmd"),
+        HORIZONTAL: Artefacto("h", None, {"subtitulos": {"diseno": "caja"}}),
+        VERTICAL: Artefacto("v", None, {"vertical": {}}),
+        CAPTION: Artefacto("c", "caption.md"),
+    })
+    guardar(vieja)
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    # Tienen la línea de tiempo de la salida antigua, no la del original: solo
+    # quedan el caption y la transcripción importada (R5).
+    assert ficha.id == vieja.id
+    assert set(ficha.artefactos) == ({CAPTION, TRANSCRIPCION} if se_queda
+                                     else {CAPTION})
+    # El final lleva los subtítulos y no hay base sin ellos.
+    assert ficha.subs_quemados_sin_base
+    assert ficha.vertical == Huella.de(vertical)
+    assert ficha.desactualizado == {"vertical"}
+    assert cargar(ficha.id) == ficha
 
 
 def test_ficha_nueva_no_adopta_la_salida_de_otra_ficha(tmp_path):

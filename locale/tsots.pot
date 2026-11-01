@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 18:02+0100\n"
+"POT-Creation-Date: 2026-11-01 19:04+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -30,7 +30,7 @@ msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede ped
 msgstr ""
 
 #, python-brace-format
-msgid "\"{nombre}\" ha cambiado fuera de la app: se empieza una ficha nueva"
+msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
 msgstr ""
 
 #, python-brace-format
@@ -51,6 +51,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "\"{nombre}\" ya tiene {paso}. ¿Rehacerlo?"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
 msgstr ""
 
 msgid "(detectado en tu cuenta)"

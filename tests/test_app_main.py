@@ -979,8 +979,9 @@ def test_anadir_videos_editados_avisa_junto_y_no_duplica(qtbot, tmp_path, monkey
     [(_padre, _titulo, texto)] = informaciones  # un solo aviso con los dos
     assert "a.mp4" in texto and "b.mp4" in texto
     assert ventana.modelo_cola.rowCount() == 2
+    # Un original editado sigue en su ficha: no se borra ni se duplica.
     despues = [ventana.modelo_cola.trabajo(f).ficha_id for f in (0, 1)]
-    assert set(despues).isdisjoint(antes)
+    assert despues == antes
     assert all(cargar(ficha_id) is not None for ficha_id in despues)
 
 
@@ -1025,18 +1026,22 @@ def test_olvidar_cancelado_no_borra(qtbot, tmp_path, monkeypatch):
     assert trabajo.ficha_id == ficha.id and trabajo.ocupa > 0
 
 
-def test_olvidar_avisa_si_el_original_vive_en_la_ficha(qtbot, tmp_path, monkeypatch):
+@pytest.mark.parametrize("es_el_original", [True, False],
+                         ids=["sin_original", "con_original_adoptado"])
+def test_olvidar_avisa_si_la_ficha_guarda_una_version_anterior(
+        qtbot, tmp_path, monkeypatch, es_el_original):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ficha = _ficha_hecha(tmp_path)
-    antiguo = ficha.ruta("a_antiguo.mov")  # una versión anterior movida a la ficha
+    antiguo = ficha.ruta("original.mov")  # una versión anterior movida a la ficha
     antiguo.write_bytes(b"VIEJO")
-    ficha.original = Huella.de(antiguo)
-    guardar(ficha)
+    if es_el_original:
+        ficha.original = Huella.de(antiguo)
+    guardar(ficha)  # si no, el original verdadero se adoptó después
     ventana.anadir_videos([ficha.final.ruta])
     ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
     preguntas = _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)
     ventana.boton_olvidar.click()
-    assert "a_antiguo.mov" in preguntas[0][2]
+    assert "original.mov" in preguntas[0][2]
     assert not antiguo.exists()
 
 
@@ -1301,15 +1306,83 @@ def test_procesar_json_lleva_reproceso(qtbot, tmp_path, monkeypatch):
     assert (datos["caption_seo"], datos["paso_audio"]) == (True, False)
 
 
-def test_procesar_fila_sin_ficha_usa_el_json_de_siempre(qtbot, tmp_path, monkeypatch):
+def test_procesar_fila_sin_ficha_la_reconoce_antes(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.modelo_cola.actualizar(0, ficha_id=None)
     lanzados = _lanzando(ventana, monkeypatch)
     ventana.procesar()
     [(fila, texto)] = lanzados
-    datos = json.loads(texto)
-    assert "reproceso" not in datos and datos["video"].endswith("a.mp4")
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.ficha_id is not None and trabajo.ocupa > 0
+    # Nunca por pipeline.run: siempre por la ficha.
+    assert json.loads(texto)["reproceso"]["ficha"] == trabajo.ficha_id
+
+
+def test_olvidar_y_procesar_otra_vez_una_salida_antigua_no_la_duplica(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "x_limpio.mp4")  # una salida antigua arrastrada
+    _md_ejemplo(video.with_suffix(".md"))
+    ventana.anadir_videos([video])
+    ventana.modelo_cola.actualizar(0, estado=EstadoTrabajo.HECHO)
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(0))
+    _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)
+    ventana.boton_olvidar.click()
+    ventana.boton_reprocesar.click()
+    ventana.panel.check_caption.setChecked(False)
+    _sin_preguntar(monkeypatch)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    [(fila, texto)] = lanzados
+    ficha = cargar(ventana.modelo_cola.trabajo(0).ficha_id)
+    # Se sobrescribe a sí misma (no x_limpio_limpio.mp4) y su caption sigue.
+    assert ficha.final.ruta == video.resolve()
+    assert json.loads(texto)["reproceso"]["ficha"] == ficha.id
+    assert video.with_suffix(".md").is_file()
+
+
+def test_procesar_fila_sin_ficha_avisa_como_al_arrastrarla(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "x.mov")
+    (tmp_path / "x_limpio.mp4").write_bytes(b"ANTIGUA")  # nadie la arrastró
+    informaciones = _capturando(monkeypatch, "information")
+    ventana.anadir_videos([video])
+    olvidar(cargar(ventana.modelo_cola.trabajo(0).ficha_id))
+    ventana.modelo_cola.actualizar(0, ficha_id=None)
+    _sin_preguntar(monkeypatch)
+    _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    [al_anadir, al_procesar] = [texto for _padre, _titulo, texto in informaciones]
+    assert '"x_limpio.mp4"' in al_procesar and al_procesar == al_anadir
+    ventana.ejecutor.cola_terminada.emit()  # la ventana sigue viva: sin pasada en curso
+
+
+def test_procesar_solo_caption_en_fila_sin_ficha_no_lanza_un_video_nuevo(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ventana.modelo_cola.actualizar(0, ficha_id=None)
+    _solo_caption(ventana)
+    _sin_preguntar(monkeypatch)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert lanzados == []
+    assert "aún no tiene vídeo procesado" in ventana.modelo_cola.trabajo(0).error
+
+
+def test_procesar_fila_sin_ficha_que_ya_no_existe_marca_error(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    [video] = _videos(tmp_path, "a.mp4")
+    ventana.anadir_videos([video])
+    ventana.modelo_cola.actualizar(0, ficha_id=None)
+    video.unlink()
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert lanzados == []
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert trabajo.estado == EstadoTrabajo.ERROR and trabajo.ficha_id is None
 
 
 def test_procesar_ficha_sin_salidas_toma_la_carpeta_actual(qtbot, tmp_path, monkeypatch):
@@ -1325,6 +1398,27 @@ def test_procesar_ficha_sin_salidas_toma_la_carpeta_actual(qtbot, tmp_path, monk
     ventana.ajustes.carpeta_salida = None  # junto al original
     ventana.procesar()
     assert cargar(ficha_id).carpeta_salida == tmp_path
+
+
+def test_procesar_ficha_sin_salidas_no_pisa_otra_en_la_carpeta_nueva(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "uno"
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ficha_id = ventana.modelo_cola.trabajo(0).ficha_id
+    otro = tmp_path / "otra" / "a.mp4"  # otro vídeo con el mismo nombre
+    otro.parent.mkdir()
+    otro.write_bytes(b"OTRO")
+    otra, _aviso = reconocer(otro, tmp_path / "dos")
+    _lanzando(ventana, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "dos"
+    ventana.procesar()
+    ficha = cargar(ficha_id)
+    assert ficha.carpeta_salida == tmp_path / "dos"
+    assert ficha.nombre == "a (2)" and otra.nombre == "a"
+    ventana.ajustes.carpeta_salida = tmp_path / "uno"  # vuelve donde no choca
+    ventana.procesar()
+    assert cargar(ficha_id).nombre == "a"
 
 
 def test_procesar_ficha_con_salidas_conserva_su_carpeta(qtbot, tmp_path, monkeypatch):
