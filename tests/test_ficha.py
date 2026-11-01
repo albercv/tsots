@@ -420,6 +420,51 @@ def test_original_adopta_primero_el_legado_horizontal(tmp_path):
     assert cargar(vertical.id).original is None
 
 
+def test_original_adopta_su_salida_antigua_sin_ficha(tmp_path):
+    # Lo mismo que si se hubiera arrastrado antes la salida antigua (regla 3)
+    # y después el original: no hay que fallar luego por un final ajeno.
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_limpio.mp4")
+    escribir_md(_caption(), salida / "x_limpio.md")
+    generar_srt([Bloque([Palabra("hola", 0.0, 0.5)], 0.0, 0.5)],
+                salida / "x_limpio.srt")
+    original = _archivo(tmp_path / "orig" / "x.mov")
+
+    ficha, aviso = reconocer(original, salida)
+
+    assert aviso == ""
+    assert ficha.final == Huella.de(antigua)
+    assert ficha.original == Huella.de(original)
+    assert ficha.legado is False
+    assert ficha.artefactos[CAPTION].clave == "importado"
+    assert leer_md(ficha.ruta("caption.md")) == _caption()
+    assert ficha.artefactos[TRANSCRIPCION].linea_tiempo == "legado"
+    assert ficha.subs_quemados_sin_base is True
+    assert cargar(ficha.id) == ficha and len(todas()) == 1
+
+
+def test_original_adopta_su_vertical_unico_antiguo_sin_ficha(tmp_path):
+    salida = tmp_path / "salida"
+    antigua = _archivo(salida / "x_vertical.mp4")
+
+    ficha, _ = reconocer(_archivo(tmp_path / "orig" / "x.mov"), salida)
+
+    assert ficha.final == Huella.de(antigua)
+    assert not ficha.hay_horizontal()
+    assert ficha.artefactos == {}
+
+
+def test_ficha_nueva_no_adopta_la_salida_de_otra_ficha(tmp_path):
+    salida = tmp_path / "salida"
+    primera, _ = reconocer(_archivo(tmp_path / "a" / "x.mov"), salida)
+    _archivo(salida / "x_limpio.mp4")  # la está escribiendo la primera
+
+    segunda, _ = reconocer(_archivo(tmp_path / "b" / "x.mov", b"otro"), salida)
+
+    assert segunda.nombre == "x (2)" and segunda.final is None
+    assert cargar(primera.id) == primera
+
+
 def test_mismo_nombre_otra_carpeta_no_pisa_salidas(tmp_path):
     salida = tmp_path / "salida"
     a = _archivo(tmp_path / "a" / "x.mov")

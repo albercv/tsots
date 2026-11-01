@@ -357,11 +357,12 @@ def test_cambiar_estilo_quema_sobre_la_base(tmp_path, monkeypatch):
 
 
 def test_no_sobrescribe_un_archivo_que_la_ficha_no_registra(tmp_path):
+    ficha = _ficha(tmp_path)
+    plan = planificar(ficha, _panel(paso_silencios=True), Decisiones())
+    # Aparece después de reconocer el vídeo: si ya estuviera, se adoptaría.
     ajeno = tmp_path / "salida" / "charla_limpio.mp4"
     ajeno.parent.mkdir()
     ajeno.write_bytes(b"AJENO")
-    ficha = _ficha(tmp_path)
-    plan = planificar(ficha, _panel(paso_silencios=True), Decisiones())
 
     with pytest.raises(PasoFallido, match="fuera de la app"):
         ejecutar(ficha, plan)
@@ -418,3 +419,103 @@ def test_caption_fallido_conserva_el_anterior(tmp_path, monkeypatch):
     assert ficha.ruta("caption.md").read_bytes() == antes
     assert any(e.get("warning", "").startswith("Caption SEO falló")
                for e in eventos)
+
+
+# --- Ronda de arreglos 1 -------------------------------------------------------
+
+def test_vertical_fallido_tras_cambiar_el_final_queda_desactualizado(
+        tmp_path, monkeypatch):
+    ficha = _pasada(_ficha(tmp_path), [A.LIMPIAR_AUDIO_ORIGINAL, A.PONER_AUDIO,
+                                       A.ESCRIBIR_FINAL, A.VERTICAL],
+                    paso_audio=True, paso_vertical=True)
+    monkeypatch.setattr(pipeline, "convertir_vertical", _revienta)
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.CORTAR, A.ESCRIBIR_FINAL, A.VERTICAL],
+                    Decisiones(regenerar_vertical=True), eventos=eventos,
+                    paso_audio=True, paso_silencios=True)
+
+    assert any(e.get("warning", "").startswith("Versión vertical falló")
+               for e in eventos)
+    assert ficha.desactualizado == {"vertical"}
+    plan = planificar(ficha, _panel(paso_vertical=True), Decisiones())
+    assert plan.acciones == [A.VERTICAL]
+
+
+def test_r10_no_pierde_el_caption_si_ya_habia_un_md_en_el_destino(tmp_path):
+    ficha = _pasada(_ficha(tmp_path), [A.TRANSCRIBIR, A.CAPTION, A.VERTICAL],
+                    caption_seo=True, paso_vertical=True)
+    caption = ficha.ruta("caption.md").read_bytes()
+    unico_md = ficha.final.ruta.with_suffix(".md")
+    viejo = tmp_path / "salida" / "charla_limpio.md"
+    viejo.write_text("de otra pasada", encoding="utf-8")
+
+    ficha = _pasada(ficha, [A.CORTAR, A.ESCRIBIR_FINAL, A.VERTICAL,
+                            A.RETIRAR_VERTICAL_UNICO], paso_silencios=True)
+
+    assert ficha.final.ruta.with_suffix(".md").read_bytes() == caption
+    assert unico_md.read_bytes() == caption  # nada que no escribió se borra
+    assert ficha.ruta("caption.md").read_bytes() == caption
+
+
+def _danar_transcripcion(ficha: Ficha) -> None:
+    ficha.ruta("transcripcion.json").write_text("{roto", encoding="utf-8")
+
+
+def test_caption_con_transcripcion_danada_vuelve_a_transcribir(falsos, tmp_path):
+    ficha = _pasada(_ficha(tmp_path),
+                    [A.CORTAR, A.TRANSCRIBIR, A.ESCRIBIR_FINAL, A.CAPTION],
+                    paso_silencios=True, caption_seo=True)
+    _danar_transcripcion(ficha)
+    falsos.clear()
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.CAPTION], Decisiones(rehacer=frozenset({"caption"})),
+                    eventos=eventos, caption_seo=True)
+
+    assert any("dañada" in e.get("warning", "") for e in eventos)
+    assert any(l.startswith("transcribir:") for l in falsos)
+    assert any(l.startswith("generar:") for l in falsos)
+    assert ficha.final.ruta.with_suffix(".md").is_file()
+
+
+@pytest.mark.parametrize("panel, decisiones, esperado", [
+    (dict(subtitulos=True, diseno="caja"), REHACER_SUBS, [A.QUEMAR]),
+    (dict(subtitulos=True, paso_vertical=True), Decisiones(), [A.VERTICAL]),
+], ids=["quemar", "vertical"])
+def test_transcripcion_danada_para_subtitulos_falla_con_un_texto_claro(
+        tmp_path, panel, decisiones, esperado):
+    ficha = _pasada(_ficha(tmp_path), [A.CORTAR, A.TRANSCRIBIR, A.QUEMAR],
+                    paso_silencios=True, subtitulos=True)
+    final = ficha.final.ruta.read_bytes()
+    _danar_transcripcion(ficha)
+    plan = planificar(ficha, _panel(**panel), decisiones)
+    assert plan.acciones == esperado
+
+    with pytest.raises(PasoFallido, match="transcripción guardada .* dañada"):
+        ejecutar(ficha, plan)
+
+    assert ficha.final.ruta.read_bytes() == final
+    assert _sin_restos(cargar(ficha.id))
+
+
+@pytest.mark.parametrize("panel, decisiones, esperado", [
+    (dict(subtitulos=True), Decisiones(), [A.TRANSCRIBIR, A.QUEMAR]),
+    (dict(caption_seo=True), Decisiones(rehacer=frozenset({"caption"})),
+     [A.TRANSCRIBIR, A.CAPTION]),
+], ids=["subtitulos", "caption"])
+def test_salida_antigua_sin_ficha_se_adopta_y_se_reprocesa(
+        tmp_path, panel, decisiones, esperado):
+    antigua = tmp_path / "salida" / "charla_limpio.mp4"
+    antigua.parent.mkdir()
+    antigua.write_bytes(b"ANTIGUA")
+    (tmp_path / "salida" / "charla_limpio.md").write_text(
+        "# T\n\n## Caption\nC\n\n## Hashtags\n#a\n\n## Palabras clave\n- k\n",
+        encoding="utf-8")
+    ficha = _ficha(tmp_path)
+    assert ficha.final.coincide(antigua) and CAPTION in ficha.artefactos
+
+    ficha = _pasada(ficha, esperado, decisiones, **panel)
+
+    assert ficha.final.ruta == antigua.resolve()
+    assert ficha.final.coincide(antigua)

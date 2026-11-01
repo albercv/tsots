@@ -68,31 +68,6 @@ def _oculto(destino: Path) -> Path:
     return destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
 
 
-def _publicar(origen: Path, destino: Path) -> None:
-    """Mueve el temporal `origen` a `destino` por otro oculto a su lado:
-    `destino` nunca queda a medias, aunque esté en otro disco."""
-    oculto = _oculto(destino)
-    try:
-        shutil.move(origen, oculto)
-        oculto.replace(destino)
-    except BaseException:
-        oculto.unlink(missing_ok=True)
-        raise
-
-
-def _mover_acompanantes(viejo: Path, nuevo: Path) -> None:
-    """R10: el .md y el .srt van junto al nuevo final. Si allí ya hay uno, es
-    el que ha escrito esta pasada y el viejo sobra."""
-    for sufijo in (".md", ".srt"):
-        origen, destino = viejo.with_suffix(sufijo), nuevo.with_suffix(sufijo)
-        if not origen.is_file():
-            continue
-        if destino.exists():
-            origen.unlink()
-        else:
-            shutil.move(origen, destino)
-
-
 class _Pasada:
     """La base actual y lo que esta pasada aún no ha registrado en la ficha."""
 
@@ -117,6 +92,7 @@ class _Pasada:
         self.degradar_subs = bool(cambia_base) or Accion.QUEMAR not in plan.acciones
         self.palabras: list[Palabra] | None = None
         self.transcrito = False
+        self.publicados: set[Path] = set()  # lo que ha escrito esta pasada
         seguimiento = ficha.artefactos.get(SEGUIMIENTO)
         self.x_cara = seguimiento.ajustes.get("x_inicial") if seguimiento else None
         # El vertical único, por si esta pasada crea el horizontal (R10).
@@ -142,14 +118,60 @@ class _Pasada:
 
     def _palabras(self) -> list[Palabra] | None:
         """Las de esta pasada o, si no se ha transcrito, las de la ficha (el
-        planificador ya ha comprobado que valen)."""
-        if not self.transcrito:
+        planificador ya ha comprobado que existen). PasoFallido si están dañadas."""
+        if not self.transcrito and TRANSCRIPCION in self.ficha.artefactos:
+            ruta = self.ficha.ruta("transcripcion.json")
+            try:
+                self.palabras = [Palabra(**palabra) for palabra in
+                                 json.loads(ruta.read_text(encoding="utf-8"))]
+            except (OSError, ValueError, TypeError) as error:
+                raise PasoFallido(_(
+                    'La transcripción guardada de "{nombre}" está dañada '
+                    '({error}): rehaz los subtítulos para volver a transcribir.'
+                ).format(nombre=self.ficha.nombre, error=error)) from error
             self.transcrito = True
-            if TRANSCRIPCION in self.ficha.artefactos:
-                datos = json.loads(self.ficha.ruta("transcripcion.json")
-                                   .read_text(encoding="utf-8"))
-                self.palabras = [Palabra(**palabra) for palabra in datos]
         return self.palabras
+
+    def _publicar(self, origen: Path, destino: Path) -> None:
+        """Mueve el temporal `origen` a `destino` por otro oculto a su lado:
+        `destino` nunca queda a medias, aunque esté en otro disco."""
+        oculto = _oculto(destino)
+        try:
+            shutil.move(origen, oculto)
+            oculto.replace(destino)
+        except BaseException:
+            oculto.unlink(missing_ok=True)
+            raise
+        self.publicados.add(destino.resolve())
+
+    def _mover_acompanantes(self, viejo: Path, nuevo: Path) -> None:
+        """R10: el .md y el .srt van junto al nuevo final. El viejo solo se
+        borra si esta pasada ya ha escrito el nuevo. Uno que no es de esta
+        pasada se rehace desde la ficha, que es la fuente de verdad, y el viejo
+        se queda."""
+        for sufijo in (".md", ".srt"):
+            origen, destino = viejo.with_suffix(sufijo), nuevo.with_suffix(sufijo)
+            if destino.resolve() in self.publicados:
+                origen.unlink(missing_ok=True)
+            elif destino.exists():
+                self._acompanante_de_la_ficha(destino)
+            elif origen.is_file():
+                shutil.move(origen, destino)
+
+    def _acompanante_de_la_ficha(self, destino: Path) -> None:
+        if destino.suffix == ".md":
+            caption = self.ficha.artefactos.get(CAPTION)
+            if caption is not None:
+                copia = self.tmp / "salida.md"
+                shutil.copyfile(self.ficha.ruta(caption.archivo), copia)
+                self._publicar(copia, destino)
+            return
+        transcripcion = self.ficha.artefactos.get(TRANSCRIPCION)
+        if transcripcion is None or transcripcion.linea_tiempo != self.linea:
+            return  # la ficha no tiene subtítulos con los tiempos de este final
+        palabras = self._palabras()
+        if palabras:  # None si la transcripción de esta pasada ha fallado
+            self._escribir_srt(agrupar(palabras, self.c.diseno), destino)
 
     # --- La base ------------------------------------------------------------
 
@@ -319,7 +341,10 @@ class _Pasada:
         ficha.final = Huella.de(destino)
         ficha.artefactos[HORIZONTAL] = Artefacto(clave(self.linea, ajustes), None,
                                                  ajustes)
-        if self.marcar_desactualizado:
+        # El vertical que había ya no es de este final (R7): si esta pasada lo
+        # regenera, la marca se quita solo cuando lo consigue.
+        regenera = Accion.VERTICAL in self.acciones and ficha.vertical is not None
+        if self.marcar_desactualizado or regenera:
             ficha.desactualizado.add("vertical")
         guardar(ficha)
         self.base_nueva = None
@@ -327,21 +352,26 @@ class _Pasada:
     def _escribir_srt(self, bloques, final: Path) -> None:
         srt = self.tmp / "subs.srt"
         generar_srt(bloques, srt)
-        _publicar(srt, final.with_suffix(".srt"))
+        self._publicar(srt, final.with_suffix(".srt"))
 
     # --- Caption y vertical -------------------------------------------------
 
     def caption(self, paso: int) -> None:
         # Se escribe en tmp: si falla, el caption que había se queda (R1).
         md = self.tmp / "caption.md"
-        _fase_caption(self.c, self.base, md.with_suffix(".mp4"), self._palabras(),
+        try:
+            palabras = self._palabras()
+        except PasoFallido as error:  # el caption la rehace él mismo
+            _avisar(self.on_progress, str(error))
+            palabras = None
+        _fase_caption(self.c, self.base, md.with_suffix(".mp4"), palabras,
                       self.on_progress, paso, self.total)
         if not md.is_file():
             return
         final = self.ficha.ruta_final(self.ficha.hay_horizontal())
         copia = self.tmp / "salida.md"
         shutil.copyfile(md, copia)
-        _publicar(copia, final.with_suffix(".md"))
+        self._publicar(copia, final.with_suffix(".md"))
         md.replace(self.ficha.ruta("caption.md"))
         ajustes = ajustes_caption(self.c)
         self.ficha.artefactos[CAPTION] = Artefacto(clave(ajustes), "caption.md",
@@ -389,7 +419,7 @@ class _Pasada:
         if not salida.is_file():
             return
         self._comprobar_propio(destino)
-        _publicar(salida, destino)
+        self._publicar(salida, destino)
         if horizontal:
             ficha.vertical = Huella.de(destino)
         else:
@@ -412,7 +442,7 @@ class _Pasada:
         self._comprobar_propio(viejo)
         self._comprobar_propio(destino)
         shutil.move(viejo, destino)  # misma carpeta: se renombra de una vez
-        _mover_acompanantes(viejo, self.ficha.final.ruta)
+        self._mover_acompanantes(viejo, self.ficha.final.ruta)
         self.ficha.vertical = Huella.de(destino)
         guardar(self.ficha)
 
@@ -427,4 +457,4 @@ class _Pasada:
             viejo.ruta.unlink()
         elif viejo.ruta.exists():
             _avisar(self.on_progress, _ajeno(viejo.ruta))
-        _mover_acompanantes(viejo.ruta, self.ficha.final.ruta)
+        self._mover_acompanantes(viejo.ruta, self.ficha.final.ruta)

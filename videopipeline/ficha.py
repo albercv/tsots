@@ -321,6 +321,16 @@ def _ficha_de_original(original: Path, carpeta_salida: Path,
                 guardar(ficha)
                 return ficha
 
+    # Su salida ya está en disco y no es de ninguna ficha (de antes de las
+    # fichas, o de una olvidada): se adopta como si se hubiera arrastrado antes.
+    for salida in (nueva.ruta_final(True), nueva.ruta_final(False)):
+        if salida.is_file() and all(salida.resolve() not in ficha._salidas()
+                                    for ficha in fichas):
+            ficha = _ficha_de_legado(salida)
+            ficha.original, ficha.legado = nueva.original, False
+            guardar(ficha)
+            return ficha
+
     # Otro original con el mismo nombre ya usa esas salidas: no se pisan.
     nombre, n = nueva.nombre, 1
     while any(ficha._salidas() & nueva._salidas() for ficha in fichas):
