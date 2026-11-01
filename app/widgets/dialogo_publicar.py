@@ -370,7 +370,8 @@ class DialogoPublicar(QDialog):
         self.aviso_fecha.hide()
         for widget in (self.radio_ahora, self.radio_programar, self.campo_fecha):
             fila_cuando.addWidget(widget)
-        fila_cuando.addWidget(self.aviso_fecha, 1)
+        fila_cuando.addWidget(self.aviso_fecha)
+        fila_cuando.addStretch(1)
         raiz.addLayout(fila_cuando)
 
         # Indeterminada mientras se publica. Sin altura máxima: con el estilo de

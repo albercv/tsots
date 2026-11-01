@@ -10,7 +10,7 @@ from typing import Callable
 
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma
+from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma, Programada
 
 from . import credenciales
 
@@ -78,6 +78,42 @@ def buscar_lugares(llavero, fabrica: Fabrica, nombre: str, datos: dict, texto: s
     except Exception as e:
         return None, _("Error inesperado al buscar el lugar ({tipo}).").format(
             tipo=type(e).__name__)
+
+
+def programadas(llavero, fabrica: Fabrica, nombre: str,
+                datos: dict) -> tuple[list[Programada] | None, str]:
+    """Lo programado en el servicio: `(lista, "")` o `(None, motivo)`. Para
+    fuera del hilo de la interfaz: nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
+    if servicio is None:
+        return None, error
+    try:
+        return servicio.programadas(), ""
+    except proveedores.ErrorConsulta as e:
+        return None, str(e)
+    except Exception as e:
+        return None, _("Error inesperado al consultar lo programado ({tipo}).").format(
+            tipo=type(e).__name__)
+
+
+def cancelar(llavero, fabrica: Fabrica, nombre: str, datos: dict,
+             referencias: list[str]) -> tuple[list[str], str]:
+    """Cancela en orden; para en el primer fallo. Devuelve las canceladas y
+    el motivo del fallo ("" si todas). Nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
+    if servicio is None:
+        return [], error
+    canceladas: list[str] = []
+    for referencia in referencias:
+        try:
+            servicio.cancelar(referencia)
+        except proveedores.ErrorConsulta as e:
+            return canceladas, str(e)
+        except Exception as e:
+            return canceladas, _("Error inesperado al cancelar ({tipo}).").format(
+                tipo=type(e).__name__)
+        canceladas.append(referencia)
+    return canceladas, ""
 
 
 def _servicio(llavero, fabrica: Fabrica, nombre: str, datos: dict,
