@@ -4,14 +4,17 @@ import html
 import logging
 import platform as plataforma_sistema
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
 from typing import Callable
+from zoneinfo import ZoneInfo
 
-from PySide6.QtCore import QProcess, Qt, QThread, Signal
+from PySide6.QtCore import QDateTime, QProcess, Qt, QThread, QTimeZone, Signal
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
+    QDateTimeEdit,
     QDialog,
     QFormLayout,
     QGridLayout,
@@ -23,6 +26,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QRadioButton,
     QVBoxLayout,
 )
 
@@ -63,6 +67,33 @@ from .selector_ubicacion import DialogoUbicacion, describir_ubicacion, ubicacion
 # Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
 # tests la sustituyen.
 medir_duracion = duracion_video
+
+# Lo antes y lo más tarde que se puede programar: subir a cada red lleva su
+# tiempo, y el servicio rechaza una fecha pasada o a más de un año.
+MARGEN_MINIMO = timedelta(minutes=15)
+MAXIMO = timedelta(days=365)
+
+
+def zona_local() -> tzinfo:
+    """Zona horaria del Mac, con su nombre IANA si se puede (el servicio lo
+    necesita para interpretar la hora); si no, su desfase actual."""
+    try:
+        return ZoneInfo(bytes(QTimeZone.systemTimeZoneId()).decode())
+    except Exception:
+        return datetime.now().astimezone().tzinfo
+
+
+def fecha_local(texto_o_fecha, zona: tzinfo, formato: str) -> str:
+    """Fecha (ISO o datetime) en la hora del Mac; el texto tal cual si no se entiende."""
+    try:
+        fecha = (texto_o_fecha if isinstance(texto_o_fecha, datetime)
+                 else datetime.fromisoformat(texto_o_fecha))
+    except (TypeError, ValueError):
+        return str(texto_o_fecha)
+    if fecha.tzinfo is not None:
+        fecha = fecha.astimezone(zona)
+    return fecha.strftime(formato)
+
 
 # Lo que escriben el diálogo y su hilo va al registro de la publicación
 # (`logs/publicacion_<vídeo>_<fecha>.log`) mientras hay un `Diario` abierto.
@@ -176,9 +207,13 @@ class DialogoPublicar(QDialog):
 
     def __init__(self, video: Path, caption: Caption, ajustes: Ajustes,
                  llavero=credenciales, fabrica: Fabrica | None = None,
-                 medir: Callable[[Path], float] | None = None, parent=None):
+                 medir: Callable[[Path], float] | None = None,
+                 ahora: Callable[[], datetime] | None = None, zona: tzinfo | None = None,
+                 parent=None):
         super().__init__(parent)
         self.video = Path(video)
+        self._zona = zona or zona_local()
+        self._ahora = ahora or (lambda: datetime.now(self._zona))
         self.ajustes = ajustes
         self.llavero = llavero
         self.fabrica = fabrica or (lambda nombre, clave, datos: proveedores.crear(
@@ -312,6 +347,32 @@ class DialogoPublicar(QDialog):
         fila_ubicacion.addWidget(self.boton_ubicacion)
         raiz.addLayout(fila_ubicacion)
 
+        fila_cuando = QHBoxLayout()
+        fila_cuando.addWidget(QLabel(_("Cuándo:")))
+        self.radio_ahora = QRadioButton(_("Ahora"))
+        self.radio_programar = QRadioButton(_("Programar"))
+        self.radio_programar.setToolTip(_(
+            "El servicio guarda el vídeo y lo publica a esa hora: puedes cerrar la app."))
+        grupo_cuando = QButtonGroup(self)
+        grupo_cuando.addButton(self.radio_ahora)
+        grupo_cuando.addButton(self.radio_programar)
+        self.radio_ahora.setChecked(True)
+        self.campo_fecha = QDateTimeEdit()
+        self.campo_fecha.setCalendarPopup(True)
+        self.campo_fecha.setDisplayFormat("dd/MM/yyyy HH:mm")
+        # La siguiente hora en punto a más de una hora vista.
+        inicio = (self._ahora() + timedelta(hours=2)).replace(minute=0, second=0,
+                                                               microsecond=0)
+        self.campo_fecha.setDateTime(QDateTime(inicio.date(), inicio.time()))
+        self.campo_fecha.setEnabled(False)
+        self.aviso_fecha = QLabel()
+        self.aviso_fecha.setStyleSheet(f"color: {COLOR_AVISO};")
+        self.aviso_fecha.hide()
+        for widget in (self.radio_ahora, self.radio_programar, self.campo_fecha):
+            fila_cuando.addWidget(widget)
+        fila_cuando.addWidget(self.aviso_fecha, 1)
+        raiz.addLayout(fila_cuando)
+
         # Indeterminada mientras se publica. Sin altura máxima: con el estilo de
         # macOS una barra de 6 px no se dibuja.
         self.barra = QProgressBar()
@@ -363,6 +424,8 @@ class DialogoPublicar(QDialog):
         self.campo_titulo.textChanged.connect(self._al_cambiar_textos)
         self.campo_hashtags.textChanged.connect(self._al_cambiar_textos)
         self.campo_x.textChanged.connect(self._al_editar_x)
+        self.radio_programar.toggled.connect(self._refrescar)
+        self.campo_fecha.dateTimeChanged.connect(self._refrescar)
         self._rellenar_x()
         self.refrescar_servicio()
         self._refrescar_aviso()
@@ -385,7 +448,27 @@ class DialogoPublicar(QDialog):
             x_premium=self.ajustes.x_premium,
             facebook_modo=ModoFacebook(self.combo_facebook.currentData()),
             ubicacion=self.ubicacion(),
+            programada=self.programada(),
         )
+
+    def programada(self) -> datetime | None:
+        """Fecha elegida, en la hora del Mac; `None` con «Ahora»."""
+        if not self.radio_programar.isChecked():
+            return None
+        return self.campo_fecha.dateTime().toPython().replace(
+            second=0, microsecond=0, tzinfo=self._zona)
+
+    def _motivo_fecha(self) -> str:
+        """Por qué no vale la fecha elegida, o "" si vale (o si es «Ahora»)."""
+        programada = self.programada()
+        if programada is None:
+            return ""
+        ahora = self._ahora()
+        if programada < ahora + MARGEN_MINIMO:
+            return _("Elige una hora al menos 15 minutos después de ahora.")
+        if programada > ahora + MAXIMO:
+            return _("Se puede programar como mucho a un año vista.")
+        return ""
 
     def ubicacion(self) -> Ubicacion:
         if self._ubicacion_propia is not None:
@@ -633,9 +716,15 @@ class DialogoPublicar(QDialog):
             else "")
         bloqueos = self._refrescar_plataformas()
         listo, _motivo = self._listo()
+        programar = self.radio_programar.isChecked()
+        self.campo_fecha.setEnabled(programar and not self.publicando)
+        self.boton_publicar.setText(_("Programar") if programar else _("Publicar"))
+        motivo_fecha = self._motivo_fecha()
+        self.aviso_fecha.setText(motivo_fecha)
+        self.aviso_fecha.setVisible(bool(motivo_fecha))
         self.boton_publicar.setEnabled(
             listo and not self.publicando and bool(self.plataformas())
-            and bool(self.campo_titulo.text().strip()) and not bloqueos)
+            and bool(self.campo_titulo.text().strip()) and not bloqueos and not motivo_fecha)
 
     def _refrescar_aviso(self) -> None:
         ultimas = registro.ultimas(self.video)
@@ -647,10 +736,12 @@ class DialogoPublicar(QDialog):
             entrada = ultimas.get(plataforma)
             if entrada is None:
                 continue
-            try:
-                fecha = datetime.fromisoformat(entrada.fecha).strftime("%d/%m/%Y %H:%M")
-            except ValueError:
-                fecha = entrada.fecha
+            if entrada.programada:
+                partes.append(_("{plataforma} (programado para el {fecha})").format(
+                    plataforma=plataforma.nombre,
+                    fecha=fecha_local(entrada.programada, self._zona, "%d/%m/%Y %H:%M")))
+                continue
+            fecha = fecha_local(entrada.fecha, self._zona, "%d/%m/%Y %H:%M")
             nombre = plataforma.nombre
             if entrada.sin_confirmar:
                 nombre = _("{plataforma} (sin confirmar)").format(plataforma=nombre)
@@ -659,9 +750,13 @@ class DialogoPublicar(QDialog):
                       and entrada.modo == ModoFacebook.BORRADOR.value)):
                 nombre = _("{plataforma} (borrador)").format(plataforma=nombre)
             partes.append(f"{nombre} {fecha}")
-        self.aviso_publicado.setText(
-            _("⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, "
-              "saldrá repetido.").format(lista=", ".join(partes)))
+        if any(e.programada for e in ultimas.values()):
+            texto = _("⚠ Este vídeo ya está publicado o programado: {lista}. Si vuelves a "
+                      "publicarlo, saldrá repetido.")
+        else:
+            texto = _("⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, "
+                      "saldrá repetido.")
+        self.aviso_publicado.setText(texto.format(lista=", ".join(partes)))
         self.aviso_publicado.show()
 
     # --- publicar ---
@@ -674,9 +769,14 @@ class DialogoPublicar(QDialog):
     def _confirmar(self) -> bool:
         elegidas = set(self.plataformas())
         ultimas = {p: e for p, e in registro.ultimas(self.video).items() if p in elegidas}
-        confirmadas = [p.nombre for p in ORDEN if p in ultimas and not ultimas[p].sin_confirmar]
+        programadas = [f"{p.nombre} ({fecha_local(ultimas[p].programada, self._zona, '%d/%m/%Y %H:%M')})"
+                       for p in ORDEN if p in ultimas and ultimas[p].programada]
+        confirmadas = [p.nombre for p in ORDEN if p in ultimas and not ultimas[p].sin_confirmar
+                       and not ultimas[p].programada]
         dudosas = [p.nombre for p in ORDEN if p in ultimas and ultimas[p].sin_confirmar]
-        texto = _("Se publicará «{titulo}» en:\n\n{resumen}").format(
+        programada = self.programada()
+        texto = (_("Se programará «{titulo}» en:\n\n{resumen}") if programada
+                 else _("Se publicará «{titulo}» en:\n\n{resumen}")).format(
             titulo=self.campo_titulo.text().strip(), resumen=self._resumen())
         if set(self.ubicacion().plataformas()) & elegidas:
             texto += "\n\n" + _("Ubicación: {ubicacion}").format(
@@ -684,12 +784,19 @@ class DialogoPublicar(QDialog):
         if confirmadas:
             texto += "\n\n" + _("Ya publicado antes en: {lista}.").format(
                 lista=", ".join(confirmadas))
+        if programadas:
+            texto += "\n\n" + _("Ya programado en: {lista}.").format(
+                lista=", ".join(programadas))
         if dudosas:
             texto += "\n\n" + _(
                 "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: "
                 "compruébalo en la app antes de publicar otra vez.").format(
                 lista=", ".join(dudosas))
-        texto += "\n\n" + _("¿Publicar ahora?")
+        if programada:
+            texto += "\n\n" + _("¿Programar para el {fecha}?").format(
+                fecha=fecha_local(programada, self._zona, _("%d/%m/%Y a las %H:%M")))
+        else:
+            texto += "\n\n" + _("¿Publicar ahora?")
         respuesta = QMessageBox.question(
             self, _("Publicar en redes"), texto,
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
@@ -700,9 +807,10 @@ class DialogoPublicar(QDialog):
     def publicar(self) -> None:
         if self.publicando:
             return
+        self._refrescar()  # la hora elegida pudo quedarse corta mientras tanto
         if not self.boton_publicar.isEnabled():
             _listo, motivo = self._listo()
-            self._poner_estado(motivo or _(
+            self._poner_estado(motivo or self._motivo_fecha() or _(
                 "Marca al menos una plataforma y escribe un título."), COLOR_AVISO)
             return
         nombre = self.ajustes.proveedor_redes
@@ -761,7 +869,8 @@ class DialogoPublicar(QDialog):
         self._hilo.progreso.connect(self._al_progresar)
         self._hilo.terminado.connect(self._al_terminar)
         self._bloquear(True)
-        self._poner_estado(_("Publicando: {lista}…").format(
+        self._poner_estado((_("Programando: {lista}…") if opciones.programada
+                            else _("Publicando: {lista}…")).format(
             lista=", ".join(p.nombre for p in plataformas)))
         log.info("Hilo de publicación en marcha.")
         self._hilo.start()
@@ -882,7 +991,7 @@ class DialogoPublicar(QDialog):
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
                        self.campo_x, self.combo_tiktok, self.combo_instagram,
                        self.combo_facebook, self.boton_redes, self.boton_cerrar,
-                       self.boton_ubicacion,
+                       self.boton_ubicacion, self.radio_ahora, self.radio_programar,
                        *self.casillas.values()):
             widget.setEnabled(not bloqueado)
         self.barra.setVisible(bloqueado)
@@ -914,6 +1023,9 @@ class DialogoPublicar(QDialog):
 
     def _texto_resultado(self, plataforma: Plataforma, resultado: Resultado) -> tuple[str, str]:
         """HTML (escapado) y color con que se muestra un resultado."""
+        if resultado.ok and resultado.programada is not None:
+            return html.escape(_("📅 Programado para el {fecha}").format(
+                fecha=fecha_local(resultado.programada, self._zona, "%d/%m %H:%M"))), COLOR_OK
         if resultado.ok:
             if resultado.url:
                 texto = _('✓ Publicado · <a href="{url}">Abrir</a>').format(
@@ -950,7 +1062,8 @@ class DialogoPublicar(QDialog):
         pendientes = sum(1 for r in self.resultados.values() if not r.ok and r.pendiente)
         if ok == 0 and pendientes == 0:
             return _("Falló en todas"), COLOR_ERROR
-        texto = _("Publicado en {ok} de {total}").format(ok=ok, total=total)
+        texto = (_("Programado en {ok} de {total}") if self._opciones_en_curso.programada
+                 else _("Publicado en {ok} de {total}")).format(ok=ok, total=total)
         if pendientes:
             texto += " · " + _("{n} por confirmar").format(n=pendientes)
         return texto, (COLOR_OK if ok == total else COLOR_AVISO)
@@ -967,6 +1080,8 @@ class DialogoPublicar(QDialog):
                 texto, color = self._texto_resultado(plataforma, resultado)
                 lineas.append(f'<b>{html.escape(plataforma.nombre)}</b>: '
                               f'<span style="color: {color};">{texto}</span>')
+                if resultado.programada is not None and resultado.referencia:
+                    self.ajustes.anotar_programada(resultado.referencia, self.video)
                 # Lo que salió, o pudo salir, no se vuelve a marcar: evita duplicados.
                 if resultado.ok or resultado.pendiente:
                     self._deseadas.discard(plataforma)

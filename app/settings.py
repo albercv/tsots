@@ -213,6 +213,39 @@ class Ajustes:
         self._q.setValue(f"redes/cuentas/{self.proveedor_redes}",
                          json.dumps(datos, ensure_ascii=False))
 
+    # Programadas desde la app: referencia del servicio → vídeo, para olvidar
+    # su entrada del registro si se cancela desde el calendario.
+
+    def programadas_locales(self) -> dict[str, str]:
+        bruto = self._q.value("redes/programadas")
+        try:
+            datos = json.loads(str(bruto)) if bruto else {}
+        except ValueError:
+            return {}
+        return {str(k): str(v) for k, v in datos.items()} if isinstance(datos, dict) else {}
+
+    def _guardar_programadas(self, datos: dict[str, str]) -> None:
+        self._q.setValue("redes/programadas", json.dumps(datos, ensure_ascii=False))
+
+    def anotar_programada(self, referencia: str, video: Path) -> None:
+        self._guardar_programadas({**self.programadas_locales(), referencia: str(video)})
+
+    def olvidar_programada(self, referencia: str) -> str:
+        """Quita la referencia; devuelve su vídeo, o "" si no estaba."""
+        datos = self.programadas_locales()
+        video = datos.pop(referencia, "")
+        if video:
+            self._guardar_programadas(datos)
+        return video
+
+    def podar_programadas(self, pendientes: set[str]) -> None:
+        """Olvida las que ya no están pendientes en el servicio (publicadas o
+        canceladas fuera de la app)."""
+        datos = self.programadas_locales()
+        quedan = {k: v for k, v in datos.items() if k in pendientes}
+        if quedan != datos:
+            self._guardar_programadas(quedan)
+
     @property
     def youtube_categoria(self) -> str:
         return str(self._q.value("redes/youtube_categoria", YOUTUBE_CATEGORIA_POR_DEFECTO)
