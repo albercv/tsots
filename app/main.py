@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QProcess, Qt, QTimer, QUrl
+from PySide6.QtCore import QLibraryInfo, QProcess, Qt, QTimer, QTranslator, QUrl
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtWidgets import (
     QApplication,
@@ -48,7 +48,7 @@ from .widgets.zona_drop import ZonaDrop
 from .worker import EjecutorCola
 
 
-# Icono de la ventana (el del Dock lo pone el bundle .app desde el mismo PNG).
+# Icono de la aplicación y de la ventana (el bundle .app usa el mismo PNG).
 RUTA_ICONO = Path(__file__).resolve().parent / "recursos" / "icon_512.png"
 BASE_DIR = Path(__file__).resolve().parent.parent
 # Lanzador nativo del bundle: relanzar por aquí conserva identidad y caffeinate.
@@ -59,6 +59,19 @@ TAMANO_INICIAL = (960, 720)
 RUTA_LANZADOR = (
     BASE_DIR / "TheSilenceOfTheShorts.app" / "Contents" / "MacOS" / "TheSilenceOfTheShorts"
 )
+
+
+def preparar_aplicacion(app: QApplication) -> None:
+    """El logo y los botones estándar de Qt en el idioma de la interfaz.
+
+    En macOS el icono de la aplicación es el del Dock y el de los avisos
+    nativos: sin él sale el de Python al arrancar sin el bundle .app. Los
+    botones (Sí, Cancelar…) los traduce Qt, no gettext."""
+    app.setWindowIcon(QIcon(str(RUTA_ICONO)))
+    traductor = QTranslator(app)
+    if traductor.load(f"qtbase_{i18n.idioma_actual()}",
+                      QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)):
+        app.installTranslator(traductor)
 
 
 def _dependencias_faltantes() -> list[str]:
@@ -659,6 +672,7 @@ def main() -> int:
         i18n.detectar() if ajustes.idioma_ui == "sistema" else ajustes.idioma_ui
     )
     app = QApplication(sys.argv)
+    preparar_aplicacion(app)
     faltan = _dependencias_faltantes()
     if faltan:
         QMessageBox.critical(
