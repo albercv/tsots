@@ -366,13 +366,13 @@ Package `videopipeline/redes/`:
 
 | Module | Role | Knows the provider? |
 |---|---|---|
-| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ciudad` (catalog of cities with their public Instagram and X place ids), `Ubicacion` (a `Ciudad` and the TikTok `Lugar` chosen with the account; `plataformas()` says which networks get it), `Lugar` (TikTok place from the lookup; its id is private and hidden from `repr`), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid), `Resultado` (ok, url, error, pendiente, referencia), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
+| `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ciudad` (catalog of cities with their public Instagram and X place ids), `Ubicacion` (a `Ciudad` and the TikTok `Lugar` chosen with the account; `plataformas()` says which networks get it), `Opciones.programada` (aware datetime to schedule, `None` = now), `Programada` (a pending post in the service: opaque reference, aware date, platforms, title, modes when known), `Lugar` (TikTok place from the lookup; its id is private and hidden from `repr`), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid), `Resultado` (ok, url, error, pendiente, referencia, `programada` when the service will publish it later), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
 | `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
 | `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
-| `proveedor.py` | `Proveedor` protocol, `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
-| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups | Yes, the only one |
+| `proveedor.py` | `Proveedor` protocol (publish, status, accounts, Facebook Pages, TikTok places, `programadas()` and `cancelar()`), `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
+| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups, scheduling (`scheduled_date` in local time + IANA `timezone`, no `async_upload`; list and cancel scheduled jobs) | Yes, the only one |
 | `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry. Before TikTok, looks up the place by name when none was chosen (no exact match or a failed lookup: TikTok goes out without a location) | No |
-| `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode. Never the key | No |
+| `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode; for a scheduled post also `programada` and `referencia`, and `olvidar()` drops it when cancelled. Never the key | No |
 
 GUI: `app/widgets/dialogo_publicar.py` (texts, the X text with its live
 counter, platforms, modes, confirmation, upload in a `QThread`,
@@ -395,6 +395,33 @@ last successful account lookup (per provider, tied to the profile); never
 the key. The checked platforms are remembered; a list saved before X and
 Facebook existed keeps working (both stay unchecked), and a new user
 starts with TikTok, YouTube and Instagram.
+
+### Scheduling
+
+The Publish dialog's **When** row (`radio_ahora` / `radio_programar` +
+`campo_fecha`, a `QDateTimeEdit`) sets `Opciones.programada` in the Mac's
+zone (`zona_local()`: the IANA name from `QTimeZone.systemTimeZoneId()`; a
+fixed-offset fallback is sent as UTC). Allowed range: 15 minutes to 365
+days ahead (`MARGEN_MINIMO`, `MAXIMO`); outside it the button is disabled
+and the reason shows next to the field. The upload is the same as
+publishing now, one request per network, but the service answers 202 with
+a `job_id` and stores the video: `Resultado(ok=True, programada=…,
+referencia=job_id)`, which the publisher records without polling. If the
+service answers with only a `request_id`, the post counts as scheduled
+without a reference (it can still be cancelled from the calendar).
+
+The app keeps `job_id → video` in QSettings (`redes/programadas`) so that
+cancelling from the calendar can also clear the video's record; entries no
+longer pending in the service are pruned each time the calendar loads.
+
+`app/widgets/dialogo_programadas.py` is the **Scheduled…** window opened
+from the bottom bar: a 6-week month grid (Monday first) with one label per
+video and time (`agrupar`: jobs with the same title and local time are one
+label, since the app uploads once per network). It lists and cancels
+through `app/cuentas.py` (`programadas`, `cancelar`), in the background. A
+404 on cancel counts as done; a 409 `scheduled_post_in_progress` is
+explained. Not done yet: changing the time (`PATCH`), the outcome after
+the time, Upload-Post's queue slots (see `docs/TODO.md`).
 
 ### X and Facebook
 

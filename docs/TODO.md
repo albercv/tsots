@@ -5,6 +5,13 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Features
 
+- [ ] **Change the time of a scheduled post** from the calendar (Upload-Post
+      `PATCH /api/uploadposts/schedule/<job_id>`; today: cancel and
+      schedule again).
+- [ ] **Outcome of a scheduled post after its time** (link or error): the
+      local record keeps "scheduled for…" (Upload-Post
+      `status?job_id=` or the upload history).
+
 - [ ] **Choose horizontal or vertical when publishing.** With both outputs,
       **Publish…** always uses the horizontal one.
 - [ ] **Show the horizontal output in the queue before the vertical one

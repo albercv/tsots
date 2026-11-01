@@ -350,6 +350,24 @@ TSOTS apunta cada publicación en `nombre_limpio.publicado.json`, junto al
 vídeo (plataforma, fecha, enlace, servicio). Si vuelves a abrir Publicar
 con ese vídeo, avisa de que ya se publicó.
 
+**Programar.** En la fila **Cuándo** del diálogo Publicar eliges
+**Ahora** (lo de siempre) o **Programar** con una fecha y una hora, en la
+hora de tu Mac. La misma fecha vale para todas las redes marcadas: al
+menos 15 minutos después de ahora y como mucho a un año. El botón pasa a
+llamarse **Programar**. Al pulsarlo, el vídeo se sube a Upload-Post en ese
+momento y Upload-Post lo publica a la hora elegida, así que después puedes
+cerrar la app o apagar el Mac. Cada red respeta su modo (un TikTok en
+borrador llega a tus borradores a esa hora). Upload-Post gasta el crédito
+al programar y lo devuelve si cancelas antes de la hora.
+
+**Programadas…** (barra inferior, junto a Redes…) abre un calendario del
+mes con todo lo pendiente en Upload-Post, también lo que programes desde
+su web. Cada día muestra la hora, las siglas de las redes (TT, YT, IG, X,
+FB) y el título. Al pulsar una etiqueta ves cada red con su botón
+**Cancelar** (y **Cancelar todas**). Cancelar pide confirmación; si el
+vídeo se programó desde TSOTS, Publicar deja de avisar de que ya está
+programado. Para cambiar la fecha, cancela y vuelve a programar.
+
 ## Si algo va mal
 
 - Una fila en **rojo** en la cola es un vídeo que ha fallado. **Doble clic**
