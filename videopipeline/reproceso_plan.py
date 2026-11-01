@@ -161,6 +161,10 @@ _CAMBIA_BASE = {  # (paso, la ficha tiene subtítulos)
                         'mantiene.'),
     ("audio", False): N_('Limpiar el audio cambia la base de "{nombre}".'),
 }
+_REHACER_DESDE_EL_ORIGINAL = N_(
+    '"{nombre}" se rehará desde el original: se volverán a transcribir y '
+    'quemar los subtítulos. El caption se mantiene.')
+_ANADIR_SUBTITULOS = N_('Se añadirán subtítulos a "{nombre}".')
 _VERTICAL_DESACTUALIZADO = N_("El vertical quedará desactualizado si no lo "
                               "regeneras.")
 
@@ -218,9 +222,19 @@ def _base_vale(ficha: Ficha) -> bool:
 
 
 def _subs_bloqueados(ficha: Ficha) -> bool:
-    """Subtítulos quemados sin base limpia ni original del que rehacerla. Con
-    `legado` y original, el original sería el propio final antiguo."""
-    return ficha.subs_quemados_sin_base and (ficha.original is None or ficha.legado)
+    """Subtítulos quemados sin base limpia ni original del que rehacerla. Un
+    original dentro de la ficha es el propio final antiguo, que los lleva."""
+    return ficha.subs_quemados_sin_base and (
+        ficha.original is None or ficha.legado
+        or ficha.original.ruta.parent == ficha.carpeta.resolve())
+
+
+def _subs_heredados(ficha: Ficha) -> bool:
+    """Salida antigua con subtítulos quemados y su original adoptado, que la app
+    aún no ha reescrito: los subtítulos cuentan como hechos (R1), sin ajustes."""
+    salida = HORIZONTAL if ficha.hay_horizontal() else VERTICAL
+    return (ficha.subs_quemados_sin_base and not _subs_bloqueados(ficha)
+            and ficha.final is not None and salida not in ficha.artefactos)
 
 
 # --- Revisar ----------------------------------------------------------------
@@ -247,7 +261,9 @@ def _cambios(antes: dict, ahora: dict) -> tuple[str, ...]:
 def revisar(ficha: Ficha, config: PipelineConfig) -> list[Consulta]:
     """Qué preguntar antes de procesar, por cada paso que marca el panel."""
     hechos = ficha.pasos_hechos()
-    con_subs, con_vertical = "subtitulos" in hechos, "vertical" in hechos
+    heredados = _subs_heredados(ficha)
+    con_subs = "subtitulos" in hechos or heredados
+    con_vertical = "vertical" in hechos
     # Un vertical único no se queda desactualizado: R10 lo regenera.
     avisa_vertical = con_vertical and ficha.hay_horizontal()
     bloqueado = config.subtitulos and _subs_bloqueados(ficha)
@@ -259,6 +275,8 @@ def revisar(ficha: Ficha, config: PipelineConfig) -> list[Consulta]:
         if bloqueado and paso in ("subtitulos", "vertical"):
             tipo, cambios = "bloqueado", ()
             texto = _texto_bloqueado(ficha, paso)
+        elif paso == "vertical" and "vertical" in ficha.desactualizado:
+            continue  # no vale (R0, R7): se regenera sin preguntar
         elif paso in hechos:
             cambios = _cambios(*_comparables(ficha, paso, config))
             tipo = "otros_ajustes" if cambios else "hecho"
@@ -272,10 +290,14 @@ def revisar(ficha: Ficha, config: PipelineConfig) -> list[Consulta]:
                                "subtítulos; el caption se mantiene."))
         elif paso in _DE_BASE and (con_subs or con_vertical):
             tipo, cambios = "cambia_base", ()
-            texto = _(_CAMBIA_BASE[paso, con_subs]).format(nombre=ficha.nombre)
+            texto = _(_REHACER_DESDE_EL_ORIGINAL if heredados
+                      else _CAMBIA_BASE[paso, con_subs]).format(nombre=ficha.nombre)
+        elif paso == "subtitulos" and avisa_vertical:  # R7
+            tipo, cambios = "cambia_base", ()
+            texto = _(_ANADIR_SUBTITULOS).format(nombre=ficha.nombre)
         else:
             continue
-        if paso in _DE_BASE and avisa_vertical:
+        if paso in (*_DE_BASE, "subtitulos") and avisa_vertical:
             extra.append(_(_VERTICAL_DESACTUALIZADO))
         consultas.append(Consulta(paso, tipo, " ".join([texto, *extra]), cambios))
     return consultas
@@ -293,15 +315,20 @@ def planificar(ficha: Ficha, config: PipelineConfig,
 
     # 1. Estado objetivo: lo del panel si se pide y falta o se rehace; si no,
     #    lo de la ficha (R1, R6).
-    def objetivo(paso: str) -> dict | None:
-        hecho = _hecho(ficha, paso)
-        pedido = paso in marcados and (hecho is None or paso in rehacer)
+    subs_antes = _hecho(ficha, "subtitulos")
+    if subs_antes is None and _subs_heredados(ficha):
+        subs_antes = {}  # los quemados de la salida antigua: con los del panel
+
+    def objetivo(paso: str, antes: dict | None) -> dict | None:
+        pedido = paso in marcados and (
+            _hecho(ficha, paso) is None or paso in rehacer)
         if pedido and not (bloqueado and paso == "subtitulos"):
             return _ajustes(paso, config)
-        return hecho
+        return antes
 
     audio, silencios, subs, encuadre = (
-        objetivo(paso) for paso in ("audio", "silencios", "subtitulos", "vertical"))
+        objetivo(paso, subs_antes if paso == "subtitulos" else _hecho(ficha, paso))
+        for paso in ("audio", "silencios", "subtitulos", "vertical"))
     efectiva = config
     for paso, ajustes in (("audio", audio), ("silencios", silencios),
                           ("subtitulos", subs), ("vertical", encuadre)):
@@ -321,7 +348,6 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     cambia_base = (audio != audio_antes or silencios != silencios_antes
                    or base_rehecha)
 
-    subs_antes = _hecho(ficha, "subtitulos")
     transcripcion = _vale(ficha, TRANSCRIPCION)
     # Rehacer los subtítulos solo para cambiar su estilo no vuelve a transcribir.
     solo_estilo = (transcripcion is not None
@@ -339,15 +365,20 @@ def planificar(ficha: Ficha, config: PipelineConfig,
 
     hay_vertical = _existe(ficha.vertical if ficha.hay_horizontal() else ficha.final)
     r10 = crea_horizontal and hay_vertical  # solo tenía vertical
-    vertical = ficha.artefactos.get(VERTICAL)
-    subs_vertical = vertical.ajustes.get("subtitulos") if vertical else None
+    if ficha.hay_horizontal():
+        vertical = ficha.artefactos.get(VERTICAL)
+        subs_vertical = vertical.ajustes.get("subtitulos") if vertical else None
+    else:
+        subs_vertical = subs_antes  # el vertical único es la salida
+    # Un vertical marcado como desactualizado no vale (R0, R7).
+    vertical_vale = hay_vertical and "vertical" not in ficha.desactualizado
 
     def genera_vertical(cambia: bool) -> tuple[bool, bool]:
         """(se genera, quedaría desactualizado) — R7, R10."""
         desactualizado = hay_vertical and (
             cambia or subs != subs_vertical
             or (subs is not None and retranscribir))
-        pedido = config.paso_vertical and (not hay_vertical or "vertical" in rehacer)
+        pedido = config.paso_vertical and (not vertical_vale or "vertical" in rehacer)
         regenera = desactualizado and (
             decisiones.regenerar_vertical or not horizontal or r10)
         genera = (pedido or regenera) and not (bloqueado and "vertical" in marcados)

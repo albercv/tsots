@@ -357,6 +357,21 @@ def test_legado_con_subs_bloquea_subtitulos(tmp_path):
     assert all("original" in aviso for aviso in plan.avisos)
 
 
+def test_legado_movido_a_la_ficha_como_original_sigue_bloqueado(tmp_path):
+    # El ejecutor guardó el final antiguo en la ficha como su original: también
+    # lleva los subtítulos quemados, se quede como se quede `legado`.
+    ficha = _legado(tmp_path, original=False, legado=False)
+    ficha.original = Huella.de(_archivo(ficha.ruta("original.mp4")))
+    panel = _panel(subtitulos=True)
+
+    consultas = revisar(ficha, panel)
+    plan = planificar(ficha, panel, Decisiones())
+
+    assert [(c.paso, c.tipo) for c in consultas] == [("subtitulos", "bloqueado")]
+    assert A.QUEMAR not in plan.acciones
+    assert len(plan.avisos) == 1
+
+
 def test_legado_permite_recortar(tmp_path):
     ficha = _legado(tmp_path, original=False, legado=True)
 
@@ -384,6 +399,71 @@ def test_legado_adoptado_con_subs_quema_sobre_el_original(tmp_path):
     assert plan.error == ""
     assert plan.avisos == []
     assert plan.acciones == [A.TRANSCRIBIR, A.QUEMAR]
+
+
+@pytest.mark.parametrize("panel, esperado", [
+    (dict(paso_silencios=True), [A.CORTAR, A.TRANSCRIBIR, A.QUEMAR]),
+    (dict(paso_audio=True),
+     [A.LIMPIAR_AUDIO_ORIGINAL, A.PONER_AUDIO, A.TRANSCRIBIR, A.QUEMAR]),
+])
+def test_legado_adoptado_con_subs_sin_marcarlos_los_vuelve_a_quemar(
+        tmp_path, panel, esperado):
+    # R1: los subtítulos quemados de la salida antigua cuentan como hechos y
+    # no se pierden al rehacer la base desde el original.
+    ficha = _legado(tmp_path)
+    paso = next(iter(panel)).removeprefix("paso_")
+
+    consultas = revisar(ficha, _panel(**panel))
+    plan = planificar(ficha, _panel(**panel, diseno="caja"), Decisiones())
+
+    assert [(c.paso, c.tipo) for c in consultas] == [(paso, "cambia_base")]
+    assert "se volverán a transcribir y quemar los subtítulos" in consultas[0].texto
+    assert plan.acciones == esperado
+    assert plan.config.subtitulos and plan.config.diseno == "caja"
+
+
+def test_legado_adoptado_con_subs_sin_cambiar_la_base_no_los_toca(tmp_path):
+    plan = planificar(_legado(tmp_path), _panel(caption_seo=True),
+                      Decisiones(rehacer=frozenset({"caption"})))
+
+    assert plan.acciones == [A.CAPTION]
+
+
+def test_revisar_anadir_subtitulos_con_vertical_avisa_que_se_desactualiza(
+        tmp_path):
+    panel = _panel(subtitulos=True)
+
+    consultas = revisar(_con_vertical_sin_subs(tmp_path), panel)
+    plan = planificar(_con_vertical_sin_subs(tmp_path), panel, Decisiones())
+
+    assert [(c.paso, c.tipo) for c in consultas] == [("subtitulos", "cambia_base")]
+    assert "vertical quedará desactualizado" in consultas[0].texto
+    assert plan.acciones == [A.TRANSCRIBIR, A.QUEMAR]
+    assert plan.marcar_desactualizado
+
+
+@pytest.mark.parametrize("panel", [dict(subtitulos=True),
+                                   dict(subtitulos=True, diseno="caja")])
+def test_revisar_subtitulos_hechos_con_vertical_avisa_que_se_desactualiza(
+        tmp_path, panel):
+    ficha = _completa(tmp_path, **{VERTICAL: _vertical(subs=True)})
+
+    consultas = revisar(ficha, _panel(**panel))
+
+    assert [c.paso for c in consultas] == ["subtitulos"]
+    assert "vertical quedará desactualizado" in consultas[0].texto
+
+
+def test_vertical_marcado_desactualizado_se_regenera(tmp_path):
+    ficha = _completa(tmp_path, **{VERTICAL: _vertical(subs=True)})
+    ficha.desactualizado = {"vertical"}
+    panel = _panel(**TODO, paso_vertical=True)
+
+    consultas = revisar(ficha, panel)
+    plan = planificar(ficha, panel, Decisiones())
+
+    assert "vertical" not in [c.paso for c in consultas]
+    assert plan.acciones == [A.VERTICAL]
 
 
 def test_revisar_hecho_y_otros_ajustes(tmp_path):
