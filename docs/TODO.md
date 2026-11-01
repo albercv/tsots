@@ -57,8 +57,25 @@ Pending work, most urgent first. Remove an item when it is merged into
       user: Task 6 of `docs/superpowers/plans/2026-09-23-publicar-x.md`
       (free plan, single post instead of a thread, Premium detection,
       Facebook draft, real shape of the accounts and Pages responses).
+- [ ] **List of processed videos.** Today a video removed from the queue is
+      reprocessed by dragging the original or one of its outputs again; its
+      record in `fichas/` is kept until **Forget this video**. Add a way to
+      see and reopen processed videos without looking for the file. The form
+      (window, panel, menu…) is still to be decided with the user.
+      `ficha.todas()` already lists the records.
 
 ## Improvements
+
+- [ ] **Reprocessing edge cases.** None loses data:
+      - A record left with no original and no outputs (the original was
+        edited outside the app) still reserves its output names, so another
+        video with the same name gets "(2)". `Ficha._salidas()` in
+        `videopipeline/ficha.py` should return nothing for it.
+      - When **Process** adopts an old `x_limpio.mp4` by name, the warning
+        appears but the job started by the same click still runs
+        (`procesar()` in `app/main.py`).
+      - An edited original can adopt a stray `x_limpio_vertical.mp4`
+        without a warning.
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
       `videopipeline/steps.py` encodes with `libx264` on the CPU. Try

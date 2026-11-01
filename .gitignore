@@ -8,6 +8,7 @@ __pycache__/
 *.mp4
 *.wav
 audio_procesado/
+fichas/
 logs/
 TheSilenceOfTheShorts.app/Contents/MacOS/
 .superpowers/

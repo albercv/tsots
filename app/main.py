@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -30,10 +31,15 @@ from PySide6.QtWidgets import (
 from videopipeline import i18n
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
+from videopipeline.ficha import (
+    CAPTION, Ficha, cargar, limpiar_temporales, mover_salidas, ocupa, olvidar,
+    reconocer,
+)
 from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
+from videopipeline.reproceso_plan import Consulta, Decisiones, planificar, revisar
 
-from .queue_model import EstadoTrabajo, ModeloCola
+from .queue_model import EstadoTrabajo, ModeloCola, resumen_de
 from .settings import Ajustes
 from .widgets.cabecera import Cabecera
 from .widgets.dialogo_glosario import DialogoGlosario
@@ -41,6 +47,7 @@ from .widgets.dialogo_marca import DialogoMarca
 from .widgets import dialogo_publicar
 from .widgets.dialogo_publicar import DialogoPublicar
 from .widgets.dialogo_redes import DialogoRedes
+from .widgets.dialogo_reproceso import preguntar_reproceso
 from .widgets.panel_caption import PanelCaption
 from .widgets.panel_opciones import PanelOpciones
 from .widgets.vista_previa import VistaPrevia
@@ -137,9 +144,18 @@ class VentanaPrincipal(QMainWindow):
         self.boton_quitar.clicked.connect(self._quitar_seleccionado)
         self.boton_limpiar = QPushButton(_("Limpiar hechos"))
         self.boton_limpiar.clicked.connect(self._limpiar_hechos)
+        self.boton_reprocesar = QPushButton(_("Volver a procesar"))
+        self.boton_reprocesar.clicked.connect(self._reprocesar_seleccionado)
+        self.boton_olvidar = QPushButton(_("Olvidar este vídeo"))
+        self.boton_olvidar.setToolTip(
+            _("Borra los datos guardados para rehacer pasos; no toca los vídeos"))
+        self.boton_olvidar.clicked.connect(self._olvidar_seleccionado)
         fila_botones_cola.addWidget(self.boton_quitar)
         fila_botones_cola.addWidget(self.boton_limpiar)
         columna_izquierda.addLayout(fila_botones_cola)
+        # Uno por fila: juntos ensanchan la ventana más de lo que cabe.
+        columna_izquierda.addWidget(self.boton_reprocesar)
+        columna_izquierda.addWidget(self.boton_olvidar)
 
         fila_superior.addLayout(columna_izquierda, 2)
 
@@ -307,8 +323,44 @@ class VentanaPrincipal(QMainWindow):
                     "Estos vídeos no tienen audio y no se han añadido:\n{nombres}"
                 ).format(nombres=nombres),
             )
-        if con_audio:
-            self.modelo_cola.anadir(con_audio)
+        reconocidos: list[tuple[Path, Ficha]] = []
+        avisos, errores = [], []
+        for ruta in con_audio:
+            try:
+                ficha, aviso = reconocer(ruta, self.ajustes.carpeta_salida)
+            except Exception as error:  # noqa: BLE001 — un archivo no frena a los demás
+                errores.append(f"{ruta.name}: {error}")
+                continue
+            reconocidos.append((ruta, ficha))
+            if aviso:
+                avisos.append(aviso)
+        self._anadir_reconocidos(reconocidos)
+        if errores:
+            QMessageBox.warning(
+                self,
+                _("No se puede añadir"),
+                _("Estos vídeos no se han añadido:\n{errores}").format(
+                    errores="\n".join(errores)),
+            )
+        if avisos:
+            QMessageBox.information(self, _("Aviso"), "\n".join(avisos))
+
+    def _anadir_reconocidos(self, reconocidos: list[tuple[Path, Ficha]]) -> None:
+        por_ruta = dict(reconocidos)
+        # Una fila con esa ruta y otra ficha (olvidada, o sustituida porque el
+        # archivo se editó) es el mismo vídeo: pasa a la ficha nueva, sin
+        # fila duplicada.
+        for fila in range(self.modelo_cola.rowCount()):
+            trabajo = self.modelo_cola.trabajo(fila)
+            ficha = por_ruta.get(trabajo.ruta)
+            if ficha is not None and trabajo.ficha_id != ficha.id:
+                self.modelo_cola.actualizar(fila, ficha_id=ficha.id)
+        self.modelo_cola.anadir([(ruta, ficha.id) for ruta, ficha in reconocidos])
+        for ficha in por_ruta.values():
+            fila = self.modelo_cola.fila_de_ficha(ficha.id)
+            if fila is not None:
+                self.modelo_cola.actualizar(
+                    fila, resumen=resumen_de(ficha), ocupa=ocupa(ficha))
 
     def _quitar_seleccionado(self) -> None:
         if self._procesando:
@@ -323,6 +375,49 @@ class VentanaPrincipal(QMainWindow):
         if self._procesando:
             return
         self.modelo_cola.limpiar_hechos()
+
+    def _ficha_de(self, trabajo) -> Ficha | None:
+        return cargar(trabajo.ficha_id) if trabajo.ficha_id else None
+
+    def _reprocesar_seleccionado(self) -> None:
+        if self._procesando:
+            return
+        self.modelo_cola.volver_a_espera(
+            [indice.row() for indice in self.vista_cola.selectedIndexes()])
+
+    def _olvidar_seleccionado(self) -> None:
+        if self._procesando:
+            return
+        indices = self.vista_cola.selectedIndexes()
+        if not indices:
+            return
+        fila = indices[0].row()
+        trabajo = self.modelo_cola.trabajo(fila)
+        ficha = self._ficha_de(trabajo)
+        if ficha is not None:
+            texto = _(
+                'Se borrarán los datos guardados para rehacer pasos de '
+                '"{nombre}" ({mb} MB). Los vídeos y su caption no se tocan.'
+            ).format(nombre=trabajo.ruta.name, mb=round(ocupa(ficha) / 1_000_000))
+            # La versión anterior de una salida antigua que se guardó en la
+            # ficha antes de sobrescribirla se borra con ella, aunque después
+            # se adoptara el original verdadero.
+            for guardada in sorted(ficha.carpeta.glob("original.*")):
+                texto += " " + _(
+                    'La versión anterior del vídeo que se guardó ahí '
+                    '("{archivo}") también se borra.'
+                ).format(archivo=guardada.name)
+            respuesta = QMessageBox.question(
+                self,
+                _("Olvidar este vídeo"),
+                texto,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if respuesta != QMessageBox.StandardButton.Yes:
+                return
+            olvidar(ficha)
+        self.modelo_cola.actualizar(fila, ficha_id=None, resumen="", ocupa=0)
 
     def _abrir_resultado(self, indice) -> None:
         trabajo = self.modelo_cola.trabajo(indice.row())
@@ -389,15 +484,45 @@ class VentanaPrincipal(QMainWindow):
         """Carga el caption del trabajo y elige pestaña: Caption si lo hay
         (lo siguiente es copiarlo o publicarlo), Previsualización si no."""
         caption = self._caption_de(trabajo)
-        self.panel_caption.mostrar(caption, trabajo.salida if caption else None)
+        self.panel_caption.mostrar(caption, self._video_de(trabajo) if caption else None)
         self.pestanas.setCurrentWidget(
             self.panel_caption if caption else self.vista_previa
         )
 
+    def _video_de(self, trabajo) -> Path | None:
+        """El vídeo que se publica: el final de su ficha o, sin él, la salida."""
+        ficha = self._ficha_de(trabajo)
+        if ficha is not None and ficha.final is not None:
+            return ficha.final.ruta
+        return trabajo.salida
+
     def _caption_de(self, trabajo) -> Caption | None:
+        if trabajo.estado == EstadoTrabajo.PROCESANDO:
+            return None
+        ficha = self._ficha_de(trabajo)
+        if (ficha is not None and CAPTION in ficha.artefactos
+                and ficha.final is not None and ficha.final.ruta.is_file()):
+            caption = leer_md(ficha.ruta("caption.md"))
+            if caption is not None:
+                self._restaurar_md(ficha)
+                return caption
+        # Sin ficha (o sin caption en ella): el `.md` junto a la salida.
         if trabajo.estado != EstadoTrabajo.HECHO or not trabajo.salida:
             return None
         return leer_md(trabajo.salida.with_suffix(".md"))
+
+    def _restaurar_md(self, ficha: Ficha) -> None:
+        """La copia de la ficha es la fuente de verdad: si falta el `.md` junto
+        al final (Publicar lo lee), se vuelve a escribir."""
+        md = ficha.final.ruta.with_suffix(".md")
+        if md.is_file():
+            return
+        temporal = md.with_name(f".{md.stem}_tmp{md.suffix}")
+        try:
+            shutil.copyfile(ficha.ruta("caption.md"), temporal)
+            temporal.replace(md)
+        except OSError:
+            pass  # el caption se muestra igual; se reintenta al volver a elegirlo
 
     def _mostrar_pestana_preview(self) -> None:
         # Al tocar las opciones de subtítulos se quiere ver el efecto.
@@ -491,9 +616,12 @@ class VentanaPrincipal(QMainWindow):
             "modo": modo_equivalente(valores["paso_audio"], valores["paso_silencios"]),
         })
         carpeta = self.ajustes.carpeta_salida
-        trabajos: list[tuple[int, str]] = []
+        filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
+        avisos = []
         for fila in pendientes:
             trabajo = self.modelo_cola.trabajo(fila)
+            if trabajo.ficha_id is None and not self._reconocer_fila(fila, avisos):
+                continue
             config = PipelineConfig(
                 video=trabajo.ruta, salida=carpeta,
                 contexto_marca=self.ajustes.contexto_marca,
@@ -502,10 +630,94 @@ class VentanaPrincipal(QMainWindow):
                 idioma_ui=i18n.idioma_actual(),
                 **valores,
             )
-            trabajos.append((fila, config.to_json()))
+            ficha = self._ficha_de(trabajo)
+            if ficha is not None and ficha.final is None and ficha.vertical is None:
+                # Aún sin salidas: van a la carpeta de ahora. Las demás fichas
+                # conservan la suya, que es donde están sus archivos.
+                mover_salidas(ficha, carpeta)
+            filas.append((fila, config, ficha))
+        if avisos:
+            QMessageBox.information(self, _("Aviso"), "\n".join(avisos))
+
+        decisiones = self._preguntar_reproceso(filas)
+        if decisiones is None:
+            return
+        trabajos: list[tuple[int, str]] = []
+        sin_nada: list[str] = []
+        for fila, config, ficha in filas:
+            trabajo = self.modelo_cola.trabajo(fila)
+            datos = json.loads(config.to_json())
+            # Siempre por la ficha: una fila arrastrada desde una salida se
+            # llama como ella, pero su original es el de la ficha.
+            decision = decisiones.get(trabajo.ficha_id, Decisiones())
+            if ficha is not None:
+                plan = planificar(ficha, config, decision)
+                if plan.error:
+                    self.modelo_cola.actualizar(
+                        fila, estado=EstadoTrabajo.ERROR, error=plan.error,
+                        percent=None, etiqueta="")
+                    continue
+                if plan.vacio:
+                    sin_nada.append(trabajo.ruta.name)
+                    if ficha.final is not None:  # lo que ya hay es el resultado
+                        self._al_terminar_trabajo(
+                            fila, True, str(ficha.final.ruta), "")
+                    continue
+            datos["reproceso"] = {
+                "ficha": trabajo.ficha_id,
+                "rehacer": sorted(decision.rehacer),
+                "regenerar_vertical": decision.regenerar_vertical,
+            }
+            trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
+        if sin_nada:
+            QMessageBox.information(
+                self, _("Nada que hacer"),
+                _("Nada que hacer en: {nombres}").format(nombres=", ".join(sin_nada)))
+        if not trabajos:
+            return
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:
+        """Una fila sin ficha (p. ej. tras «Olvidar este vídeo») se reconoce
+        como al arrastrarla: nunca se procesa como un vídeo nuevo, que
+        escribiría `x_limpio_limpio` o borraría el caption de una salida."""
+        trabajo = self.modelo_cola.trabajo(fila)
+        try:
+            ficha, aviso = reconocer(trabajo.ruta, self.ajustes.carpeta_salida)
+        except Exception as error:  # noqa: BLE001 — un archivo no frena a los demás
+            self.modelo_cola.actualizar(
+                fila, estado=EstadoTrabajo.ERROR, percent=None, etiqueta="",
+                error=f"{trabajo.ruta.name}: {error}")
+            return False
+        if aviso:
+            avisos.append(aviso)
+        self.modelo_cola.actualizar(
+            fila, ficha_id=ficha.id, resumen=resumen_de(ficha), ocupa=ocupa(ficha))
+        return True
+
+    def _preguntar_reproceso(
+        self, filas: list[tuple[int, PipelineConfig, Ficha | None]]
+    ) -> dict[str, Decisiones] | None:
+        """Avisa de lo que los vídeos ya tienen. None si el usuario cancela;
+        sin nada que avisar, ni se pregunta (todo se mantiene)."""
+        consultas: dict[str, tuple[str, list[Consulta]]] = {}
+        hay_vertical: set[str] = set()
+        for fila, config, ficha in filas:
+            if ficha is None:
+                continue
+            lista = revisar(ficha, config)
+            # Si cambia el audio, los silencios o los subtítulos, el vertical que
+            # ya hay puede quedar desactualizado: se ofrece regenerarlo (R7).
+            if ficha.vertical is not None and (
+                    config.paso_audio or config.paso_silencios or config.subtitulos):
+                hay_vertical.add(ficha.id)
+            if lista or ficha.id in hay_vertical:
+                consultas[ficha.id] = (self.modelo_cola.trabajo(fila).ruta.name, lista)
+        if not consultas:
+            return {}
+        return preguntar_reproceso(self, consultas, hay_vertical)
 
     def _procesar_o_cancelar(self) -> None:
         if self._procesando:
@@ -535,9 +747,17 @@ class VentanaPrincipal(QMainWindow):
         self, fila: int, ok: bool, salida: str, error: str
     ) -> None:
         if ok:
+            cambios = {"salida": Path(salida)}
+            ficha = self._ficha_de(self.modelo_cola.trabajo(fila))
+            if ficha is not None:  # la pasada la dejó al día
+                if ficha.final is not None:
+                    cambios["salida"] = ficha.final.ruta
+                if ficha.vertical is not None:
+                    cambios["salida_vertical"] = ficha.vertical.ruta
+                cambios.update(resumen=resumen_de(ficha), ocupa=ocupa(ficha))
             self.modelo_cola.actualizar(
-                fila, estado=EstadoTrabajo.HECHO, salida=Path(salida),
-                percent=None, etiqueta="",
+                fila, estado=EstadoTrabajo.HECHO, percent=None, etiqueta="",
+                **cambios,
             )
             actual = self.vista_cola.currentIndex()
             if actual.isValid() and actual.row() == fila:
@@ -552,11 +772,15 @@ class VentanaPrincipal(QMainWindow):
                 fila, estado=estado, error=error, percent=None, etiqueta="",
             )
             if estado == EstadoTrabajo.CANCELADO:
-                self._limpiar_temporal(self.modelo_cola.trabajo(fila).ruta)
+                self._limpiar_temporal(self.modelo_cola.trabajo(fila))
 
-    def _limpiar_temporal(self, video: Path) -> None:
+    def _limpiar_temporal(self, trabajo) -> None:
         """Borra los tmp ocultos que el runner dejó a medias al cancelar."""
-        carpeta = self.ajustes.carpeta_salida
+        ficha = self._ficha_de(trabajo)
+        if ficha is not None:
+            limpiar_temporales(ficha)
+            return
+        video, carpeta = trabajo.ruta, self.ajustes.carpeta_salida
         # Los pasos del trabajo cancelado no se conocen aquí: se prueban todos
         # los destinos posibles (horizontal, su vertical y vertical único).
         destinos = (
@@ -588,16 +812,18 @@ class VentanaPrincipal(QMainWindow):
             self.boton_procesar.setEnabled(True)
         else:
             self.boton_procesar.setText(_("▶ Procesar"))
-            hay_pasos = self.panel.hay_pasos_de_video()
+            hay_pasos = self.panel.hay_pasos()
             self.boton_procesar.setEnabled(
                 bool(self.modelo_cola.pendientes()) and hay_pasos
             )
             self.boton_procesar.setToolTip(
                 "" if hay_pasos else
-                _("Marca al menos un paso: audio, silencios, subtítulos o vertical.")
+                _("Marca al menos un paso.")
             )
         self.boton_quitar.setEnabled(not self._procesando)
         self.boton_limpiar.setEnabled(not self._procesando)
+        self.boton_reprocesar.setEnabled(not self._procesando)
+        self.boton_olvidar.setEnabled(not self._procesando)
 
     # --- idioma ---
 

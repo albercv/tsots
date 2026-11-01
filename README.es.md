@@ -136,6 +136,128 @@ detiene nada; cerrar la tapa sin monitor externo sí.
 .venv-clearvoice/bin/python limpiarVideo.py video.mov --caption --marca "Soy…"
 ```
 
+## Volver a procesar un vídeo
+
+Puedes añadir pasos a un vídeo que ya procesaste (por ejemplo, el recorte
+de silencios que se te olvidó) sin perder lo que ya tiene y sin acabar con
+`x_limpio_limpio.mp4`. Hay dos formas de repetir un vídeo:
+
+- **Volver a procesar**: selecciona en la cola uno o varios vídeos
+  terminados y pulsa el botón. Vuelven a "en espera"; marca los pasos que
+  quieras en el panel y pulsa **▶ Procesar**.
+- **Arrastrarlo otra vez**: sirve el original o cualquiera de sus
+  resultados (`_limpio`, `_vertical`). La app reconoce que es el mismo
+  vídeo y no crea una fila nueva.
+
+**Qué recuerda la app.** De cada vídeo guarda una *ficha* en la carpeta
+`fichas/` de la app, con lo que cuesta rehacer: el audio limpio, el vídeo
+sin subtítulos (solo si el resultado lleva subtítulos quemados), la
+transcripción, el caption y el seguimiento de la cara, además de los
+ajustes con que se hizo cada cosa. Tus vídeos no se guardan ahí, salvo una
+excepción: cuando la app sobrescribe por primera vez un resultado antiguo
+(ver «Vídeos procesados antes de esta función»), guarda en la ficha la
+versión anterior. Cada fila de la cola muestra los pasos que ya tiene el
+vídeo (por ejemplo «✓ audio · silencios · subtítulos · caption») y cuánto
+ocupan sus datos.
+
+**Qué no se repite.**
+
+- Un resultado se reutiliza mientras no cambie aquello de lo que depende:
+  la limpieza de audio, la transcripción, el caption o el seguimiento de la
+  cara no se vuelven a calcular si ya valen.
+- Los resultados son siempre los mismos archivos y se sustituyen:
+  `nombre_limpio.mp4`, `nombre_limpio_vertical.mp4` (o `nombre_vertical.mp4`
+  si solo hay vertical), `.md` y `.srt`. `nombre` es siempre el del
+  original.
+- Desmarcar **Subtítulos** o **Caption** no borra los que ya existen.
+- Los subtítulos nunca se queman encima de otros: se queman siempre sobre
+  la versión sin subtítulos. Por eso, recortar silencios en un vídeo que ya
+  tiene subtítulos los vuelve a transcribir y quemar; el caption se
+  mantiene.
+- **Solo caption** se puede pedir sobre un vídeo ya procesado: usa la
+  transcripción que haya y no toca la imagen.
+- **Publicar…** funciona con cualquier vídeo que tenga resultado y caption.
+  Si falta el `.md` junto al vídeo, la app lo vuelve a escribir desde la
+  ficha.
+- Si cancelas o falla una pasada, los resultados anteriores quedan como
+  estaban.
+
+**Avisos.** Al pulsar **▶ Procesar**, la app revisa cada vídeo y, si ya
+tiene algo de lo que marcaste, abre **Pasos ya hechos** antes de empezar:
+
+- *«"x" ya tiene subtítulos»*: se mantiene tal como está. Marca
+  **Rehacer** si el resultado no te gusta. Si lo ya hecho tiene otros
+  ajustes que los del panel, el aviso dice qué cambia (por ejemplo,
+  «estilo X → Y»).
+- Un paso que cambia los tiempos (recortar silencios, limpiar el audio)
+  explica qué se volverá a hacer y qué se mantiene.
+- **Regenerar también el vertical**: si lo que cambias afecta al vertical y
+  no lo regeneras, se queda como está y la fila lo marca como «vertical
+  desactualizado».
+- **Aplicar a todos los vídeos** copia tus marcas del primero al resto.
+- Si no queda nada que hacer, la app lo dice y no lanza el proceso. Si
+  falta el original y hace falta, avisa con su ruta y no toca nada.
+
+Los ajustes de lo que se rehace sin que lo pidas (los subtítulos tras
+recortar, un vertical desactualizado) son los guardados para ese vídeo:
+estilo, idioma, modelo de Whisper y encuadre. El glosario y el contexto de
+marca son siempre los de ahora.
+
+**Olvidar este vídeo** borra la ficha de la fila seleccionada (base, audio
+limpio, transcripción, seguimiento y copia del caption) y libera su
+espacio. Nunca toca los resultados actuales ni sus `.md` y `.srt`, pero si
+la ficha guarda la versión anterior de un resultado antiguo que se
+sobrescribió, esa versión se borra con ella (la app te lo dice al pedir
+confirmación). Los datos de una ficha se guardan hasta que la olvidas;
+`desinstalar.command` borra `fichas/` entera, con esa versión incluida.
+
+**Un vídeo cambiado o movido.** La app reconoce un archivo por su ruta,
+tamaño y fecha. Si lo editas fuera de la app, te avisa y deja de usar lo
+que se hizo a partir de él, pero no borra nada de su ficha. Un original
+editado sigue en su ficha: se mantienen el caption y los resultados, y lo
+demás se rehace desde el original nuevo. Un resultado editado empieza una
+ficha nueva, y la anterior conserva todo lo demás (también una versión
+anterior guardada). Si lo mueves o lo renombras, ya no lo reconoce. Nunca sobrescribe ni
+borra un archivo que no escribió ella o que has cambiado: te dice cuál es
+para que lo muevas o lo borres. La carpeta de salida que cambies en la app
+solo se aplica a los vídeos sin resultados; los demás siguen escribiendo
+donde ya están.
+
+**Vídeos procesados antes de esta función.** No tienen ficha, así que la
+app no sabe qué pasos se hicieron y no marca ninguno con ✓, salvo caption si
+encontró su `.md` junto al vídeo.
+
+- Si arrastras el original de un vídeo cuyo resultado ya está junto a él
+  (`x_limpio.mp4`), la app adopta ese resultado: lo sobrescribirá en vez de
+  crear una copia, y usa su `.md` y su `.srt`, si existen, como caption y
+  transcripción. Un `x_limpio_vertical.mp4` de antes también se adopta
+  (aunque ya no esté el `x_limpio.mp4`), marcado como desactualizado porque
+  no se sabe cómo se hizo. Un original sin resultado previo es un vídeo
+  nuevo, igual que cualquier otro.
+- Ese resultado puede ser de otro vídeo con el mismo nombre (las cámaras
+  repiten nombres), así que la app avisa de que usará su caption. Si no es
+  de este vídeo, muévelo a otra carpeta y usa **Olvidar este vídeo**. Un
+  resultado que dura más que el original (más de un segundo) no puede ser
+  suyo: no se adopta y el vídeo nuevo se llama `x (2)` para no pisarlo.
+- Si arrastras un resultado antiguo sin su original (`x_limpio.mp4`,
+  `x_vertical.mp4`, `x_limpio_limpio.mp4`…), pasa a ser el resultado de ese
+  vídeo y se sobrescribe a sí mismo; nunca escribe en otra versión antigua.
+  La primera vez que lo sobrescribe, guarda su versión anterior en la
+  ficha (es la excepción de arriba).
+- En ese caso, si junto al resultado hay un `.srt`, la app da por hecho que los
+  subtítulos están quemados y que no existe una versión sin ellos: no puede
+  rehacerlos ni hacer un vertical con subtítulos hasta que arrastres el
+  original («Arrastra el original para rehacerlos»). Lo demás sí se
+  permite; recortar silencios corta imagen y subtítulos a la vez. Si luego
+  arrastras el original verdadero, se une a ese resultado en vez de crear
+  otro, aunque la app ya lo haya sobrescrito, y entonces sí puede
+  rehacerlos. La versión anterior guardada se queda en la ficha. Lo que se
+  calculó a partir del resultado antiguo (audio limpio, recorte,
+  transcripción, seguimiento de la cara) tiene sus tiempos y se rehace
+  desde el original; el caption se mantiene.
+- Las copias duplicadas que ya tengas (`x_limpio_limpio.mp4`…) no se
+  borran: bórralas tú.
+
 ## Publicar en redes
 
 Desde un vídeo terminado con caption, **Publicar…** lo envía a **TikTok →

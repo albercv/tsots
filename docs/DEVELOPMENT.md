@@ -159,6 +159,185 @@ lines (`step/total/label/percent`, `warning`, `error` + `diagnostico`,
 `done`). Heavy imports (torch, mlx, faster-whisper) therefore only happen in
 the subprocess.
 
+### Fichas y reproceso
+
+A *ficha* (record) remembers what was done to one video so a later pass
+reuses it instead of starting over. Design:
+`docs/superpowers/specs/2026-11-01-reprocesar-design.md`. The CLI
+(`limpiarVideo.py`, `limpiarAudio.py`) does not use records.
+
+| Module | Role |
+|---|---|
+| `videopipeline/ficha.py` | `Ficha`, `Artefacto`, `Huella`; storage (`guardar`, `cargar`, `olvidar`, `ocupa`) and recognition (`reconocer`). No Qt. |
+| `videopipeline/reproceso_plan.py` | Pure logic, writes nothing: `revisar` (what to ask before Process), `planificar` (ordered list of `Accion`s). Rules R0–R10. |
+| `videopipeline/reproceso.py` | `ejecutar`: runs a plan, one method per `Accion`, saving the record after each. |
+| `videopipeline/runner.py` | The `reproceso` key (below). |
+| `app/queue_model.py`, `app/widgets/dialogo_reproceso.py`, `app/main.py` | Queue summary and size, "Process again", "Forget this video", the "Steps already done" dialog. |
+
+**Where records live.** `fichas/<id>/` in the app folder, next to
+`audio_procesado/` (`DIR_FICHAS = BASE_DIR / "fichas"`; both gitignored).
+`<id>` is `uuid4().hex[:12]`. `desinstalar.command` deletes the folder;
+"Forget this video" deletes one record (`olvidar`) and never touches the
+outputs. The folder holds:
+
+- `ficha.json`: original, outputs, artifacts and their settings, and the
+  fingerprint (`Huella`: real path, size, mtime) of every file it
+  recognises. Written atomically: hidden temp file, then `replace`.
+  `cargar` returns `None` for a missing file, and for a damaged one
+  (type-checked, so a valid JSON that is not a record counts too) with a
+  log warning; it never breaks the queue.
+- the artifact files below, and `tmp/` for the pass in progress (emptied
+  at the start, deleted at the end, whatever the outcome).
+- `original.<ext>`: only for an old output that has no known original and
+  is about to be overwritten; it is moved here first. It stays when the
+  real original is adopted later, and "Forget this video" names any
+  `original.*` it is about to delete.
+
+**Artifacts and keys.** `Ficha.artefactos` maps a key to an `Artefacto`
+(`clave`, `archivo`, `ajustes`, `linea_tiempo`). An artifact is valid if
+its file exists and its `clave` (and `linea_tiempo`, where it applies)
+equals what the planner computes now. `clave()` is a short hash of the
+settings that matter. The timeline of the base is `clave(audio, silencios)`
+when it was cut and, uncut, `Ficha.linea_original()`: `"original"` with a
+real original, `"legado"` when the old final (or its copy in the record)
+stands in for it. Planner and executor use the same helper.
+
+| Key | File in `fichas/<id>/` | `clave` hashes | `ajustes` holds |
+|---|---|---|---|
+| `audio` | `audio_limpio.flac` | task + model | `tarea`, `modelo`; `linea_tiempo` is that of the video it was cleaned from (R9) |
+| `base` | `base.mp4`, or none when the final is the base (R3) | settings of the steps applied + timeline | `{"audio": …, "silencios": …}`, only the steps applied |
+| `transcripcion` | `transcripcion.json` | language, Whisper model, glossary key | the same; `linea_tiempo` is that of the base it came from |
+| `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings | `{"subtitulos": …}` if burned |
+| `caption` | `caption.md` (the `.md` next to the final is a copy) | `modelo_caption` | `{"caption": …}` |
+| `seguimiento` | `cara.cmd` | timeline of the base only: the picture depends on the cuts, not the audio | `x_inicial` |
+| `vertical` | none: `ficha.vertical`, or `ficha.final` if it is the only output | timeline + framing (+ subtitle settings) | `{"vertical": …}` and `{"subtitulos": …}` if burned |
+
+`Ficha.pasos_hechos()` derives the ✓ in the queue from these.
+`ficha.desactualizado` (`{"vertical"}`) marks an output that no longer
+matches its base.
+
+**Rules.** Implemented in `reproceso_plan.py` (the executor only does what
+the plan says); numbers match comments in the code.
+
+| Rule | In short |
+|---|---|
+| R0 | An artifact is reused if its `clave` matches; otherwise it is redone from the nearest valid ancestor, never further back. Redoing it invalidates what depends on it, nothing it depends on. |
+| R1 | Unticking a step keeps what exists (caption, subtitles). |
+| R2 | Subtitles are never burned over a video that has them: always onto the base. |
+| R3 | The base is kept apart (`base.mp4`) only if the final has subtitles; without them the final is the base. |
+| R4 | The caption depends on the text, not the timing: cutting silences or redoing subtitles does not touch it. |
+| R5 | Any transcript serves the caption, whatever its timeline; with none, only the final's audio is transcribed (no video encode). |
+| R6 | A step already done with other settings is "done, with other settings": ask, and keep by default. |
+| R7 | If the base, transcript or subtitle design changes and a vertical exists, offer to regenerate it; if declined, mark it `desactualizado`. |
+| R8 | What is redone unasked (subtitles after a cut, an outdated vertical) uses the settings saved in the record: subtitle design, language, Whisper model, framing. Glossary and brand context are the current ones. |
+| R9 | Cleaned audio is tied to its timeline. If it was cleaned from an already-cut base and the cut changes, the audio is cleaned again from the whole original (the only case). |
+| R10 | The app replaces its own outputs instead of duplicating them: when a vertical-only video gains a horizontal, `x_vertical.mp4` is deleted and `x_limpio.mp4` + `x_limpio_vertical.mp4` are written; the `.md` and `.srt` move with the final. Only files the record lists, with a matching fingerprint, are ever deleted. |
+
+**Recognition (`reconocer`).** A dragged file belongs to a record if its
+real path is the original's or an output's and size and mtime match. If
+the path matches but the fingerprint does not (edited outside the app),
+the user is warned and the record drops that fingerprint and what only
+described that file (`_soltar`); nothing else is deleted. An edited
+original is adopted back into its record; an edited output starts a new
+legacy record. Outputs written before records existed (`*_limpio.mp4`,
+`*_vertical.mp4`) become a *legacy* record: the file is its own final and
+overwrites itself, and a `.md` / `.srt` next to it are imported as caption
+and transcript (an `.srt` also sets `subs_quemados_sin_base`, which blocks
+subtitles and subtitled verticals until the original is dragged in).
+
+Dragging the real original later adopts (`_adoptar`) the record whose final
+is its computed output (horizontal, vertical-only, or else the companion
+`x_limpio_vertical.mp4`) when that record has no real original
+(`Ficha.original_verdadero()`: `original` missing, `legado`, or the copy in
+the record folder), instead of creating a second one with the same
+outputs. An output on disk that no record owns is adopted the same way,
+with a warning (it may be another video's), unless it is more than 1 s
+longer than the original (`duracion_video`; adopted if it cannot be
+measured). Adopting drops `audio`, `base`, `seguimiento`, `horizontal`,
+`vertical` and any transcript not on the `"legado"` timeline: they were
+made from the old final. A dropped horizontal with subtitles sets
+`subs_quemados_sin_base`; an existing vertical is marked `desactualizado`.
+A record without outputs gets `name (2)` when another record uses its
+outputs or a file it does not own is in the way (`_nombre_libre`), both
+when it is created and when Process moves it to the current output folder
+(`mover_salidas`).
+
+**Writes.** Outputs are written to a hidden temp (`.{stem}_tmp{suffix}`)
+and replace the previous file only when complete; moves across folders use
+`shutil.move` (the output folder can be on another disk). The record is
+saved after each action with only what finished, so a cancelled or failed
+pass leaves the earlier outputs and record as they were.
+`_comprobar_propio` refuses to replace or delete a file the record does
+not list or that changed outside the app; `ejecutar` checks every
+destination once before the first action, and again when replacing it. Degradation is unchanged: a
+failed caption or vertical leaves a warning, and failed subtitles with
+other steps save the video without them.
+
+**Runner protocol.** The job JSON passed with `--config` is a
+`PipelineConfig` as before; without the `reproceso` key the runner calls
+`pipeline.run` exactly as it always did. The GUI never sends that: a row
+without `ficha_id` (e.g. after "Forget this video") is recognised again
+with `reconocer` before planning. With it:
+
+```json
+{ "video": "…", "caption_seo": true, "…": "…",
+  "reproceso": { "ficha": "3f9c1a2b7d40",
+                 "rehacer": ["subtitulos"],
+                 "regenerar_vertical": false } }
+```
+
+- `ficha`: record id. If `fichas/<id>/ficha.json` is missing or damaged
+  the job fails with a message telling the user to drag the original in.
+- `rehacer`: panel steps (`audio`, `silencios`, `subtitulos`, `caption`,
+  `vertical`) the user chose to redo in the dialog; steps not ticked in
+  the config are ignored.
+- `regenerar_vertical`: the R7 answer.
+
+The runner pops the key before `PipelineConfig.from_datos`, validates with
+`validar(exigir_paso_de_video=False)` ("caption only" ticks no video
+step), calls `planificar`, and then `ejecutar`. A plan with `error` fails
+the job (e.g. the original is missing); an empty plan runs nothing and
+returns what already exists. Progress events are the usual
+`step/total/label/percent` and `warning`; the final event adds the record
+id: `{"done": true, "salida": …, "salida_vertical": …, "ficha": "<id>"}`.
+The GUI reads the record again afterwards for the row's ✓ summary, size
+and outputs. It evaluates `planificar` itself before launching so that
+"nothing to do" never starts a subprocess.
+
+**Strings.** Everything user-facing is marked with `_()` / `N_()`;
+translate with `lanzador/traducir.sh` (see Translations). Step names appear
+inside sentences ("… already has {paso} …") and in the queue summary, so
+their `msgstr`s must work as bare nouns.
+
+**Testing.** No test needs ffmpeg or a model:
+`tests/falsos_pipeline.py` replaces the steps in both `pipeline` and
+`reproceso`, and `tests/conftest.py` makes `ficha.duracion_video` return
+0.0 ("could not measure") unless a test sets durations.
+
+- `tests/test_ficha.py`: storage, damaged files, recognition, legacy
+  outputs, same-name originals.
+- `tests/test_reproceso_plan.py`: the cases table of the design, rule by
+  rule.
+- `tests/test_reproceso.py`: the executor (which files it writes, cancel
+  and failure, outputs on another disk, files changed outside the app).
+- `tests/test_runner.py`, `tests/test_app_queue.py`,
+  `tests/test_app_main.py`, `tests/test_app_widgets.py`: protocol, queue,
+  dialog and forget.
+- `tests/test_cli_compat.py`: the CLI is untouched and the uninstaller
+  deletes `fichas/`.
+
+```bash
+QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -q
+```
+
+The `slow` tests (models loaded for real) skip when the checkpoints are
+missing. To check by hand with a short clip: process it with audio,
+silences, subtitles and caption; look inside `fichas/<id>/` (`ficha.json`,
+`audio_limpio.flac`, `base.mp4`, `transcripcion.json`, `caption.md`); drag
+`clip_limpio.mp4` in again (same row, back to "waiting", ✓ summary) and
+tick only **Vertical** (no new transcription, one video encode); then tick
+**Silence cutting** with another margin and read the warning.
+
 ## Glossary of terms
 
 `videopipeline/glosario.py` (pure, no I/O). The user's text (QSettings key

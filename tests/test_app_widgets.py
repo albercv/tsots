@@ -3,10 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QMimeData, Qt, QUrl
+from PySide6.QtWidgets import QDialog, QDialogButtonBox, QGroupBox, QLabel
 
+from app.widgets.dialogo_reproceso import DialogoReproceso, preguntar_reproceso
 from app.widgets.panel_opciones import PanelOpciones
 from app.widgets.zona_drop import ZonaDrop
 from videopipeline.config import PipelineConfig
+from videopipeline.reproceso_plan import Consulta, Decisiones
 
 
 def test_zona_drop_filtra_extensiones(qtbot):
@@ -424,7 +427,7 @@ def test_estado_trabajo_display_usa_traduccion(qtbot):
     from app.queue_model import EstadoTrabajo, ModeloCola
 
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert EstadoTrabajo.ESPERA.value in texto  # español = idioma fuente
 
@@ -756,7 +759,7 @@ def test_panel_pasos_por_defecto(qtbot):
         False, False, "central")
     assert "modo" not in v
     assert panel.check_completo.checkState() == Qt.CheckState.PartiallyChecked
-    assert panel.hay_pasos_de_video()
+    assert panel.hay_pasos()
 
 
 def test_panel_pipeline_completo_marca_y_desmarca_todo(qtbot):
@@ -770,7 +773,7 @@ def test_panel_pipeline_completo_marca_y_desmarca_todo(qtbot):
     panel.check_completo.click()
     assert not any(c.isChecked() for c in casillas)
     assert panel.check_completo.checkState() == Qt.CheckState.Unchecked
-    assert not panel.hay_pasos_de_video()
+    assert not panel.hay_pasos()
 
 
 def test_panel_pasos_cambiados_se_emite(qtbot):
@@ -840,3 +843,107 @@ def test_panel_encuadres_traducidos():
         encoding="utf-8")
     traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
     assert [e for e in ETIQUETA_ENCUADRE if e not in traducidas] == []
+
+
+def test_panel_hay_pasos_cuenta_el_caption(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    for casilla in (panel.check_audio, panel.check_silencios):
+        casilla.setChecked(False)
+    assert not panel.hay_pasos()
+    panel.check_caption.setChecked(True)  # «solo caption» es un trabajo válido
+    assert panel.hay_pasos()
+
+
+# --- diálogo de reproceso ---
+
+
+def _consultas():
+    """Dos vídeos con los mismos pasos hechos (a) y otros ajustes (b)."""
+    hecho = Consulta("audio", "hecho", '"a" ya tiene la limpieza de audio.')
+    cambios = Consulta("subtitulos", "otros_ajustes", '"a" ya tiene subtítulos.',
+                       ("diseno: reels_bold → caja",))
+    base = Consulta("silencios", "cambia_base", "Recortar cambia los tiempos.")
+    bloqueado = Consulta("vertical", "bloqueado", "Arrastra el original.")
+    return {
+        "fa": ("a.mp4", [hecho, cambios, base, bloqueado]),
+        "fb": ("b.mp4", [Consulta("audio", "hecho", '"b" ya tiene audio.'),
+                         Consulta("caption", "hecho", '"b" ya tiene caption.')]),
+    }
+
+
+def test_dialogo_mantener_por_defecto(qtbot):
+    dialogo = DialogoReproceso(_consultas(), {"fa"})
+    qtbot.addWidget(dialogo)
+    # Una casilla «Rehacer» por consulta de hecho u otros_ajustes; los avisos
+    # de cambia_base y bloqueado no se pueden marcar.
+    assert {id_: set(c) for id_, c in dialogo.casillas_rehacer.items()} == {
+        "fa": {"audio", "subtitulos"}, "fb": {"audio", "caption"}}
+    assert not any(c.isChecked() for cs in dialogo.casillas_rehacer.values()
+                   for c in cs.values())
+    assert set(dialogo.casillas_vertical) == {"fa"}  # solo si hay vertical
+    assert not dialogo.casillas_vertical["fa"].isChecked()
+    assert dialogo.decisiones() == {"fa": Decisiones(), "fb": Decisiones()}
+    textos = " ".join(etiqueta.text() for etiqueta in dialogo.findChildren(QLabel))
+    for esperado in ("ya tiene subtítulos", "diseno: reels_bold → caja",
+                     "Recortar cambia", "Arrastra el original"):
+        assert esperado in textos
+    assert [g.title() for g in dialogo.findChildren(QGroupBox)] == [
+        "a.mp4", "b.mp4"]  # un bloque por vídeo
+
+
+def test_dialogo_rehacer_marca_decision(qtbot):
+    dialogo = DialogoReproceso(_consultas(), {"fa"})
+    qtbot.addWidget(dialogo)
+    dialogo.casillas_rehacer["fa"]["audio"].setChecked(True)
+    dialogo.casillas_rehacer["fa"]["subtitulos"].setChecked(True)
+    dialogo.casillas_vertical["fa"].setChecked(True)
+    dialogo.casillas_rehacer["fb"]["caption"].setChecked(True)
+    assert dialogo.decisiones() == {
+        "fa": Decisiones(frozenset({"audio", "subtitulos"}), True),
+        "fb": Decisiones(frozenset({"caption"}), False)}
+
+
+def test_dialogo_aplicar_a_todos(qtbot):
+    dialogo = DialogoReproceso(_consultas(), {"fa", "fb"})
+    qtbot.addWidget(dialogo)
+    dialogo.casillas_rehacer["fa"]["audio"].setChecked(True)
+    dialogo.casillas_rehacer["fa"]["subtitulos"].setChecked(True)  # fb no lo tiene
+    dialogo.casillas_vertical["fa"].setChecked(True)
+    dialogo.check_todos.setChecked(True)
+    assert dialogo.decisiones() == {
+        "fa": Decisiones(frozenset({"audio", "subtitulos"}), True),
+        "fb": Decisiones(frozenset({"audio"}), True)}
+    # Mientras está marcada, lo que cambia en el primero llega a los demás.
+    dialogo.casillas_rehacer["fa"]["audio"].setChecked(False)
+    assert dialogo.decisiones()["fb"].rehacer == frozenset()
+    # Desmarcarla devuelve el control de cada vídeo.
+    dialogo.check_todos.setChecked(False)
+    dialogo.casillas_rehacer["fb"]["caption"].setChecked(True)
+    assert dialogo.decisiones()["fb"].rehacer == frozenset({"caption"})
+
+
+def test_dialogo_aplicar_a_todos_solo_con_varios_videos(qtbot):
+    solo = {"fa": _consultas()["fa"]}
+    dialogo = DialogoReproceso(solo, set())
+    qtbot.addWidget(dialogo)
+    assert dialogo.check_todos.isHidden()
+    assert not dialogo.casillas_vertical  # sin vertical no hay casilla
+
+
+def test_preguntar_reproceso_devuelve_decisiones_o_none(qtbot, monkeypatch):
+    marcadas = {}
+
+    def aceptar(dialogo):
+        dialogo.casillas_rehacer["fa"]["audio"].setChecked(True)
+        marcadas["procesar"] = dialogo.botones.button(
+            QDialogButtonBox.StandardButton.Ok).text()
+        return QDialog.DialogCode.Accepted
+
+    monkeypatch.setattr(DialogoReproceso, "exec", aceptar)
+    decisiones = preguntar_reproceso(None, _consultas(), set())
+    assert decisiones["fa"].rehacer == frozenset({"audio"})
+    assert marcadas["procesar"] == "Procesar"
+    monkeypatch.setattr(DialogoReproceso, "exec",
+                        lambda dialogo: QDialog.DialogCode.Rejected)
+    assert preguntar_reproceso(None, _consultas(), set()) is None

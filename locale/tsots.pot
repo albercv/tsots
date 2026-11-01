@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 11:36+0100\n"
+"POT-Creation-Date: 2026-11-01 19:04+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -23,6 +23,38 @@ msgstr ""
 
 #, python-brace-format
 msgid " en «{paso}»"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso} con otros ajustes ({cambios}). ¿Rehacerlo?"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso}. ¿Rehacerlo?"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
 msgstr ""
 
 msgid "(detectado en tu cuenta)"
@@ -70,6 +102,9 @@ msgstr ""
 msgid "Amarillo"
 msgstr ""
 
+msgid "Aplicar a todos los vídeos"
+msgstr ""
+
 msgid "Archivo de vídeo incompleto o corrupto"
 msgstr ""
 
@@ -85,10 +120,16 @@ msgstr ""
 msgid "Automático: el lugar que se llame «{nombre}»"
 msgstr ""
 
+msgid "Aviso"
+msgstr ""
+
 msgid "Añadir subtítulos"
 msgstr ""
 
 msgid "Barras negras"
+msgstr ""
+
+msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
 msgstr ""
 
 msgid "Borrador (lo terminas en Facebook)"
@@ -161,6 +202,9 @@ msgid "ClearVoice no generó el audio limpio: {salida}"
 msgstr ""
 
 msgid "Cola"
+msgstr ""
+
+msgid "Compresión del audio limpio"
 msgstr ""
 
 msgid "Comprobado ahora."
@@ -348,6 +392,13 @@ msgstr ""
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr ""
 
+#, python-brace-format
+msgid "El vertical de \"{nombre}\" no puede llevar subtítulos: ya están quemados en el vídeo. Arrastra el original para rehacerlos."
+msgstr ""
+
+msgid "El vertical quedará desactualizado si no lo regeneras."
+msgstr ""
+
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr ""
 
@@ -432,8 +483,17 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Estos vídeos no se han añadido:\n"
+"{errores}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
 "Estos vídeos no tienen audio y no se han añadido:\n"
 "{nombres}"
+msgstr ""
+
+msgid "Estos vídeos ya tienen pasos hechos. Se mantienen tal como están; marca «Rehacer» en los que quieras volver a hacer."
 msgstr ""
 
 msgid "Extracción de audio"
@@ -497,6 +557,9 @@ msgstr ""
 msgid "Generando caption SEO"
 msgstr ""
 
+msgid "Guardando el vídeo"
+msgstr ""
+
 msgid "Guardar"
 msgstr ""
 
@@ -553,7 +616,15 @@ msgstr ""
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr ""
 
+#, python-brace-format
+msgid "La transcripción guardada de \"{nombre}\" está dañada ({error}): rehaz los subtítulos para volver a transcribir."
+msgstr ""
+
 msgid "La ubicación con que se publica cada vídeo"
+msgstr ""
+
+#, python-brace-format
+msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
 msgstr ""
 
 msgid "Leyendo la API key del Llavero…"
@@ -563,6 +634,14 @@ msgid "Libera espacio o vacía audio_procesado/ y vuelve a procesar."
 msgstr ""
 
 msgid "Limpiando audio"
+msgstr ""
+
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\": se volverán a quemar los subtítulos. El caption se mantiene."
 msgstr ""
 
 msgid "Limpiar hechos"
@@ -585,7 +664,7 @@ msgstr ""
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr ""
 
-msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
+msgid "Marca al menos un paso."
 msgstr ""
 
 msgid "Marca al menos una plataforma y escribe un título."
@@ -634,6 +713,13 @@ msgstr ""
 msgid "Música"
 msgstr ""
 
+msgid "Nada que hacer"
+msgstr ""
+
+#, python-brace-format
+msgid "Nada que hacer en: {nombres}"
+msgstr ""
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr ""
@@ -643,6 +729,14 @@ msgstr ""
 
 #, python-brace-format
 msgid "No conectada en {servicio}"
+msgstr ""
+
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": arrástralo para rehacer el vídeo"
+msgstr ""
+
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": {ruta}"
 msgstr ""
 
 msgid "No enviado"
@@ -679,12 +773,20 @@ msgid "No se encuentra el vídeo: {nombre}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "No se encuentran en PATH: {faltan}\n"
 "Instálalas y vuelve a abrir la aplicación."
 msgstr ""
 
 msgid "No se etiqueta en ninguna red."
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el FLAC: {flac}"
 msgstr ""
 
 #, python-brace-format
@@ -804,6 +906,13 @@ msgstr ""
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr ""
 
+msgid "No se puede añadir"
+msgstr ""
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
+msgstr ""
+
 msgid "Nombre del perfil en el servicio"
 msgstr ""
 
@@ -847,11 +956,20 @@ msgstr ""
 msgid "Olvidar clave"
 msgstr ""
 
+msgid "Olvidar este vídeo"
+msgstr ""
+
+msgid "Ordenando las salidas"
+msgstr ""
+
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
 #, python-brace-format
 msgid "Paso: {paso}"
+msgstr ""
+
+msgid "Pasos ya hechos"
 msgstr ""
 
 msgid "Pega la API key para guardarla"
@@ -898,6 +1016,9 @@ msgid "Previsualización"
 msgstr ""
 
 msgid "Procesando en el servicio…"
+msgstr ""
+
+msgid "Procesar"
 msgstr ""
 
 msgid "Proceso completado correctamente."
@@ -967,6 +1088,14 @@ msgstr ""
 msgid "Recortar silencios"
 msgstr ""
 
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\": se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
 msgid "Recorte central"
 msgstr ""
 
@@ -992,6 +1121,15 @@ msgid "Reels Karaoke"
 msgstr ""
 
 msgid "Reencodado del vídeo (h264_videotoolbox)"
+msgstr ""
+
+msgid "Regenerar también el vertical"
+msgstr ""
+
+msgid "Rehacer"
+msgstr ""
+
+msgid "Rehacerlo volverá a transcribir y quemar los subtítulos; el caption se mantiene."
 msgstr ""
 
 #, python-brace-format
@@ -1030,6 +1168,14 @@ msgid "Salida del proceso (últimas líneas):"
 msgstr ""
 
 msgid "Salida:"
+msgstr ""
+
+#, python-brace-format
+msgid "Se añadirán subtítulos a \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
 msgstr ""
 
 msgid "Se está publicando en redes. Espera a que termine para salir."
@@ -1232,6 +1378,9 @@ msgstr ""
 msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
 msgstr ""
 
+msgid "Volver a procesar"
+msgstr ""
+
 #, python-brace-format
 msgid "Vía {servicio}"
 msgstr ""
@@ -1270,6 +1419,9 @@ msgstr ""
 msgid "argumentos inválidos: se requiere --config"
 msgstr ""
 
+msgid "audio"
+msgstr ""
+
 msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
 msgstr ""
 
@@ -1300,6 +1452,12 @@ msgstr ""
 msgid "cancelado"
 msgstr ""
 
+msgid "caption"
+msgstr ""
+
+msgid "el recorte de silencios"
+msgstr ""
+
 msgid "en espera"
 msgstr ""
 
@@ -1316,6 +1474,9 @@ msgid "hecho"
 msgstr ""
 
 msgid "la descarga no produjo ningún fichero"
+msgstr ""
+
+msgid "la limpieza de audio"
 msgstr ""
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
@@ -1341,13 +1502,25 @@ msgstr ""
 msgid "señal desconocida {numero}"
 msgstr ""
 
+msgid "silencios"
+msgstr ""
+
 msgid "small (rápido)"
 msgstr ""
 
 msgid "solo este vídeo"
 msgstr ""
 
+msgid "subtítulos"
+msgstr ""
+
 msgid "turbo (recomendado)"
+msgstr ""
+
+msgid "vertical"
+msgstr ""
+
+msgid "vertical desactualizado"
 msgstr ""
 
 #, python-brace-format
