@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 23:30+0100\n"
+"POT-Creation-Date: 2026-11-01 23:42+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -54,8 +54,14 @@ msgstr "\"{nombre}\" already has {paso}. Redo this step?"
 msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
 msgstr "\"{salida}\" was already in the output folder: it is taken as the processed video of \"{original}\", with its caption if it has one. If it is not from this video, move it to another folder and use \"Forget this video\"."
 
+msgid "%d/%m %H:%M"
+msgstr "%m/%d %H:%M"
+
 msgid "%d/%m a las %H:%M"
 msgstr "%m/%d at %H:%M"
+
+msgid "%d/%m/%Y %H:%M"
+msgstr "%m/%d/%Y %H:%M"
 
 msgid "%d/%m/%Y a las %H:%M"
 msgstr "%m/%d/%Y at %H:%M"
@@ -435,6 +441,9 @@ msgstr "Burning the subtitles failed (code {codigo})"
 msgid "El servicio guarda el vídeo y lo publica a esa hora: puedes cerrar la app."
 msgstr "The service keeps the video and publishes it at that time: you can close the app."
 
+msgid "El servicio no confirmó la programación."
+msgstr "The service did not confirm the schedule."
+
 #, python-brace-format
 msgid "El servicio no devolvió resultado para {plataforma}: {motivo}"
 msgstr "The service returned no result for {plataforma}: {motivo}"
@@ -544,6 +553,9 @@ msgstr "Type the place you want to search for."
 
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
+
+msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
+msgstr "Wait for the current check to finish and try again."
 
 #, python-brace-format
 msgid "Esperando a que el servicio termine: {lista}…"
@@ -697,6 +709,9 @@ msgstr "Vertical conversion failed (code {codigo})"
 #, python-brace-format
 msgid "La detección de caras falló (código {codigo})"
 msgstr "Face detection failed (code {codigo})"
+
+msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
+msgstr "The scheduled time has already passed: it was not sent. Pick another one."
 
 msgid "La respuesta del modelo no es JSON válido"
 msgstr "The model's response is not valid JSON"
@@ -1100,6 +1115,10 @@ msgstr "Steps already done"
 
 msgid "Pega la API key para guardarla"
 msgstr "Paste the API key to save it"
+
+#, python-brace-format
+msgid "Pendientes: {n}."
+msgstr "Pending: {n}."
 
 msgid "Perfil:"
 msgstr "Profile:"
@@ -1587,6 +1606,10 @@ msgid "X sin Premium admite vídeos de hasta {maximo}; este dura {duracion}."
 msgstr "X without Premium accepts videos up to {maximo}; this one is {duracion} long."
 
 #, python-brace-format
+msgid "Ya no estaban programadas (puede que ya se hayan publicado): {n}."
+msgstr "No longer scheduled (they may already be published): {n}."
+
+#, python-brace-format
 msgid "Ya programado en: {lista}."
 msgstr "Already scheduled on: {lista}."
 
@@ -1736,10 +1759,6 @@ msgid "{n} por confirmar"
 msgstr "{n} unconfirmed"
 
 #, python-brace-format
-msgid "{n} publicaciones pendientes."
-msgstr "{n} pending posts."
-
-#, python-brace-format
 msgid "{plataforma} (borrador)"
 msgstr "{plataforma} (draft)"
 
@@ -1763,10 +1782,8 @@ msgstr "{redes}: “{titulo}” on {fecha}"
 msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
-"{lista}\n"
-"\n"
-"El servicio devuelve el crédito."
-msgstr "Cancel these posts?\n\n{lista}\n\nThe service refunds the credit."
+"{lista}"
+msgstr "Cancel these posts?\n\n{lista}"
 
 #, python-brace-format
 msgid "¿Programar para el {fecha}?"
@@ -1878,6 +1895,10 @@ msgstr "📅 Scheduled for {fecha}"
 
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"
+
+#, python-brace-format
+#~ msgid "{n} publicaciones pendientes."
+#~ msgstr "{n} pending posts."
 
 #~ msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
 #~ msgstr "⚠ An Instagram ID only contains digits: it won't be sent."

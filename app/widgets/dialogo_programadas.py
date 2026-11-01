@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, tzinfo
+from datetime import date, datetime, timedelta, timezone, tzinfo
 from pathlib import Path
 from typing import Callable
 
@@ -157,10 +157,12 @@ class CeldaDia(QFrame):
     def poner(self, grupos: list[Grupo], al_pulsar: Callable[[list[Grupo]], None]) -> None:
         visibles = grupos if len(grupos) <= MAX_ETIQUETAS + 1 else grupos[:MAX_ETIQUETAS]
         for grupo in visibles:
-            self._boton(grupo.texto, lambda g=grupo: al_pulsar([g]), grupo.descripcion)
+            # `clicked` pasa `checked`: sin `_c`, ocuparía el sitio de `g`.
+            self._boton(grupo.texto, lambda _c=False, g=grupo: al_pulsar([g]),
+                        grupo.descripcion)
         if len(visibles) < len(grupos):
             self._boton(_("+{n} más").format(n=len(grupos) - len(visibles)),
-                        lambda: al_pulsar(grupos))
+                        lambda _c=False: al_pulsar(grupos))
 
     def _boton(self, texto: str, accion: Callable[[], None], ayuda: str = "") -> None:
         boton = QPushButton(texto)
@@ -176,17 +178,20 @@ class CeldaDia(QFrame):
 
 class DialogoProgramadas(QDialog):
     def __init__(self, ajustes: Ajustes, llavero=credenciales, fabrica: Fabrica | None = None,
-                 zona: tzinfo | None = None, hoy: date | None = None, parent=None):
+                 zona: tzinfo | None = None, ahora: Callable[[], datetime] | None = None,
+                 parent=None):
         super().__init__(parent)
         self.ajustes = ajustes
         self.llavero = llavero
         self.fabrica = fabrica or (lambda nombre, clave, datos: proveedores.crear(
             nombre, clave, datos))
         self.zona = zona or zona_local()
-        self.hoy = hoy or datetime.now(self.zona).date()
+        self._ahora = ahora or (lambda: datetime.now(timezone.utc))
+        self.hoy = self._ahora().astimezone(self.zona).date()
         self.mes = self.hoy.replace(day=1)
         self._programadas: list[Programada] = []
-        self._ocupado = False
+        self._ocupado = False  # consultando o cancelando: una cosa cada vez
+        self._cancelando = False  # mientras tanto no se cierra: su error se vería tarde
         self.celdas: dict[date, CeldaDia] = {}
         self.setWindowTitle(_("Programadas"))
         self.setMinimumSize(860, 700)
@@ -292,15 +297,17 @@ class DialogoProgramadas(QDialog):
             self._estado(error, COLOR_ERROR)
             return
         self._programadas = list(lista)
-        self.ajustes.podar_programadas({p.referencia for p in lista})
-        self._estado(_("{n} publicaciones pendientes.").format(n=len(lista)) if lista
+        self.ajustes.podar_programadas(self._ahora())
+        self._estado(_("Pendientes: {n}.").format(n=len(lista)) if lista
                      else _("No hay nada programado."))
         self._pintar()
 
     # --- detalle y cancelar ---
 
     def _abrir(self, grupos: list[Grupo]) -> None:
-        self.detalle(grupos).exec()
+        detalle = self.detalle(grupos)
+        detalle.exec()
+        detalle.deleteLater()
 
     def detalle(self, grupos: list[Grupo]) -> QDialog:
         """Ventana con los trabajos de esos grupos y un Cancelar por trabajo."""
@@ -314,14 +321,14 @@ class DialogoProgramadas(QDialog):
             titulo.setStyleSheet("font-weight: bold;")
             titulo.setWordWrap(True)
             caja.addWidget(titulo)
-            caja.addWidget(QLabel(f"{grupo.fecha:%d/%m/%Y %H:%M}"))
+            caja.addWidget(QLabel(grupo.fecha.strftime(_("%d/%m/%Y %H:%M"))))
             for trabajo in grupo.trabajos:
                 fila = QHBoxLayout()
                 fila.addWidget(QLabel(describir_trabajo(trabajo)), 1)
                 boton = QPushButton(_("Cancelar"))
                 boton.setObjectName(f"cancelar_{trabajo.referencia}")
                 boton.clicked.connect(
-                    lambda _c=False, t=trabajo: (dialogo.accept(), self.cancelar([t])))
+                    lambda _c=False, t=trabajo: self.cancelar([t], dialogo) and dialogo.accept())
                 fila.addWidget(boton)
                 caja.addLayout(fila)
                 trabajos.append(trabajo)
@@ -329,7 +336,8 @@ class DialogoProgramadas(QDialog):
         botones.addStretch(1)
         if len(trabajos) > 1:
             todas = QPushButton(_("Cancelar todas"))
-            todas.clicked.connect(lambda: (dialogo.accept(), self.cancelar(trabajos)))
+            todas.clicked.connect(
+                lambda _c=False: self.cancelar(trabajos, dialogo) and dialogo.accept())
             botones.addWidget(todas)
         cerrar = QPushButton(_("Cerrar"))
         cerrar.setDefault(True)
@@ -338,24 +346,29 @@ class DialogoProgramadas(QDialog):
         caja.addLayout(botones)
         return dialogo
 
-    def cancelar(self, trabajos: list[Programada]) -> None:
-        """Pide confirmación y cancela en segundo plano."""
-        if self._ocupado or not trabajos:
-            return
+    def cancelar(self, trabajos: list[Programada], padre=None) -> bool:
+        """Pide confirmación y cancela en segundo plano. `True` si se puso
+        en marcha."""
+        if not trabajos:
+            return False
+        if self._ocupado:
+            QMessageBox.information(padre or self, _("Cancelar publicación"), _(
+                "Espera a que termine la consulta en curso y vuelve a intentarlo."))
+            return False
         lineas = "\n".join(
             "• " + _("{redes}: «{titulo}» el {fecha}").format(
                 redes=describir_trabajo(t), titulo=t.titulo or _("(sin título)"),
                 fecha=t.fecha.astimezone(self.zona).strftime(_("%d/%m a las %H:%M")))
             for t in trabajos)
         respuesta = QMessageBox.question(
-            self, _("Cancelar publicación"),
-            _("¿Cancelar estas publicaciones?\n\n{lista}\n\nEl servicio devuelve el "
-              "crédito.").format(lista=lineas),
+            padre or self, _("Cancelar publicación"),
+            _("¿Cancelar estas publicaciones?\n\n{lista}").format(lista=lineas),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No)
         if respuesta != QMessageBox.StandardButton.Yes:
-            return
+            return False
         self._ocupar(True)
+        self._cancelando = True
         self._estado(_("Cancelando…"))
         llavero, fabrica = self.llavero, self.fabrica
         nombre, datos = self.ajustes.proveedor_redes, self.ajustes.ajustes_proveedor()
@@ -363,12 +376,19 @@ class DialogoProgramadas(QDialog):
         segundo_plano.en_segundo_plano(
             lambda: consulta_cuentas.cancelar(llavero, fabrica, nombre, datos, referencias),
             self._al_cancelar, "tsots-cancelar")
+        return True
 
     def _al_cancelar(self, resultado) -> None:
         self._ocupar(False)
+        self._cancelando = False
         if isinstance(resultado, BaseException):  # `cancelar` no lanza; por si acaso
-            resultado = ([], type(resultado).__name__)
-        canceladas, error = resultado
+            resultado = consulta_cuentas.Cancelacion(error=type(resultado).__name__)
+        canceladas, ausentes, error = resultado.canceladas, resultado.ausentes, resultado.error
+        for referencia in ausentes:
+            # Ya no estaba: pudo publicarse. Su entrada del registro se queda
+            # para seguir avisando antes de repetirla.
+            log.info("La programada %s ya no estaba en el servicio", referencia)
+            self.ajustes.olvidar_programada(referencia)
         for referencia in canceladas:
             log.info("Cancelada la programada %s", referencia)
             video = self.ajustes.olvidar_programada(referencia)
@@ -378,9 +398,40 @@ class DialogoProgramadas(QDialog):
                 except OSError:
                     # El servicio ya la canceló; solo queda un aviso de más.
                     log.warning("No se pudo limpiar el registro de %s", video, exc_info=True)
-        self._programadas = [p for p in self._programadas if p.referencia not in canceladas]
+        quitadas = set(canceladas) | set(ausentes)
+        self._programadas = [p for p in self._programadas if p.referencia not in quitadas]
         self._pintar()
+        partes = []
+        if canceladas:
+            partes.append(_("Canceladas: {n}.").format(n=len(canceladas)))
+        if ausentes:
+            partes.append(_("Ya no estaban programadas (puede que ya se hayan publicado): "
+                            "{n}.").format(n=len(ausentes)))
         if error:
-            self._estado(_("No se pudo cancelar: {motivo}").format(motivo=error), COLOR_ERROR)
-        else:
-            self._estado(_("Canceladas: {n}.").format(n=len(canceladas)), COLOR_AVISO)
+            partes.append(_("No se pudo cancelar: {motivo}").format(motivo=error))
+        self._estado(" ".join(partes), COLOR_ERROR if error else COLOR_AVISO)
+        if error:
+            # Que no pase desapercibido: la publicación sigue programada.
+            QMessageBox.warning(self, _("Cancelar publicación"), " ".join(partes))
+
+    # --- cierre: no mientras se cancela ---
+
+    @property
+    def cancelando(self) -> bool:
+        return self._cancelando
+
+    def reject(self) -> None:
+        if self._cancelando:
+            return
+        super().reject()
+
+    def done(self, resultado: int) -> None:
+        if self._cancelando:
+            return
+        super().done(resultado)
+
+    def closeEvent(self, evento) -> None:
+        if self._cancelando:
+            evento.ignore()
+            return
+        super().closeEvent(evento)

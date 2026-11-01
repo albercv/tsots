@@ -96,24 +96,35 @@ def programadas(llavero, fabrica: Fabrica, nombre: str,
             tipo=type(e).__name__)
 
 
+@dataclass(frozen=True)
+class Cancelacion:
+    """Resultado de `cancelar`: las canceladas, las que ya no estaban
+    programadas (canceladas antes o ya publicadas) y el motivo del primer
+    fallo ("" si no hubo)."""
+
+    canceladas: tuple[str, ...] = ()
+    ausentes: tuple[str, ...] = ()
+    error: str = ""
+
+
 def cancelar(llavero, fabrica: Fabrica, nombre: str, datos: dict,
-             referencias: list[str]) -> tuple[list[str], str]:
-    """Cancela en orden; para en el primer fallo. Devuelve las canceladas y
-    el motivo del fallo ("" si todas). Nunca lanza."""
+             referencias: list[str]) -> Cancelacion:
+    """Cancela en orden; para en el primer fallo. Nunca lanza."""
     servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
     if servicio is None:
-        return [], error
+        return Cancelacion(error=error)
     canceladas: list[str] = []
+    ausentes: list[str] = []
     for referencia in referencias:
         try:
-            servicio.cancelar(referencia)
+            (canceladas if servicio.cancelar(referencia) else ausentes).append(referencia)
         except proveedores.ErrorConsulta as e:
-            return canceladas, str(e)
+            error = str(e)
         except Exception as e:
-            return canceladas, _("Error inesperado al cancelar ({tipo}).").format(
-                tipo=type(e).__name__)
-        canceladas.append(referencia)
-    return canceladas, ""
+            error = _("Error inesperado al cancelar ({tipo}).").format(tipo=type(e).__name__)
+        if error:
+            break
+    return Cancelacion(tuple(canceladas), tuple(ausentes), error)
 
 
 def _servicio(llavero, fabrica: Fabrica, nombre: str, datos: dict,

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 23:30+0100\n"
+"POT-Creation-Date: 2026-11-01 23:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -57,7 +57,13 @@ msgstr ""
 msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
 msgstr ""
 
+msgid "%d/%m %H:%M"
+msgstr ""
+
 msgid "%d/%m a las %H:%M"
+msgstr ""
+
+msgid "%d/%m/%Y %H:%M"
 msgstr ""
 
 msgid "%d/%m/%Y a las %H:%M"
@@ -434,6 +440,9 @@ msgstr ""
 msgid "El servicio guarda el vídeo y lo publica a esa hora: puedes cerrar la app."
 msgstr ""
 
+msgid "El servicio no confirmó la programación."
+msgstr ""
+
 #, python-brace-format
 msgid "El servicio no devolvió resultado para {plataforma}: {motivo}"
 msgstr ""
@@ -542,6 +551,9 @@ msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
 msgid "Escribe el perfil del servicio para comprobarlo."
+msgstr ""
+
+msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
 msgstr ""
 
 #, python-brace-format
@@ -691,6 +703,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "La detección de caras falló (código {codigo})"
+msgstr ""
+
+msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
 msgstr ""
 
 msgid "La respuesta del modelo no es JSON válido"
@@ -1090,6 +1105,10 @@ msgid "Pasos ya hechos"
 msgstr ""
 
 msgid "Pega la API key para guardarla"
+msgstr ""
+
+#, python-brace-format
+msgid "Pendientes: {n}."
 msgstr ""
 
 msgid "Perfil:"
@@ -1575,6 +1594,10 @@ msgid "X sin Premium admite vídeos de hasta {maximo}; este dura {duracion}."
 msgstr ""
 
 #, python-brace-format
+msgid "Ya no estaban programadas (puede que ya se hayan publicado): {n}."
+msgstr ""
+
+#, python-brace-format
 msgid "Ya programado en: {lista}."
 msgstr ""
 
@@ -1724,10 +1747,6 @@ msgid "{n} por confirmar"
 msgstr ""
 
 #, python-brace-format
-msgid "{n} publicaciones pendientes."
-msgstr ""
-
-#, python-brace-format
 msgid "{plataforma} (borrador)"
 msgstr ""
 
@@ -1751,9 +1770,7 @@ msgstr ""
 msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
-"{lista}\n"
-"\n"
-"El servicio devuelve el crédito."
+"{lista}"
 msgstr ""
 
 #, python-brace-format

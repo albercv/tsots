@@ -141,7 +141,8 @@ publicada para avisar de que saldría repetido.
 - Sin API key o sin perfil, el mismo mensaje que el diálogo Publicar
   («Falta la API key del servicio: guárdala en Redes…»).
 - Tras cancelar, la entrada desaparece del calendario. Si la cancelación
-  falla, el motivo se ve y la entrada se queda.
+  falla, el motivo se ve (también en un aviso) y la entrada se queda.
+  Mientras cancela, la ventana no se cierra.
 
 ## Cómo encaja en el código
 
@@ -179,9 +180,10 @@ servicio, `publicador` y la app solo ven el protocolo `Proveedor`.
   calendario pueda limpiar el registro del vídeo, la app guarda en sus
   ajustes (`QSettings`) un mapa `job_id → ruta del vídeo` al programar. Al
   cancelar: si el `job_id` está en el mapa, `registro.olvidar` sobre ese
-  vídeo y se borra del mapa. Las entradas cuya fecha ya pasó se pueden
-  purgar al abrir el calendario. Sin entrada en el mapa (programado desde la
-  web), no hay registro que limpiar.
+  vídeo y se borra del mapa. El mapa guarda también la fecha, y al cargar el
+  calendario se olvidan las entradas cuya fecha ya pasó (nunca por no salir
+  en la lista). Sin entrada en el mapa (programado desde la web), no hay
+  registro que limpiar.
 - **`app/widgets/dialogo_publicar.py`**: la fila «Cuándo», el texto del
   botón, los límites de fecha, la confirmación y el texto «📅 Programado
   para…».
@@ -221,9 +223,17 @@ verdad.
 - **`async_upload` con `scheduled_date`** no está documentado: al programar,
   la subida **no** pide `async_upload` *(decisión mía)*, para recibir el
   `job_id` en la misma respuesta (el 202 documentado). Si aun así el servicio
-  responde solo con un `request_id` aceptado, la red se da por programada sin
+  responde con la fecha pero sin `job_id`, la red se da por programada sin
   referencia: sale en el calendario y se cancela desde ahí, pero el registro
-  del vídeo no se limpia solo. Queda anotado en el registro de la publicación.
+  del vídeo no se limpia solo. Si responde solo con un `request_id`, no se
+  sabe si programó o publicó ya: queda **por confirmar**, como hoy cualquier
+  respuesta dudosa.
+- **Un 404 al cancelar** puede ser que ya se publicó: se dice «ya no estaba
+  programada (puede que ya se haya publicado)» y la entrada del registro se
+  queda, para seguir avisando antes de repetir.
+- **La hora puede quedarse corta**: se vuelve a comprobar tras la
+  confirmación, y el publicador no envía una red cuya hora programada esté
+  a menos de un minuto (subir red a red lleva tiempo).
 - **Prueba real** (solo con permiso explícito del usuario y su cuenta):
   programar un vídeo corto en una red para dentro de varios días, verlo en
   el calendario y cancelarlo. No llega a publicarse nada y el crédito vuelve.

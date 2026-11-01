@@ -78,13 +78,15 @@ def _poner(dialogo, fecha: datetime) -> None:
 
 def test_ajustes_programadas_locales(ajustes, video):
     assert ajustes.programadas_locales() == {}
-    ajustes.anotar_programada("j1", video)
-    ajustes.anotar_programada("j2", video)
+    ajustes.anotar_programada("j1", video, CUANDO)
+    ajustes.anotar_programada("j2", video, AHORA + timedelta(days=30))
     assert ajustes.programadas_locales() == {"j1": str(video), "j2": str(video)}
     assert ajustes.olvidar_programada("j1") == str(video)
     assert ajustes.olvidar_programada("j1") == ""
-    ajustes.podar_programadas({"otra"})
-    assert ajustes.programadas_locales() == {}
+    ajustes.anotar_programada("j1", video, CUANDO)
+    # Solo se olvidan las que ya pasaron.
+    ajustes.podar_programadas(CUANDO + timedelta(minutes=1))
+    assert ajustes.programadas_locales() == {"j2": str(video)}
     ajustes._q.setValue("redes/programadas", "{no es json")
     assert ajustes.programadas_locales() == {}
 
@@ -146,6 +148,41 @@ def test_programar_envia_la_fecha_y_muestra_programado(qtbot, video, ajustes, ll
     assert ajustes.programadas_locales() == {"j1": str(video), "j2": str(video)}
     assert "TikTok (programado para el 03/11/2026 18:00)" in dialogo.aviso_publicado.text()
     assert {e.referencia for e in registro.leer(video)} == {"j1", "j2"}
+
+
+def test_si_la_hora_se_queda_corta_en_la_confirmacion_no_envia(
+        qtbot, video, ajustes, llavero_falso, monkeypatch):
+    _listo(ajustes)
+    momentos = [AHORA]
+    dialogo, proveedor = _dialogo(qtbot, video, ajustes)
+    dialogo._ahora = lambda: momentos[-1]
+    dialogo.radio_programar.setChecked(True)
+    _poner(dialogo, AHORA + timedelta(minutes=20))
+
+    def pregunta(*args, **kwargs):
+        momentos.append(AHORA + timedelta(minutes=10))  # la confirmación se quedó abierta
+        return QMessageBox.StandardButton.Yes
+
+    monkeypatch.setattr("app.widgets.dialogo_publicar.QMessageBox.question", pregunta)
+    dialogo.boton_publicar.click()
+    assert proveedor.llamadas == [] and not dialogo.publicando
+    assert "15 minutos" in dialogo.etiqueta_estado.text()
+
+
+def test_zona_sin_nombre_usa_el_desfase_de_la_fecha_elegida(qtbot, video, ajustes,
+                                                             llavero_falso):
+    from datetime import timezone
+    _listo(ajustes)
+    dialogo = DialogoPublicar(
+        video, Caption(titulo="t", caption="c", hashtags=[], palabras_clave=[]), ajustes,
+        fabrica=lambda *a: ProveedorFalso(), ahora=lambda: AHORA,
+        zona=timezone(timedelta(hours=1)))
+    qtbot.addWidget(dialogo)
+    dialogo.radio_programar.setChecked(True)
+    _poner(dialogo, CUANDO)
+    programada = dialogo.programada()
+    assert programada.tzinfo is not None
+    assert programada.replace(tzinfo=None) == CUANDO.replace(tzinfo=None)
 
 
 def test_confirmacion_dice_lo_ya_programado(qtbot, video, ajustes, llavero_falso,

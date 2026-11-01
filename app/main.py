@@ -608,7 +608,9 @@ class VentanaPrincipal(QMainWindow):
         self._configurar_redes()
 
     def _abrir_programadas(self) -> None:
-        DialogoProgramadas(self.ajustes, parent=self).exec()
+        dialogo = DialogoProgramadas(self.ajustes, parent=self)
+        dialogo.exec()  # no se cierra mientras cancela
+        dialogo.deleteLater()
 
     def _configurar_redes(self, al_guardar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)

@@ -156,8 +156,10 @@ class HiloPublicacion(QThread):
 
     def __init__(self, proveedor, publicacion: Publicacion, opciones: Opciones,
                  plataformas: list[Plataforma], nombre_proveedor: str,
-                 diario_publicacion: diario.Diario | None = None):
+                 diario_publicacion: diario.Diario | None = None,
+                 ahora: Callable[[], datetime] | None = None):
         super().__init__()  # sin padre: ver `_HILOS_VIVOS`
+        self._ahora = ahora
         self._proveedor = proveedor
         self._publicacion = publicacion
         self._opciones = opciones
@@ -184,6 +186,7 @@ class HiloPublicacion(QThread):
                 progreso=avisar,
                 nombre_proveedor=self._nombre_proveedor,
                 cancelado=self.isInterruptionRequested,
+                **({"ahora": self._ahora} if self._ahora else {}),
             )
         except BaseException as e:  # publicador aísla los fallos; esto es el último seguro
             log.exception("Fallo inesperado en el hilo de publicación")
@@ -456,8 +459,11 @@ class DialogoPublicar(QDialog):
         """Fecha elegida, en la hora del Mac; `None` con «Ahora»."""
         if not self.radio_programar.isChecked():
             return None
-        return self.campo_fecha.dateTime().toPython().replace(
-            second=0, microsecond=0, tzinfo=self._zona)
+        elegida = self.campo_fecha.dateTime().toPython().replace(second=0, microsecond=0)
+        if isinstance(self._zona, ZoneInfo):
+            return elegida.replace(tzinfo=self._zona)
+        # Zona sin nombre (desfase fijo): el desfase de esa fecha, no el de hoy.
+        return elegida.astimezone()
 
     def _motivo_fecha(self) -> str:
         """Por qué no vale la fecha elegida, o "" si vale (o si es «Ahora»)."""
@@ -740,9 +746,9 @@ class DialogoPublicar(QDialog):
             if entrada.programada:
                 partes.append(_("{plataforma} (programado para el {fecha})").format(
                     plataforma=plataforma.nombre,
-                    fecha=fecha_local(entrada.programada, self._zona, "%d/%m/%Y %H:%M")))
+                    fecha=fecha_local(entrada.programada, self._zona, _("%d/%m/%Y %H:%M"))))
                 continue
-            fecha = fecha_local(entrada.fecha, self._zona, "%d/%m/%Y %H:%M")
+            fecha = fecha_local(entrada.fecha, self._zona, _("%d/%m/%Y %H:%M"))
             nombre = plataforma.nombre
             if entrada.sin_confirmar:
                 nombre = _("{plataforma} (sin confirmar)").format(plataforma=nombre)
@@ -770,7 +776,8 @@ class DialogoPublicar(QDialog):
     def _confirmar(self) -> bool:
         elegidas = set(self.plataformas())
         ultimas = {p: e for p, e in registro.ultimas(self.video).items() if p in elegidas}
-        programadas = [f"{p.nombre} ({fecha_local(ultimas[p].programada, self._zona, '%d/%m/%Y %H:%M')})"
+        formato = _("%d/%m/%Y %H:%M")
+        programadas = [f"{p.nombre} ({fecha_local(ultimas[p].programada, self._zona, formato)})"
                        for p in ORDEN if p in ultimas and ultimas[p].programada]
         confirmadas = [p.nombre for p in ORDEN if p in ultimas and not ultimas[p].sin_confirmar
                        and not ultimas[p].programada]
@@ -827,6 +834,10 @@ class DialogoPublicar(QDialog):
                                       COLOR_AVISO, marcar=False)
             return
         log.info("Confirmado por el usuario.")
+        motivo_fecha = self._motivo_fecha()  # la confirmación pudo quedarse abierta un rato
+        if motivo_fecha:
+            self._terminar_sin_enviar(motivo_fecha, COLOR_AVISO, marcar=False)
+            return
         self._poner_estado(_("Leyendo la API key del Llavero…"))
         self.etiqueta_estado.repaint()
         try:
@@ -866,7 +877,7 @@ class DialogoPublicar(QDialog):
         self.ajustes.instagram_modo = opciones.instagram_modo
         self.ajustes.facebook_modo = opciones.facebook_modo
         self._hilo = HiloPublicacion(proveedor, self.publicacion(), opciones,
-                                     plataformas, nombre, self._diario)
+                                     plataformas, nombre, self._diario, self._ahora)
         self._hilo.progreso.connect(self._al_progresar)
         self._hilo.terminado.connect(self._al_terminar)
         self._bloquear(True)
@@ -1015,6 +1026,11 @@ class DialogoPublicar(QDialog):
         else:
             self._procesando.discard(plataforma)
             self._mostrar_resultado(plataforma, resultado)
+            # En cuanto se sabe, por si la app se cierra antes de terminar.
+            if resultado is not None and resultado.programada is not None \
+                    and resultado.referencia:
+                self.ajustes.anotar_programada(resultado.referencia, self.video,
+                                               resultado.programada)
         # Todo enviado y alguna sigue en el servicio: se dice qué se espera.
         en_marcha = (_("En cola"), _("Subiendo…"))
         if self._procesando and not any(
@@ -1026,7 +1042,7 @@ class DialogoPublicar(QDialog):
         """HTML (escapado) y color con que se muestra un resultado."""
         if resultado.ok and resultado.programada is not None:
             return html.escape(_("📅 Programado para el {fecha}").format(
-                fecha=fecha_local(resultado.programada, self._zona, "%d/%m %H:%M"))), COLOR_OK
+                fecha=fecha_local(resultado.programada, self._zona, _("%d/%m %H:%M")))), COLOR_OK
         if resultado.ok:
             if resultado.url:
                 texto = _('✓ Publicado · <a href="{url}">Abrir</a>').format(
@@ -1081,8 +1097,6 @@ class DialogoPublicar(QDialog):
                 texto, color = self._texto_resultado(plataforma, resultado)
                 lineas.append(f'<b>{html.escape(plataforma.nombre)}</b>: '
                               f'<span style="color: {color};">{texto}</span>')
-                if resultado.programada is not None and resultado.referencia:
-                    self.ajustes.anotar_programada(resultado.referencia, self.video)
                 # Lo que salió, o pudo salir, no se vuelve a marcar: evita duplicados.
                 if resultado.ok or resultado.pendiente:
                     self._deseadas.discard(plataforma)

@@ -1119,18 +1119,30 @@ def test_respuesta_programada_es_ok_con_job_id(video):
     assert r.programada == CUANDO and r.referencia == "job-1"
     final = publicador.publicar(proveedor, _pub(video), Opciones(programada=CUANDO),
                                 [Plataforma.TIKTOK], registrar=False,
-                                espera=lambda s: pytest.fail("no debe sondear"))
+                                espera=lambda s: pytest.fail("no debe sondear"),
+                                ahora=lambda: CUANDO - timedelta(days=1))
     assert final[Plataforma.TIKTOK].programada == CUANDO
     assert [r.method for r in servidor.peticiones] == ["POST", "POST"]
 
 
-def test_programada_con_solo_request_id_queda_programada_sin_referencia(video):
-    servidor = Servidor(lambda req, s: httpx.Response(200, json={
-        "success": True, "request_id": "req-7", "total_platforms": 1}))
+def test_programada_con_fecha_y_sin_job_id_queda_programada_sin_referencia(video):
+    servidor = Servidor(lambda req, s: httpx.Response(202, json={
+        "success": True, "scheduled_date": "2026-11-03T17:00:00Z"}))
     r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
                                       Opciones(programada=CUANDO))
     assert r.ok and not r.pendiente
     assert r.programada == CUANDO and r.referencia == ""
+
+
+def test_programar_con_solo_request_id_queda_por_confirmar(video):
+    """Sin `job_id` ni fecha no se sabe si se programó o salió ya: nunca
+    «programado» a ciegas, y nada que sondear (pendiente sin referencia)."""
+    servidor = Servidor(lambda req, s: httpx.Response(200, json={
+        "success": True, "request_id": "req-7", "total_platforms": 1}))
+    r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
+                                      Opciones(programada=CUANDO))
+    assert not r.ok and r.pendiente and r.programada is None and r.referencia == ""
+    assert "antes de volver a publicar" in r.error
 
 
 def test_programar_rechazado_es_error(video):
@@ -1174,6 +1186,15 @@ def test_lista_de_programadas():
     assert dos.fecha.utcoffset() == timedelta(0)
 
 
+def test_lista_de_programadas_no_va_al_registro(caplog):
+    servidor = _lista({"scheduled_posts": [
+        {"job_id": "j1", "scheduled_date": "2026-11-03T17:00:00Z", "platforms": ["tiktok"],
+         "fields": {"tiktok_location_id": "privado-123"}}]})
+    with caplog.at_level("INFO"):
+        _proveedor(servidor).programadas()
+    assert "privado-123" not in caplog.text
+
+
 def test_lista_de_programadas_vacia_o_rara():
     assert _proveedor(_lista({"scheduled_posts": [], "total": 0})).programadas() == []
     with pytest.raises(ErrorConsulta):
@@ -1198,8 +1219,8 @@ def test_cancelar_borra_y_404_cuenta_como_cancelada():
         return httpx.Response(200, json={"success": True, "credits_refunded": 1})
 
     proveedor = _proveedor(Servidor(responder))
-    assert proveedor.cancelar("j 1") is None
-    assert proveedor.cancelar("ya-no") is None
+    assert proveedor.cancelar("j 1") is True
+    assert proveedor.cancelar("ya-no") is False  # ya no estaba: cancelada o publicada
     assert vistas == [
         ("DELETE", "https://api.upload-post.com/api/uploadposts/schedule/j%201"),
         ("DELETE", "https://api.upload-post.com/api/uploadposts/schedule/ya-no")]

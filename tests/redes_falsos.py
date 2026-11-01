@@ -68,12 +68,15 @@ class ProveedorFalso:
             raise self.pendientes
         return list(self.pendientes)
 
-    def cancelar(self, referencia: str) -> None:
+    def cancelar(self, referencia: str) -> bool:
         self.consultas.append(f"cancelar:{referencia}")
         if self.al_cancelar is not None:
             raise self.al_cancelar
-        if isinstance(self.pendientes, list):
-            self.pendientes = [p for p in self.pendientes if p.referencia != referencia]
+        if not isinstance(self.pendientes, list) or all(
+                p.referencia != referencia for p in self.pendientes):
+            return False
+        self.pendientes = [p for p in self.pendientes if p.referencia != referencia]
+        return True
 
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:

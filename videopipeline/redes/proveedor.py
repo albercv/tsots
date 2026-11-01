@@ -74,9 +74,10 @@ class Proveedor(Protocol):
         fuera de la app). Lanza `ErrorConsulta`."""
         ...
 
-    def cancelar(self, referencia: str) -> None:
-        """Cancela una publicación programada. Si ya no existe, no lanza.
-        Lanza `ErrorConsulta` si no se pudo cancelar."""
+    def cancelar(self, referencia: str) -> bool:
+        """Cancela una publicación programada: `True`. Si ya no existía
+        (cancelada antes o ya publicada), `False`, sin lanzar. Lanza
+        `ErrorConsulta` si no se pudo cancelar."""
         ...
 
 

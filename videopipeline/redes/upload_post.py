@@ -475,8 +475,10 @@ class ProveedorUploadPost:
         return lugares
 
     def programadas(self) -> list[Programada]:
+        # Los campos de cada trabajo pueden llevar datos de la cuenta: no van al registro.
         cuerpo = self._consultar("programadas", URL_PROGRAMADAS + "?profile_username={perfil}",
-                                 URL_PROGRAMADAS, {"profile_username": self._perfil})
+                                 URL_PROGRAMADAS, {"profile_username": self._perfil},
+                                 registrar_cuerpo=False)
         lista = self._buscar(cuerpo, "scheduled_posts")
         if not isinstance(lista, list):
             raise ErrorConsulta(_(
@@ -500,7 +502,7 @@ class ProveedorUploadPost:
         log.info("Programadas: %d", len(programadas))
         return programadas
 
-    def cancelar(self, referencia: str) -> None:
+    def cancelar(self, referencia: str) -> bool:
         referencia = (referencia or "").strip()
         if not referencia:
             raise ErrorConsulta(_("Publicación programada sin referencia: cancélala en el servicio."))
@@ -521,7 +523,7 @@ class ProveedorUploadPost:
                  respuesta.status_code, time.monotonic() - inicio,
                  diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)")
         if respuesta.status_code == 404:
-            return  # ya no existe: cancelada antes, o ya publicada
+            return False  # ya no existe: cancelada antes, o ya publicada
         if respuesta.status_code >= 400:
             raise ErrorConsulta(self._mensaje_http(respuesta))
         cuerpo = self._json(respuesta)
@@ -532,6 +534,7 @@ class ProveedorUploadPost:
         if cuerpo.get("success") is False or str(cuerpo.get("success")).lower() == "false":
             raise ErrorConsulta(self._limpiar(self._texto(cuerpo) or _(
                 "El servicio no pudo cancelarla.")))
+        return True
 
     def _consultar(self, que: str, plantilla: str, url: str,
                    parametros: dict | None = None, registrar_cuerpo: bool = True) -> Any:
@@ -695,9 +698,11 @@ class ProveedorUploadPost:
         aceptada = not (cuerpo.get("success") is False
                         or str(cuerpo.get("success")).lower() == "false")
         if programada is not None and aceptada and (cuerpo.get("job_id")
-                                                    or cuerpo.get("request_id")):
-            # Sin `job_id` (solo `request_id`) se sabe que se aceptó, pero no
-            # se puede cancelar desde aquí: se hace desde el calendario.
+                                                    or cuerpo.get("scheduled_date")):
+            # Con la fecha pero sin `job_id` se sabe que se programó, pero no
+            # se puede cancelar desde aquí: se hace desde el calendario. Solo
+            # con un `request_id` no se sabe si se programó o salió ya: sigue
+            # abajo y queda por confirmar.
             referencia = str(cuerpo.get("job_id") or "")
             if not referencia:
                 log.warning("%s: programada sin job_id en la respuesta", plataforma.nombre)
@@ -708,6 +713,9 @@ class ProveedorUploadPost:
             resultado = self._resultado_plataforma(
                 plataforma, propio, str(cuerpo.get("request_id") or ""))
             return replace(resultado, extra=extra)
+        if cuerpo.get("request_id") and programada is not None:
+            return replace(self._por_confirmar(plataforma, _(
+                "El servicio no confirmó la programación.")), extra=extra)
         if cuerpo.get("request_id"):
             return Resultado(plataforma, ok=False, pendiente=True,
                              referencia=str(cuerpo["request_id"]), extra=extra)

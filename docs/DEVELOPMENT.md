@@ -406,21 +406,27 @@ days ahead (`MARGEN_MINIMO`, `MAXIMO`); outside it the button is disabled
 and the reason shows next to the field. The upload is the same as
 publishing now, one request per network, but the service answers 202 with
 a `job_id` and stores the video: `Resultado(ok=True, programada=…,
-referencia=job_id)`, which the publisher records without polling. If the
-service answers with only a `request_id`, the post counts as scheduled
-without a reference (it can still be cancelled from the calendar).
+referencia=job_id)`, which the publisher records without polling. With a
+`scheduled_date` but no `job_id` the post counts as scheduled without a
+reference (it can still be cancelled from the calendar); with only a
+`request_id` it is left unconfirmed. The time is checked again after the
+confirmation, and the publisher skips a network whose scheduled time is
+less than a minute away (uploads run one network after another).
 
-The app keeps `job_id → video` in QSettings (`redes/programadas`) so that
-cancelling from the calendar can also clear the video's record; entries no
-longer pending in the service are pruned each time the calendar loads.
+The app keeps `job_id → video + date` in QSettings (`redes/programadas`),
+written as each network's result arrives, so that cancelling from the
+calendar can also clear the video's record; entries whose date has passed
+are pruned each time the calendar loads.
 
 `app/widgets/dialogo_programadas.py` is the **Scheduled…** window opened
 from the bottom bar: a 6-week month grid (Monday first) with one label per
 video and time (`agrupar`: jobs with the same title and local time are one
 label, since the app uploads once per network). It lists and cancels
-through `app/cuentas.py` (`programadas`, `cancelar`), in the background. A
-404 on cancel counts as done; a 409 `scheduled_post_in_progress` is
-explained. Not done yet: changing the time (`PATCH`), the outcome after
+through `app/cuentas.py` (`programadas`, `cancelar`), in the background,
+and cannot be closed while cancelling. `Proveedor.cancelar` returns `False`
+on a 404: the post is gone (cancelled before, or already published), so it
+leaves the calendar but its record entry stays to keep warning about
+duplicates. A 409 `scheduled_post_in_progress` is explained. Not done yet: changing the time (`PATCH`), the outcome after
 the time, Upload-Post's queue slots (see `docs/TODO.md`).
 
 ### X and Facebook
