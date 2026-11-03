@@ -213,6 +213,55 @@ class Ajustes:
         self._q.setValue(f"redes/cuentas/{self.proveedor_redes}",
                          json.dumps(datos, ensure_ascii=False))
 
+    # Programadas desde la app: referencia del servicio → vídeo y fecha, para
+    # olvidar su entrada del registro si se cancela desde el calendario.
+
+    def _programadas(self) -> dict[str, dict]:
+        bruto = self._q.value("redes/programadas")
+        try:
+            datos = json.loads(str(bruto)) if bruto else {}
+        except ValueError:
+            return {}
+        if not isinstance(datos, dict):
+            return {}
+        return {str(k): v for k, v in datos.items()
+                if isinstance(v, dict) and isinstance(v.get("video"), str)}
+
+    def programadas_locales(self) -> dict[str, str]:
+        """Referencia → ruta del vídeo."""
+        return {k: v["video"] for k, v in self._programadas().items()}
+
+    def _guardar_programadas(self, datos: dict[str, dict]) -> None:
+        self._q.setValue("redes/programadas", json.dumps(datos, ensure_ascii=False))
+
+    def anotar_programada(self, referencia: str, video: Path, fecha: datetime) -> None:
+        self._guardar_programadas({**self._programadas(), referencia: {
+            "video": str(video), "fecha": fecha.isoformat(timespec="seconds")}})
+
+    def olvidar_programada(self, referencia: str) -> str:
+        """Quita la referencia; devuelve su vídeo, o "" si no estaba."""
+        datos = self._programadas()
+        entrada = datos.pop(referencia, None)
+        if entrada is None:
+            return ""
+        self._guardar_programadas(datos)
+        return entrada["video"]
+
+    def podar_programadas(self, ahora: datetime) -> None:
+        """Olvida las que ya salieron (o debían salir): ya no se pueden
+        cancelar. Sin fecha legible, se quedan."""
+        datos = self._programadas()
+
+        def vigente(entrada: dict) -> bool:
+            try:
+                return datetime.fromisoformat(str(entrada.get("fecha"))) > ahora
+            except (TypeError, ValueError):
+                return True
+
+        quedan = {k: v for k, v in datos.items() if vigente(v)}
+        if quedan != datos:
+            self._guardar_programadas(quedan)
+
     @property
     def youtube_categoria(self) -> str:
         return str(self._q.value("redes/youtube_categoria", YOUTUBE_CATEGORIA_POR_DEFECTO)

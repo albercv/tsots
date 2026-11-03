@@ -7,6 +7,7 @@ from videopipeline.redes.modelo import (
     Opciones,
     Pagina,
     Plataforma,
+    Programada,
     Publicacion,
     Resultado,
 )
@@ -22,19 +23,24 @@ class ProveedorFalso:
     `publicar` (o una excepción a lanzar); `estados[plataforma]` la lista de
     Resultados que devuelve `estado` en cada consulta. `cuentas_conectadas` y
     `paginas` son lo que devuelven `cuentas()` y `paginas_facebook()` (o una
-    excepción a lanzar); `lugares`, lo que devuelve `lugares_tiktok()`. Se
-    anotan en `consultas`, no en `llamadas`."""
+    excepción a lanzar); `lugares`, lo que devuelve `lugares_tiktok()`;
+    `pendientes`, lo que devuelve `programadas()` (o una excepción), y
+    `al_cancelar`, una excepción que lanza `cancelar()`. Se anotan en
+    `consultas`, no en `llamadas`."""
 
     nombre = "Falso"
 
     def __init__(self, respuestas=None, estados=None, cuentas_conectadas=None,
-                 paginas=None, lugares=None):
+                 paginas=None, lugares=None, pendientes=None, al_cancelar=None):
         self.respuestas = dict(respuestas or {})
         self.estados = {p: list(v) for p, v in (estados or {}).items()}
         self.cuentas_conectadas = (todas_conectadas() if cuentas_conectadas is None
                                    else cuentas_conectadas)
         self.paginas = [Pagina("111", "Mi página")] if paginas is None else paginas
         self.lugares = [Lugar("v2_madrid", "Madrid")] if lugares is None else lugares
+        self.pendientes: list[Programada] | BaseException = (
+            [] if pendientes is None else pendientes)
+        self.al_cancelar = al_cancelar
         self.llamadas: list[tuple] = []
         self.consultas: list[str] = []
 
@@ -55,6 +61,22 @@ class ProveedorFalso:
         if isinstance(self.lugares, BaseException):
             raise self.lugares
         return list(self.lugares)
+
+    def programadas(self):
+        self.consultas.append("programadas")
+        if isinstance(self.pendientes, BaseException):
+            raise self.pendientes
+        return list(self.pendientes)
+
+    def cancelar(self, referencia: str) -> bool:
+        self.consultas.append(f"cancelar:{referencia}")
+        if self.al_cancelar is not None:
+            raise self.al_cancelar
+        if not isinstance(self.pendientes, list) or all(
+                p.referencia != referencia for p in self.pendientes):
+            return False
+        self.pendientes = [p for p in self.pendientes if p.referencia != referencia]
+        return True
 
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:

@@ -45,6 +45,7 @@ from .widgets.cabecera import Cabecera
 from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
 from .widgets import dialogo_publicar
+from .widgets.dialogo_programadas import DialogoProgramadas
 from .widgets.dialogo_publicar import DialogoPublicar
 from .widgets.dialogo_redes import DialogoRedes
 from .widgets.dialogo_reproceso import preguntar_reproceso
@@ -195,6 +196,9 @@ class VentanaPrincipal(QMainWindow):
 
         fila_inferior = QHBoxLayout()
         self.etiqueta_salida = QLabel()
+        # Que una ruta larga no imponga el ancho mínimo de la ventana: se
+        # recorta y la ruta entera queda en el tooltip.
+        self.etiqueta_salida.setMinimumWidth(60)
         self._refrescar_etiqueta_salida()
         self.boton_carpeta = QPushButton(_("Cambiar…"))
         self.boton_carpeta.clicked.connect(self._elegir_carpeta)
@@ -219,6 +223,10 @@ class VentanaPrincipal(QMainWindow):
         # ventana después de soltarla (el botón es su hijo y guarda la lambda).
         self.boton_redes.clicked.connect(self._abrir_redes)
         fila_inferior.addWidget(self.boton_redes)
+        self.boton_programadas = QPushButton(_("Programadas…"))
+        self.boton_programadas.setToolTip(_("Lo que tienes programado en el servicio"))
+        self.boton_programadas.clicked.connect(self._abrir_programadas)
+        fila_inferior.addWidget(self.boton_programadas)
         fila_inferior.addWidget(QLabel(_("Salida:")))
         fila_inferior.addWidget(self.etiqueta_salida, 1)
         fila_inferior.addWidget(self.boton_carpeta)
@@ -544,6 +552,7 @@ class VentanaPrincipal(QMainWindow):
         self.etiqueta_salida.setText(
             str(carpeta) if carpeta else _("Junto al original (_limpio.mp4)")
         )
+        self.etiqueta_salida.setToolTip(self.etiqueta_salida.text())
 
     def _elegir_carpeta(self) -> None:
         carpeta = QFileDialog.getExistingDirectory(self, _("Carpeta de salida"))
@@ -597,6 +606,11 @@ class VentanaPrincipal(QMainWindow):
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
         self._configurar_redes()
+
+    def _abrir_programadas(self) -> None:
+        dialogo = DialogoProgramadas(self.ajustes, parent=self)
+        dialogo.exec()  # no se cierra mientras cancela
+        dialogo.deleteLater()
 
     def _configurar_redes(self, al_guardar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)

@@ -1457,3 +1457,16 @@ def test_boton_procesar_con_solo_caption_habilitado(qtbot, tmp_path, monkeypatch
     ventana.panel.check_caption.setChecked(True)
     assert ventana.boton_procesar.isEnabled()
     assert ventana.boton_procesar.toolTip() == ""
+
+
+def test_boton_programadas_junto_a_redes_y_abre_el_calendario(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    fila = _layout_de(ventana.centralWidget().layout(), ventana.boton_redes)
+    assert fila.indexOf(ventana.boton_programadas) == fila.indexOf(ventana.boton_redes) + 1
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoProgramadas", Falso)
+    ventana.boton_programadas.click()
+    assert Falso.abiertos == [(ventana.ajustes,)]

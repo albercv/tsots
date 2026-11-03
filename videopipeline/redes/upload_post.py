@@ -41,6 +41,15 @@ API (docs y openapi.json consultados el 2026-09-23):
   (`q` ≤ 100 caracteres) → `{"locations": [{location_id, location_name,
   location_address}]}`, hasta 20. El id solo vale para esa cuenta. Sin el
   permiso `location` en `capabilities`: 400 `tiktok_reconnect_required`.
+- Programar (docs consultadas el 2026-11-01): `scheduled_date` (ISO 8601,
+  futura, ≤ 365 días) y `timezone` (IANA; la fecha se interpreta en esa
+  zona) en la misma subida. Responde 202 `{"success", "job_id",
+  "scheduled_date"}`; el vídeo queda guardado en el servicio. No se pide
+  `async_upload` (su combinación con `scheduled_date` no está documentada).
+  Lo pendiente: `GET /api/uploadposts/schedule?profile_username=` →
+  `{"scheduled_posts": [{job_id, scheduled_date (UTC), platforms, title,
+  fields…}]}`; se cancela con `DELETE /api/uploadposts/schedule/<job_id>`
+  (404 si ya no existe) y el servicio devuelve el crédito.
 
 Cada petición, su código HTTP, su cuerpo (limpio y acotado) y cada sondeo
 se anotan con `logging` en el registro de la publicación (`diario`).
@@ -66,6 +75,7 @@ import traceback
 import uuid
 from contextlib import contextmanager
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator
 from urllib.parse import quote
@@ -83,6 +93,7 @@ from .modelo import (
     Opciones,
     Pagina,
     Plataforma,
+    Programada,
     Publicacion,
     Resultado,
     id_instagram_valido,
@@ -104,6 +115,7 @@ URL_ESTADO = f"{URL_API}/uploadposts/status"
 URL_USUARIOS = f"{URL_API}/uploadposts/users"
 URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
 URL_LUGARES_TIKTOK = f"{URL_API}/uploadposts/tiktok/locations"
+URL_PROGRAMADAS = f"{URL_API}/uploadposts/schedule"
 MAX_BUSQUEDA_LUGAR = 100
 # Las consultas de cuentas y páginas se hacen al abrir los diálogos: si el
 # servicio no responde pronto, la app sigue con lo último que sabía.
@@ -137,6 +149,8 @@ _PLATAFORMAS = {
 # Nombres con que el servicio puede devolver cada plataforma.
 _NOMBRES_RESPUESTA = {plataforma: (nombre,) for plataforma, nombre in _PLATAFORMAS.items()}
 _NOMBRES_RESPUESTA[Plataforma.X] = ("x", "twitter")
+_POR_NOMBRE = {nombre: plataforma for plataforma, nombres in _NOMBRES_RESPUESTA.items()
+               for nombre in nombres}
 # Capacidades de una cuenta de X que indican Premium (supuesto, ver arriba).
 _RE_PREMIUM = re.compile(r"premium|long[\s_-]?(?:video|form|post|text)", re.IGNORECASE)
 # Estados (de la petición o de una plataforma) que da el servicio.
@@ -181,12 +195,15 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
     datos: dict[str, str | list[str]] = {
         "user": perfil,
         "platform[]": [_PLATAFORMAS[plataforma]],
-        # Responde enseguida con un request_id: sin petición larga que pueda
-        # cortarse después de que el servicio ya aceptó el vídeo.
-        "async_upload": "true",
         # Obligatorio para YouTube; las demás usan su título propio.
         "title": titulo_para(Plataforma.YOUTUBE, publicacion),
     }
+    if opciones.programada is None:
+        # Responde enseguida con un request_id: sin petición larga que pueda
+        # cortarse después de que el servicio ya aceptó el vídeo.
+        datos["async_upload"] = "true"
+    else:
+        datos["scheduled_date"], datos["timezone"] = fecha_programada(opciones.programada)
     texto = texto_para(plataforma, publicacion, x_premium=opciones.x_premium)
     if plataforma == Plataforma.TIKTOK:
         datos["tiktok_title"] = texto
@@ -238,6 +255,49 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
             "DRAFT" if opciones.facebook_modo == ModoFacebook.BORRADOR else "PUBLISHED")
         datos["facebook_is_ai_generated"] = "false"
     return datos
+
+
+def fecha_programada(fecha: datetime) -> tuple[str, str]:
+    """`scheduled_date` (hora local, sin desfase) y `timezone` (IANA). Una
+    zona sin nombre IANA (desfase fijo, o sin zona: la del Mac) va en UTC."""
+    zona = getattr(fecha.tzinfo, "key", "")
+    if not zona:
+        fecha, zona = fecha.astimezone(timezone.utc), "UTC"
+    return fecha.replace(tzinfo=None).isoformat(timespec="seconds"), zona
+
+
+def _modos(plataformas: tuple[Plataforma, ...], campos_subida: Any) -> dict[Plataforma, str]:
+    """Modo de cada red según los campos con que se programó (solo los que
+    la app distingue)."""
+    if not isinstance(campos_subida, dict):
+        return {}
+    modos: dict[Plataforma, str] = {}
+    if Plataforma.TIKTOK in plataformas and campos_subida.get("post_mode"):
+        modos[Plataforma.TIKTOK] = (ModoTikTok.PUBLICO.value
+                                    if campos_subida["post_mode"] == "DIRECT_POST"
+                                    else ModoTikTok.BORRADOR.value)
+    if Plataforma.INSTAGRAM in plataformas and campos_subida.get("share_mode"):
+        modos[Plataforma.INSTAGRAM] = (ModoInstagram.NORMAL.value
+                                       if campos_subida["share_mode"] == "CUSTOM"
+                                       else ModoInstagram.PRUEBA.value)
+    if Plataforma.FACEBOOK in plataformas and (campos_subida.get("video_state")
+                                               or campos_subida.get("facebook_media_type")):
+        if campos_subida.get("video_state") == "DRAFT":
+            modos[Plataforma.FACEBOOK] = ModoFacebook.BORRADOR.value
+        elif campos_subida.get("facebook_media_type") == "VIDEO":
+            modos[Plataforma.FACEBOOK] = ModoFacebook.VIDEO.value
+        else:
+            modos[Plataforma.FACEBOOK] = ModoFacebook.REEL.value
+    return modos
+
+
+def _fecha_servicio(texto: Any) -> datetime | None:
+    """Fecha ISO del servicio (UTC si no trae zona), o `None` si no se entiende."""
+    try:
+        fecha = datetime.fromisoformat(str(texto).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return fecha if fecha.tzinfo else fecha.replace(tzinfo=timezone.utc)
 
 
 class ProveedorUploadPost:
@@ -317,7 +377,7 @@ class ProveedorUploadPost:
             return self._error(plataforma, _("No se pudo leer el vídeo ({tipo}).").format(
                 tipo=type(e).__name__))
         self._registrar_respuesta(plataforma, "subida", respuesta, time.monotonic() - inicio)
-        resultado = self._interpretar_subida(plataforma, respuesta)
+        resultado = self._interpretar_subida(plataforma, respuesta, opciones.programada)
         self._registrar_resultado(resultado)
         return resultado
 
@@ -413,6 +473,68 @@ class ProveedorUploadPost:
         log.info("Lugares de TikTok para %r: %s", consulta,
                  ", ".join(l.visible for l in lugares) or "(ninguno)")
         return lugares
+
+    def programadas(self) -> list[Programada]:
+        # Los campos de cada trabajo pueden llevar datos de la cuenta: no van al registro.
+        cuerpo = self._consultar("programadas", URL_PROGRAMADAS + "?profile_username={perfil}",
+                                 URL_PROGRAMADAS, {"profile_username": self._perfil},
+                                 registrar_cuerpo=False)
+        lista = self._buscar(cuerpo, "scheduled_posts")
+        if not isinstance(lista, list):
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae las publicaciones programadas."))
+        programadas: list[Programada] = []
+        for trabajo in lista:
+            if not isinstance(trabajo, dict):
+                continue
+            referencia = str(trabajo.get("job_id") or "").strip()
+            fecha = _fecha_servicio(trabajo.get("scheduled_date"))
+            nombres = trabajo.get("platforms")
+            plataformas = tuple(dict.fromkeys(
+                _POR_NOMBRE[str(n).strip().lower()] for n in
+                (nombres if isinstance(nombres, list) else [])
+                if str(n).strip().lower() in _POR_NOMBRE))
+            if not referencia or fecha is None or not plataformas:
+                continue  # sin referencia no se puede cancelar; redes que la app no conoce
+            programadas.append(Programada(
+                referencia, fecha, plataformas, str(trabajo.get("title") or "").strip(),
+                _modos(plataformas, trabajo.get("fields"))))
+        log.info("Programadas: %d", len(programadas))
+        return programadas
+
+    def cancelar(self, referencia: str) -> bool:
+        referencia = (referencia or "").strip()
+        if not referencia:
+            raise ErrorConsulta(_("Publicación programada sin referencia: cancélala en el servicio."))
+        if not self._clave:
+            raise ErrorConsulta(_("Falta la API key. Guárdala en Redes…"))
+        url = f"{URL_PROGRAMADAS}/{quote(referencia, safe='')}"
+        log.info("Cancelar programada: DELETE %s", url)
+        inicio = time.monotonic()
+        try:
+            with self._cliente() as http:
+                respuesta = http.delete(url, headers=self._cabeceras(), timeout=ESPERA_CONSULTA)
+        except httpx.HTTPError as e:
+            log.warning("Cancelar %s falló tras %.1f s: %s", referencia,
+                        time.monotonic() - inicio, self._traza(e))
+            raise ErrorConsulta(_("No se pudo conectar con el servicio ({tipo}).").format(
+                tipo=type(e).__name__)) from None
+        log.info("Cancelar %s → HTTP %d en %.1f s · cuerpo: %s", referencia,
+                 respuesta.status_code, time.monotonic() - inicio,
+                 diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)")
+        if respuesta.status_code == 404:
+            return False  # ya no existe: cancelada antes, o ya publicada
+        if respuesta.status_code >= 400:
+            raise ErrorConsulta(self._mensaje_http(respuesta))
+        cuerpo = self._json(respuesta)
+        if not isinstance(cuerpo, dict):  # sin confirmación: que se pueda reintentar
+            raise ErrorConsulta(self._limpiar(_(
+                "Respuesta inesperada del servicio (HTTP {codigo}).").format(
+                codigo=respuesta.status_code)))
+        if cuerpo.get("success") is False or str(cuerpo.get("success")).lower() == "false":
+            raise ErrorConsulta(self._limpiar(self._texto(cuerpo) or _(
+                "El servicio no pudo cancelarla.")))
+        return True
 
     def _consultar(self, que: str, plantilla: str, url: str,
                    parametros: dict | None = None, registrar_cuerpo: bool = True) -> Any:
@@ -548,14 +670,19 @@ class ProveedorUploadPost:
     @staticmethod
     def _registrar_resultado(resultado: Resultado) -> None:
         nombre = resultado.plataforma.nombre
-        if resultado.ok:
+        if resultado.programada is not None:
+            log.info("%s: programada para %s · job_id %s", nombre,
+                     resultado.programada.isoformat(timespec="minutes"),
+                     resultado.referencia or "(ninguno)")
+        elif resultado.ok:
             log.info("%s: publicado %s", nombre, resultado.url or "(sin enlace)")
         elif resultado.pendiente:
             log.info("%s: pendiente en el servicio, request_id=%s", nombre, resultado.referencia)
         else:
             log.warning("%s: error: %s", nombre, resultado.error)
 
-    def _interpretar_subida(self, plataforma: Plataforma, respuesta: httpx.Response) -> Resultado:
+    def _interpretar_subida(self, plataforma: Plataforma, respuesta: httpx.Response,
+                            programada: datetime | None = None) -> Resultado:
         if respuesta.status_code in _CODIGOS_SERVIDOR:
             # Tras enviar el vídeo, un 5xx no dice si el servicio lo aceptó.
             return self._por_confirmar(plataforma, self._mensaje_http(respuesta, plataforma))
@@ -568,11 +695,27 @@ class ProveedorUploadPost:
                 "Respuesta inesperada del servicio (HTTP {codigo}).").format(
                 codigo=respuesta.status_code) + (f" {texto}" if texto else ""))
         extra = self._uso(cuerpo)
+        aceptada = not (cuerpo.get("success") is False
+                        or str(cuerpo.get("success")).lower() == "false")
+        if programada is not None and aceptada and (cuerpo.get("job_id")
+                                                    or cuerpo.get("scheduled_date")):
+            # Con la fecha pero sin `job_id` se sabe que se programó, pero no
+            # se puede cancelar desde aquí: se hace desde el calendario. Solo
+            # con un `request_id` no se sabe si se programó o salió ya: sigue
+            # abajo y queda por confirmar.
+            referencia = str(cuerpo.get("job_id") or "")
+            if not referencia:
+                log.warning("%s: programada sin job_id en la respuesta", plataforma.nombre)
+            return Resultado(plataforma, ok=True, programada=programada,
+                             referencia=referencia, extra=extra)
         propio = self._resultado_de(cuerpo.get("results"), plataforma)
         if propio is not None:
             resultado = self._resultado_plataforma(
                 plataforma, propio, str(cuerpo.get("request_id") or ""))
             return replace(resultado, extra=extra)
+        if cuerpo.get("request_id") and programada is not None:
+            return replace(self._por_confirmar(plataforma, _(
+                "El servicio no confirmó la programación.")), extra=extra)
         if cuerpo.get("request_id"):
             return Resultado(plataforma, ok=False, pendiente=True,
                              referencia=str(cuerpo["request_id"]), extra=extra)
@@ -729,6 +872,9 @@ class ProveedorUploadPost:
             detalle = self._texto(cuerpo)
         if _RE_PERFIL_DESCONOCIDO.search(detalle):
             return self._limpiar(f"{self._perfil_desconocido()} ({codigo}: {detalle})")
+        if "scheduled_post_in_progress" in detalle:
+            return self._limpiar(_(
+                "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."))
         if "tiktok_reconnect_required" in detalle:
             return self._limpiar(_(
                 "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.").format(

@@ -201,3 +201,39 @@ def test_modo_de_x_y_facebook_en_el_registro(pub, modo):
                         nombre_proveedor="falso", espera=lambda s: None)
     modos = {e.plataforma: e.modo for e in registro.leer(pub.video)}
     assert modos == {X: "publico", F: modo.value}
+
+
+def test_programada_no_se_sondea_y_se_anota_con_fecha_y_referencia(pub):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    cuando = datetime(2026, 11, 3, 18, 0, tzinfo=ZoneInfo("Europe/Madrid"))
+    proveedor = ProveedorFalso(respuestas={
+        T: Resultado(T, ok=True, programada=cuando, referencia="j1"),
+        Y: Resultado(Y, ok=True, programada=cuando)})
+    resultados, eventos = _publicar(proveedor, pub, [T, Y],
+                                    espera=lambda s: pytest.fail("no debe sondear"),
+                                    ahora=lambda: datetime(2026, 11, 1, tzinfo=cuando.tzinfo))
+    assert resultados[T].programada == cuando and resultados[Y].programada == cuando
+    assert [c[0] for c in proveedor.llamadas] == ["publicar", "publicar"]
+    assert (T, Estado.HECHO) in eventos and (Y, Estado.HECHO) in eventos
+    tiktok, youtube = registro.leer(pub.video)
+    assert tiktok.programada == "2026-11-03T18:00:00+01:00" and tiktok.referencia == "j1"
+    assert youtube.programada and youtube.referencia == ""
+    assert not tiktok.sin_confirmar and tiktok.url == ""
+
+
+def test_programada_cuya_hora_ya_paso_no_se_envia(pub):
+    """Subir red a red lleva tiempo: si la hora elegida se queda atrás, esa
+    red no se envía (el servicio la rechazaría o saldría al momento)."""
+    from datetime import datetime, timedelta, timezone
+    cuando = datetime(2026, 11, 3, 18, 0, tzinfo=timezone.utc)
+    momentos = iter([cuando - timedelta(minutes=20), cuando - timedelta(seconds=30)])
+    proveedor = ProveedorFalso(respuestas={
+        T: Resultado(T, ok=True, programada=cuando, referencia="j1")})
+    resultados = publicador.publicar(
+        proveedor, pub, Opciones(programada=cuando), [T, Y], registrar=False,
+        espera=lambda s: None, ahora=lambda: next(momentos))
+    assert resultados[T].ok
+    assert not resultados[Y].ok and not resultados[Y].pendiente
+    assert "ya ha pasado" in resultados[Y].error
+    assert [c[1] for c in proveedor.llamadas] == [T]

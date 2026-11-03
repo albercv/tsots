@@ -354,6 +354,24 @@ TSOTS writes `name_limpio.publicado.json` next to the video (platform,
 date, link, service). If you open Publish again for that video, it warns
 you that it was already published.
 
+**Scheduling.** In the **When** row of the Publish dialog, choose **Now**
+(as before) or **Schedule** with a date and time in your Mac's time zone.
+The same time applies to every ticked network: at least 15 minutes from
+now and at most a year ahead. The button becomes **Schedule**. When you
+press it, the video is uploaded to Upload-Post right away and Upload-Post
+publishes it at the chosen time, so afterwards you can quit the app or
+turn off the Mac. Each network keeps its mode (a TikTok draft reaches your
+drafts at that time). Upload-Post spends the credit when you schedule and
+refunds it if you cancel before the time.
+
+**Scheduled…** (bottom bar, next to Networks…) opens a month calendar with
+everything pending in Upload-Post, including what you schedule on its
+website. Each day shows the time, the networks' initials (TT, YT, IG, X,
+FB) and the title. Click a label to see each network with its **Cancel**
+button (and **Cancel all**). Cancelling asks for confirmation; if the video
+was scheduled from TSOTS, Publish stops warning that it is already
+scheduled. To change the time, cancel and schedule again.
+
 ## If something goes wrong
 
 - A **red** row in the queue is a failed video. **Double-click** it: you
