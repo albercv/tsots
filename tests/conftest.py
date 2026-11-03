@@ -218,3 +218,10 @@ def video_720p(tmp_path_factory) -> Path:
         check=True,
     )
     return destino
+
+
+@pytest.fixture(autouse=True)
+def sin_medir_duraciones(monkeypatch):
+    """Los vídeos de mentira no se miden con ffprobe: al reconocer un vídeo,
+    su duración «no se pudo medir» (0.0), salvo que el test diga otra."""
+    monkeypatch.setattr("videopipeline.ficha.duracion_video", lambda ruta: 0.0)

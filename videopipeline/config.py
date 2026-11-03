@@ -89,8 +89,10 @@ class PipelineConfig:
         """Hay salida horizontal salvo que el único procesado sea el vertical."""
         return self.paso_audio or self.paso_silencios or not self.paso_vertical
 
-    def validar(self) -> None:
-        if not (self.paso_audio or self.paso_silencios or self.subtitulos
+    def validar(self, exigir_paso_de_video: bool = True) -> None:
+        """Sin `exigir_paso_de_video` vale «solo caption» (sobre un vídeo con ficha)."""
+        if exigir_paso_de_video and not (
+                self.paso_audio or self.paso_silencios or self.subtitulos
                 or self.paso_vertical):
             raise ValueError(
                 "no hay ningún paso de vídeo seleccionado "
@@ -143,7 +145,11 @@ class PipelineConfig:
 
     @classmethod
     def from_json(cls, texto: str) -> "PipelineConfig":
-        datos = json.loads(texto)
+        return cls.from_datos(json.loads(texto))
+
+    @classmethod
+    def from_datos(cls, datos: dict) -> "PipelineConfig":
+        datos = dict(datos)  # el del llamador no se toca
         datos["video"] = Path(datos["video"])
         if datos.get("salida") is not None:
             datos["salida"] = Path(datos["salida"])

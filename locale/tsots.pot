@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 11:36+0100\n"
+"POT-Creation-Date: 2026-11-01 23:42+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -25,13 +25,64 @@ msgstr ""
 msgid " en «{paso}»"
 msgstr ""
 
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso} con otros ajustes ({cambios}). ¿Rehacerlo?"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso}. ¿Rehacerlo?"
+msgstr ""
+
+#, python-brace-format
+msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
+msgstr ""
+
+msgid "%d/%m %H:%M"
+msgstr ""
+
+msgid "%d/%m a las %H:%M"
+msgstr ""
+
+msgid "%d/%m/%Y %H:%M"
+msgstr ""
+
+msgid "%d/%m/%Y a las %H:%M"
+msgstr ""
+
 msgid "(detectado en tu cuenta)"
 msgstr ""
 
 msgid "(sin elegir)"
 msgstr ""
 
+msgid "(sin título)"
+msgstr ""
+
 msgid "+ vertical"
+msgstr ""
+
+#, python-brace-format
+msgid "+{n} más"
 msgstr ""
 
 #, python-brace-format
@@ -52,13 +103,25 @@ msgstr ""
 msgid "Abre el log del trabajo y añade este caso a videopipeline/errores.py para que la próxima vez se explique."
 msgstr ""
 
+msgid "Abril"
+msgstr ""
+
 msgid "Abrir log"
 msgstr ""
 
 msgid "Acelerar"
 msgstr ""
 
+msgid "Actualizar"
+msgstr ""
+
 msgid "Además del horizontal, guarda nombre_limpio_vertical.mp4 para Reels y TikTok (solo el vertical si no hay audio ni silencios)."
+msgstr ""
+
+msgid "Agosto"
+msgstr ""
+
+msgid "Ahora"
 msgstr ""
 
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
@@ -68,6 +131,9 @@ msgid "Al publicar"
 msgstr ""
 
 msgid "Amarillo"
+msgstr ""
+
+msgid "Aplicar a todos los vídeos"
 msgstr ""
 
 msgid "Archivo de vídeo incompleto o corrupto"
@@ -85,10 +151,16 @@ msgstr ""
 msgid "Automático: el lugar que se llame «{nombre}»"
 msgstr ""
 
+msgid "Aviso"
+msgstr ""
+
 msgid "Añadir subtítulos"
 msgstr ""
 
 msgid "Barras negras"
+msgstr ""
+
+msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
 msgstr ""
 
 msgid "Borrador (lo terminas en Facebook)"
@@ -115,10 +187,23 @@ msgstr ""
 msgid "Cambiar…"
 msgstr ""
 
+#, python-brace-format
+msgid "Canceladas: {n}."
+msgstr ""
+
 msgid "Cancelado"
 msgstr ""
 
+msgid "Cancelando…"
+msgstr ""
+
 msgid "Cancelar"
+msgstr ""
+
+msgid "Cancelar publicación"
+msgstr ""
+
+msgid "Cancelar todas"
 msgstr ""
 
 msgid "Caption"
@@ -163,6 +248,9 @@ msgstr ""
 msgid "Cola"
 msgstr ""
 
+msgid "Compresión del audio limpio"
+msgstr ""
+
 msgid "Comprobado ahora."
 msgstr ""
 
@@ -188,6 +276,9 @@ msgid "Conectada"
 msgstr ""
 
 msgid "Consejos y estilo"
+msgstr ""
+
+msgid "Consultando…"
 msgstr ""
 
 msgid "Contexto de marca"
@@ -229,6 +320,9 @@ msgstr ""
 msgid "Cuentas conectadas"
 msgstr ""
 
+msgid "Cuándo:"
+msgstr ""
+
 msgid "Deportes"
 msgstr ""
 
@@ -250,7 +344,13 @@ msgstr ""
 msgid "Detectando caras"
 msgstr ""
 
+msgid "Diciembre"
+msgstr ""
+
 msgid "Diseño:"
+msgstr ""
+
+msgid "Dom"
 msgstr ""
 
 #, python-brace-format
@@ -337,8 +437,17 @@ msgstr ""
 msgid "El quemado de subtítulos falló (código {codigo})"
 msgstr ""
 
+msgid "El servicio guarda el vídeo y lo publica a esa hora: puedes cerrar la app."
+msgstr ""
+
+msgid "El servicio no confirmó la programación."
+msgstr ""
+
 #, python-brace-format
 msgid "El servicio no devolvió resultado para {plataforma}: {motivo}"
+msgstr ""
+
+msgid "El servicio no pudo cancelarla."
 msgstr ""
 
 msgid "El servicio rechazó la publicación."
@@ -346,6 +455,13 @@ msgstr ""
 
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
+msgstr ""
+
+#, python-brace-format
+msgid "El vertical de \"{nombre}\" no puede llevar subtítulos: ya están quemados en el vídeo. Arrastra el original para rehacerlos."
+msgstr ""
+
+msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr ""
 
 msgid "El vídeo es demasiado grande para el servicio (413)."
@@ -364,6 +480,9 @@ msgstr ""
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr ""
 
+msgid "Elige una hora al menos 15 minutos después de ahora."
+msgstr ""
+
 #, python-brace-format
 msgid "Elige uno de la lista: ninguno se llama «{texto}». Sin elegir, TikTok se publica sin ubicación."
 msgstr ""
@@ -375,6 +494,9 @@ msgid "En cola"
 msgstr ""
 
 msgid "Encuadre:"
+msgstr ""
+
+msgid "Enero"
 msgstr ""
 
 msgid "Entretenimiento"
@@ -399,11 +521,19 @@ msgid "Error inesperado al buscar el lugar ({tipo})."
 msgstr ""
 
 #, python-brace-format
+msgid "Error inesperado al cancelar ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "Error inesperado al consultar las cuentas ({tipo})."
 msgstr ""
 
 #, python-brace-format
 msgid "Error inesperado al consultar las páginas ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "Error inesperado al consultar lo programado ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -423,6 +553,9 @@ msgstr ""
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr ""
 
+msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
+msgstr ""
+
 #, python-brace-format
 msgid "Esperando a que el servicio termine: {lista}…"
 msgstr ""
@@ -432,8 +565,17 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Estos vídeos no se han añadido:\n"
+"{errores}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
 "Estos vídeos no tienen audio y no se han añadido:\n"
 "{nombres}"
+msgstr ""
+
+msgid "Estos vídeos ya tienen pasos hechos. Se mantienen tal como están; marca «Rehacer» en los que quieras volver a hacer."
 msgstr ""
 
 msgid "Extracción de audio"
@@ -479,6 +621,9 @@ msgstr ""
 msgid "Faltan dependencias"
 msgstr ""
 
+msgid "Febrero"
+msgstr ""
+
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr ""
 
@@ -497,6 +642,9 @@ msgstr ""
 msgid "Generando caption SEO"
 msgstr ""
 
+msgid "Guardando el vídeo"
+msgstr ""
+
 msgid "Guardar"
 msgstr ""
 
@@ -504,6 +652,10 @@ msgid "Hashtags:"
 msgstr ""
 
 msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
+msgstr ""
+
+#, python-brace-format
+msgid "Hora de tu Mac ({zona})"
 msgstr ""
 
 msgid "Humor"
@@ -519,6 +671,15 @@ msgid "Idioma:"
 msgstr ""
 
 msgid "Impacto"
+msgstr ""
+
+msgid "Jue"
+msgstr ""
+
+msgid "Julio"
+msgstr ""
+
+msgid "Junio"
 msgstr ""
 
 msgid "Junto al original (_limpio.mp4)"
@@ -544,6 +705,9 @@ msgstr ""
 msgid "La detección de caras falló (código {codigo})"
 msgstr ""
 
+msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
+msgstr ""
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr ""
 
@@ -553,7 +717,15 @@ msgstr ""
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr ""
 
+#, python-brace-format
+msgid "La transcripción guardada de \"{nombre}\" está dañada ({error}): rehaz los subtítulos para volver a transcribir."
+msgstr ""
+
 msgid "La ubicación con que se publica cada vídeo"
+msgstr ""
+
+#, python-brace-format
+msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
 msgstr ""
 
 msgid "Leyendo la API key del Llavero…"
@@ -565,6 +737,14 @@ msgstr ""
 msgid "Limpiando audio"
 msgstr ""
 
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\": se volverán a quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
 msgid "Limpiar hechos"
 msgstr ""
 
@@ -572,6 +752,9 @@ msgid "Limpieza de audio"
 msgstr ""
 
 msgid "Llavero"
+msgstr ""
+
+msgid "Lo que tienes programado en el servicio"
 msgstr ""
 
 #, python-brace-format
@@ -582,10 +765,16 @@ msgstr ""
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
 msgstr ""
 
+msgid "Lun"
+msgstr ""
+
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr ""
 
-msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
+msgid "Mar"
+msgstr ""
+
+msgid "Marca al menos un paso."
 msgstr ""
 
 msgid "Marca al menos una plataforma y escribe un título."
@@ -598,6 +787,12 @@ msgid "Marca…"
 msgstr ""
 
 msgid "Margen:"
+msgstr ""
+
+msgid "Marzo"
+msgstr ""
+
+msgid "Mayo"
 msgstr ""
 
 msgid "Mejora de voz"
@@ -613,6 +808,9 @@ msgid "Mi cuenta de X tiene Premium"
 msgstr ""
 
 msgid "Minimalista"
+msgstr ""
+
+msgid "Mié"
 msgstr ""
 
 msgid "Modelo de Ollama no descargado"
@@ -634,6 +832,13 @@ msgstr ""
 msgid "Música"
 msgstr ""
 
+msgid "Nada que hacer"
+msgstr ""
+
+#, python-brace-format
+msgid "Nada que hacer en: {nombres}"
+msgstr ""
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr ""
@@ -645,11 +850,22 @@ msgstr ""
 msgid "No conectada en {servicio}"
 msgstr ""
 
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": arrástralo para rehacer el vídeo"
+msgstr ""
+
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": {ruta}"
+msgstr ""
+
 msgid "No enviado"
 msgstr ""
 
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
+msgstr ""
+
+msgid "No hay nada programado."
 msgstr ""
 
 #, python-brace-format
@@ -679,12 +895,20 @@ msgid "No se encuentra el vídeo: {nombre}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "No se encuentran en PATH: {faltan}\n"
 "Instálalas y vuelve a abrir la aplicación."
 msgstr ""
 
 msgid "No se etiqueta en ninguna red."
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el FLAC: {flac}"
 msgstr ""
 
 #, python-brace-format
@@ -737,6 +961,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo cancelar: {motivo}"
 msgstr ""
 
 #, python-brace-format
@@ -804,10 +1032,23 @@ msgstr ""
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr ""
 
+msgid "No se puede añadir"
+msgstr ""
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
+msgstr ""
+
 msgid "Nombre del perfil en el servicio"
 msgstr ""
 
 msgid "Noticias y política"
+msgstr ""
+
+msgid "Noviembre"
+msgstr ""
+
+msgid "Octubre"
 msgstr ""
 
 #, python-brace-format
@@ -847,6 +1088,12 @@ msgstr ""
 msgid "Olvidar clave"
 msgstr ""
 
+msgid "Olvidar este vídeo"
+msgstr ""
+
+msgid "Ordenando las salidas"
+msgstr ""
+
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
@@ -854,7 +1101,14 @@ msgstr ""
 msgid "Paso: {paso}"
 msgstr ""
 
+msgid "Pasos ya hechos"
+msgstr ""
+
 msgid "Pega la API key para guardarla"
+msgstr ""
+
+#, python-brace-format
+msgid "Pendientes: {n}."
 msgstr ""
 
 msgid "Perfil:"
@@ -900,13 +1154,39 @@ msgstr ""
 msgid "Procesando en el servicio…"
 msgstr ""
 
+msgid "Procesar"
+msgstr ""
+
 msgid "Proceso completado correctamente."
 msgstr ""
 
 msgid "Proceso en curso"
 msgstr ""
 
+msgid "Programada"
+msgstr ""
+
+msgid "Programadas"
+msgstr ""
+
+msgid "Programadas…"
+msgstr ""
+
+#, python-brace-format
+msgid "Programado en {ok} de {total}"
+msgstr ""
+
+#, python-brace-format
+msgid "Programando: {lista}…"
+msgstr ""
+
+msgid "Programar"
+msgstr ""
+
 msgid "Publicación cancelada: no se ha enviado nada."
+msgstr ""
+
+msgid "Publicación programada sin referencia: cancélala en el servicio."
 msgstr ""
 
 msgid "Publicación sin referencia para consultar."
@@ -967,6 +1247,14 @@ msgstr ""
 msgid "Recortar silencios"
 msgstr ""
 
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\": se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
 msgid "Recorte central"
 msgstr ""
 
@@ -994,11 +1282,23 @@ msgstr ""
 msgid "Reencodado del vídeo (h264_videotoolbox)"
 msgstr ""
 
+msgid "Regenerar también el vertical"
+msgstr ""
+
+msgid "Rehacer"
+msgstr ""
+
+msgid "Rehacerlo volverá a transcribir y quemar los subtítulos; el caption se mantiene."
+msgstr ""
+
 #, python-brace-format
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
 msgstr ""
 
 msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no trae las publicaciones programadas."
 msgstr ""
 
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
@@ -1032,6 +1332,14 @@ msgstr ""
 msgid "Salida:"
 msgstr ""
 
+#, python-brace-format
+msgid "Se añadirán subtítulos a \"{nombre}\"."
+msgstr ""
+
+#, python-brace-format
+msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
+msgstr ""
+
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr ""
 
@@ -1041,9 +1349,19 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Se programará «{titulo}» en:\n"
+"\n"
+"{resumen}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
 "{resumen}"
+msgstr ""
+
+msgid "Se puede programar como mucho a un año vista."
 msgstr ""
 
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
@@ -1059,6 +1377,9 @@ msgid "Selecciona un vídeo terminado con Caption SEO para ver su título, capti
 msgstr ""
 
 msgid "Separación de hablantes"
+msgstr ""
+
+msgid "Septiembre"
 msgstr ""
 
 msgid "Servicio no disponible (503). Prueba más tarde."
@@ -1078,6 +1399,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Sigue procesándose en el servicio. Revisa {plataforma} en unos minutos."
+msgstr ""
+
+msgid "Siguiente ›"
 msgstr ""
 
 msgid "Silencios:"
@@ -1145,6 +1469,9 @@ msgid "Sustitución de la pista de audio"
 msgstr ""
 
 msgid "Sustituyendo pista de audio"
+msgstr ""
+
+msgid "Sáb"
 msgstr ""
 
 msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube, Instagram, X y Facebook. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
@@ -1229,7 +1556,13 @@ msgstr ""
 msgid "Viajes y eventos"
 msgstr ""
 
+msgid "Vie"
+msgstr ""
+
 msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
+msgstr ""
+
+msgid "Volver a procesar"
 msgstr ""
 
 #, python-brace-format
@@ -1261,13 +1594,27 @@ msgid "X sin Premium admite vídeos de hasta {maximo}; este dura {duracion}."
 msgstr ""
 
 #, python-brace-format
+msgid "Ya no estaban programadas (puede que ya se hayan publicado): {n}."
+msgstr ""
+
+#, python-brace-format
+msgid "Ya programado en: {lista}."
+msgstr ""
+
+#, python-brace-format
 msgid "Ya publicado antes en: {lista}."
+msgstr ""
+
+msgid "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."
 msgstr ""
 
 msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
 msgstr ""
 
 msgid "argumentos inválidos: se requiere --config"
+msgstr ""
+
+msgid "audio"
 msgstr ""
 
 msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
@@ -1300,6 +1647,12 @@ msgstr ""
 msgid "cancelado"
 msgstr ""
 
+msgid "caption"
+msgstr ""
+
+msgid "el recorte de silencios"
+msgstr ""
+
 msgid "en espera"
 msgstr ""
 
@@ -1316,6 +1669,9 @@ msgid "hecho"
 msgstr ""
 
 msgid "la descarga no produjo ningún fichero"
+msgstr ""
+
+msgid "la limpieza de audio"
 msgstr ""
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
@@ -1341,13 +1697,25 @@ msgstr ""
 msgid "señal desconocida {numero}"
 msgstr ""
 
+msgid "silencios"
+msgstr ""
+
 msgid "small (rápido)"
 msgstr ""
 
 msgid "solo este vídeo"
 msgstr ""
 
+msgid "subtítulos"
+msgstr ""
+
 msgid "turbo (recomendado)"
+msgstr ""
+
+msgid "vertical"
+msgstr ""
+
+msgid "vertical desactualizado"
 msgstr ""
 
 #, python-brace-format
@@ -1383,6 +1751,10 @@ msgid "{plataforma} (borrador)"
 msgstr ""
 
 #, python-brace-format
+msgid "{plataforma} (programado para el {fecha})"
+msgstr ""
+
+#, python-brace-format
 msgid "{plataforma} (sin confirmar)"
 msgstr ""
 
@@ -1390,11 +1762,29 @@ msgstr ""
 msgid "{plataforma} rechazó la publicación."
 msgstr ""
 
+#, python-brace-format
+msgid "{redes}: «{titulo}» el {fecha}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
+"¿Cancelar estas publicaciones?\n"
+"\n"
+"{lista}"
+msgstr ""
+
+#, python-brace-format
+msgid "¿Programar para el {fecha}?"
+msgstr ""
+
 msgid "¿Publicar ahora?"
 msgstr ""
 
 #, python-brace-format
 msgid "Última comprobación: {fecha}"
+msgstr ""
+
+msgid "‹ Anterior"
 msgstr ""
 
 msgid "■ Cancelar"
@@ -1407,6 +1797,10 @@ msgid "⚠ El ID de una página solo tiene números."
 msgstr ""
 
 msgid "⚠ Eso parece un email. El perfil no es el email de tu cuenta: es el nombre del perfil dentro del servicio."
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ Este vídeo ya está publicado o programado: {lista}. Si vuelves a publicarlo, saldrá repetido."
 msgstr ""
 
 #, python-brace-format
@@ -1442,4 +1836,8 @@ msgstr ""
 
 #, python-brace-format
 msgid "✓ Publicado · <a href=\"{url}\">Abrir</a>"
+msgstr ""
+
+#, python-brace-format
+msgid "📅 Programado para el {fecha}"
 msgstr ""

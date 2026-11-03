@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -235,6 +236,8 @@ class Opciones:
     x_premium: bool = False
     facebook_modo: ModoFacebook = ModoFacebook.REEL
     ubicacion: Ubicacion = Ubicacion()
+    # Fecha y hora (con zona horaria) en que debe salir; `None`: ahora.
+    programada: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -244,6 +247,8 @@ class Resultado:
     `pendiente`: el proveedor aceptó el vídeo y lo sigue procesando; se
     consulta después con `Proveedor.estado(plataforma, referencia)`.
     `referencia` es opaca para la app: solo la entiende el proveedor.
+    `programada`: el servicio la publicará en esa fecha (`ok=True`, sin URL
+    todavía); `referencia` sirve entonces para cancelarla (puede faltar).
     """
 
     plataforma: Plataforma
@@ -253,6 +258,20 @@ class Resultado:
     pendiente: bool = False
     referencia: str = ""
     extra: dict = field(default_factory=dict, compare=False)
+    programada: datetime | None = None
+
+
+@dataclass(frozen=True)
+class Programada:
+    """Publicación pendiente en el servicio. `referencia` es opaca (sirve para
+    `Proveedor.cancelar`); `fecha`, con zona horaria. `modos`: el modo de
+    cada red si el servicio lo dice (valores de `ModoTikTok`…)."""
+
+    referencia: str
+    fecha: datetime
+    plataformas: tuple[Plataforma, ...]
+    titulo: str = ""
+    modos: dict = field(default_factory=dict, compare=False)
 
 
 @dataclass(frozen=True)

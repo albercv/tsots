@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-30 11:36+0100\n"
+"POT-Creation-Date: 2026-11-01 23:42+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -22,14 +22,65 @@ msgstr " What to do: {solucion}"
 msgid " en «{paso}»"
 msgstr " at “{paso}”"
 
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
+msgstr "\"{nombre}\" has no processed video yet: a caption can only be requested for an already processed video"
+
+#, python-brace-format
+msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
+msgstr "\"{nombre}\" was changed outside the app: what was made from it will be redone. Nothing saved is deleted."
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
+msgstr "\"{nombre}\" has no output to show. Drag in the original to process it again."
+
+#, python-brace-format
+msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr "\"{nombre}\" will be redone from the original: the subtitles will be transcribed and burned in again. The caption is kept."
+
+#, python-brace-format
+msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
+msgstr "\"{nombre}\" already has the subtitles burned in and there is no version without them. Drag in the original to redo them."
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso} con otros ajustes ({cambios}). ¿Rehacerlo?"
+msgstr "\"{nombre}\" already has {paso} with different settings ({cambios}). Redo this step?"
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene {paso}. ¿Rehacerlo?"
+msgstr "\"{nombre}\" already has {paso}. Redo this step?"
+
+#, python-brace-format
+msgid "\"{salida}\" ya estaba en la carpeta de salida: se toma como el vídeo procesado de \"{original}\", con su caption si lo tiene. Si no es de este vídeo, muévelo a otra carpeta y usa «Olvidar este vídeo»."
+msgstr "\"{salida}\" was already in the output folder: it is taken as the processed video of \"{original}\", with its caption if it has one. If it is not from this video, move it to another folder and use \"Forget this video\"."
+
+msgid "%d/%m %H:%M"
+msgstr "%m/%d %H:%M"
+
+msgid "%d/%m a las %H:%M"
+msgstr "%m/%d at %H:%M"
+
+msgid "%d/%m/%Y %H:%M"
+msgstr "%m/%d/%Y %H:%M"
+
+msgid "%d/%m/%Y a las %H:%M"
+msgstr "%m/%d/%Y at %H:%M"
+
 msgid "(detectado en tu cuenta)"
 msgstr "(detected on your account)"
 
 msgid "(sin elegir)"
 msgstr "(none selected)"
 
+msgid "(sin título)"
+msgstr "(untitled)"
+
 msgid "+ vertical"
 msgstr "+ vertical"
+
+#, python-brace-format
+msgid "+{n} más"
+msgstr "+{n} more"
 
 #, python-brace-format
 msgid "<br>Causa: {causa}"
@@ -49,14 +100,26 @@ msgstr "WARNING: {aviso}"
 msgid "Abre el log del trabajo y añade este caso a videopipeline/errores.py para que la próxima vez se explique."
 msgstr "Open the job log and add this case to videopipeline/errores.py so it is explained next time."
 
+msgid "Abril"
+msgstr "April"
+
 msgid "Abrir log"
 msgstr "Open log"
 
 msgid "Acelerar"
 msgstr "Speed up"
 
+msgid "Actualizar"
+msgstr "Refresh"
+
 msgid "Además del horizontal, guarda nombre_limpio_vertical.mp4 para Reels y TikTok (solo el vertical si no hay audio ni silencios)."
 msgstr "Besides the horizontal video, saves nombre_limpio_vertical.mp4 for Reels and TikTok (only the vertical one if neither audio nor silences are selected)."
+
+msgid "Agosto"
+msgstr "August"
+
+msgid "Ahora"
+msgstr "Now"
 
 msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: concede acceso a Terminal/Python, o elige otra carpeta de salida."
 msgstr "System Settings → Privacy & Security → Files and Folders: grant access to Terminal/Python, or choose another output folder."
@@ -66,6 +129,9 @@ msgstr "When publishing"
 
 msgid "Amarillo"
 msgstr "Yellow"
+
+msgid "Aplicar a todos los vídeos"
+msgstr "Apply to all videos"
 
 msgid "Archivo de vídeo incompleto o corrupto"
 msgstr "Incomplete or corrupt video file"
@@ -84,11 +150,17 @@ msgstr "Auto-detect"
 msgid "Automático: el lugar que se llame «{nombre}»"
 msgstr "Automatic: the place called “{nombre}”"
 
+msgid "Aviso"
+msgstr "Notice"
+
 msgid "Añadir subtítulos"
 msgstr "Add subtitles"
 
 msgid "Barras negras"
 msgstr "Black bars"
+
+msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
+msgstr "Deletes the data saved for redoing steps; does not touch the videos"
 
 msgid "Borrador (lo terminas en Facebook)"
 msgstr "Draft (finish it in Facebook)"
@@ -114,11 +186,24 @@ msgstr "Changes the location for this video only"
 msgid "Cambiar…"
 msgstr "Change…"
 
+#, python-brace-format
+msgid "Canceladas: {n}."
+msgstr "Cancelled: {n}."
+
 msgid "Cancelado"
 msgstr "Cancelled"
 
+msgid "Cancelando…"
+msgstr "Cancelling…"
+
 msgid "Cancelar"
 msgstr "Cancel"
+
+msgid "Cancelar publicación"
+msgstr "Cancel post"
+
+msgid "Cancelar todas"
+msgstr "Cancel all"
 
 msgid "Caption"
 msgstr "Caption"
@@ -162,6 +247,9 @@ msgstr "ClearVoice did not produce the clean audio: {salida}"
 msgid "Cola"
 msgstr "Queue"
 
+msgid "Compresión del audio limpio"
+msgstr "Compressing the cleaned audio"
+
 msgid "Comprobado ahora."
 msgstr "Checked just now."
 
@@ -188,6 +276,9 @@ msgstr "Connected"
 
 msgid "Consejos y estilo"
 msgstr "Howto & Style"
+
+msgid "Consultando…"
+msgstr "Checking…"
 
 msgid "Contexto de marca"
 msgstr "Brand context"
@@ -228,6 +319,9 @@ msgstr "Account"
 msgid "Cuentas conectadas"
 msgstr "Connected accounts"
 
+msgid "Cuándo:"
+msgstr "When:"
+
 msgid "Deportes"
 msgstr "Sports"
 
@@ -251,8 +345,14 @@ msgstr ""
 msgid "Detectando caras"
 msgstr "Detecting faces"
 
+msgid "Diciembre"
+msgstr "December"
+
 msgid "Diseño:"
 msgstr "Style:"
+
+msgid "Dom"
+msgstr "Sun"
 
 #, python-brace-format
 msgid "ERROR en paso {paso} ({etiqueta})"
@@ -338,9 +438,18 @@ msgstr "The process ended unexpectedly (code {codigo})"
 msgid "El quemado de subtítulos falló (código {codigo})"
 msgstr "Burning the subtitles failed (code {codigo})"
 
+msgid "El servicio guarda el vídeo y lo publica a esa hora: puedes cerrar la app."
+msgstr "The service keeps the video and publishes it at that time: you can close the app."
+
+msgid "El servicio no confirmó la programación."
+msgstr "The service did not confirm the schedule."
+
 #, python-brace-format
 msgid "El servicio no devolvió resultado para {plataforma}: {motivo}"
 msgstr "The service returned no result for {plataforma}: {motivo}"
+
+msgid "El servicio no pudo cancelarla."
+msgstr "The service could not cancel it."
 
 msgid "El servicio rechazó la publicación."
 msgstr "The service rejected the post."
@@ -348,6 +457,13 @@ msgstr "The service rejected the post."
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr "The service finished without giving the result for {plataforma}."
+
+#, python-brace-format
+msgid "El vertical de \"{nombre}\" no puede llevar subtítulos: ya están quemados en el vídeo. Arrastra el original para rehacerlos."
+msgstr "The vertical version of \"{nombre}\" cannot have subtitles: they are already burned into the video. Drag in the original to redo them."
+
+msgid "El vertical quedará desactualizado si no lo regeneras."
+msgstr "The vertical version will be out of date unless you regenerate it."
 
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr "The video is too large for the service (413)."
@@ -365,6 +481,9 @@ msgstr "Choose videos"
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr "Choose a finished video with a caption in the queue."
 
+msgid "Elige una hora al menos 15 minutos después de ahora."
+msgstr "Pick a time at least 15 minutes from now."
+
 #, python-brace-format
 msgid "Elige uno de la lista: ninguno se llama «{texto}». Sin elegir, TikTok se publica sin ubicación."
 msgstr "Pick one from the list: none is called “{texto}”. If you don't pick one, TikTok is published without a location."
@@ -377,6 +496,9 @@ msgstr "Queued"
 
 msgid "Encuadre:"
 msgstr "Framing:"
+
+msgid "Enero"
+msgstr "January"
 
 msgid "Entretenimiento"
 msgstr "Entertainment"
@@ -400,12 +522,20 @@ msgid "Error inesperado al buscar el lugar ({tipo})."
 msgstr "Unexpected error while searching for the place ({tipo})."
 
 #, python-brace-format
+msgid "Error inesperado al cancelar ({tipo})."
+msgstr "Unexpected error while cancelling ({tipo})."
+
+#, python-brace-format
 msgid "Error inesperado al consultar las cuentas ({tipo})."
 msgstr "Unexpected error while checking the accounts ({tipo})."
 
 #, python-brace-format
 msgid "Error inesperado al consultar las páginas ({tipo})."
 msgstr "Unexpected error while checking the Pages ({tipo})."
+
+#, python-brace-format
+msgid "Error inesperado al consultar lo programado ({tipo})."
+msgstr "Unexpected error while checking scheduled posts ({tipo})."
 
 #, python-brace-format
 msgid "Error {codigo} del servicio."
@@ -424,6 +554,9 @@ msgstr "Type the place you want to search for."
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
 
+msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
+msgstr "Wait for the current check to finish and try again."
+
 #, python-brace-format
 msgid "Esperando a que el servicio termine: {lista}…"
 msgstr "Waiting for the service to finish: {lista}…"
@@ -433,11 +566,22 @@ msgstr "Waiting for confirmation…"
 
 #, python-brace-format
 msgid ""
+"Estos vídeos no se han añadido:\n"
+"{errores}"
+msgstr ""
+"These videos were not added:\n"
+"{errores}"
+
+#, python-brace-format
+msgid ""
 "Estos vídeos no tienen audio y no se han añadido:\n"
 "{nombres}"
 msgstr ""
 "These videos have no audio and were not added:\n"
 "{nombres}"
+
+msgid "Estos vídeos ya tienen pasos hechos. Se mantienen tal como están; marca «Rehacer» en los que quieras volver a hacer."
+msgstr "These videos already have steps done. They are kept as they are; tick “Redo” on the ones you want to do again."
 
 msgid "Extracción de audio"
 msgstr "Audio extraction"
@@ -482,6 +626,9 @@ msgstr "An external tool is missing"
 msgid "Faltan dependencias"
 msgstr "Missing dependencies"
 
+msgid "Febrero"
+msgstr "February"
+
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr "Text file with your own terms for the transcription (one line per term; \"Term = variant, variant\")."
 
@@ -500,6 +647,9 @@ msgstr "Generates an SEO title, caption and hashtags (name_limpio.md) with Ollam
 msgid "Generando caption SEO"
 msgstr "Generating SEO caption"
 
+msgid "Guardando el vídeo"
+msgstr "Saving the video"
+
 msgid "Guardar"
 msgstr "Save"
 
@@ -508,6 +658,10 @@ msgstr "Hashtags:"
 
 msgid "Hay un vídeo procesándose. ¿Cancelar y salir?"
 msgstr "A video is being processed. Cancel and quit?"
+
+#, python-brace-format
+msgid "Hora de tu Mac ({zona})"
+msgstr "Your Mac's time ({zona})"
 
 msgid "Humor"
 msgstr "Comedy"
@@ -523,6 +677,15 @@ msgstr "Language:"
 
 msgid "Impacto"
 msgstr "Impact"
+
+msgid "Jue"
+msgstr "Thu"
+
+msgid "Julio"
+msgstr "July"
+
+msgid "Junio"
+msgstr "June"
 
 msgid "Junto al original (_limpio.mp4)"
 msgstr "Next to the original (_limpio.mp4)"
@@ -547,6 +710,9 @@ msgstr "Vertical conversion failed (code {codigo})"
 msgid "La detección de caras falló (código {codigo})"
 msgstr "Face detection failed (code {codigo})"
 
+msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
+msgstr "The scheduled time has already passed: it was not sent. Pick another one."
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr "The model's response is not valid JSON"
 
@@ -556,8 +722,16 @@ msgstr "The model's response is not valid: missing fields or wrong types"
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr "The transcript is empty; there is no text for the caption"
 
+#, python-brace-format
+msgid "La transcripción guardada de \"{nombre}\" está dañada ({error}): rehaz los subtítulos para volver a transcribir."
+msgstr "The saved transcript of \"{nombre}\" is damaged ({error}): redo the subtitles to transcribe again."
+
 msgid "La ubicación con que se publica cada vídeo"
 msgstr "The location every video is posted with"
+
+#, python-brace-format
+msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
+msgstr "The earlier version of the video that was saved there (\"{archivo}\") is also deleted."
 
 msgid "Leyendo la API key del Llavero…"
 msgstr "Reading the API key from the Keychain…"
@@ -568,6 +742,14 @@ msgstr "Free up space or empty audio_procesado/ and process again."
 msgid "Limpiando audio"
 msgstr "Cleaning audio"
 
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\"."
+msgstr "Cleaning the audio changes the base video of \"{nombre}\"."
+
+#, python-brace-format
+msgid "Limpiar el audio cambia la base de \"{nombre}\": se volverán a quemar los subtítulos. El caption se mantiene."
+msgstr "Cleaning the audio changes the base video of \"{nombre}\": the subtitles will be burned in again. The caption is kept."
+
 msgid "Limpiar hechos"
 msgstr "Clear finished"
 
@@ -577,6 +759,9 @@ msgstr "Audio cleaning"
 msgid "Llavero"
 msgstr "Keychain"
 
+msgid "Lo que tienes programado en el servicio"
+msgstr "What you have scheduled in the service"
+
 #, python-brace-format
 msgid "Logo de {app}"
 msgstr "{app} logo"
@@ -585,11 +770,17 @@ msgstr "{app} logo"
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
 msgstr "The last {n} terms don't fit in Whisper's hint. They are still used for corrections and in the caption."
 
+msgid "Lun"
+msgstr "Mon"
+
 msgid "Límite de subidas del plan alcanzado (429)."
 msgstr "Your plan's upload limit has been reached (429)."
 
-msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
-msgstr "Select at least one step: audio, silences, subtitles or vertical."
+msgid "Mar"
+msgstr "Tue"
+
+msgid "Marca al menos un paso."
+msgstr "Select at least one step."
 
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr "Tick at least one platform and enter a title."
@@ -602,6 +793,12 @@ msgstr "Brand…"
 
 msgid "Margen:"
 msgstr "Margin:"
+
+msgid "Marzo"
+msgstr "March"
+
+msgid "Mayo"
+msgstr "May"
 
 msgid "Mejora de voz"
 msgstr "Speech enhancement"
@@ -617,6 +814,9 @@ msgstr "My X account has Premium"
 
 msgid "Minimalista"
 msgstr "Minimal"
+
+msgid "Mié"
+msgstr "Wed"
 
 msgid "Modelo de Ollama no descargado"
 msgstr "Ollama model not downloaded"
@@ -637,6 +837,13 @@ msgstr "Slower: it analyses the video."
 msgid "Música"
 msgstr "Music"
 
+msgid "Nada que hacer"
+msgstr "Nothing to do"
+
+#, python-brace-format
+msgid "Nada que hacer en: {nombres}"
+msgstr "Nothing to do for: {nombres}"
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr "Needs ~{total} GB of memory ({modelo} GB for the model + context) and this Mac leaves ~{memoria} GB for models."
@@ -648,12 +855,23 @@ msgstr "No available ffmpeg supports subtitles (libass). Install ffmpeg-full: br
 msgid "No conectada en {servicio}"
 msgstr "Not connected in {servicio}"
 
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": arrástralo para rehacer el vídeo"
+msgstr "Cannot find the original of \"{nombre}\": drag it in to redo the video"
+
+#, python-brace-format
+msgid "No encuentro el original de \"{nombre}\": {ruta}"
+msgstr "Cannot find the original of \"{nombre}\": {ruta}"
+
 msgid "No enviado"
 msgstr "Not sent"
 
 #, python-brace-format
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr "Subtitle file not found: {ass}"
+
+msgid "No hay nada programado."
+msgstr "Nothing is scheduled."
 
 #, python-brace-format
 msgid "No hay páginas de Facebook conectadas en {servicio}."
@@ -684,6 +902,10 @@ msgid "No se encuentra el vídeo: {nombre}"
 msgstr "Video not found: {nombre}"
 
 #, python-brace-format
+msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
+msgstr "The record for this video ({id}) was not found. Drag in the original to process it again."
+
+#, python-brace-format
 msgid ""
 "No se encuentran en PATH: {faltan}\n"
 "Instálalas y vuelve a abrir la aplicación."
@@ -693,6 +915,10 @@ msgstr ""
 
 msgid "No se etiqueta en ninguna red."
 msgstr "Not tagged on any network."
+
+#, python-brace-format
+msgid "No se generó el FLAC: {flac}"
+msgstr "The FLAC was not produced: {flac}"
 
 #, python-brace-format
 msgid "No se generó el WAV: {wav}"
@@ -745,6 +971,10 @@ msgstr "Could not delete the TikTok place from the Keychain (code {codigo})."
 #, python-brace-format
 msgid "No se pudo borrar la clave del Llavero (código {codigo})."
 msgstr "Could not delete the key from the Keychain (code {codigo})."
+
+#, python-brace-format
+msgid "No se pudo cancelar: {motivo}"
+msgstr "Could not cancel: {motivo}"
 
 #, python-brace-format
 msgid "No se pudo cerrar ollama serve: {error}"
@@ -811,11 +1041,24 @@ msgstr "The check could not be prepared ({tipo})."
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr "Could not use the Keychain ({tipo})."
 
+msgid "No se puede añadir"
+msgstr "Cannot add"
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
+msgstr "Won't touch \"{ruta}\": it was changed outside the app or the app did not create it. Move or delete it and process again."
+
 msgid "Nombre del perfil en el servicio"
 msgstr "Profile name in the service"
 
 msgid "Noticias y política"
 msgstr "News & Politics"
+
+msgid "Noviembre"
+msgstr "November"
+
+msgid "Octubre"
+msgstr "October"
 
 #, python-brace-format
 msgid "Ocupa ~{total} GB, más de la mitad de los ~{memoria} GB que este Mac deja para modelos: puede ralentizar el equipo. Mejor uno más ligero."
@@ -854,6 +1097,12 @@ msgstr "Ollama responds but does not have the requested model locally."
 msgid "Olvidar clave"
 msgstr "Forget key"
 
+msgid "Olvidar este vídeo"
+msgstr "Forget this video"
+
+msgid "Ordenando las salidas"
+msgstr "Tidying up the outputs"
+
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr "To change the language the app will restart. Any process in progress will be cancelled. Restart now?"
 
@@ -861,8 +1110,15 @@ msgstr "To change the language the app will restart. Any process in progress wil
 msgid "Paso: {paso}"
 msgstr "Step: {paso}"
 
+msgid "Pasos ya hechos"
+msgstr "Steps already done"
+
 msgid "Pega la API key para guardarla"
 msgstr "Paste the API key to save it"
+
+#, python-brace-format
+msgid "Pendientes: {n}."
+msgstr "Pending: {n}."
 
 msgid "Perfil:"
 msgstr "Profile:"
@@ -907,14 +1163,40 @@ msgstr "Preview"
 msgid "Procesando en el servicio…"
 msgstr "Processing in the service…"
 
+msgid "Procesar"
+msgstr "Process"
+
 msgid "Proceso completado correctamente."
 msgstr "Process completed successfully."
 
 msgid "Proceso en curso"
 msgstr "Process running"
 
+msgid "Programada"
+msgstr "Scheduled post"
+
+msgid "Programadas"
+msgstr "Scheduled"
+
+msgid "Programadas…"
+msgstr "Scheduled…"
+
+#, python-brace-format
+msgid "Programado en {ok} de {total}"
+msgstr "Scheduled on {ok} of {total}"
+
+#, python-brace-format
+msgid "Programando: {lista}…"
+msgstr "Scheduling: {lista}…"
+
+msgid "Programar"
+msgstr "Schedule"
+
 msgid "Publicación cancelada: no se ha enviado nada."
 msgstr "Publishing cancelled: nothing was sent."
+
+msgid "Publicación programada sin referencia: cancélala en el servicio."
+msgstr "Scheduled post without a reference: cancel it in the service."
 
 msgid "Publicación sin referencia para consultar."
 msgstr "Post has no reference to check."
@@ -974,6 +1256,14 @@ msgstr "Cutting silences"
 msgid "Recortar silencios"
 msgstr "Cut silences"
 
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\"."
+msgstr "Cutting silences changes the timing of \"{nombre}\"."
+
+#, python-brace-format
+msgid "Recortar silencios cambia los tiempos de \"{nombre}\": se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr "Cutting silences changes the timing of \"{nombre}\": the subtitles will be transcribed and burned in again. The caption is kept."
+
 msgid "Recorte central"
 msgstr "Centre crop"
 
@@ -1001,12 +1291,24 @@ msgstr "Reels Karaoke"
 msgid "Reencodado del vídeo (h264_videotoolbox)"
 msgstr "Video re-encoding (h264_videotoolbox)"
 
+msgid "Regenerar también el vertical"
+msgstr "Also regenerate the vertical version"
+
+msgid "Rehacer"
+msgstr "Redo"
+
+msgid "Rehacerlo volverá a transcribir y quemar los subtítulos; el caption se mantiene."
+msgstr "Redoing it will transcribe and burn in the subtitles again; the caption is kept."
+
 #, python-brace-format
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
 msgstr "Unexpected response from the service (HTTP {codigo})."
 
 msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
 msgstr "Unexpected response from the service: it does not include the connected accounts."
+
+msgid "Respuesta inesperada del servicio: no trae las publicaciones programadas."
+msgstr "Unexpected response from the service: it does not include the scheduled posts."
 
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr "Unexpected response from the service: it does not include the Facebook Pages."
@@ -1039,12 +1341,27 @@ msgstr "Process output (last lines):"
 msgid "Salida:"
 msgstr "Output:"
 
+#, python-brace-format
+msgid "Se añadirán subtítulos a \"{nombre}\"."
+msgstr "Subtitles will be added to \"{nombre}\"."
+
+#, python-brace-format
+msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
+msgstr "The data saved for redoing steps of \"{nombre}\" ({mb} MB) will be deleted. The videos and their caption are not touched."
+
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr "Publishing to social networks is in progress. Wait for it to finish before quitting."
 
 #, python-brace-format
 msgid "Se etiqueta en: {redes}."
 msgstr "Tagged on: {redes}."
+
+#, python-brace-format
+msgid ""
+"Se programará «{titulo}» en:\n"
+"\n"
+"{resumen}"
+msgstr "“{titulo}” will be scheduled on:\n\n{resumen}"
 
 #, python-brace-format
 msgid ""
@@ -1055,6 +1372,9 @@ msgstr ""
 "“{titulo}” will be published to:\n"
 "\n"
 "{resumen}"
+
+msgid "Se puede programar como mucho a un año vista."
+msgstr "You can schedule up to one year ahead."
 
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr "Used for every post. In Publish you can change it for a single video."
@@ -1070,6 +1390,9 @@ msgstr "Select a finished video with SEO caption to see its title, caption and h
 
 msgid "Separación de hablantes"
 msgstr "Speaker separation"
+
+msgid "Septiembre"
+msgstr "September"
 
 msgid "Servicio no disponible (503). Prueba más tarde."
 msgstr "Service unavailable (503). Try again later."
@@ -1089,6 +1412,9 @@ msgstr "Still processing"
 #, python-brace-format
 msgid "Sigue procesándose en el servicio. Revisa {plataforma} en unos minutos."
 msgstr "Still processing in the service. Check {plataforma} in a few minutes."
+
+msgid "Siguiente ›"
+msgstr "Next ›"
 
 msgid "Silencios:"
 msgstr "Silences:"
@@ -1156,6 +1482,9 @@ msgstr "Audio track replacement"
 
 msgid "Sustituyendo pista de audio"
 msgstr "Replacing audio track"
+
+msgid "Sáb"
+msgstr "Sat"
 
 msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube, Instagram, X y Facebook. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
 msgstr "TSOTS publishes through a service that already has permission from TikTok, YouTube, Instagram, X and Facebook. Create an account in the service, connect your networks there and paste its API key here: it is stored in the macOS Keychain, never in the app."
@@ -1239,8 +1568,14 @@ msgstr "Vertical: {ruta}"
 msgid "Viajes y eventos"
 msgstr "Travel & Events"
 
+msgid "Vie"
+msgstr "Fri"
+
 msgid "Volver a leer los modelos instalados en Ollama (tras un ollama pull)."
 msgstr "Re-read the models installed in Ollama (after an ollama pull)."
+
+msgid "Volver a procesar"
+msgstr "Process again"
 
 #, python-brace-format
 msgid "Vía {servicio}"
@@ -1271,14 +1606,28 @@ msgid "X sin Premium admite vídeos de hasta {maximo}; este dura {duracion}."
 msgstr "X without Premium accepts videos up to {maximo}; this one is {duracion} long."
 
 #, python-brace-format
+msgid "Ya no estaban programadas (puede que ya se hayan publicado): {n}."
+msgstr "No longer scheduled (they may already be published): {n}."
+
+#, python-brace-format
+msgid "Ya programado en: {lista}."
+msgstr "Already scheduled on: {lista}."
+
+#, python-brace-format
 msgid "Ya publicado antes en: {lista}."
 msgstr "Already published on: {lista}."
+
+msgid "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."
+msgstr "It is being published or goes out in less than a minute: it cannot be cancelled."
 
 msgid "YouTube y Facebook no admiten ubicación. El lugar de TikTok es de tu cuenta: se guarda solo en el Llavero de macOS."
 msgstr "YouTube and Facebook don't support locations. The TikTok place belongs to your account: it is only stored in the macOS Keychain."
 
 msgid "argumentos inválidos: se requiere --config"
 msgstr "invalid arguments: --config is required"
+
+msgid "audio"
+msgstr "audio"
 
 msgid "auto-editor (31.5/31.6) no soporta la estructura de timestamps del stream H.264 de este vídeo: al escribir la salida genera un DTS no monótono y el muxer lo rechaza. Ocurre con exportaciones de algunos editores; el archivo original está bien."
 msgstr "auto-editor (31.5/31.6) does not support the timestamp structure of this video's H.264 stream: when writing the output it produces a non-monotonic DTS and the muxer rejects it. It happens with exports from some editors; the original file is fine."
@@ -1310,6 +1659,12 @@ msgstr "brew install ollama   (then: ollama pull qwen3.5:9b)"
 msgid "cancelado"
 msgstr "cancelled"
 
+msgid "caption"
+msgstr "caption"
+
+msgid "el recorte de silencios"
+msgstr "silence cutting"
+
 msgid "en espera"
 msgstr "waiting"
 
@@ -1327,6 +1682,9 @@ msgstr "done"
 
 msgid "la descarga no produjo ningún fichero"
 msgstr "the download produced no file"
+
+msgid "la limpieza de audio"
+msgstr "audio cleaning"
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
 msgstr "macOS denied access to the video or output folder (Desktop, Documents and external disks require permission)."
@@ -1351,14 +1709,26 @@ msgstr "processing"
 msgid "señal desconocida {numero}"
 msgstr "unknown signal {numero}"
 
+msgid "silencios"
+msgstr "silences"
+
 msgid "small (rápido)"
 msgstr "small (fast)"
 
 msgid "solo este vídeo"
 msgstr "this video only"
 
+msgid "subtítulos"
+msgstr "subtitles"
+
 msgid "turbo (recomendado)"
 msgstr "turbo (recommended)"
+
+msgid "vertical"
+msgstr "vertical"
+
+msgid "vertical desactualizado"
+msgstr "vertical out of date"
 
 #, python-brace-format
 msgid "{descripcion} falló (código {codigo})"
@@ -1393,6 +1763,10 @@ msgid "{plataforma} (borrador)"
 msgstr "{plataforma} (draft)"
 
 #, python-brace-format
+msgid "{plataforma} (programado para el {fecha})"
+msgstr "{plataforma} (scheduled for {fecha})"
+
+#, python-brace-format
 msgid "{plataforma} (sin confirmar)"
 msgstr "{plataforma} (unconfirmed)"
 
@@ -1400,12 +1774,30 @@ msgstr "{plataforma} (unconfirmed)"
 msgid "{plataforma} rechazó la publicación."
 msgstr "{plataforma} rejected the post."
 
+#, python-brace-format
+msgid "{redes}: «{titulo}» el {fecha}"
+msgstr "{redes}: “{titulo}” on {fecha}"
+
+#, python-brace-format
+msgid ""
+"¿Cancelar estas publicaciones?\n"
+"\n"
+"{lista}"
+msgstr "Cancel these posts?\n\n{lista}"
+
+#, python-brace-format
+msgid "¿Programar para el {fecha}?"
+msgstr "Schedule for {fecha}?"
+
 msgid "¿Publicar ahora?"
 msgstr "Publish now?"
 
 #, python-brace-format
 msgid "Última comprobación: {fecha}"
 msgstr "Last checked: {fecha}"
+
+msgid "‹ Anterior"
+msgstr "‹ Previous"
 
 msgid "■ Cancelar"
 msgstr "■ Cancel"
@@ -1418,6 +1810,10 @@ msgstr "⚠ A Page ID only contains digits."
 
 msgid "⚠ Eso parece un email. El perfil no es el email de tu cuenta: es el nombre del perfil dentro del servicio."
 msgstr "⚠ That looks like an email. The profile is not your account email: it is the name of the profile inside the service."
+
+#, python-brace-format
+msgid "⚠ Este vídeo ya está publicado o programado: {lista}. Si vuelves a publicarlo, saldrá repetido."
+msgstr "⚠ This video is already published or scheduled: {lista}. Publishing it again will create a duplicate."
 
 #, python-brace-format
 msgid "⚠ Este vídeo ya se publicó: {lista}. Si vuelves a publicarlo, saldrá repetido."
@@ -1454,6 +1850,10 @@ msgstr "✓ Published"
 msgid "✓ Publicado · <a href=\"{url}\">Abrir</a>"
 msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 
+#, python-brace-format
+msgid "📅 Programado para el {fecha}"
+msgstr "📅 Scheduled for {fecha}"
+
 #~ msgid "Al publicar, por defecto"
 #~ msgstr "Defaults when publishing"
 
@@ -1471,6 +1871,9 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 
 #~ msgid "Lugar:"
 #~ msgstr "Place:"
+
+#~ msgid "Marca al menos un paso: audio, silencios, subtítulos o vertical."
+#~ msgstr "Select at least one step: audio, silences, subtitles or vertical."
 
 #~ msgid "Modo"
 #~ msgstr "Mode"
@@ -1492,6 +1895,10 @@ msgstr "✓ Published · <a href=\"{url}\">Open</a>"
 
 #~ msgid "X y Facebook"
 #~ msgstr "X and Facebook"
+
+#, python-brace-format
+#~ msgid "{n} publicaciones pendientes."
+#~ msgstr "{n} pending posts."
 
 #~ msgid "⚠ El ID de Instagram solo tiene números: no se enviará."
 #~ msgstr "⚠ An Instagram ID only contains digits: it won't be sent."

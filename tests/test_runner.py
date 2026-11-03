@@ -9,6 +9,8 @@ import pytest
 
 from videopipeline import i18n, runner
 from videopipeline.config import PipelineConfig
+from videopipeline.ficha import Ficha, Huella
+from videopipeline.reproceso_plan import Accion, Decisiones, Plan
 from videopipeline.steps import PasoFallido
 
 
@@ -251,3 +253,186 @@ def test_done_ignora_vertical_de_ejecucion_anterior(tmp_path, monkeypatch, capsy
     assert runner.main(["--config", str(ruta)]) == 0
     final = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert final["salida_vertical"] is None
+
+
+def test_runner_sin_reproceso_igual_que_hoy(tmp_path, monkeypatch, capsys):
+    """Sin la clave `reproceso` corre `run`, sin tocar fichas, y `done` no
+    lleva `ficha`."""
+    ruta = _config_json(tmp_path, paso_vertical=True)
+
+    def no_debe_llamarse(*args, **kwargs):
+        raise AssertionError("sin `reproceso` no se usa la ficha")
+
+    for nombre in ("cargar", "planificar", "ejecutar"):
+        monkeypatch.setattr(runner, nombre, no_debe_llamarse)
+    monkeypatch.setattr(runner, "run", _run_que_escribe_vertical(True))
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 0
+    final = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert final == {
+        "done": True,
+        "salida": str(tmp_path / "out.mp4"),
+        "salida_vertical": str((tmp_path / "out_vertical.mp4").resolve()),
+    }
+
+
+ID_FICHA = "abc123def456"
+
+
+def _ficha(tmp_path: Path, vertical: bool = False, final: bool = True) -> Ficha:
+    """Una ficha con el horizontal (y, si se pide, su vertical) ya en disco, de
+    una ejecución anterior."""
+    huellas = {}
+    for campo, nombre in (("final", "v_limpio.mp4"), ("vertical", "v_limpio_vertical.mp4")):
+        if (campo == "final" and final) or (campo == "vertical" and vertical):
+            archivo = tmp_path / "salidas" / nombre
+            archivo.parent.mkdir(exist_ok=True)
+            archivo.write_bytes(b"X")
+            os.utime(archivo, (1_000_000, 1_000_000))
+            huellas[campo] = Huella.de(archivo)
+    return Ficha(id=ID_FICHA, nombre="v", carpeta_salida=tmp_path / "salidas",
+                 **huellas)
+
+
+def _reprocesar(tmp_path, monkeypatch, capsys, ficha, reproceso=None,
+                acciones=(Accion.CORTAR,), error="", escribe_vertical=False,
+                **config):
+    """Corre el runner con `reproceso` y la ficha/plan/ejecutor falsos.
+
+    Devuelve (código, líneas de stdout, llamadas registradas)."""
+    reproceso = {"ficha": ID_FICHA} if reproceso is None else reproceso
+    ruta = _config_json(tmp_path, **config)
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    ruta.write_text(json.dumps({**datos, "reproceso": reproceso}), encoding="utf-8")
+    llamadas = {"cargar": [], "planificar": [], "ejecutar": []}
+
+    def falso_cargar(id_):
+        llamadas["cargar"].append(id_)
+        return ficha
+
+    def falso_planificar(ficha_, config_, decisiones):
+        llamadas["planificar"].append((ficha_, config_, decisiones))
+        return Plan(list(acciones), config_, [], error)
+
+    def falso_ejecutar(ficha_, plan, on_progress):
+        llamadas["ejecutar"].append((ficha_, plan, on_progress))
+        on_progress({"step": 1, "total": 1, "label": "Cortando", "percent": None})
+        if escribe_vertical:
+            ficha_.vertical.ruta.write_bytes(b"NUEVO")
+        return ficha_.final.ruta
+
+    monkeypatch.setattr(runner, "cargar", falso_cargar)
+    monkeypatch.setattr(runner, "planificar", falso_planificar)
+    monkeypatch.setattr(runner, "ejecutar", falso_ejecutar)
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    codigo = runner.main(["--config", str(ruta)])
+    lineas = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
+    return codigo, lineas, llamadas
+
+
+def test_runner_con_reproceso_planifica_y_ejecuta(tmp_path, monkeypatch, capsys):
+    ficha = _ficha(tmp_path, vertical=True)
+    codigo, lineas, llamadas = _reprocesar(
+        tmp_path, monkeypatch, capsys, ficha,
+        {"ficha": ID_FICHA, "rehacer": ["audio", "caption"],
+         "regenerar_vertical": True},
+        escribe_vertical=True, paso_vertical=True, margen="0.5s")
+    assert codigo == 0
+    assert llamadas["cargar"] == [ID_FICHA]
+    (ficha_p, config, decisiones), = llamadas["planificar"]
+    assert ficha_p is ficha
+    assert config.margen == "0.5s" and config.video == tmp_path / "v.mp4"
+    assert decisiones == Decisiones(frozenset({"audio", "caption"}), True)
+    (ficha_e, plan, on_progress), = llamadas["ejecutar"]
+    assert ficha_e is ficha and plan.acciones == [Accion.CORTAR]
+    assert callable(on_progress)
+    assert lineas[0]["label"] == "Cortando"  # el progreso del ejecutor llega a stdout
+    assert lineas[-1] == {
+        "done": True,
+        "salida": str(ficha.final.ruta),
+        "salida_vertical": str(ficha.vertical.ruta),
+        "ficha": ID_FICHA,
+    }
+    assert "OK" in next((tmp_path / "logs").glob("v_*.log")).read_text(encoding="utf-8")
+
+
+def test_runner_reproceso_sin_decisiones_usa_los_valores_por_defecto(
+        tmp_path, monkeypatch, capsys):
+    _, _, llamadas = _reprocesar(tmp_path, monkeypatch, capsys, _ficha(tmp_path),
+                                 {"ficha": ID_FICHA})
+    assert llamadas["planificar"][0][2] == Decisiones()
+
+
+def test_runner_reproceso_admite_solo_caption(tmp_path, monkeypatch, capsys):
+    """Sin ningún paso de vídeo marcado vale «solo caption» (no se exige uno)."""
+    codigo, lineas, _ = _reprocesar(
+        tmp_path, monkeypatch, capsys, _ficha(tmp_path), paso_audio=False,
+        paso_silencios=False, caption_seo=True)
+    assert codigo == 0 and lineas[-1]["done"] is True
+
+
+def test_runner_reproceso_valida_el_resto_de_la_config(tmp_path, monkeypatch, capsys):
+    codigo, lineas, llamadas = _reprocesar(
+        tmp_path, monkeypatch, capsys, _ficha(tmp_path), encuadre="inventado")
+    assert codigo == 1 and "encuadre" in lineas[-1]["error"]
+    assert llamadas["cargar"] == []
+
+
+def test_runner_ficha_inexistente_falla(tmp_path, monkeypatch, capsys):
+    codigo, lineas, llamadas = _reprocesar(tmp_path, monkeypatch, capsys, None)
+    assert codigo == 1
+    assert ID_FICHA in lineas[-1]["error"]
+    assert llamadas["planificar"] == [] and llamadas["ejecutar"] == []
+
+
+def test_runner_plan_con_error_falla_con_su_texto(tmp_path, monkeypatch, capsys):
+    codigo, lineas, llamadas = _reprocesar(
+        tmp_path, monkeypatch, capsys, _ficha(tmp_path),
+        acciones=(), error="Falta el original de v.")
+    assert codigo == 1
+    assert lineas[-1]["error"] == "Falta el original de v."
+    assert "log" in lineas[-1] and "diagnostico" in lineas[-1]
+    assert llamadas["ejecutar"] == []
+
+
+def test_runner_plan_vacio_termina_sin_ejecutar(tmp_path, monkeypatch, capsys):
+    ficha = _ficha(tmp_path, vertical=True)
+    codigo, lineas, llamadas = _reprocesar(
+        tmp_path, monkeypatch, capsys, ficha, acciones=())
+    assert codigo == 0
+    assert llamadas["ejecutar"] == []
+    # No escribió nada: el vertical que ya había no cuenta como nuevo.
+    assert lineas[-1] == {
+        "done": True, "salida": str(ficha.final.ruta), "salida_vertical": None,
+        "ficha": ID_FICHA}
+
+
+def test_runner_plan_vacio_sin_salida_falla(tmp_path, monkeypatch, capsys):
+    codigo, lineas, llamadas = _reprocesar(
+        tmp_path, monkeypatch, capsys, _ficha(tmp_path, final=False), acciones=())
+    assert codigo == 1 and "error" in lineas[-1]
+    assert llamadas["ejecutar"] == []
+
+
+@pytest.mark.parametrize("escribe", [True, False])
+def test_runner_reproceso_vertical_solo_si_es_de_esta_ejecucion(
+        tmp_path, monkeypatch, capsys, escribe):
+    ficha = _ficha(tmp_path, vertical=True)
+    _, lineas, _ = _reprocesar(tmp_path, monkeypatch, capsys, ficha,
+                               escribe_vertical=escribe)
+    esperada = str(ficha.vertical.ruta) if escribe else None
+    assert lineas[-1]["salida_vertical"] == esperada
+
+
+def test_runner_reproceso_de_un_vertical_unico(tmp_path, monkeypatch, capsys):
+    """Sin horizontal la salida es el propio vertical y no hay compañero."""
+    unico = tmp_path / "salidas" / "v_vertical.mp4"
+    unico.parent.mkdir()
+    unico.write_bytes(b"V")
+    ficha = Ficha(id=ID_FICHA, nombre="v", carpeta_salida=unico.parent,
+                  final=Huella.de(unico))
+    _, lineas, _ = _reprocesar(tmp_path, monkeypatch, capsys, ficha)
+    assert lineas[-1]["salida"] == str(ficha.final.ruta)
+    assert lineas[-1]["salida_vertical"] is None

@@ -200,6 +200,22 @@ def remux(
         )
 
 
+def cmd_a_flac(ffmpeg: str, wav: Path, flac: Path) -> list[str]:
+    """El audio limpio se guarda en la ficha sin pérdida y en menos espacio."""
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(wav), "-c:a", "flac", str(flac),
+    ]
+
+
+def a_flac(wav: Path, flac: Path) -> None:
+    flac.parent.mkdir(parents=True, exist_ok=True)
+    _ejecutar(cmd_a_flac(_binario("ffmpeg"), wav, flac),
+              _("Compresión del audio limpio"))
+    if not flac.is_file() or flac.stat().st_size == 0:
+        raise PasoFallido(_("No se generó el FLAC: {flac}").format(flac=flac))
+
+
 def _parsear_progreso(linea: str) -> float | None:
     """Extrae el porcentaje de una línea de progreso de auto-editor.
 

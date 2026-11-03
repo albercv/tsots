@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -155,6 +156,43 @@ def generar_srt(bloques: list[Bloque], ruta: Path) -> None:
         lineas.append("")
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text("\n".join(lineas), encoding="utf-8")
+
+
+_TIEMPO_SRT = r"(\d+):(\d{2}):(\d{2})[,.](\d{1,3})"
+_LINEA_TIEMPOS = re.compile(rf"{_TIEMPO_SRT}\s*-->\s*{_TIEMPO_SRT}")
+
+
+def _segundos_srt(h: str, m: str, s: str, ms: str) -> float:
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms.ljust(3, "0")) / 1000
+
+
+def leer_srt(ruta: Path) -> list[Palabra]:
+    """Palabras de un .srt. El .srt solo guarda el tiempo del bloque, así que
+    las palabras se reparten a partes iguales dentro de él. `[]` si no se
+    puede leer o no tiene bloques válidos."""
+    try:
+        texto = ruta.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeDecodeError):
+        return []
+    palabras: list[Palabra] = []
+    for bloque in re.split(r"\n\s*\n", texto.replace("\r\n", "\n")):
+        lineas = bloque.strip().splitlines()
+        for i, linea in enumerate(lineas):
+            tiempos = _LINEA_TIEMPOS.search(linea)
+            if tiempos:
+                break
+        else:
+            continue
+        grupos = tiempos.groups()
+        inicio, fin = _segundos_srt(*grupos[:4]), _segundos_srt(*grupos[4:])
+        textos = " ".join(lineas[i + 1:]).split()
+        for n, texto in enumerate(textos):
+            palabras.append(Palabra(
+                texto,
+                inicio + (fin - inicio) * n / len(textos),
+                inicio + (fin - inicio) * (n + 1) / len(textos),
+            ))
+    return palabras
 
 
 def _tiempo_ass(segundos: float) -> str:

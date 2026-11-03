@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from PySide6.QtCore import QSettings, Qt
 
-from app.queue_model import EstadoTrabajo, ModeloCola
+from app.queue_model import EstadoTrabajo, ModeloCola, resumen_de
 from app.settings import Ajustes
+from videopipeline.ficha import BASE, CAPTION, HORIZONTAL, VERTICAL, Artefacto, Ficha
 
 
 def _ajustes(tmp_path) -> Ajustes:
@@ -34,17 +36,17 @@ def test_panel_persistido(tmp_path):
 
 def test_cola_anadir_y_duplicados(qtbot):
     m = ModeloCola()
-    añadidos = m.anadir([Path("/v/a.mp4"), Path("/v/b.mp4")])
+    añadidos = m.anadir([(Path("/v/a.mp4"), None), (Path("/v/b.mp4"), None)])
     assert len(añadidos) == 2
     assert m.rowCount() == 2
     # Duplicado pendiente ignorado
-    assert m.anadir([Path("/v/a.mp4")]) == []
+    assert m.anadir([(Path("/v/a.mp4"), None)]) == []
     assert m.rowCount() == 2
 
 
 def test_cola_estados_y_display(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     assert m.trabajo(0).estado == EstadoTrabajo.ESPERA
     m.actualizar(0, estado=EstadoTrabajo.PROCESANDO, percent=42.0,
                  etiqueta="Limpiando audio")
@@ -54,7 +56,7 @@ def test_cola_estados_y_display(qtbot):
 
 def test_cola_pendientes_y_limpiar_hechos(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4"), Path("/v/b.mp4"), Path("/v/c.mp4")])
+    m.anadir([(Path(f"/v/{n}.mp4"), None) for n in "abc"])
     m.actualizar(0, estado=EstadoTrabajo.HECHO)
     m.actualizar(1, estado=EstadoTrabajo.ERROR, error="boom")
     assert m.pendientes() == [2]
@@ -64,7 +66,7 @@ def test_cola_pendientes_y_limpiar_hechos(qtbot):
 
 def test_cola_quitar(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4"), Path("/v/b.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None), (Path("/v/b.mp4"), None)])
     m.quitar(0)
     assert m.rowCount() == 1
     assert m.trabajo(0).ruta == Path("/v/b.mp4")
@@ -72,7 +74,7 @@ def test_cola_quitar(qtbot):
 
 def test_cola_quitar_fuera_de_rango(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     assert m.rowCount() == 1
     # Out-of-range quitar should not raise and model should remain valid
     m.quitar(5)
@@ -84,14 +86,14 @@ def test_cola_quitar_fuera_de_rango(qtbot):
 
 def test_cola_anadir_duplicado_en_mismo_lote(qtbot):
     m = ModeloCola()
-    añadidos = m.anadir([Path("/v/a.mp4"), Path("/v/a.mp4")])
+    añadidos = m.anadir([(Path("/v/a.mp4"), None), (Path("/v/a.mp4"), None)])
     assert len(añadidos) == 1
     assert m.rowCount() == 1
 
 
 def test_foreground_por_estado(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4"), Path("/v/b.mp4"), Path("/v/c.mp4"), Path("/v/d.mp4")])
+    m.anadir([(Path(f"/v/{n}.mp4"), None) for n in "abcd"])
     m.actualizar(0, estado=EstadoTrabajo.ERROR, error="boom")
     m.actualizar(1, estado=EstadoTrabajo.CANCELADO)
     # fila 2 queda en ESPERA, fila 3 pasa a HECHO
@@ -110,7 +112,7 @@ def test_foreground_por_estado(qtbot):
 
 def test_aviso_en_display_y_tooltip(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     m.actualizar(0, estado=EstadoTrabajo.HECHO, aviso="subs fallaron")
     texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
     assert "⚠" in texto
@@ -119,7 +121,7 @@ def test_aviso_en_display_y_tooltip(qtbot):
 
 def test_error_muestra_titulo_en_la_fila(qtbot):
     m = ModeloCola()
-    m.anadir([Path("/v/a.mp4")])
+    m.anadir([(Path("/v/a.mp4"), None)])
     m.actualizar(
         0, estado=EstadoTrabajo.ERROR,
         error="auto-editor no pudo escribir el vídeo\nCausa: X\nQué hacer: Y",
@@ -158,10 +160,95 @@ def test_ajustes_glosario_persistido(tmp_path):
 
 def test_fila_muestra_vertical():
     modelo = ModeloCola()
-    modelo.anadir([Path("/v/a.mp4")])
+    modelo.anadir([(Path("/v/a.mp4"), None)])
     modelo.actualizar(0, estado=EstadoTrabajo.HECHO, salida=Path("/v/a_limpio.mp4"),
                       salida_vertical=Path("/v/a_limpio_vertical.mp4"))
     indice = modelo.index(0)
     assert "+ vertical" in modelo.data(indice, Qt.ItemDataRole.DisplayRole)
     assert "/v/a_limpio_vertical.mp4" in modelo.data(
         indice, Qt.ItemDataRole.ToolTipRole)
+
+
+TERMINADOS = (EstadoTrabajo.HECHO, EstadoTrabajo.ERROR, EstadoTrabajo.CANCELADO)
+
+
+@pytest.mark.parametrize("estado", TERMINADOS)
+def test_anadir_misma_ficha_reactiva_en_vez_de_duplicar(qtbot, estado):
+    m = ModeloCola()
+    assert m.anadir([(Path("/v/a.mp4"), "f1"), (Path("/v/b.mp4"), "f2")]) == [0, 1]
+    m.actualizar(1, estado=estado, error="boom", aviso="ojo", percent=40.0)
+    assert m.anadir([(Path("/v/b.mp4"), "f2")]) == [1]
+    assert m.rowCount() == 2
+    t = m.trabajo(1)
+    assert (t.estado, t.error, t.aviso, t.percent) == (
+        EstadoTrabajo.ESPERA, "", "", None)
+
+
+@pytest.mark.parametrize(
+    "estado", (EstadoTrabajo.ESPERA, EstadoTrabajo.PROCESANDO))
+def test_anadir_misma_ficha_en_espera_no_cambia(qtbot, estado):
+    m = ModeloCola()
+    m.anadir([(Path("/v/a.mp4"), "f1")])
+    m.actualizar(0, estado=estado, percent=40.0, aviso="ojo")
+    assert m.anadir([(Path("/v/a.mp4"), "f1")]) == []
+    assert m.rowCount() == 1
+    t = m.trabajo(0)
+    assert (t.estado, t.percent, t.aviso) == (estado, 40.0, "ojo")
+
+
+def test_anadir_ficha_no_deduplica_por_ruta_y_si_en_el_mismo_lote(qtbot):
+    m = ModeloCola()
+    # Otra ficha con la misma ruta es otra fila; la misma ficha dos veces, no.
+    assert m.anadir([(Path("/v/a.mp4"), "f1"), (Path("/v/a.mp4"), "f2"),
+                     (Path("/v/a.mp4"), "f1")]) == [0, 1]
+    assert [m.fila_de_ficha(i) for i in ("f1", "f2", "nada")] == [0, 1, None]
+    # Sin ficha se sigue deduplicando por ruta contra lo pendiente.
+    assert m.anadir([(Path("/v/a.mp4"), None)]) == []
+
+
+def test_volver_a_espera_solo_terminados(qtbot):
+    m = ModeloCola()
+    m.anadir([(Path(f"/v/{n}.mp4"), None) for n in "abcde"])
+    m.actualizar(1, estado=EstadoTrabajo.PROCESANDO, percent=10.0)
+    m.actualizar(2, estado=EstadoTrabajo.HECHO, aviso="ojo")
+    m.actualizar(3, estado=EstadoTrabajo.ERROR, error="boom", diagnostico={"x": 1})
+    m.actualizar(4, estado=EstadoTrabajo.CANCELADO, error="Cancelado")
+    m.volver_a_espera([0, 1, 2, 3, 4])
+    assert [m.trabajo(i).estado for i in range(5)] == [
+        EstadoTrabajo.ESPERA, EstadoTrabajo.PROCESANDO, EstadoTrabajo.ESPERA,
+        EstadoTrabajo.ESPERA, EstadoTrabajo.ESPERA]
+    assert m.trabajo(1).percent == 10.0  # el que procesa no se toca
+    assert (m.trabajo(2).aviso, m.trabajo(3).error, m.trabajo(3).diagnostico,
+            m.trabajo(4).error) == ("", "", None, "")
+
+
+def test_fila_muestra_resumen_y_tamano(qtbot):
+    m = ModeloCola()
+    m.anadir([(Path("/v/a.mp4"), "f1"), (Path("/v/b.mp4"), "f2")])
+    m.actualizar(0, resumen="✓ audio · silencios", ocupa=312_400_000)
+    texto = m.data(m.index(0), Qt.ItemDataRole.DisplayRole)
+    assert "✓ audio · silencios" in texto and "· 312 MB" in texto
+    # Sin resumen ni tamaño la fila queda como siempre.
+    assert m.data(m.index(1), Qt.ItemDataRole.DisplayRole) == "b.mp4 — en espera"
+
+
+def _ficha(artefactos, desactualizado=()):
+    return Ficha(id="f1", nombre="a", carpeta_salida=Path("/v"),
+                 artefactos=artefactos, desactualizado=set(desactualizado))
+
+
+def test_resumen_de_ficha():
+    assert resumen_de(_ficha({})) == ""
+    completa = {
+        BASE: Artefacto("k", None, {"audio": {}, "silencios": {}}),
+        HORIZONTAL: Artefacto("k", "h.mp4", {"subtitulos": {}}),
+        CAPTION: Artefacto("k", "caption.md"),
+    }
+    assert resumen_de(_ficha(completa)) == "✓ audio · silencios · subtítulos · caption"
+    con_vertical = {**completa, VERTICAL: Artefacto("k", "v.mp4")}
+    assert resumen_de(_ficha(con_vertical)) == (
+        "✓ audio · silencios · subtítulos · caption · vertical")
+    # Un vertical desactualizado se avisa una sola vez, haya artefacto o no.
+    esperado = "✓ audio · silencios · subtítulos · caption · vertical desactualizado"
+    assert resumen_de(_ficha(completa, {"vertical"})) == esperado
+    assert resumen_de(_ficha(con_vertical, {"vertical"})) == esperado

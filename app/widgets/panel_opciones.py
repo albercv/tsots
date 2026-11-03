@@ -352,12 +352,9 @@ class PanelOpciones(QWidget):
             "vertical": self.check_vertical,
         }
 
-    def hay_pasos_de_video(self) -> bool:
-        """Hay algo que hacer con el vídeo (el caption solo no basta)."""
-        return any(c.isChecked() for c in (
-            self.check_audio, self.check_silencios, self.check_subtitulos,
-            self.check_vertical,
-        ))
+    def hay_pasos(self) -> bool:
+        """Hay algo que hacer. El caption solo vale: se pide sobre un vídeo ya procesado."""
+        return any(c.isChecked() for c in self._casillas_pasos().values())
 
     def _marcar_todo(self, *args) -> None:
         casillas = self._casillas_pasos().values()

@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Callable, Iterable
 
@@ -30,6 +31,8 @@ Progreso = Callable[[Plataforma, Estado, "Resultado | None"], None]
 
 INTERVALO_SONDEO = 10.0
 ESPERA_MAXIMA = 15 * 60.0
+# Lo programado debe llegar al servicio con al menos este margen.
+MARGEN_PROGRAMADA = timedelta(minutes=1)
 
 
 def modo_de(plataforma: Plataforma, opciones: Opciones) -> str:
@@ -73,6 +76,9 @@ def _fallo(plataforma: Plataforma, excepcion: BaseException) -> Resultado:
 
 
 def _describir(resultado: Resultado) -> str:
+    if resultado.programada is not None:
+        return (f"programada para {resultado.programada.isoformat(timespec='minutes')} "
+                f"(referencia {resultado.referencia or '-'})")
     if resultado.ok:
         return f"OK {resultado.url or '(sin enlace)'}"
     if resultado.pendiente:
@@ -94,6 +100,7 @@ def publicar(
     reloj: Callable[[], float] = time.monotonic,
     intervalo: float | None = None,
     espera_maxima: float | None = None,
+    ahora: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> dict[Plataforma, Resultado]:
     """Publica en las plataformas elegidas, en el orden fijo de `ORDEN`
     (TikTok → YouTube → Instagram → X → Facebook). Un fallo en una no
@@ -117,7 +124,9 @@ def publicar(
             try:
                 registro.anotar(publicacion.video, plataforma, resultado.url,
                                 nombre_proveedor, modo_de(plataforma, opciones),
-                                sin_confirmar=not resultado.ok)
+                                sin_confirmar=not resultado.ok,
+                                programada=resultado.programada,
+                                referencia=resultado.referencia if resultado.programada else "")
             except OSError:
                 # El vídeo ya está publicado; perder la nota no es grave.
                 log.warning("%s: no se pudo anotar en el registro local", plataforma.nombre,
@@ -129,6 +138,12 @@ def publicar(
         if cancelado():
             log.info("Cancelado antes de %s", plataforma.nombre)
             break
+        if opciones.programada is not None and opciones.programada <= ahora() + MARGEN_PROGRAMADA:
+            log.warning("%s: la hora programada (%s) ya ha pasado: no se envía",
+                        plataforma.nombre, opciones.programada.isoformat(timespec="minutes"))
+            terminar(plataforma, Resultado(plataforma, ok=False, error=_(
+                "La hora programada ya ha pasado: no se ha enviado. Elige otra.")))
+            continue
         avisar(plataforma, Estado.SUBIENDO, None)
         log.info("%s: enviando (modo %s)", plataforma.nombre, modo_de(plataforma, opciones))
         inicio = reloj()

@@ -14,8 +14,11 @@ from pathlib import Path
 from . import i18n
 from .config import PipelineConfig
 from .errores import explicar
+from .ficha import cargar
 from .i18n import _
-from .pipeline import run
+from .pipeline import Progreso, run
+from .reproceso import ejecutar
+from .reproceso_plan import Decisiones, planificar
 from .steps import BASE_DIR, PasoFallido
 
 # Un log por trabajo: logs/<vídeo>_<YYYYmmdd-HHMMSS>.log. Guarda config,
@@ -59,6 +62,42 @@ def _ruta_log(config_path: Path) -> Path:
     except (OSError, ValueError, AttributeError):
         stem = "trabajo"
     return DIR_LOGS / f"{stem}_{datetime.now():%Y%m%d-%H%M%S}.log"
+
+
+def _reprocesar(config: PipelineConfig, reproceso: dict, on_progress: Progreso
+                ) -> tuple[Path, Path | None]:
+    """Una pasada sobre la ficha. Devuelve la salida principal y el vertical que
+    acompaña a un horizontal (si lo hay)."""
+    # «Solo caption» no marca ningún paso de vídeo.
+    config.validar(exigir_paso_de_video=False)
+    ficha = cargar(reproceso["ficha"])
+    if ficha is None:
+        raise PasoFallido(
+            _("No se encuentra la ficha de este vídeo ({id}). Arrastra el "
+              "original para procesarlo de nuevo.").format(id=reproceso["ficha"]))
+    plan = planificar(ficha, config, Decisiones(
+        rehacer=frozenset(reproceso.get("rehacer", ())),
+        regenerar_vertical=bool(reproceso.get("regenerar_vertical", False))))
+    if plan.error:
+        raise PasoFallido(plan.error)
+    if plan.vacio:  # nada que hacer: se muestra lo que ya hay
+        if ficha.final is None:
+            raise PasoFallido(
+                _('"{nombre}" no tiene ninguna salida que mostrar. Arrastra el '
+                  'original para procesarlo de nuevo.').format(nombre=ficha.nombre))
+        salida = ficha.final.ruta
+    else:
+        salida = ejecutar(ficha, plan, on_progress)  # deja la ficha al día
+    return salida, ficha.vertical.ruta if ficha.vertical else None
+
+
+def _escrito_ahora(ruta: Path | None, inicio: float) -> Path | None:
+    """La ruta resuelta si es un archivo escrito en esta ejecución: si falló, el
+    de una ejecución anterior sigue en disco y no debe parecer nuevo."""
+    if ruta is None:
+        return None
+    ruta = ruta.expanduser().resolve()
+    return ruta if ruta.is_file() and ruta.stat().st_mtime >= inicio else None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -121,13 +160,18 @@ def main(argv: list[str] | None = None) -> int:
 
     inicio = time.time() - 1  # margen para relojes de sistemas de archivos gruesos
     try:
-        config = PipelineConfig.from_json(
-            config_path.read_text(encoding="utf-8")
-        )
+        datos = json.loads(config_path.read_text(encoding="utf-8"))
+        reproceso = datos.pop("reproceso", None)  # no es un campo de PipelineConfig
+        config = PipelineConfig.from_datos(datos)
         i18n.instalar(config.idioma_ui)
         log.escribir("config: " + json.dumps(asdict(config), ensure_ascii=False,
                                              default=str))
-        salida = run(config, on_progress)
+        if reproceso is None:
+            salida = run(config, on_progress)
+            vertical = config.ruta_salida_vertical()
+        else:
+            log.escribir("reproceso: " + json.dumps(reproceso, ensure_ascii=False))
+            salida, vertical = _reprocesar(config, reproceso, on_progress)
     except PasoFallido as error:
         return fallar(str(error), error.detalle)
     except Exception as error:  # noqa: BLE001 — el subproceso reporta todo por JSON
@@ -136,22 +180,18 @@ def main(argv: list[str] | None = None) -> int:
             "".join(traceback.format_exception(error)),
         )
 
-    # Solo cuenta un vertical escrito en esta ejecución: si falló, el de una
-    # ejecución anterior sigue en disco y no debe parecer nuevo.
-    vertical = config.ruta_salida_vertical()
-    if vertical is not None:
-        vertical = vertical.expanduser().resolve()
-    nuevo = (
-        vertical is not None and vertical.is_file()
-        and vertical.stat().st_mtime >= inicio
-    )
-    log.escribir(f"OK · salida={salida}" + (f" · vertical={vertical}" if nuevo else ""))
+    vertical = _escrito_ahora(vertical, inicio)
+    log.escribir(
+        f"OK · salida={salida}" + (f" · vertical={vertical}" if vertical else ""))
     log.cerrar()
-    _imprimir({
+    evento = {
         "done": True,
         "salida": str(salida),
-        "salida_vertical": str(vertical) if nuevo else None,
-    })
+        "salida_vertical": str(vertical) if vertical else None,
+    }
+    if reproceso is not None:
+        evento["ficha"] = reproceso["ficha"]
+    _imprimir(evento)
     return 0
 
 

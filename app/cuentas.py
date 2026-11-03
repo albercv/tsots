@@ -10,7 +10,7 @@ from typing import Callable
 
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma
+from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma, Programada
 
 from . import credenciales
 
@@ -78,6 +78,53 @@ def buscar_lugares(llavero, fabrica: Fabrica, nombre: str, datos: dict, texto: s
     except Exception as e:
         return None, _("Error inesperado al buscar el lugar ({tipo}).").format(
             tipo=type(e).__name__)
+
+
+def programadas(llavero, fabrica: Fabrica, nombre: str,
+                datos: dict) -> tuple[list[Programada] | None, str]:
+    """Lo programado en el servicio: `(lista, "")` o `(None, motivo)`. Para
+    fuera del hilo de la interfaz: nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
+    if servicio is None:
+        return None, error
+    try:
+        return servicio.programadas(), ""
+    except proveedores.ErrorConsulta as e:
+        return None, str(e)
+    except Exception as e:
+        return None, _("Error inesperado al consultar lo programado ({tipo}).").format(
+            tipo=type(e).__name__)
+
+
+@dataclass(frozen=True)
+class Cancelacion:
+    """Resultado de `cancelar`: las canceladas, las que ya no estaban
+    programadas (canceladas antes o ya publicadas) y el motivo del primer
+    fallo ("" si no hubo)."""
+
+    canceladas: tuple[str, ...] = ()
+    ausentes: tuple[str, ...] = ()
+    error: str = ""
+
+
+def cancelar(llavero, fabrica: Fabrica, nombre: str, datos: dict,
+             referencias: list[str]) -> Cancelacion:
+    """Cancela en orden; para en el primer fallo. Nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
+    if servicio is None:
+        return Cancelacion(error=error)
+    canceladas: list[str] = []
+    ausentes: list[str] = []
+    for referencia in referencias:
+        try:
+            (canceladas if servicio.cancelar(referencia) else ausentes).append(referencia)
+        except proveedores.ErrorConsulta as e:
+            error = str(e)
+        except Exception as e:
+            error = _("Error inesperado al cancelar ({tipo}).").format(tipo=type(e).__name__)
+        if error:
+            break
+    return Cancelacion(tuple(canceladas), tuple(ausentes), error)
 
 
 def _servicio(llavero, fabrica: Fabrica, nombre: str, datos: dict,

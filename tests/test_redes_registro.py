@@ -55,3 +55,42 @@ def test_entrada_sin_confirmar(tmp_path):
     [entrada] = registro.leer(video)
     assert entrada.sin_confirmar
     assert registro.ya_publicado(video) == {Plataforma.INSTAGRAM}
+
+
+def test_programada_y_referencia_ida_y_vuelta(tmp_path):
+    video = tmp_path / "v.mp4"
+    registro.anotar(video, Plataforma.YOUTUBE, "https://yt/1", "p", "publico")
+    registro.anotar(video, Plataforma.TIKTOK, "", "p", "borrador",
+                    programada=datetime(2026, 11, 3, 18, 0), referencia="j1")
+    datos = json.loads(registro.ruta(video).read_text(encoding="utf-8"))
+    publicada, programada = datos["publicaciones"]
+    assert "programada" not in publicada and "referencia" not in publicada
+    assert programada["programada"] == "2026-11-03T18:00:00"
+    assert programada["referencia"] == "j1"
+    entrada = registro.ultimas(video)[Plataforma.TIKTOK]
+    assert entrada.programada == "2026-11-03T18:00:00" and entrada.referencia == "j1"
+
+
+def test_olvidar_quita_solo_esa_referencia(tmp_path):
+    video = tmp_path / "v.mp4"
+    registro.anotar(video, Plataforma.TIKTOK, "", "p", programada=datetime(2026, 11, 3, 18),
+                    referencia="j1")
+    registro.anotar(video, Plataforma.YOUTUBE, "", "p", programada=datetime(2026, 11, 3, 18),
+                    referencia="j2")
+    assert registro.olvidar(video, "j1") is True
+    assert [e.referencia for e in registro.leer(video)] == ["j2"]
+    antes = registro.ruta(video).read_text(encoding="utf-8")
+    assert registro.olvidar(video, "no-existe") is False
+    assert registro.olvidar(video, "") is False
+    assert registro.ruta(video).read_text(encoding="utf-8") == antes
+    assert registro.olvidar(tmp_path / "otro.mp4", "j2") is False
+    assert not list(tmp_path.glob(".*.tmp"))
+
+
+def test_registro_antiguo_sin_campos_nuevos(tmp_path):
+    video = tmp_path / "v.mp4"
+    registro.ruta(video).write_text(json.dumps({"version": 1, "publicaciones": [
+        {"plataforma": "tiktok", "fecha": "2026-09-23T12:00:00", "url": "", "modo": "borrador"}]}),
+        encoding="utf-8")
+    [entrada] = registro.leer(video)
+    assert entrada.programada == "" and entrada.referencia == ""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Callable
 
@@ -261,11 +262,14 @@ def _fase_base(config: PipelineConfig, video: Path, tmp_final: Path,
 def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                    bloques: list[Bloque] | None, trabajo: Path,
                    on_progress: Progreso | None, paso: int, total: int,
-                   degradar: bool, desde_original: bool) -> None:
+                   degradar: bool, desde_original: bool,
+                   seguimiento: tuple[int | None, Path] | None = None) -> None:
     """Convierte `fuente` (sin subtítulos) a vertical y lo publica en `destino`.
 
     Con `degradar`, un fallo deja solo un aviso (el horizontal ya está
-    publicado); sin él, el error se propaga.
+    publicado); sin él, el error se propaga. Con `seguimiento` (x inicial y
+    comandos, ya calculados) no se detecta la cara otra vez: x None es
+    recorte central.
     """
     tmp = destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
     ass = trabajo / "subs_vertical.ass"
@@ -279,7 +283,14 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
             _avisar(on_progress,
                     _("El vídeo ya era vertical: se reescala con barras."))
             encuadre = "barras"
-        if config.encuadre == "cara":
+        if config.encuadre == "cara" and seguimiento is not None:
+            if encuadre == "cara":
+                x_cara, ruta_comandos = seguimiento
+                if x_cara is None:
+                    encuadre = "central"
+                else:  # el filtro lee `cara.cmd` en `trabajo`
+                    shutil.copyfile(ruta_comandos, comandos)
+        elif config.encuadre == "cara":
             if encuadre == "cara":
                 etiqueta = (
                     _("Detectando caras") if RUTA_PESOS.is_file()
