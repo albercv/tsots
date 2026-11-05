@@ -97,7 +97,9 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      seconds. Ollama writes them from the transcript, with the caption's
      model; without Ollama the video is saved with no title, and the row
      shows a warning. The font, Titan One, is bundled under the SIL Open Font
-     License (`videopipeline/fuentes/OFL.txt`).
+     License (`videopipeline/fuentes/OFL.txt`). It has a cost: even with
+     subtitles off the box still transcribes the video (the first time it may
+     download the Whisper model) and re-encodes it; untick it to avoid that.
    - **SEO caption**: writes `name_limpio.md` with a title, caption and
      the 5 hashtags that best describe what is said in the video. **Brand…** stores a text
      about who you are, your tone and your call to action so the copy

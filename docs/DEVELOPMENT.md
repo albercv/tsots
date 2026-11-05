@@ -226,13 +226,18 @@ subtitle transcript, e.g. "redo the subtitles"), reused when only the cut
 changes and no subtitles are burned (with subtitles, a new cut means a new
 transcript, hence a new title), and not touched by redoing the caption. If
 regenerating fails, the previous title stays and is the one burned. Ticking
-or unticking the box re-burns the app's own outputs whose base still holds
-(horizontal and vertical, without the R7 question). It does not transcribe
-again when the record already has a transcript; with none (e.g. a video
-processed without subtitles or caption), ticking the box transcribes first.
-On legacy or adopted outputs, or when no base can be rebuilt, the title is only
-added when that output is rebuilt for another reason. It is never burned
-over `subs_quemados_sin_base` (R2). With the box on and the model
+or unticking the box re-burns only the outputs the app made, still on disk
+and unchanged since (its `Huella` matches the file), whose base still holds,
+and only on a record with a true original (`Ficha.original_verdadero()`):
+horizontal and vertical, without the R7 question. An output the user edited
+or deleted outside the app is never touched for the title alone. It does not
+transcribe again when the record already has a transcript; with none (e.g. a
+video processed without subtitles or caption), ticking the box transcribes
+first. On legacy or adopted outputs, or when no base can be rebuilt, the title
+is only added when that output is rebuilt for another reason. Without a true
+original the old final stands in for it and may already carry subtitles or a
+title, so no title is burned on it at all (R2, wider than
+`subs_quemados_sin_base`). With the box on and the model
 unavailable, each "Process again" retries the title and burns it again.
 The title text is part of the `clave` of the burned outputs, so a different
 title re-burns them.
@@ -400,10 +405,18 @@ lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
 ```
 
 `generar_titulo` returns `None` on any failure, and `lineas_titulo` returns
-`([], [])` for an empty text. Writing a short's `.ass` with its title:
+`([], [])` for an empty text. `generar_titulo` does **not** start Ollama: the
+caller must run `servidor = asegurar_servidor()` (from `videopipeline.ollama`)
+before it and `servidor.cerrar()` after, as `pipeline._fase_titulo` does. With
+the server down every title comes back `None` and the only trace is a log
+line. Writing a short's `.ass` with its title:
 
 ```python
-texto = generar_titulo(tramo_transcripcion, idioma, modelo_caption)  # None on failure
+servidor = asegurar_servidor()  # may raise PasoFallido (Ollama missing)
+try:
+    texto = generar_titulo(tramo_transcripcion, idioma, modelo_caption)  # None on failure
+finally:
+    servidor.cerrar()
 generar_ass(bloques, diseno, posicion, resolucion, ass_path,
             extra=lineas_titulo(texto or "", resolucion))
 ```

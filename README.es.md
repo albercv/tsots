@@ -99,7 +99,10 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      5 primeros segundos. Las escribe Ollama, con el mismo modelo del caption,
      a partir de la transcripción; sin Ollama el vídeo sale sin título y la
      fila muestra un aviso. La fuente, Titan One, va incluida con licencia OFL
-     (`videopipeline/fuentes/OFL.txt`).
+     (`videopipeline/fuentes/OFL.txt`). Tiene un coste: aunque los subtítulos
+     estén desactivados, la casilla sigue transcribiendo el vídeo (la primera
+     vez puede descargar el modelo Whisper) y lo recodifica; desmárcala para
+     evitarlo.
    - **Caption SEO**: genera `nombre_limpio.md` con título, caption y
      los 5 hashtags que mejor describen lo que se dice en el vídeo. **Marca…** guarda un
      texto con quién eres, tu tono y tu llamada a la acción para que el
