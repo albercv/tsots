@@ -349,8 +349,10 @@ shorts when processing**, **Create shorts** button).
 **Flow (`shorts.crear`).**
 
 1. Checks what it can cut from: shorts are always cut from the base
-   (`base.mp4`, or the final when it has no burned subtitles), never from a
-   video with burned subtitles. A final with them and no base
+   (`_Pasada`: the `base` artifact's file, i.e. `base.mp4` or the final
+   when the final is the base; with no `base` artifact, because no audio or
+   silence step was done, the original), never from a video with burned
+   subtitles. A final with them and no base
    (`subs_quemados_sin_base`), or a base that is missing or was edited
    outside the app, is a clear error. Each short's subtitles are made from
    the existing transcript, shifted to the clip's start and laid out for
@@ -438,10 +440,13 @@ asking.
   "shorts": { "ficha": "3f9c1a2b7d40", "subtitulos": true, "encuadre": "cara" } }
 ```
 
-- Alone (the button): if the video is not processed yet the runner
-  processes it first with the panel settings, then makes the shorts.
-- With `reproceso` or a normal run (the checkbox): the shorts run after
-  it, and a failure of the shorts is a warning, never a failed job.
+- `shorts` without `reproceso` is the button path (`_shorts_desde_boton`):
+  if the video has no final yet the runner processes it first with the
+  panel settings, then makes the shorts; a failure of the shorts fails the
+  job.
+- `shorts` with `reproceso` is the checkbox path (the app always sends
+  `reproceso` from **Process**): the shorts run after it, and a failure of
+  the shorts is a warning, never a failed job.
 - The final event adds `"shorts": {"carpeta": …, "n": …}` when any were
   made (`n > 0`).
 
