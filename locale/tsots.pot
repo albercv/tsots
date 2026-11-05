@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 09:28+0100\n"
+"POT-Creation-Date: 2026-11-05 09:34+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -708,6 +708,10 @@ msgstr ""
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
 msgstr ""
 
+#, python-brace-format
+msgid "La respuesta de {juez} no es válida"
+msgstr ""
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr ""
 
@@ -959,6 +963,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
 msgstr ""
 
@@ -1033,6 +1041,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se pudo usar el Llavero ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
 msgstr ""
 
 msgid "No se puede añadir"
