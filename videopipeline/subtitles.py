@@ -203,9 +203,8 @@ def _tiempo_ass(segundos: float) -> str:
     return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
 
 
-def _envolver(texto: str) -> str:
-    if len(texto) <= MAX_CHARS_LINEA:
-        return texto
+def partir_en_dos(texto: str) -> str:
+    """Parte en dos líneas (`\\N`) por el espacio que minimiza la mitad más larga."""
     posiciones_espacio = [i for i, c in enumerate(texto) if c == " "]
     if not posiciones_espacio:
         return texto
@@ -214,6 +213,12 @@ def _envolver(texto: str) -> str:
         key=lambda i: max(len(texto[:i]), len(texto[i + 1:])),
     )
     return texto[:mejor_corte] + "\\N" + texto[mejor_corte + 1:]
+
+
+def _envolver(texto: str) -> str:
+    if len(texto) <= MAX_CHARS_LINEA:
+        return texto
+    return partir_en_dos(texto)
 
 
 def _fs_ajustado(texto_plano: str, tamano_fuente: int, ancho: int) -> int | None:
@@ -246,12 +251,15 @@ def _texto_bloque(bloque: Bloque, preset: EstiloPreset,
 
 
 def generar_ass(bloques: list[Bloque], preset_id: str, posicion: int,
-                resolucion: tuple[int, int], ruta: Path, tamano: int = 100) -> None:
+                resolucion: tuple[int, int], ruta: Path, tamano: int = 100,
+                extra: tuple[list[str], list[str]] | None = None) -> None:
+    """`extra`: (líneas `Style:`, líneas `Dialogue:`) añadidas, p. ej. el título."""
     preset = PRESETS[preset_id]
     ancho, alto = resolucion
     margen_v = int(alto * (100 - posicion) / 100)
     tamano_fuente = int(alto * preset.tamano_rel * tamano / 100)
 
+    estilos_extra, eventos_extra = extra or ([], [])
     cabecera = [
         "[Script Info]",
         "ScriptType: v4.00+",
@@ -268,13 +276,14 @@ def generar_ass(bloques: list[Bloque], preset_id: str, posicion: int,
         f"{preset.contorno_color},{preset.fondo},{preset.negrita},0,0,0,"
         f"100,100,0,0,{preset.borde_estilo},{preset.grosor_contorno},"
         f"{preset.sombra},2,{MARGEN_LATERAL},{MARGEN_LATERAL},{margen_v},1",
+        *estilos_extra,
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, "
         "Effect, Text",
     ]
 
-    eventos: list[str] = []
+    eventos: list[str] = list(eventos_extra)
     for bloque in bloques:
         texto_plano = bloque.texto.upper() if preset.mayusculas else bloque.texto
         if preset.tipo == "frases":

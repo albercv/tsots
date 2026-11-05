@@ -12,6 +12,7 @@ from .steps import (
     duracion_video,
     ejecutar_ffmpeg_con_progreso,
     ffmpeg_con_ass,
+    filtro_ass,
     fps_objetivo,
 )
 
@@ -68,7 +69,8 @@ def filtro_vertical(
     ``cara.cmd``); sin ella (no hay caras) la ventana queda quieta, centrada.
     """
     w, h = ANCHO_VERTICAL, ALTO_VERTICAL
-    final = f"setsar=1{f',ass={ass_nombre}' if ass_nombre else ''},format=yuv420p[v]"
+    ass = f",{filtro_ass(ass_nombre)}" if ass_nombre else ""
+    final = f"setsar=1{ass},format=yuv420p[v]"
     if encuadre == "central":
         return f"[0:v]crop={ancho_recorte(alto)}:{alto},scale={w}:{h},{final}"
     if encuadre == "barras":

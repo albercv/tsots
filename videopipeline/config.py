@@ -69,6 +69,7 @@ class PipelineConfig:
     modelo_whisper: str = "turbo"
     tamano_subs: int = 100
     caption_seo: bool = False
+    titulo: bool = False  # título de inicio quemado; la CLI lo deja apagado
     contexto_marca: str = ""
     glosario: str = ""  # texto crudo; ver videopipeline/glosario.py
     modelo_caption: str = "qwen3.5:9b"

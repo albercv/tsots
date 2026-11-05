@@ -28,6 +28,7 @@ SUFIJOS_SALIDA = ("_limpio", "_vertical")
 AUDIO, BASE, TRANSCRIPCION, HORIZONTAL, CAPTION, SEGUIMIENTO, VERTICAL = (
     "audio", "base", "transcripcion", "horizontal", "caption", "seguimiento",
     "vertical")
+TITULO = "titulo"  # texto del título de inicio; sin archivo, vale si está
 
 # Los pasos del panel, en el orden en que se muestran.
 PASOS = ("audio", "silencios", "subtitulos", "caption", "vertical")

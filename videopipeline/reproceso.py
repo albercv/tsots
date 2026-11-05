@@ -16,13 +16,14 @@ from pathlib import Path
 
 from .config import SAMPLE_RATE_POR_MODELO
 from .ficha import (
-    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, VERTICAL,
-    Artefacto, Ficha, Huella, _escribir_json, guardar, limpiar_temporales,
+    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION,
+    VERTICAL, Artefacto, Ficha, Huella, _escribir_json, guardar,
+    limpiar_temporales,
 )
 from .i18n import _
 from .pipeline import (
-    Progreso, _avisar, _emitir, _fase_caption, _fase_vertical, _quemar_subs,
-    _transcribir_subs,
+    Progreso, _avisar, _emitir, _fase_caption, _fase_titulo, _fase_vertical,
+    _quemar_subs, _transcribir_subs,
 )
 from .reproceso_plan import (
     Accion, Plan, ajustes_audio, ajustes_caption, ajustes_silencios,
@@ -152,6 +153,13 @@ class _Pasada:
             self.transcrito = True
         return self.palabras
 
+    def _titulo(self) -> str | None:
+        """El título que se quema: el de la ficha, si esta pasada lo lleva."""
+        titulo = self.ficha.artefactos.get(TITULO)
+        # Sin texto (ficha.json editada a mano) cuenta como que falta.
+        return (titulo.ajustes.get("texto") or None
+                if self.c.titulo and titulo else None)
+
     def _publicar(self, origen: Path, destino: Path) -> None:
         """Mueve el temporal `origen` a `destino` por otro oculto a su lado:
         `destino` nunca queda a medias, aunque esté en otro disco."""
@@ -266,8 +274,9 @@ class _Pasada:
 
     def transcribir(self, paso: int) -> None:
         c = self.c
-        para_subs = (Accion.QUEMAR in self.acciones
-                     or (Accion.VERTICAL in self.acciones and c.subtitulos))
+        # Solo para el título o el caption, un fallo se degrada.
+        para_subs = c.subtitulos and (Accion.QUEMAR in self.acciones
+                                      or Accion.VERTICAL in self.acciones)
         self.transcrito = True
         try:
             # El .srt de la salida lo escribe quien la publica: este va a tmp.
@@ -277,9 +286,15 @@ class _Pasada:
                 wav_continuo=(self.tmp / "subs.wav"
                               if self.base == self.fuente else None),
             )[0]
-        except Exception:  # noqa: BLE001 — solo era para el caption: lo reintenta y avisa él
-            if para_subs or Accion.CAPTION not in self.acciones:
+        except Exception as error:  # noqa: BLE001 — el caption o el título se degradan
+            # Sin caption ni título que lo absorban (los shorts), el error sube.
+            absorben = {Accion.CAPTION, Accion.TITULO} & set(self.acciones)
+            if para_subs or not absorben:
                 raise
+            if Accion.TITULO in self.acciones:
+                _avisar(self.on_progress,
+                        _("No se pudo transcribir para el título: {error}. "
+                          "Vídeo guardado sin título.").format(error=error))
         if self.palabras is None:
             return
         ajustes = ajustes_transcripcion(c)
@@ -289,18 +304,34 @@ class _Pasada:
             clave(ajustes), "transcripcion.json", ajustes, self.linea)
         guardar(self.ficha)
 
+    def titulo(self, paso: int) -> None:
+        # Si falla, el TITULO que hubiera se queda y es el que se quema.
+        try:
+            palabras = self._palabras()
+        except PasoFallido as error:
+            _avisar(self.on_progress, str(error))
+            return
+        texto = _fase_titulo(self.c, palabras, self.on_progress, paso, self.total)
+        if texto:
+            self.ficha.artefactos[TITULO] = Artefacto(clave(texto), None,
+                                                      {"texto": texto})
+            guardar(self.ficha)
+
     def quemar(self, paso: int) -> None:
         c, destino = self.c, self.ficha.ruta_final(True)
-        palabras = self._palabras()
+        palabras = self._palabras() if c.subtitulos else None
         bloques = agrupar(palabras, c.diseno) if palabras else None
+        titulo = self._titulo()
         quemado = None
-        if bloques:
+        if bloques or titulo:
             quemado = _quemar_subs(
-                c, bloques, self.base, destino, self.tmp, self.on_progress, paso,
-                self.total, desde_original=self.base == self.fuente,
-                degradar=self.degradar_subs)
+                c, bloques or [], self.base, destino, self.tmp, self.on_progress,
+                paso, self.total, desde_original=self.base == self.fuente,
+                degradar=self.degradar_subs, titulo=titulo)
         if quemado is None:
             if self.base.parent != self.tmp:  # sin base nueva no hay nada que guardar
+                if not c.subtitulos and self.ficha.hay_horizontal():
+                    return  # el título falló: el final se queda como estaba
                 raise PasoFallido(
                     _("No se pudieron añadir los subtítulos: la transcripción "
                       "no dio texto que mostrar."))
@@ -313,12 +344,22 @@ class _Pasada:
         if self.base.parent == self.tmp:  # la base nueva se guarda aparte (R3)
             self.base.replace(self.ficha.ruta("base.mp4"))
             self.base = self.ficha.ruta("base.mp4")
-        self._registrar_final(destino, {"subtitulos": ajustes_subtitulos(c)})
-        self._escribir_srt(bloques, destino)
+        ajustes = {}
+        if bloques:
+            ajustes["subtitulos"] = ajustes_subtitulos(c)
+        if titulo:
+            ajustes["titulo"] = titulo
+        self._registrar_final(destino, ajustes)
+        if bloques:
+            self._escribir_srt(bloques, destino)
 
     def escribir_final(self, paso: int) -> None:
         self._paso(paso, _("Guardando el vídeo"))
-        assert self.base.parent == self.tmp, "solo se mueve una base de esta pasada"
+        # Una base de esta pasada o la guardada aparte (quitar el título de un
+        # final sin subtítulos); nunca el original ni su copia en la ficha.
+        assert (self.base.parent == self.tmp
+                or self.base == self.ficha.ruta("base.mp4")), \
+            "solo se mueve una base de esta pasada o la guardada aparte"
         destino = self.ficha.ruta_final(True)
         self._sustituir_final(self.base, destino)
         self.base = destino
@@ -434,12 +475,14 @@ class _Pasada:
         destino = ficha.ruta_vertical() if horizontal else ficha.ruta_final(False)
         palabras = self._palabras() if c.subtitulos else None
         bloques = agrupar(palabras, c.diseno) if palabras else None
+        titulo = self._titulo()
         # Se convierte en tmp: si falla, el vertical que había se queda.
         salida = self.tmp / "vertical.mp4"
         _fase_vertical(c, self.base, salida, bloques, self.tmp, self.on_progress,
                        paso, self.total, degradar=horizontal,
                        desde_original=self.base == self.fuente,
-                       seguimiento=(self.x_cara, ficha.ruta("cara.cmd")))
+                       seguimiento=(self.x_cara, ficha.ruta("cara.cmd")),
+                       titulo=titulo)
         if not salida.is_file():
             return
         self._comprobar_propio(destino)
@@ -453,6 +496,8 @@ class _Pasada:
         ajustes = {"vertical": ajustes_vertical(c)}
         if bloques:
             ajustes["subtitulos"] = ajustes_subtitulos(c)
+        if titulo:
+            ajustes["titulo"] = titulo
         ficha.artefactos[VERTICAL] = Artefacto(clave(self.linea, ajustes), None,
                                                ajustes)
         ficha.desactualizado.discard("vertical")

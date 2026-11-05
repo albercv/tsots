@@ -29,6 +29,7 @@ from .glosario import prompt_whisper, terminos_caption
 from .i18n import _
 from .ollama import asegurar_servidor
 from .subtitles import Bloque, Palabra
+from .titulo import lineas_titulo, pedir_titulo
 from .vertical import (
     ALTO_VERTICAL,
     ANCHO_VERTICAL,
@@ -115,25 +116,27 @@ def _transcribir_subs(config: PipelineConfig, fuente: Path, final: Path,
 def _quemar_subs(config: PipelineConfig, bloques: list[Bloque], fuente: Path,
                  final: Path, trabajo: Path, on_progress: Progreso | None,
                  paso: int, total: int, desde_original: bool,
-                 degradar: bool) -> Path | None:
-    """Quema los subtítulos de `fuente` en un temporal y lo devuelve.
+                 degradar: bool, titulo: str | None = None) -> Path | None:
+    """Quema los subtítulos y el título de `fuente` en un temporal y lo devuelve.
 
     No toca `fuente`: la fase vertical la usa sin subtítulos. Con `degradar`,
-    un fallo avisa y devuelve None; sin él, el error sube.
+    un fallo avisa y devuelve None; sin él, el error sube. Sin `bloques` solo
+    se quema el título.
     """
     ass = trabajo / "subs.ass"
     tmp_subs = final.with_name(f".{final.stem}_subs_tmp{final.suffix}")
+    etiqueta = _("Quemando subtítulos") if bloques else _("Quemando el título")
     try:
         trabajo.mkdir(parents=True, exist_ok=True)
-        generar_ass(bloques, config.diseno, config.posicion_subs,
-                    resolucion_video(fuente), ass, tamano=config.tamano_subs)
+        resolucion = resolucion_video(fuente)
+        generar_ass(bloques, config.diseno, config.posicion_subs, resolucion,
+                    ass, tamano=config.tamano_subs,
+                    extra=lineas_titulo(titulo, resolucion) if titulo else None)
         tmp_subs.unlink(missing_ok=True)
-        _emitir(on_progress, paso, total, _("Quemando subtítulos"))
+        _emitir(on_progress, paso, total, etiqueta)
         quemar_subtitulos(
             fuente, ass, tmp_subs,
-            on_percent=lambda p: _emitir(
-                on_progress, paso, total, _("Quemando subtítulos"), p
-            ),
+            on_percent=lambda p: _emitir(on_progress, paso, total, etiqueta, p),
             desde_original=desde_original,
         )
         return tmp_subs
@@ -144,10 +147,33 @@ def _quemar_subs(config: PipelineConfig, bloques: list[Bloque], fuente: Path,
         _avisar(on_progress,
                 _("Subtítulos fallaron: {error}. "
                   "Vídeo guardado sin subtítulos (.srt conservado)."
-                  ).format(error=error))
+                  ).format(error=error)
+                if bloques else
+                _("El título no se pudo quemar: {error}. "
+                  "Vídeo guardado sin título.").format(error=error))
         return None
     finally:
         ass.unlink(missing_ok=True)
+
+
+def _sugerencia(error: Exception) -> str:
+    """El «Qué hacer» del diagnóstico del error, o "" si no se conoce."""
+    diag = explicar(str(error), getattr(error, "detalle", ""))
+    return (
+        _(" Qué hacer: {solucion}").format(solucion=diag.solucion)
+        if diag.conocido else ""
+    )
+
+
+def _cerrar_servidor(servidor, on_progress: Progreso | None) -> None:
+    """Cierra el `ollama serve` que arrancó la fase; un fallo solo avisa."""
+    if servidor is None:
+        return
+    try:
+        servidor.cerrar()
+    except Exception as error:  # noqa: BLE001
+        _avisar(on_progress,
+                _("No se pudo cerrar ollama serve: {error}").format(error=error))
 
 
 def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
@@ -172,21 +198,37 @@ def _fase_caption(config: PipelineConfig, video_publicable: Path, final: Path,
         escribir_md(caption, ruta_md)
     except Exception as error:  # noqa: BLE001 — degradación deliberada
         ruta_md.unlink(missing_ok=True)
-        diag = explicar(str(error), getattr(error, "detalle", ""))
-        sugerencia = (
-            _(" Qué hacer: {solucion}").format(solucion=diag.solucion)
-            if diag.conocido else ""
-        )
         _avisar(on_progress,
                 _("Caption SEO falló: {error}. Vídeo guardado sin caption."
-                  "{sugerencia}").format(error=error, sugerencia=sugerencia))
+                  "{sugerencia}").format(error=error,
+                                         sugerencia=_sugerencia(error)))
     finally:
-        if servidor is not None:
-            try:
-                servidor.cerrar()
-            except Exception as error:  # noqa: BLE001
-                _avisar(on_progress,
-                        _("No se pudo cerrar ollama serve: {error}").format(error=error))
+        _cerrar_servidor(servidor, on_progress)
+
+
+def _fase_titulo(config: PipelineConfig, palabras: list[Palabra] | None,
+                 on_progress: Progreso | None, paso: int, total: int
+                 ) -> str | None:
+    """Título de inicio para `palabras`. Nunca hace fallar el vídeo.
+
+    Sin palabras devuelve None sin avisar: ya avisó quien transcribió.
+    """
+    if not palabras:
+        return None
+    servidor = None
+    try:
+        _emitir(on_progress, paso, total, _("Generando título"))
+        servidor = asegurar_servidor()
+        return pedir_titulo(texto_plano(palabras), config.idioma_subs,
+                            config.modelo_caption)
+    except Exception as error:  # noqa: BLE001 — degradación deliberada
+        _avisar(on_progress,
+                _("No se pudo generar el título: {error}. Vídeo guardado "
+                  "sin título.{sugerencia}").format(
+                      error=error, sugerencia=_sugerencia(error)))
+        return None
+    finally:
+        _cerrar_servidor(servidor, on_progress)
 
 
 def pasos_extra(config: PipelineConfig) -> int:
@@ -200,11 +242,14 @@ def pasos_extra(config: PipelineConfig) -> int:
 def total_pasos(config: PipelineConfig) -> int:
     """Pasos que verá el usuario según los pasos pedidos."""
     total = 3 * config.paso_audio + config.paso_silencios
-    if config.subtitulos:
+    transcribe = config.subtitulos or config.titulo
+    if transcribe:
         # Transcribir y, si hay horizontal, quemar (el vertical quema al convertir).
         total += 1 + config.hay_horizontal()
+    if config.titulo:
+        total += 1
     if config.caption_seo:
-        total += 1 if config.subtitulos else 2
+        total += 1 if transcribe else 2
     if config.paso_vertical:
         total += 1 + (config.encuadre == "cara")
     return total
@@ -264,6 +309,7 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                    on_progress: Progreso | None, paso: int, total: int,
                    degradar: bool, desde_original: bool,
                    seguimiento: tuple[int | None, Path] | None = None,
+                   titulo: str | None = None,
                    tramo: tuple[float, float] | None = None) -> None:
     """Convierte `fuente` (sin subtítulos) a vertical y lo publica en `destino`.
 
@@ -312,17 +358,19 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                             _("No se pudo preparar el detector de caras: "
                               "{error}. Se encuadra al centro.").format(error=error))
             paso += 1  # el total cuenta el paso aunque se salte
-        if bloques:
-            generar_ass(bloques, config.diseno, config.posicion_subs,
-                        (ANCHO_VERTICAL, ALTO_VERTICAL), ass,
-                        tamano=config.tamano_subs)
+        usa_ass = bool(bloques or titulo)
+        if usa_ass:
+            resolucion = (ANCHO_VERTICAL, ALTO_VERTICAL)
+            generar_ass(bloques or [], config.diseno, config.posicion_subs,
+                        resolucion, ass, tamano=config.tamano_subs,
+                        extra=lineas_titulo(titulo, resolucion) if titulo else None)
         tmp.unlink(missing_ok=True)
         _emitir(on_progress, paso, total, _("Convirtiendo a vertical"))
         convertir_vertical(
             fuente, tmp,
             filtro_vertical(encuadre, ancho, alto, x_cara=x_cara,
-                            ass_nombre=ass.name if bloques else None),
-            cwd=trabajo, usa_ass=bool(bloques), desde_original=desde_original,
+                            ass_nombre=ass.name if usa_ass else None),
+            cwd=trabajo, usa_ass=usa_ass, desde_original=desde_original,
             on_percent=lambda p: _emitir(
                 on_progress, paso, total, _("Convirtiendo a vertical"), p
             ),
@@ -368,6 +416,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
     hay_base = config.paso_audio or config.paso_silencios
     # Si los subtítulos son el único paso, su fallo es el fallo del trabajo.
     solo_subs = not (hay_base or config.paso_vertical)
+    transcribe = config.subtitulos or config.titulo
 
     try:
         if hay_base:
@@ -383,23 +432,39 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
                 wav_continuo=None if hay_base else trabajo / f"{video.stem}_subs.wav",
             )
             paso += 1
+        elif config.titulo:  # transcribe solo para el título: sin .srt
+            try:
+                _emitir(on_progress, paso, total, _("Transcribiendo"))
+                palabras = _transcribir(config, base, on_progress) or None
+                if palabras is None:
+                    raise RuntimeError("la transcripción no produjo palabras")
+            except Exception as error:  # noqa: BLE001 — degradación deliberada
+                _avisar(on_progress,
+                        _("No se pudo transcribir para el título: {error}. "
+                          "Vídeo guardado sin título.").format(error=error))
+            paso += 1
+
+        titulo = None
+        if config.titulo:
+            titulo = _fase_titulo(config, palabras, on_progress, paso, total)
+            paso += 1
 
         fuente_v = video
         if horizontal:
             publicar = base
-            if config.subtitulos:
-                if bloques:
+            if transcribe:
+                if bloques or titulo:
                     quemado = _quemar_subs(
-                        config, bloques, base, final, trabajo, on_progress,
+                        config, bloques or [], base, final, trabajo, on_progress,
                         paso, total, desde_original=not hay_base,
-                        degradar=not solo_subs,
+                        degradar=not solo_subs, titulo=titulo,
                     )
                     publicar = quemado or base
                 paso += 1
             if config.caption_seo:
                 _fase_caption(config, publicar, final, palabras, on_progress,
                               paso, total)
-                paso += 1 if config.subtitulos else 2
+                paso += 1 if transcribe else 2
             else:
                 final.with_suffix(".md").unlink(missing_ok=True)
             if publicar == video:
@@ -419,7 +484,7 @@ def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:
             )
             _fase_vertical(config, fuente_v, destino, bloques, trabajo,
                            on_progress, paso, total, degradar=horizontal,
-                           desde_original=fuente_v == video)
+                           desde_original=fuente_v == video, titulo=titulo)
             if not horizontal:
                 paso += 1 + (config.encuadre == "cara")
                 if config.caption_seo:

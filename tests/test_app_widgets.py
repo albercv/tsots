@@ -498,12 +498,72 @@ def test_panel_boton_glosario_activo_con_subtitulos_o_caption(qtbot):
     qtbot.addWidget(panel)
     panel.check_subtitulos.setChecked(False)
     panel.check_caption.setChecked(False)
+    panel.check_titulo.setChecked(False)
     assert not panel.boton_glosario.isEnabled()
     panel.check_subtitulos.setChecked(True)
     assert panel.boton_glosario.isEnabled()
     panel.check_subtitulos.setChecked(False)
     panel.check_caption.setChecked(True)
     assert panel.boton_glosario.isEnabled()
+    panel.check_caption.setChecked(False)
+    panel.check_titulo.setChecked(True)
+    assert panel.boton_glosario.isEnabled()
+
+
+# --- título al inicio ---
+
+
+def test_titulo_marcado_por_defecto_y_en_valores(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.check_titulo.isChecked()
+    assert panel.valores()["titulo"] is True
+    assert panel.secciones["subtitulos"].contenido.isAncestorOf(panel.check_titulo)
+
+
+def test_cargar_titulo(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"titulo": "false"})
+    assert not panel.check_titulo.isChecked()
+    panel.cargar({})
+    assert panel.check_titulo.isChecked()
+    panel.cargar({"titulo": False})
+    assert not panel.check_titulo.isChecked()
+    assert panel.valores()["titulo"] is False
+    panel.cargar({})
+    assert panel.check_titulo.isChecked()
+
+
+def test_titulo_sin_subtitulos_habilita_idioma_y_modelo(qtbot, tmp_path, monkeypatch):
+    from app.widgets import panel_opciones
+
+    monkeypatch.setattr(panel_opciones, "WHISPER_CACHE_DIR", tmp_path)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_subtitulos.setChecked(False)
+    panel.check_titulo.setChecked(True)
+    assert panel.combo_idioma_subs.isEnabled()
+    assert panel.combo_modelo_whisper.isEnabled()
+    assert not panel.combo_diseno.isEnabled()
+    assert not panel.spin_posicion.isEnabled()
+    assert not panel.slider_tamano.isEnabled()
+    # Se transcribe igual: sin caché, el aviso de descarga de Whisper sigue.
+    assert panel.aviso_whisper.text() != ""
+    panel.check_titulo.setChecked(False)
+    assert not panel.combo_idioma_subs.isEnabled()
+    assert not panel.combo_modelo_whisper.isEnabled()
+    assert panel.aviso_whisper.text() == ""
+
+
+def test_titulo_no_es_un_paso(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    for casilla in panel._casillas_pasos().values():
+        casilla.setChecked(False)
+    assert panel.check_titulo.isChecked()
+    assert panel.hay_pasos() is False
+    assert panel.check_titulo not in panel._casillas_pasos().values()
 
 
 # --- cabecera ---

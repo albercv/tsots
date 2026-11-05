@@ -451,6 +451,10 @@ msgstr "The Whisper model will be downloaded on first use ({tamano})."
 msgid "El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los vídeos largos a 48 kHz cargan el audio completo en memoria."
 msgstr "The cleaning model (ClearVoice) or Whisper ran out of RAM/GPU. Long videos at 48 kHz load the whole audio into memory."
 
+#, python-brace-format
+msgid "El modelo no propuso un título de 3 a 5 palabras: «{titulo}»"
+msgstr "The model did not propose a title of 3 to 5 words: “{titulo}”"
+
 msgid "El modelo se descargará al primer uso."
 msgstr "The model will be downloaded on first use."
 
@@ -499,6 +503,10 @@ msgstr "The service rejected the post."
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr "The service finished without giving the result for {plataforma}."
+
+#, python-brace-format
+msgid "El título no se pudo quemar: {error}. Vídeo guardado sin título."
+msgstr "The title could not be burned: {error}. Video saved without a title."
 
 #, python-brace-format
 msgid "El vertical de \"{nombre}\" no puede llevar subtítulos: ya están quemados en el vídeo. Arrastra el original para rehacerlos."
@@ -689,6 +697,9 @@ msgstr "Generates an SEO title, caption and hashtags (name_limpio.md) with Ollam
 msgid "Generando caption SEO"
 msgstr "Generating SEO caption"
 
+msgid "Generando título"
+msgstr "Generating title"
+
 msgid "Guardando el vídeo"
 msgstr "Saving the video"
 
@@ -768,8 +779,14 @@ msgstr "The model's response is not valid: missing fields or wrong types"
 msgid "La respuesta del modelo no es válida: faltan los candidatos"
 msgstr "The model's response is not valid: the candidates are missing"
 
+msgid "La respuesta del modelo no trae un título"
+msgstr "The model's response has no title"
+
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr "The transcript is empty; there is no text for the caption"
+
+msgid "La transcripción está vacía; no hay texto para el título"
+msgstr "The transcript is empty; there is no text for the title"
 
 #, python-brace-format
 msgid "La transcripción guardada de \"{nombre}\" está dañada ({error}): rehaz los subtítulos para volver a transcribir."
@@ -1053,6 +1070,10 @@ msgstr "Could not connect to the service ({tipo})."
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr "Could not confirm whether it was published. Check {plataforma} before publishing again."
 
+#, python-brace-format
+msgid "No se pudo generar el título: {error}. Vídeo guardado sin título.{sugerencia}"
+msgstr "Could not generate the title: {error}. Video saved without a title.{sugerencia}"
+
 msgid "No se pudo guardar el lugar de TikTok en el Llavero."
 msgstr "Could not save the TikTok place in the Keychain."
 
@@ -1105,6 +1126,10 @@ msgstr "The check could not be prepared ({tipo})."
 #, python-brace-format
 msgid "No se pudo transcribir \"{nombre}\": sin transcripción no se pueden buscar shorts."
 msgstr "Could not transcribe \"{nombre}\": without a transcript no shorts can be found."
+
+#, python-brace-format
+msgid "No se pudo transcribir para el título: {error}. Vídeo guardado sin título."
+msgstr "Could not transcribe for the title: {error}. Video saved without a title."
 
 #, python-brace-format
 msgid "No se pudo usar el Llavero ({tipo})."
@@ -1310,6 +1335,9 @@ msgstr "Facebook Page:"
 msgid "Público"
 msgstr "Public"
 
+msgid "Quemando el título"
+msgstr "Burning the title"
+
 msgid "Quemando subtítulos"
 msgstr "Burning subtitles"
 
@@ -1444,7 +1472,10 @@ msgid ""
 "Se programará «{titulo}» en:\n"
 "\n"
 "{resumen}"
-msgstr "“{titulo}” will be scheduled on:\n\n{resumen}"
+msgstr ""
+"“{titulo}” will be scheduled on:\n"
+"\n"
+"{resumen}"
 
 #, python-brace-format
 msgid ""
@@ -1606,6 +1637,9 @@ msgstr "TikTok can't find “{texto}”."
 msgid "Transcribiendo"
 msgstr "Transcribing"
 
+msgid "Tres a cinco palabras clave arriba durante los 5 primeros segundos, escritas por el modelo del caption (Ollama) a partir de la transcripción."
+msgstr "Three to five keywords shown at the top for the first 5 seconds, written by the caption model (Ollama) from the transcript."
+
 msgid "Términos"
 msgstr "Terms"
 
@@ -1615,6 +1649,9 @@ msgstr "Terms: {terminos} · Corrections: {correcciones}"
 
 msgid "Términos…"
 msgstr "Terms…"
+
+msgid "Título al inicio"
+msgstr "Opening title"
 
 msgid "Título, caption y hashtags"
 msgstr "Title, caption and hashtags"
@@ -1873,7 +1910,10 @@ msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
 "{lista}"
-msgstr "Cancel these posts?\n\n{lista}"
+msgstr ""
+"Cancel these posts?\n"
+"\n"
+"{lista}"
 
 #, python-brace-format
 msgid "¿Programar para el {fecha}?"

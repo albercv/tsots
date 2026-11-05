@@ -11,8 +11,8 @@ from videopipeline import ficha as modulo_ficha
 from videopipeline import pipeline, reproceso
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, Ficha, cargar,
-    guardar, reconocer,
+    BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION, VERTICAL,
+    Ficha, cargar, guardar, reconocer,
 )
 from videopipeline.reproceso import ejecutar
 from videopipeline.reproceso_plan import (
@@ -22,7 +22,7 @@ from videopipeline.reproceso_plan import (
 from videopipeline.steps import PasoFallido
 
 from tests.falsos_pipeline import (  # noqa: F401 — fixtures
-    entorno, entorno_caption, entorno_subs, entorno_vertical,
+    entorno, entorno_caption, entorno_subs, entorno_titulo, entorno_vertical,
 )
 
 A = Accion
@@ -30,7 +30,8 @@ REHACER_SUBS = Decisiones(rehacer=frozenset({"subtitulos"}))
 
 
 @pytest.fixture(autouse=True)
-def falsos(entorno_vertical, entorno_caption, tmp_path, monkeypatch):
+def falsos(entorno_vertical, entorno_caption, entorno_titulo, tmp_path,
+           monkeypatch):
     """Todos los pasos falsos; las fichas y las salidas, dentro de tmp_path."""
     llamadas, video, _, _ = entorno_vertical
     monkeypatch.setattr(modulo_ficha, "DIR_FICHAS", tmp_path / "fichas")
@@ -753,3 +754,114 @@ def test_audio_limpio_a_medias_no_queda_registrado(tmp_path):
         ejecutar(ficha, plan)
 
     assert "audio" not in cargar(ficha.id).artefactos
+
+
+# --- Título de inicio ---------------------------------------------------------
+
+CON_TITULO = [A.CORTAR, A.TRANSCRIBIR, A.TITULO, A.QUEMAR]
+
+
+def _avisos(eventos: list[dict]) -> list[str]:
+    return [e["warning"] for e in eventos if "warning" in e]
+
+
+def test_titulo_se_guarda_y_se_quema(falsos, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    titulo=True)
+
+    assert ficha.artefactos[TITULO].ajustes == {"texto": "Audio limpio ya"}
+    assert ficha.artefactos[HORIZONTAL].ajustes == {"titulo": "Audio limpio ya"}
+    assert ficha.ruta("base.mp4").read_bytes() == b"MP4FINAL"  # R3
+    assert ficha.final.ruta.read_bytes() == b"MP4SUBS"
+    assert "ass:titulo" in falsos
+    assert not ficha.final.ruta.with_suffix(".srt").exists()
+    assert _sin_restos(ficha)
+
+
+def test_titulo_fallido_sale_sin_titulo(entorno_titulo, tmp_path):
+    entorno_titulo[3]["falla"] = True
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, eventos=eventos,
+                    paso_silencios=True, titulo=True)
+
+    avisos = _avisos(eventos)
+    assert len(avisos) == 1 and "título" in avisos[0]
+    assert TITULO not in ficha.artefactos
+    assert "titulo" not in ficha.artefactos[HORIZONTAL].ajustes
+    assert ficha.final.ruta.read_bytes() == b"MP4FINAL"
+    assert _sin_restos(ficha)
+
+
+def test_transcripcion_fallida_solo_para_el_titulo_avisa(tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, "transcribir", _revienta)
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, eventos=eventos,
+                    paso_silencios=True, titulo=True)
+
+    avisos = _avisos(eventos)
+    assert len(avisos) == 1 and "transcribir para el título" in avisos[0]
+    assert TITULO not in ficha.artefactos
+    assert ficha.final.ruta.read_bytes() == b"MP4FINAL"
+
+
+def test_quitar_el_titulo_sin_subtitulos_escribe_el_final_desde_la_base(
+        tmp_path):
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    titulo=True)
+
+    ficha = _pasada(ficha, [A.ESCRIBIR_FINAL], titulo=False)
+
+    assert ficha.final.ruta.read_bytes() == b"MP4FINAL"
+    assert ficha.final.coincide(ficha.final.ruta)
+    assert not ficha.ruta("base.mp4").exists()
+    assert ficha.artefactos[BASE].archivo is None
+    assert ficha.artefactos[HORIZONTAL].ajustes == {}
+    assert TITULO in ficha.artefactos  # R1: se reutiliza si se vuelve a marcar
+    assert _sin_restos(ficha)
+
+
+def test_titulo_en_el_vertical_se_registra(falsos, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), [*CON_TITULO, A.VERTICAL],
+                    paso_silencios=True, paso_vertical=True, titulo=True)
+
+    assert ficha.artefactos[VERTICAL].ajustes["titulo"] == "Audio limpio ya"
+    assert falsos.count("ass:titulo") == 2  # horizontal y vertical
+
+
+def test_titulo_que_falla_al_regenerar_conserva_el_anterior(
+        entorno_titulo, tmp_path, monkeypatch):
+    falso = pipeline.pedir_titulo
+    monkeypatch.setattr(pipeline, "pedir_titulo",
+                        lambda *args, **kwargs: "Viejo título aquí")
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    subtitulos=True, titulo=True)
+    monkeypatch.setattr(pipeline, "pedir_titulo", falso)
+    entorno_titulo[3]["falla"] = True
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.TRANSCRIBIR, A.TITULO, A.QUEMAR], REHACER_SUBS,
+                    eventos=eventos, subtitulos=True, titulo=True)
+
+    avisos = _avisos(eventos)
+    assert len(avisos) == 1 and "título" in avisos[0]
+    assert ficha.artefactos[TITULO].ajustes == {"texto": "Viejo título aquí"}
+    horizontal = ficha.artefactos[HORIZONTAL].ajustes
+    assert horizontal["titulo"] == "Viejo título aquí"
+    assert "subtitulos" in horizontal
+
+
+def test_titulo_sin_texto_en_la_ficha_no_se_quema(entorno_titulo, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    subtitulos=True, titulo=True)
+    ficha.artefactos[TITULO].ajustes = {}  # ficha.json editada a mano
+    guardar(ficha)
+    entorno_titulo[3]["falla"] = True
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.TITULO, A.QUEMAR], eventos=eventos,
+                    subtitulos=True, titulo=True)
+
+    assert len(_avisos(eventos)) == 1
+    assert set(ficha.artefactos[HORIZONTAL].ajustes) == {"subtitulos"}

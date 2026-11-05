@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 13:12+0100\n"
+"POT-Creation-Date: 2026-11-05 13:57+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -450,6 +450,10 @@ msgstr ""
 msgid "El modelo de limpieza (ClearVoice) o Whisper han agotado la RAM/GPU. Los vídeos largos a 48 kHz cargan el audio completo en memoria."
 msgstr ""
 
+#, python-brace-format
+msgid "El modelo no propuso un título de 3 a 5 palabras: «{titulo}»"
+msgstr ""
+
 msgid "El modelo se descargará al primer uso."
 msgstr ""
 
@@ -497,6 +501,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
+msgstr ""
+
+#, python-brace-format
+msgid "El título no se pudo quemar: {error}. Vídeo guardado sin título."
 msgstr ""
 
 #, python-brace-format
@@ -684,6 +692,9 @@ msgstr ""
 msgid "Generando caption SEO"
 msgstr ""
 
+msgid "Generando título"
+msgstr ""
+
 msgid "Guardando el vídeo"
 msgstr ""
 
@@ -763,7 +774,13 @@ msgstr ""
 msgid "La respuesta del modelo no es válida: faltan los candidatos"
 msgstr ""
 
+msgid "La respuesta del modelo no trae un título"
+msgstr ""
+
 msgid "La transcripción está vacía; no hay texto para el caption"
+msgstr ""
+
+msgid "La transcripción está vacía; no hay texto para el título"
 msgstr ""
 
 #, python-brace-format
@@ -1044,6 +1061,10 @@ msgstr ""
 msgid "No se pudo confirmar si se publicó. Revisa {plataforma} antes de volver a publicar."
 msgstr ""
 
+#, python-brace-format
+msgid "No se pudo generar el título: {error}. Vídeo guardado sin título.{sugerencia}"
+msgstr ""
+
 msgid "No se pudo guardar el lugar de TikTok en el Llavero."
 msgstr ""
 
@@ -1095,6 +1116,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se pudo transcribir \"{nombre}\": sin transcripción no se pueden buscar shorts."
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo transcribir para el título: {error}. Vídeo guardado sin título."
 msgstr ""
 
 #, python-brace-format
@@ -1299,6 +1324,9 @@ msgid "Página de Facebook:"
 msgstr ""
 
 msgid "Público"
+msgstr ""
+
+msgid "Quemando el título"
 msgstr ""
 
 msgid "Quemando subtítulos"
@@ -1594,6 +1622,9 @@ msgstr ""
 msgid "Transcribiendo"
 msgstr ""
 
+msgid "Tres a cinco palabras clave arriba durante los 5 primeros segundos, escritas por el modelo del caption (Ollama) a partir de la transcripción."
+msgstr ""
+
 msgid "Términos"
 msgstr ""
 
@@ -1602,6 +1633,9 @@ msgid "Términos: {terminos} · Correcciones: {correcciones}"
 msgstr ""
 
 msgid "Términos…"
+msgstr ""
+
+msgid "Título al inicio"
 msgstr ""
 
 msgid "Título, caption y hashtags"
