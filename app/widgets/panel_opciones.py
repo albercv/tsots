@@ -57,9 +57,9 @@ ETIQUETA_IDIOMA = {"Español": "es", N_("Autodetectar"): "auto", "English": "en"
 
 ETIQUETA_ENCUADRE = {
     N_("Recorte central"): "central",
-    N_("Fondo difuminado"): "difuminado",
+    N_("Fondo difuminado (16:9)"): "difuminado",
     N_("Barras negras"): "barras",
-    N_("Seguir la cara"): "cara",
+    N_("Seguir la cara (4:3)"): "cara",
 }
 
 ETIQUETA_MODELO_WHISPER = {

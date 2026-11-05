@@ -103,7 +103,7 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
    - **Formato vertical**: guarda además `nombre_limpio_vertical.mp4`
      (9:16, 1080x1920) para Reels y TikTok; si no marcas audio ni
      silencios, solo sale `nombre_vertical.mp4`. Encuadres: recorte central
-     (por defecto), fondo difuminado, barras negras o **seguir la cara**
+     (por defecto), fondo difuminado (16:9), barras negras o **seguir la cara (4:3)**
      (más lento; la primera vez descarga el detector, ~90 MB). Se desmarca
      al reabrir la app: es un paso ocasional.
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que

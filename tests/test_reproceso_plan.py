@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from videopipeline import ficha as modulo_ficha
+from videopipeline import reproceso_plan
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
     AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, VERTICAL,
@@ -13,7 +14,7 @@ from videopipeline.ficha import (
 from videopipeline.reproceso_plan import (
     Accion, Consulta, Decisiones, ajustes_audio, ajustes_caption,
     ajustes_silencios, ajustes_subtitulos, ajustes_transcripcion,
-    ajustes_vertical, clave, planificar, revisar,
+    ajustes_vertical, clave, clave_seguimiento, planificar, revisar,
 )
 
 A = Accion
@@ -256,12 +257,45 @@ def test_vertical_regenerado_sin_pedirlo_usa_el_encuadre_de_la_ficha(tmp_path):
 def test_seguimiento_valido_no_se_repite(tmp_path):
     ficha = _completa(tmp_path, **{
         VERTICAL: _vertical("cara", subs=True),
-        SEGUIMIENTO: Artefacto(L_AS, "cara.cmd", {"x_inicial": 10})})
+        SEGUIMIENTO: Artefacto(clave_seguimiento(L_AS), "cara.cmd",
+                               {"x_inicial": 10})})
 
     plan = planificar(ficha, _panel(paso_vertical=True, encuadre="cara"),
                       Decisiones(rehacer=frozenset({"vertical"})))
 
     assert plan.acciones == [A.VERTICAL]
+
+
+def _con_seguimiento_de_la_ventana_9_16(tmp_path) -> Ficha:
+    # Sus x son de la ventana de 9:16 (clave = solo la línea de tiempo).
+    return _completa(tmp_path, **{
+        VERTICAL: _vertical("cara", subs=True),
+        SEGUIMIENTO: Artefacto(L_AS, "cara.cmd", {"x_inicial": 10})})
+
+
+def test_seguimiento_de_la_ventana_9_16_no_vale_para_la_ventana_ancha(tmp_path):
+    plan = planificar(_con_seguimiento_de_la_ventana_9_16(tmp_path),
+                      _panel(paso_vertical=True, encuadre="cara"),
+                      Decisiones(rehacer=frozenset({"vertical"})))
+
+    assert plan.acciones == [A.SEGUIMIENTO, A.VERTICAL]
+
+
+def test_clave_del_seguimiento_depende_de_la_proporcion_de_la_ventana(monkeypatch):
+    antes = clave_seguimiento(L_AS)
+    monkeypatch.setattr(reproceso_plan, "PROPORCION_VENTANA_CARA", 4 / 5)
+    assert clave_seguimiento(L_AS) != antes != L_AS
+
+
+def test_vertical_cara_antiguo_no_se_da_por_desactualizado(tmp_path):
+    # Solo el seguimiento cambia de clave: el vertical ya hecho sigue valiendo
+    # y no se regenera ni se marca; se recalcula únicamente si se rehace.
+    ficha = _con_seguimiento_de_la_ventana_9_16(tmp_path)
+
+    plan = planificar(ficha, _panel(paso_vertical=True, encuadre="cara"),
+                      Decisiones())
+
+    assert plan.vacio and not plan.marcar_desactualizado
 
 
 def _solo_vertical(tmp_path, subs) -> Ficha:
