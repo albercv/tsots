@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 23:42+0100\n"
+"POT-Creation-Date: 2026-11-05 09:28+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -718,6 +718,9 @@ msgstr "The model's response is not valid JSON"
 
 msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
 msgstr "The model's response is not valid: missing fields or wrong types"
+
+msgid "La respuesta del modelo no es válida: faltan los candidatos"
+msgstr "The model's response is not valid: the candidates are missing"
 
 msgid "La transcripción está vacía; no hay texto para el caption"
 msgstr "The transcript is empty; there is no text for the caption"
