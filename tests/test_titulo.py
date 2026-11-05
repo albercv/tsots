@@ -7,12 +7,17 @@ import subprocess
 import pytest
 
 from videopipeline import steps
+from videopipeline.steps import PasoFallido
 from videopipeline.titulo import (
     ANCHO_CARACTER,
     ANCHO_UTIL,
     BORDE_DORADO,
     DESPLAZAMIENTO,
+    ESQUEMA,
+    construir_mensajes,
+    generar_titulo,
     lineas_titulo,
+    pedir_titulo,
 )
 
 ASS = """\
@@ -124,3 +129,75 @@ def test_inicio_y_duracion():
 
 def test_texto_vacio_no_da_nada():
     assert lineas_titulo("  {} ", (1920, 1080)) == ([], [])
+
+
+class _Cliente:
+    """Cliente falso: guarda los argumentos y devuelve `respuesta`."""
+
+    def __init__(self, respuesta):
+        self.respuesta = respuesta
+        self.llamadas = []
+
+    def __call__(self, modelo, mensajes, esquema):
+        self.llamadas.append((modelo, mensajes, esquema))
+        if isinstance(self.respuesta, Exception):
+            raise self.respuesta
+        return self.respuesta
+
+
+def test_pedir_titulo_limpia_la_respuesta():
+    cliente = _Cliente({"titulo": "  «Limpia tu  audio con IA».  "})
+    assert pedir_titulo("hola mundo", "es", "m", cliente) == "Limpia tu audio con IA"
+    modelo, mensajes, esquema = cliente.llamadas[0]
+    assert (modelo, mensajes, esquema) == (
+        "m", construir_mensajes("hola mundo", "es"), ESQUEMA)
+
+
+def test_pedir_titulo_quita_almohadilla_y_puntuacion_final():
+    cliente = _Cliente({"titulo": '#Audio "limpio" con IA, .'})
+    assert pedir_titulo("x", "es", "m", cliente) == "Audio limpio con IA"
+    # Un signo suelto no cuenta como palabra.
+    with pytest.raises(PasoFallido):
+        pedir_titulo("x", "es", "m", _Cliente({"titulo": "uno dos ."}))
+
+
+def test_pedir_titulo_recorta_a_cinco_palabras():
+    cliente = _Cliente({"titulo": "uno dos tres cuatro cinco seis siete"})
+    assert pedir_titulo("x", "es", "m", cliente) == "uno dos tres cuatro cinco"
+
+
+def test_pedir_titulo_con_menos_de_tres_palabras_falla():
+    with pytest.raises(PasoFallido):
+        pedir_titulo("x", "es", "m", _Cliente({"titulo": "Audio limpio"}))
+
+
+@pytest.mark.parametrize("respuesta", [{}, {"titulo": 3}])
+def test_pedir_titulo_sin_campo_falla(respuesta):
+    with pytest.raises(PasoFallido):
+        pedir_titulo("x", "es", "m", _Cliente(respuesta))
+
+
+def test_generar_titulo_none_si_falla():
+    assert generar_titulo(
+        "hola", "es", "m", _Cliente(PasoFallido("Ollama no responde"))) is None
+    # Cualquier excepción, no solo PasoFallido.
+    assert generar_titulo("hola", "es", "m", _Cliente(RuntimeError("x"))) is None
+    vacio = _Cliente({"titulo": "uno dos tres"})
+    assert generar_titulo("   ", "es", "m", vacio) is None
+    assert vacio.llamadas == []
+
+
+def test_generar_titulo_devuelve_el_titulo():
+    assert generar_titulo(
+        "hola", "es", "m", _Cliente({"titulo": "uno dos tres"})) == "uno dos tres"
+
+
+@pytest.mark.parametrize("idioma, marca, etiqueta", [
+    ("en", "3 to 5", "Transcript"),
+    ("es", "3 a 5", "Transcripción"),
+    ("auto", "3 a 5", "Transcripción"),
+])
+def test_mensajes_por_idioma(idioma, marca, etiqueta):
+    sistema, usuario = construir_mensajes("hola mundo", idioma)
+    assert sistema["role"] == "system" and marca in sistema["content"]
+    assert usuario == {"role": "user", "content": f"{etiqueta}:\nhola mundo"}

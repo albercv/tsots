@@ -1,6 +1,52 @@
 from __future__ import annotations
 
+import logging
+from typing import Callable
+
+from .caption import recortar
+from .i18n import _
+from .ollama import chat_json
+from .steps import PasoFallido
 from .subtitles import _tiempo_ass, partir_en_dos
+
+log = logging.getLogger(__name__)
+
+MIN_PALABRAS = 3
+MAX_PALABRAS = 5
+_QUITAR = str.maketrans("", "", "\"'«»“”#")
+
+# Prompt del LLM: no es texto de interfaz (no se traduce con gettext). Hay una
+# variante fija por idioma; `construir_mensajes` elige según `idioma`.
+_SYSTEM_ES = (
+    "Eres un experto en vídeo corto (Instagram Reels, TikTok, YouTube Shorts) en "
+    "español de España. A partir de la transcripción de un vídeo escribe el "
+    "título que se sobreimprime en grande durante los primeros segundos:\n"
+    f"- titulo: de {MIN_PALABRAS} a {MAX_PALABRAS} palabras clave que digan de qué "
+    "trata el vídeo, con los temas, nombres o conceptos concretos que se "
+    "mencionan.\n"
+    "- Nada genérico (\"vídeo interesante\", \"mira esto\").\n"
+    "- Sin emojis, hashtags, comillas ni punto final.\n"
+    "- En el mismo idioma que la transcripción.\n"
+    "No inventes datos que no estén en la transcripción. Responde solo JSON."
+)
+
+_SYSTEM_EN = (
+    "You are a short-form video expert (Instagram Reels, TikTok, YouTube Shorts). "
+    "From a video transcript write the title that is overlaid in large type "
+    "during the first seconds:\n"
+    f"- titulo: {MIN_PALABRAS} to {MAX_PALABRAS} keywords that say what the video "
+    "is about, using the specific topics, names or concepts it mentions.\n"
+    "- Nothing generic (\"interesting video\", \"look at this\").\n"
+    "- No emojis, hashtags, quotes or final period.\n"
+    "- In the same language as the transcript.\n"
+    "Do not invent data that isn't in the transcript. Respond only with JSON."
+)
+
+ESQUEMA: dict = {
+    "type": "object",
+    "properties": {"titulo": {"type": "string"}},
+    "required": ["titulo"],
+}
 
 DURACION = 5.0
 FUENTE = "Titan One"
@@ -58,3 +104,42 @@ def lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
         f"{{\\an8\\pos({x},{y}){fundido}}}{texto}",
     ]
     return estilos, eventos
+
+
+def construir_mensajes(transcripcion: str, idioma: str) -> list[dict]:
+    ingles = idioma == "en"
+    etiqueta = "Transcript" if ingles else "Transcripción"
+    return [
+        {"role": "system", "content": _SYSTEM_EN if ingles else _SYSTEM_ES},
+        {"role": "user", "content": f"{etiqueta}:\n{recortar(transcripcion)}"},
+    ]
+
+
+def pedir_titulo(transcripcion: str, idioma: str, modelo: str,
+                 cliente: Callable[[str, list[dict], dict], dict] = chat_json) -> str:
+    """Título de 3 a 5 palabras para la transcripción. Lanza `PasoFallido`."""
+    if not transcripcion.strip():
+        raise PasoFallido(
+            _("La transcripción está vacía; no hay texto para el título"))
+    datos = cliente(modelo, construir_mensajes(transcripcion, idioma), ESQUEMA)
+    titulo = datos.get("titulo")
+    if not isinstance(titulo, str):
+        raise PasoFallido(_("La respuesta del modelo no trae un título"))
+    titulo = " ".join(titulo.translate(_QUITAR).split()[:MAX_PALABRAS]).rstrip(".,;: ")
+    if len(titulo.split()) < MIN_PALABRAS:
+        raise PasoFallido(
+            _("El modelo no propuso un título de 3 a 5 palabras: «{titulo}»")
+            .format(titulo=titulo))
+    return titulo
+
+
+def generar_titulo(transcripcion: str, idioma: str, modelo: str,
+                   cliente: Callable[[str, list[dict], dict], dict] = chat_json
+                   ) -> str | None:
+    """Contrato con shorts: el título o `None` (con aviso en el log) si algo falla;
+    nunca lanza, para que un fallo del modelo no tumbe el procesado."""
+    try:
+        return pedir_titulo(transcripcion, idioma, modelo, cliente)
+    except Exception as e:  # noqa: BLE001
+        log.warning("No se pudo generar el título de inicio: %s", e)
+        return None
