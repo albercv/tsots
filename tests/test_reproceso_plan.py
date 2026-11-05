@@ -8,8 +8,8 @@ from videopipeline import ficha as modulo_ficha
 from videopipeline import reproceso_plan
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, VERTICAL,
-    Artefacto, Ficha, Huella,
+    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION,
+    VERTICAL, Artefacto, Ficha, Huella,
 )
 from videopipeline.reproceso_plan import (
     Accion, Consulta, Decisiones, ajustes_audio, ajustes_caption,
@@ -69,14 +69,26 @@ def _transcripcion(linea) -> Artefacto:
     return Artefacto(clave(TRANS), "transcripcion.json", TRANS, linea)
 
 
-def _horizontal(subs=True) -> Artefacto:
-    return Artefacto("h", None, {"subtitulos": SUBS} if subs else {})
+T = "Audio limpio ya"
 
 
-def _vertical(encuadre="central", subs=False) -> Artefacto:
+def _titulo(texto=T) -> Artefacto:
+    return Artefacto(clave(texto), None, {"texto": texto})
+
+
+def _horizontal(subs=True, titulo=None) -> Artefacto:
+    ajustes = {"subtitulos": SUBS} if subs else {}
+    if titulo:
+        ajustes["titulo"] = titulo
+    return Artefacto("h", None, ajustes)
+
+
+def _vertical(encuadre="central", subs=False, titulo=None) -> Artefacto:
     ajustes = {"vertical": {"encuadre": encuadre}}
     if subs:
         ajustes["subtitulos"] = SUBS
+    if titulo:
+        ajustes["titulo"] = titulo
     return Artefacto("v", None, ajustes)
 
 
@@ -113,8 +125,22 @@ def _completa(tmp_path, **extra) -> Ficha:
     }, con_vertical=VERTICAL in extra)
 
 
+def _con_titulo(tmp_path) -> Ficha:
+    """`_completa` con el título ya quemado en el horizontal."""
+    return _completa(tmp_path, **{HORIZONTAL: _horizontal(titulo=T),
+                                  TITULO: _titulo()})
+
+
+def _solo_titulo(tmp_path) -> Ficha:
+    """Recortado, con el título quemado y sin subtítulos: la base va aparte."""
+    return _ficha(tmp_path, {BASE: _base(silencios=True),
+                             HORIZONTAL: _horizontal(subs=False, titulo=T),
+                             TITULO: _titulo()})
+
+
 TODO = dict(paso_audio=True, paso_silencios=True, subtitulos=True,
             caption_seo=True)
+REHACER_SUBS = Decisiones(rehacer=frozenset({"subtitulos"}))
 
 CASOS = [
     ("caption_con_transcripcion_de_otra_linea",
@@ -168,6 +194,33 @@ CASOS = [
     ("pasos_ya_hechos_mismos_ajustes",
      lambda t: _completa(t, **{VERTICAL: _vertical(subs=True)}),
      dict(TODO, paso_vertical=True), Decisiones(), []),
+    # Título de inicio: no es un paso del panel, va con lo quemado.
+    ("titulo_en_ficha_nueva", lambda t: _ficha(t, {}, final=None),
+     dict(TODO, paso_vertical=True, titulo=True), Decisiones(),
+     [A.LIMPIAR_AUDIO_ORIGINAL, A.CORTAR, A.TRANSCRIBIR, A.TITULO, A.QUEMAR,
+      A.CAPTION, A.VERTICAL]),
+    ("anadir_titulo_reutiliza_la_transcripcion", _completa, dict(titulo=True),
+     Decisiones(), [A.TITULO, A.QUEMAR]),
+    ("anadir_titulo_sin_subtitulos_transcribe",
+     lambda t: _ficha(t, {BASE: _base(silencios=True, aparte=False),
+                          HORIZONTAL: _horizontal(subs=False)}),
+     dict(titulo=True), Decisiones(), [A.TRANSCRIBIR, A.TITULO, A.QUEMAR]),
+    ("titulo_ya_quemado", _con_titulo, dict(titulo=True), Decisiones(), []),
+    ("quitar_titulo_vuelve_a_quemar", _con_titulo, dict(titulo=False),
+     Decisiones(), [A.QUEMAR]),
+    ("rehacer_subtitulos_rehace_el_titulo", _con_titulo,
+     dict(subtitulos=True, titulo=True), REHACER_SUBS,
+     [A.TRANSCRIBIR, A.TITULO, A.QUEMAR]),
+    ("cambiar_estilo_conserva_el_titulo", _con_titulo,
+     dict(subtitulos=True, diseno="caja", titulo=True), REHACER_SUBS, [A.QUEMAR]),
+    ("rehacer_caption_no_toca_el_titulo", _con_titulo,
+     dict(caption_seo=True, titulo=True),
+     Decisiones(rehacer=frozenset({"caption"})), [A.CAPTION]),
+    ("quitar_titulo_sin_subtitulos_escribe_el_final", _solo_titulo,
+     dict(titulo=False), Decisiones(), [A.ESCRIBIR_FINAL]),
+    ("recortar_con_solo_titulo_lo_reutiliza", _solo_titulo,
+     dict(paso_silencios=True, margen="0.4s", titulo=True),
+     Decisiones(rehacer=frozenset({"silencios"})), [A.CORTAR, A.QUEMAR]),
 ]
 
 
@@ -572,6 +625,33 @@ def test_artefacto_sin_archivo_se_rehace(tmp_path):
 
     assert plan.acciones == [A.LIMPIAR_AUDIO_ORIGINAL, A.CORTAR,
                              A.ESCRIBIR_FINAL]
+
+
+def test_titulo_nuevo_regenera_el_vertical_sin_preguntar(tmp_path):
+    ficha = _completa(tmp_path, **{VERTICAL: _vertical(subs=True)})
+    panel = _panel(titulo=True)
+
+    plan = planificar(ficha, panel, Decisiones())
+
+    assert revisar(ficha, panel) == []  # R7 no se consulta
+    assert plan.acciones == [A.TITULO, A.QUEMAR, A.VERTICAL]
+    assert plan.marcar_desactualizado is False
+    assert plan.config.titulo is True
+
+
+def test_legado_con_subs_quemados_no_lleva_titulo(tmp_path):
+    ficha = _legado(tmp_path, original=False, legado=True)
+
+    plan = planificar(ficha, _panel(paso_silencios=True, titulo=True),
+                      Decisiones())
+
+    assert plan.error == ""
+    assert plan.acciones == [A.CORTAR, A.ESCRIBIR_FINAL]  # R2
+    assert plan.config.titulo is False
+
+
+def test_revisar_no_pregunta_por_el_titulo(tmp_path):
+    assert revisar(_completa(tmp_path), _panel(titulo=True)) == []
 
 
 def test_ajustes_y_clave():
