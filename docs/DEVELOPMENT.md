@@ -135,8 +135,9 @@ QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/t
 
 ```
 app/                 PySide6 GUI (main window, queue model, worker, widgets)
-videopipeline/       pipeline (steps, subtitles, caption, glossary, ollama
-                     client, errors → diagnostics, runner subprocess, i18n)
+videopipeline/       pipeline (steps, subtitles, caption, opening title,
+                     glossary, ollama client, errors → diagnostics, runner
+                     subprocess, i18n)
 videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
@@ -207,14 +208,31 @@ stands in for it. Planner and executor use the same helper.
 | `audio` | `audio_limpio.flac` | task + model | `tarea`, `modelo`; `linea_tiempo` is that of the video it was cleaned from (R9) |
 | `base` | `base.mp4`, or none when the final is the base (R3) | settings of the steps applied + timeline | `{"audio": …, "silencios": …}`, only the steps applied |
 | `transcripcion` | `transcripcion.json` | language, Whisper model, glossary key | the same; `linea_tiempo` is that of the base it came from |
-| `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings | `{"subtitulos": …}` if burned |
+| `titulo` | none: the text is the whole artifact | `clave(texto)` | `{"texto": …}`, from the subtitles' transcript (action `TITULO`); no timeline, so valid while present |
+| `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings + title text | `{"subtitulos": …}` if burned, `"titulo"` if it has a title |
 | `caption` | `caption.md` (the `.md` next to the final is a copy) | `modelo_caption` | `{"caption": …}` |
 | `seguimiento` | `cara.cmd` | timeline of the base only: the picture depends on the cuts, not the audio | `x_inicial` |
-| `vertical` | none: `ficha.vertical`, or `ficha.final` if it is the only output | timeline + framing (+ subtitle settings) | `{"vertical": …}` and `{"subtitulos": …}` if burned |
+| `vertical` | none: `ficha.vertical`, or `ficha.final` if it is the only output | timeline + framing (+ subtitle and title settings) | `{"vertical": …}`, `{"subtitulos": …}` if burned, `"titulo"` if it has a title |
 
 `Ficha.pasos_hechos()` derives the ✓ in the queue from these.
 `ficha.desactualizado` (`{"vertical"}`) marks an output that no longer
 matches its base.
+
+**Opening title in a record.** `TITULO` is an internal action, not a
+panel step, and asks nothing in the reprocess dialog. It runs between
+`TRANSCRIBIR` and `QUEMAR` (progress label "Generando título"). The text
+is generated when it is missing (box just ticked, new video, or a new
+subtitle transcript, e.g. "redo the subtitles"), reused when only the cut
+changes, and not touched by redoing the caption. If regenerating fails, the
+previous title stays and is the one burned. Ticking or unticking the box
+re-burns the app's own outputs whose base still holds (horizontal and
+vertical, without the R7 question) and does not transcribe again. On
+legacy or adopted outputs, or when no base can be rebuilt, the title is only
+added when that output is rebuilt for another reason. It is never burned
+over `subs_quemados_sin_base` (R2). With the box on and the model
+unavailable, each "Process again" retries the title and burns it again.
+The title text is part of the `clave` of the burned outputs, so a different
+title re-burns them.
 
 **Rules.** Implemented in `reproceso_plan.py` (the executor only does what
 the plan says); numbers match comments in the code.
@@ -337,6 +355,58 @@ silences, subtitles and caption; look inside `fichas/<id>/` (`ficha.json`,
 `clip_limpio.mp4` in again (same row, back to "waiting", ✓ summary) and
 tick only **Vertical** (no new transcription, one video encode); then tick
 **Silence cutting** with another margin and read the warning.
+
+### Opening title
+
+The first 5 seconds of the horizontal and the vertical (and, through the
+contract below, of the shorts) can carry a title: 3 to 5 keywords in large
+type at the top, Titan One, white with a black border and a gold outline
+shifted down-right. The checkbox **Título al inicio** (*Opening title* in
+the English UI) sits in the Subtitles section and is on by default.
+`PipelineConfig.titulo` defaults to `False`, so the CLI (which has no flag
+for it) and old runner JSON are unchanged.
+
+- `videopipeline/titulo.py`: `generar_titulo` (never raises: `None` and a
+  log warning), `pedir_titulo` (the same, but raises `PasoFallido`), the
+  prompt and its validation, and `lineas_titulo`, which turns the text into
+  ASS styles and events (`DURACION = 5.0`). The size is fitted to the width
+  with the measured per-glyph table `_ANCHOS` (advance of each glyph of
+  Titan One per point of font size) and the letter spacing `ESPACIADO`.
+- `subtitles.generar_ass(..., extra=(estilos, eventos))` appends those lines
+  to the subtitles' `.ass`; `bloques` may be `[]`. The title is burned in the
+  same encoding pass as the subtitles (`pipeline._quemar_subs`), or alone
+  when there are none.
+- `steps.filtro_ass` adds `fontsdir=videopipeline/fuentes/`, so libass finds
+  `TitanOne-Regular.ttf` without the font installed. The licence, `OFL.txt`,
+  sits next to it.
+- The text comes from `pipeline._fase_titulo`: one call to the caption model
+  (`modelo_caption`, through `ollama.chat_json`) on the transcript, before
+  anything is burned. The JSON is `{"idioma", "titulo"}` with `idioma` first,
+  so the model names the transcript's language before writing the title.
+  Validation keeps the first 5 words and drops answers with fewer than 3. If
+  Ollama fails, the video is saved without a title and the row shows a
+  warning. The prompt is not in gettext: it is two fixed texts in `titulo.py`.
+
+**Contract for shorts.** Two public functions are shared with the shorts
+branch (`feature/shorts`); keep their names and signatures:
+
+```python
+generar_titulo(transcripcion: str, idioma: str, modelo: str, cliente=chat_json) -> str | None
+lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
+              duracion: float = DURACION) -> tuple[list[str], list[str]]
+```
+
+`generar_titulo` returns `None` on any failure, and `lineas_titulo` returns
+`([], [])` for an empty text. Writing a short's `.ass` with its title:
+
+```python
+texto = generar_titulo(tramo_transcripcion, idioma, modelo_caption)  # None on failure
+generar_ass(bloques, diseno, posicion, resolucion, ass_path,
+            extra=lineas_titulo(texto or "", resolucion))
+```
+
+Tests: `tests/test_titulo.py` (validation, ASS lines and width, with the
+client passed in as a fake, so no Ollama is needed).
 
 ## Glossary of terms
 

@@ -330,3 +330,26 @@ No es para un subagente: lo hace quien coordina, con criterio visual.
 - [ ] Quemar con `pipeline._quemar_subs` (o ffmpeg directo con `filtro_ass`) un clip `testsrc2` de 1920x1080 y otro de 1080x1920, con y sin subtítulos, títulos de 3 y de 5 palabras; extraer el fotograma de t=2 s a PNG y mirarlo. Comprobar: legible, centrado, sin cortes por los lados, aire por arriba, contorno dorado visible abajo a la derecha. Ajustar las constantes de `titulo.py` si hace falta (y los números exactos de sus tests).
 - [ ] Probar `generar_titulo` contra Ollama local (`gemma4:12b-mlx` u otro instalado) con dos o tres transcripciones de ejemplo en español y una en inglés: que salgan 3-5 palabras concretas. Ajustar el prompt si salen genéricas.
 - [ ] Suite → verde. **Commit** `fix: tune the opening title look and prompt` (solo si hubo cambios).
+
+---
+
+## Desviaciones durante la ejecución
+
+Lo que se hizo distinto de lo escrito arriba, y por qué:
+
+- **Anchura del título (tarea 8).** `ANCHO_CARACTER = 0.62`, una media para
+  todas las letras, se sustituye por una tabla medida por glifo, `_ANCHOS`
+  (avance de cada carácter de Titan One por punto de tamaño de libass), con
+  `ANCHO_DESCONOCIDO = 0.70` para lo que no está en la tabla. Se añade además
+  el espaciado entre letras `ESPACIADO = 0.04` (fracción del tamaño de letra,
+  `Spacing` del estilo). La media no reflejaba el ancho de cada letra;
+  `_ancho_en_fs` suma ahora el avance de cada glifo más el espaciado.
+- **`ESQUEMA` con `idioma` antes que `titulo` (tarea 3).** El esquema pide
+  los dos campos, `idioma` primero: Ollama genera los campos en ese orden, así
+  el modelo nombra el idioma de la transcripción antes de escribir el título.
+  La validación sigue leyendo solo `titulo`.
+- **El título solo fuerza a rehacer lo que hizo la app (tarea 5).** Un título
+  distinto obliga a rehacer una salida solo si la hizo la app y su base vale
+  (`_base_vale`). En salidas heredadas o adoptadas, o si no se puede rehacer
+  la base, el título va con esa salida cuando se rehace por otro motivo. Nunca
+  se quema sobre `subs_quemados_sin_base` (R2).
