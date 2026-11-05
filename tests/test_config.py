@@ -164,6 +164,16 @@ def test_caption_json_ida_y_vuelta():
     assert c2.contexto_marca == "Soy Alberto, tono cercano"
 
 
+def test_titulo_defecto_y_json():
+    assert _config_minima().titulo is False
+    datos = json.loads(_config_minima().to_json())
+    datos.pop("titulo")  # JSON de una versión anterior
+    assert PipelineConfig.from_json(json.dumps(datos)).titulo is False
+    c = _config_minima(titulo=True)
+    assert json.loads(c.to_json())["titulo"] is True
+    assert PipelineConfig.from_json(c.to_json()) == c
+
+
 def test_caption_modelo_vacio_invalido():
     with pytest.raises(ValueError, match="modelo_caption"):
         _config_minima(caption_seo=True, modelo_caption="").validar()

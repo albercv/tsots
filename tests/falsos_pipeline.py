@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from videopipeline import pipeline, reproceso
+from videopipeline.steps import PasoFallido
 
 
 def _parchear(monkeypatch, nombre: str, valor) -> None:
@@ -77,8 +78,11 @@ def entorno_subs(entorno, monkeypatch, tmp_path):
         llamadas.append("srt")
         ruta.write_text("srt", encoding="utf-8")
 
-    def falso_ass(bloques, preset_id, posicion, resolucion, ruta, tamano=100):
+    def falso_ass(bloques, preset_id, posicion, resolucion, ruta, tamano=100,
+                  extra=None):
         llamadas.append(f"ass:{posicion}:{resolucion}:{tamano}")
+        if extra and extra[1]:
+            llamadas.append("ass:titulo")
         ruta.write_text("ass", encoding="utf-8")
 
     def falso_resolucion(video_):
@@ -122,6 +126,25 @@ def entorno_caption(entorno_subs, monkeypatch):
     _parchear(monkeypatch, "asegurar_servidor", falso_asegurar)
     _parchear(monkeypatch, "generar_caption", falso_generar)
     return llamadas, video, base
+
+
+@pytest.fixture()
+def entorno_titulo(entorno_caption, monkeypatch):
+    """Extiende `entorno_caption` mockeando el modelo del título.
+
+    `estado["falla"] = True` hace que pedir el título falle como si Ollama no
+    respondiera."""
+    llamadas, video, base = entorno_caption
+    estado = {"falla": False}
+
+    def falso_pedir_titulo(transcripcion, idioma, modelo, cliente=None):
+        llamadas.append(f"titulo:{modelo}:{idioma}")
+        if estado["falla"]:
+            raise PasoFallido("Ollama no responde")
+        return "Audio limpio ya"
+
+    _parchear(monkeypatch, "pedir_titulo", falso_pedir_titulo)
+    return llamadas, video, base, estado
 
 
 @pytest.fixture()
