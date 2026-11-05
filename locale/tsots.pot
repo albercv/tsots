@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-01 23:42+0100\n"
+"POT-Creation-Date: 2026-11-05 07:51+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -878,7 +878,7 @@ msgstr ""
 msgid "No queda espacio en disco"
 msgstr ""
 
-msgid "No se detectó ninguna cara: se usa recorte central."
+msgid "No se detectó ninguna cara: se encuadra al centro."
 msgstr ""
 
 msgid "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"
@@ -1017,7 +1017,7 @@ msgid "No se pudo leer la resolución del vídeo: {video}"
 msgstr ""
 
 #, python-brace-format
-msgid "No se pudo preparar el detector de caras: {error}. Se usa recorte central."
+msgid "No se pudo preparar el detector de caras: {error}. Se encuadra al centro."
 msgstr ""
 
 #, python-brace-format

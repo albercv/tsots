@@ -14,8 +14,9 @@ guarda en cada uno:
 - HORIZONTAL y VERTICAL: `{"subtitulos": ajustes_subtitulos}` si los llevan;
   VERTICAL, además, `{"vertical": ajustes_vertical}`.
 - CAPTION: `{"caption": ajustes_caption}`.
-- SEGUIMIENTO: clave = línea de tiempo de la base; la imagen solo depende de
-  los cortes, no del audio.
+- SEGUIMIENTO: clave = `clave_seguimiento(línea de tiempo de la base)`; la
+  imagen solo depende de los cortes, no del audio, y las x guardadas son las de
+  una ventana de recorte concreta (`PROPORCION_VENTANA_CARA`).
 
 Línea de tiempo de la base: `ficha.linea_original()` sin recorte, y
 `clave(ajustes_audio o None, ajustes_silencios)` al recortar (sobre el audio
@@ -38,11 +39,20 @@ from .ficha import (
     VERTICAL, Artefacto, Ficha, Huella,
 )
 from .i18n import N_, _
+from .vertical import PROPORCION_VENTANA_CARA
 
 
 def clave(*partes) -> str:
     texto = json.dumps(partes, sort_keys=True, default=str)
     return hashlib.sha256(texto.encode("utf-8")).hexdigest()[:16]
+
+
+def clave_seguimiento(linea: str) -> str:
+    """Las x del seguimiento valen solo para la ventana con la que se
+    calcularon. Un seguimiento hecho antes de ella (su clave era la línea de
+    tiempo sin más) no coincide: se recalcula al rehacer el vertical, sin tocar
+    el vertical ya hecho."""
+    return clave(linea, PROPORCION_VENTANA_CARA)
 
 
 # Ajustes de los que depende cada paso: nombre en la ficha → campo del panel.
@@ -449,8 +459,9 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     if genera:
         elegidas.add(Accion.VERTICAL)
         seguimiento = _vale(ficha, SEGUIMIENTO)
-        if efectiva.encuadre == "cara" and (seguimiento is None
-                                            or seguimiento.clave != linea):
+        if efectiva.encuadre == "cara" and (
+                seguimiento is None
+                or seguimiento.clave != clave_seguimiento(linea)):
             elegidas.add(Accion.SEGUIMIENTO)
     if r10:
         elegidas.add(Accion.RETIRAR_VERTICAL_UNICO if genera

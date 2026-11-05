@@ -12,11 +12,12 @@ from videopipeline import pipeline, reproceso
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
     BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, Ficha, cargar,
-    reconocer,
+    guardar, reconocer,
 )
 from videopipeline.reproceso import ejecutar
 from videopipeline.reproceso_plan import (
-    Accion, Decisiones, ajustes_silencios, planificar, revisar,
+    Accion, Decisiones, ajustes_silencios, clave_seguimiento, planificar,
+    revisar,
 )
 from videopipeline.steps import PasoFallido
 
@@ -289,6 +290,8 @@ def test_vertical_con_seguimiento_guardado_no_detecta_otra_vez(
                     paso_silencios=True, paso_vertical=True, encuadre="cara")
     assert falsos.count("caras") == 1
     assert ficha.artefactos[SEGUIMIENTO].ajustes == {"x_inicial": 10}
+    assert ficha.artefactos[SEGUIMIENTO].clave == clave_seguimiento(
+        ficha.artefactos[BASE].linea_tiempo)
     falsos.clear()
     comandos: list[str] = []
     convertir = pipeline.convertir_vertical
@@ -303,8 +306,34 @@ def test_vertical_con_seguimiento_guardado_no_detecta_otra_vez(
             paso_vertical=True, encuadre="cara")
 
     assert "caras" not in falsos
-    assert "crop@v=606:1080:10:0" in falsos[-1]
+    assert "crop@v=810:1080:10:0" in falsos[-1]
     assert comandos == ["0.000 crop@v x 10;"]
+
+
+def test_vertical_con_seguimiento_de_la_ventana_9_16_lo_recalcula(falsos, tmp_path):
+    ficha = _pasada(_ficha(tmp_path),
+                    [A.CORTAR, A.ESCRIBIR_FINAL, A.SEGUIMIENTO, A.VERTICAL],
+                    paso_silencios=True, paso_vertical=True, encuadre="cara")
+    # Lo que guardaban las versiones con la ventana de 9:16: clave = línea.
+    ficha.artefactos[SEGUIMIENTO].clave = ficha.artefactos[BASE].linea_tiempo
+    guardar(ficha)
+    falsos.clear()
+
+    ficha = _pasada(cargar(ficha.id), [A.SEGUIMIENTO, A.VERTICAL],
+                    Decisiones(rehacer=frozenset({"vertical"})),
+                    paso_vertical=True, encuadre="cara")
+
+    assert falsos.count("caras") == 1  # no se reutilizan las x de la ventana vieja
+    assert ficha.artefactos[SEGUIMIENTO].clave == clave_seguimiento(
+        ficha.artefactos[BASE].linea_tiempo)
+
+
+def test_vertical_sin_caras_centra_la_ventana_ancha(falsos, tmp_path, monkeypatch):
+    monkeypatch.setattr(reproceso, "preparar_seguimiento", lambda *a, **k: None)
+    _pasada(_ficha(tmp_path), [A.SEGUIMIENTO, A.VERTICAL], eventos=[],
+            paso_vertical=True, encuadre="cara")
+
+    assert "[0:v]crop=810:1080,split" in falsos[-1] and "sendcmd" not in falsos[-1]
 
 
 def test_desactualizado_se_marca_y_se_limpia_al_regenerar(tmp_path):
