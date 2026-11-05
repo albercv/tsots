@@ -117,6 +117,50 @@ def test_chat_json_envoltura_no_dict(servidor_falso):
         ollama.chat_json("m", [], {}, url=servidor_falso)
 
 
+def test_chat_json_temperatura_por_defecto_y_fijada(servidor_falso):
+    _Falso.respuestas["/api/chat"] = (
+        200, {"message": {"role": "assistant", "content": "{}"}}
+    )
+    ollama.chat_json("m", [], {}, url=servidor_falso)
+    ollama.chat_json("m", [], {}, url=servidor_falso, temperatura=0)
+    assert _Falso.peticiones[0][1]["options"]["temperature"] == 0.7
+    assert _Falso.peticiones[1][1]["options"]["temperature"] == 0
+
+
+def test_systemone_envia_formato_y_devuelve_answers(servidor_falso):
+    _Falso.respuestas["/v1/systemone"] = (200, {"answers": {"interes": 3, "ok": True}})
+    preguntas = {"interes": {"type": "number"}, "ok": {"type": "boolean"}}
+    respuesta = ollama.systemone("tev1:0.8b", "texto", preguntas, url=servidor_falso)
+    assert respuesta == {"interes": 3, "ok": True}
+    assert _Falso.peticiones == [("/v1/systemone", {
+        "model": "tev1:0.8b", "state": "texto", "questions": preguntas,
+    })]
+
+
+def test_systemone_404_modelo_no_descargado(servidor_falso):
+    _Falso.respuestas["/v1/systemone"] = (404, {"error": "model 'tev1:0.8b' not found"})
+    with pytest.raises(PasoFallido) as info:
+        ollama.systemone("tev1:0.8b", "texto", {}, url=servidor_falso)
+    assert str(info.value) == "Modelo no descargado: tev1:0.8b"
+    assert "not found" in info.value.detalle
+
+
+@pytest.mark.parametrize("cuerpo", [
+    {"foo": 1}, ["no", "es", "dict"], b"<html>gateway error</html>",
+], ids=["sin_answers", "lista", "no_json"])
+def test_systemone_sin_answers_es_respuesta_no_valida(servidor_falso, cuerpo):
+    _Falso.respuestas["/v1/systemone"] = (200, cuerpo)
+    with pytest.raises(PasoFallido) as info:
+        ollama.systemone("tev1:0.8b", "texto", {}, url=servidor_falso)
+    assert str(info.value) == "Ollama devolvió una respuesta no válida"
+
+
+def test_systemone_sin_servidor():
+    with pytest.raises(PasoFallido) as info:
+        ollama.systemone("tev1:0.8b", "texto", {}, url="http://127.0.0.1:1", timeout=0.5)
+    assert str(info.value).startswith("Ollama no responde en")
+
+
 def test_asegurar_servidor_no_arranca_si_ya_responde(servidor_falso, monkeypatch):
     monkeypatch.setattr(ollama.subprocess, "Popen",
                         lambda *a, **k: pytest.fail("no debe lanzar ollama serve"))
