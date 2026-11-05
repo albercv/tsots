@@ -3,19 +3,30 @@
 Flujo: la transcripción por palabras se trocea en frases numeradas; el LLM
 propone trozos como rangos de frases; el código valida esos rangos (existen,
 duran entre 60 y 179 s, no se repiten), `tev1` (o el modelo del caption) los
-puntúa y se eligen los mejores sin solapes. La generación va aparte.
+puntúa y se eligen los mejores sin solapes. `crear` corta cada uno de la base
+de la ficha y publica la carpeta.
 """
 from __future__ import annotations
 
 import json
 import re
+import shutil
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path
 
+from .config import ENCUADRES, PipelineConfig
+from .ficha import TRANSCRIPCION, Ficha, _escribir_json
 from .i18n import _
-from .ollama import chat_json, systemone
-from .steps import PasoFallido
-from .subtitles import Palabra
+from .ollama import asegurar_servidor, chat_json, systemone
+from .pipeline import Progreso, _avisar, _emitir, _fase_caption, _fase_vertical
+from .reproceso import _Pasada, ejecutar
+from .reproceso_plan import (
+    Accion, Plan, _base_vale, _subs_bloqueados, _vale, seguimiento_vale,
+)
+from .seguimiento import recortar_comandos
+from .steps import PasoFallido, duracion_video
+from .subtitles import Palabra, agrupar, generar_srt
 
 DURACION_MIN = 60.0
 DURACION_MAX = 179.0
@@ -410,3 +421,208 @@ def puntuar(
             detalle=str(error),
         ) from error
     return modelo
+
+
+# --- Generar y publicar la carpeta ------------------------------------------
+
+TMP = ".shorts_tmp"
+_SUFIJOS = (".mp4", ".srt", ".md")
+
+
+@dataclass(frozen=True)
+class OpcionesShorts:
+    subtitulos: bool = True
+    encuadre: str = "cara"
+
+    @classmethod
+    def de_datos(cls, datos: dict) -> OpcionesShorts:
+        """Las del JSON del runner. ValueError si el encuadre no existe."""
+        opciones = cls(bool(datos.get("subtitulos", True)),
+                       datos.get("encuadre", "cara"))
+        if opciones.encuadre not in ENCUADRES:
+            raise ValueError(f"encuadre inválido: {opciones.encuadre!r} "
+                             f"(esperado uno de {ENCUADRES})")
+        return opciones
+
+
+@dataclass(frozen=True)
+class Resultado:
+    carpeta: Path
+    n: int  # shorts creados
+
+
+def carpeta_shorts(ficha: Ficha) -> Path:
+    return ficha.carpeta_salida / ficha.nombre
+
+
+def hay_shorts(ficha: Ficha) -> bool:
+    return (carpeta_shorts(ficha) / "shorts.json").is_file()
+
+
+def limpiar_temporal(ficha: Ficha) -> None:
+    shutil.rmtree(carpeta_shorts(ficha) / TMP, ignore_errors=True)
+
+
+def _transcrita(ficha: Ficha, linea: str) -> bool:
+    transcripcion = _vale(ficha, TRANSCRIPCION)
+    return transcripcion is not None and transcripcion.linea_tiempo == linea
+
+
+def _anteriores(carpeta: Path) -> list[str]:
+    """Lo que la app escribió la vez anterior, según su `shorts.json`. Solo
+    nombres sueltos: nunca se borra fuera de la carpeta. Dañado, nada."""
+    try:
+        archivos = json.loads(
+            (carpeta / "shorts.json").read_text(encoding="utf-8"))["archivos"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+    if not isinstance(archivos, list):
+        return []
+    return [n for n in archivos if isinstance(n, str)
+            and n not in ("", ".", "..") and Path(n).name == n]
+
+
+def _con_etiqueta(on_progress: Progreso | None, etiqueta: str) -> Progreso | None:
+    """`on_progress` con `etiqueta` en los eventos de paso; los avisos, tal cual."""
+    if on_progress is None:
+        return None
+    return lambda evento: on_progress(
+        {**evento, "label": etiqueta} if "step" in evento else evento)
+
+
+def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
+          on_progress: Progreso | None = None) -> Resultado:
+    """Saca los shorts de `ficha` a `carpeta_shorts(ficha)`; PasoFallido si no.
+
+    Antes transcribe la base o sigue la cara si hace falta, y lo registra en la
+    ficha. Los shorts se generan en `TMP` y solo si salen todos sustituyen a los
+    anteriores: de la carpeta solo se borra lo que lista su `shorts.json`, y no
+    se pisa nada más.
+    """
+    nombre = ficha.nombre
+    if ficha.final is None:
+        raise PasoFallido(_('"{nombre}" aún no tiene vídeo procesado del que '
+                            'sacar shorts.').format(nombre=nombre))
+    if _subs_bloqueados(ficha):
+        raise PasoFallido(_(
+            '"{nombre}" lleva los subtítulos quemados y no hay una versión sin '
+            'ellos de la que cortar los shorts. Arrastra el original y vuelve a '
+            'procesarlo.').format(nombre=nombre))
+    if not _base_vale(ficha):
+        raise PasoFallido(_('La versión sin subtítulos de "{nombre}" ya no está. '
+                            'Vuelve a procesarlo para sacar shorts.'
+                            ).format(nombre=nombre))
+    pasada = _Pasada(ficha, Plan([], config, []), on_progress)
+    acciones = []
+    if not _transcrita(ficha, pasada.linea):
+        acciones.append(Accion.TRANSCRIBIR)
+    if opciones.encuadre == "cara" and not seguimiento_vale(ficha, pasada.linea):
+        acciones.append(Accion.SEGUIMIENTO)
+    if acciones:
+        ejecutar(ficha, Plan(acciones, config, []), on_progress)
+        pasada = _Pasada(ficha, Plan([], config, []), on_progress)
+    # `_Pasada.transcribir` traga el fallo cuando no es para subtítulos.
+    if not _transcrita(ficha, pasada.linea):
+        raise PasoFallido(_('No se pudo transcribir "{nombre}": sin '
+                            'transcripción no se pueden buscar shorts.'
+                            ).format(nombre=nombre))
+    palabras = pasada._palabras()
+
+    duracion = duracion_video(pasada.base)
+    maximo = maximo_shorts(duracion)
+    if maximo == 0:
+        raise PasoFallido(_('"{nombre}" dura menos de 3 minutos: es demasiado '
+                            'corto para sacar shorts.').format(nombre=nombre))
+    frases = trocear_frases(palabras)
+    total = 2 + maximo
+
+    def avance(paso: int, etiqueta: str) -> Callable[[float], None]:
+        _emitir(on_progress, paso, total, etiqueta)
+        return lambda p: _emitir(on_progress, paso, total, etiqueta, p)
+
+    servidor = asegurar_servidor()
+    try:
+        candidatos = buscar_candidatos(
+            frases, duracion, maximo, config.modelo_caption,
+            avance(1, _("Buscando trozos para shorts")))
+        juez = puntuar(candidatos, frases, config.modelo_caption,
+                       on_aviso=lambda texto: _avisar(on_progress, texto),
+                       on_percent=avance(2, _("Puntuando los trozos")))
+    finally:
+        servidor.cerrar()
+
+    elegidos = elegir(candidatos, maximo)
+    carpeta = carpeta_shorts(ficha)
+    if not elegidos:
+        _avisar(on_progress, _('Ningún trozo de "{nombre}" es lo bastante bueno '
+                               'para un short: no se ha creado ninguno.'
+                               ).format(nombre=nombre))
+        return Resultado(carpeta, 0)
+
+    anteriores = _anteriores(carpeta)
+    nombres = [nombre_archivo(i, c.titulo) for i, c in enumerate(elegidos, 1)]
+    for c, stem in zip(elegidos, nombres):
+        c.archivo = stem + ".mp4"
+        for sufijo in _SUFIJOS:
+            ruta = carpeta / (stem + sufijo)
+            if ruta.exists() and ruta.name not in anteriores:
+                raise PasoFallido(_(
+                    'No se toca "{ruta}": no lo creó la app. Muévelo o bórralo y '
+                    'vuelve a crear los shorts.').format(ruta=ruta))
+
+    cara = (ficha.ruta("cara.cmd").read_text(encoding="utf-8")
+            if opciones.encuadre == "cara" and seguimiento_vale(ficha, pasada.linea)
+            else None)
+    config_vertical = replace(config, encuadre=opciones.encuadre)
+    total = 2 + len(elegidos)
+    tmp = carpeta / TMP
+    comandos = tmp / "tramo.cmd"
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir(parents=True)
+    try:
+        for i, (c, stem) in enumerate(zip(elegidos, nombres), 1):
+            progreso = _con_etiqueta(on_progress, _("Creando short {n} de {total}")
+                                     .format(n=i, total=len(elegidos)))
+            tramo = tramo_palabras(palabras, c.inicio, c.fin)
+            bloques = (agrupar(tramo, config.diseno)
+                       if opciones.subtitulos and tramo else None)
+            seguimiento = None
+            if opciones.encuadre == "cara":
+                # Siempre con seguimiento: sin él, `_fase_vertical` buscaría la
+                # cara en toda la base. Sin uno válido, x None: recorte central.
+                x0 = None
+                if cara is not None:
+                    texto, x0 = recortar_comandos(cara, c.inicio, c.fin)
+                    comandos.write_text(texto, encoding="utf-8")
+                seguimiento = (x0, comandos)
+            mp4 = tmp / (stem + ".mp4")
+            _fase_vertical(config_vertical, pasada.base, mp4, bloques, tmp, progreso,
+                           2 + i, total, degradar=False,
+                           desde_original=pasada.base == pasada.fuente,
+                           seguimiento=seguimiento, tramo=(c.inicio, c.fin))
+            if bloques:
+                generar_srt(bloques, mp4.with_suffix(".srt"))
+            if config.caption_seo:  # escribe el .md o deja su propio aviso
+                _fase_caption(config, mp4, mp4, tramo, progreso, 2 + i, total)
+
+        # Todos han salido: sustituyen a los anteriores.
+        for anterior in anteriores:
+            if (carpeta / anterior).is_file():
+                (carpeta / anterior).unlink()
+        archivos = []
+        for stem in nombres:
+            for sufijo in _SUFIJOS:
+                nuevo = tmp / (stem + sufijo)
+                if nuevo.is_file():
+                    nuevo.replace(carpeta / nuevo.name)
+                    archivos.append(nuevo.name)
+        _escribir_json(carpeta / "shorts.json", {
+            "version": 1, "video": nombre, "juez": juez, "maximo": maximo,
+            "archivos": archivos,
+            # Los elegidos en orden y luego los demás, con su descarte.
+            "candidatos": [asdict(c) for c in
+                           elegidos + [c for c in candidatos if c.descarte]],
+        })
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    return Resultado(carpeta, len(elegidos))

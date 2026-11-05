@@ -1,8 +1,20 @@
 from __future__ import annotations
 
+import json
+from dataclasses import asdict, replace
+from types import SimpleNamespace
+
 import pytest
 
-from videopipeline import shorts
+from videopipeline import ficha as modulo_ficha
+from videopipeline import pipeline, reproceso, shorts
+from videopipeline.caption import Caption
+from videopipeline.config import PipelineConfig
+from videopipeline.ficha import (
+    BASE, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, Artefacto, Ficha, Huella,
+    _escribir_json, cargar, guardar,
+)
+from videopipeline.reproceso_plan import clave_seguimiento
 from videopipeline.steps import PasoFallido
 from videopipeline.subtitles import Palabra
 
@@ -469,3 +481,344 @@ def test_puntuar_sin_candidatos_vivos_no_llama_a_nadie(monkeypatch):
     monkeypatch.setattr(shorts, "systemone", prohibido)
     monkeypatch.setattr(shorts, "chat_json", prohibido)
     assert shorts.puntuar([descartado], frases, "m", lambda aviso: None) == shorts.JUEZ
+
+
+# --- crear --------------------------------------------------------------------
+
+LINEA = "base-recortada"
+# Lo que propone el modelo, desordenado: el mejor (11-18), el segundo (25-32),
+# uno que solapa al mejor (15-22) y uno de 20 s.
+PROPUESTOS = [
+    _cand(25, 32, titulo="El segundo"), _cand(15, 22, titulo="Solapado"),
+    _cand(11, 18, titulo="El mejor trozo"), _cand(35, 36, titulo="Corto"),
+]
+MEJOR, SEGUNDO = "01 - El mejor trozo", "02 - El segundo"
+
+
+def _palabras_charla() -> list[Palabra]:
+    """40 frases de 10 s: la frase k son diez palabras «fk» de 1 s, con punto."""
+    return [Palabra(f"f{k}" + ("." if i == 9 else ""), (k - 1) * 10.0 + i,
+                    (k - 1) * 10.0 + i + 1)
+            for k in range(1, 41) for i in range(10)]
+
+
+def _comandos_cara() -> str:
+    """Una orden cada 10 s con la x igual al segundo."""
+    return "".join(f"{t:.3f} crop@v x {t};\n" for t in range(0, 400, 10))
+
+
+@pytest.fixture()
+def ficha_con_base(tmp_path, monkeypatch):
+    """Ficha recortada (base aparte), con su transcripción y todo lo caro falso."""
+    monkeypatch.setattr(modulo_ficha, "DIR_FICHAS", tmp_path / "fichas")
+    original = tmp_path / "charla.mov"
+    original.write_bytes(b"VID")
+    salida = tmp_path / "salida"
+    salida.mkdir()
+    final = salida / "charla_limpio.mp4"
+    final.write_bytes(b"FINAL")
+    ficha = Ficha(
+        id="f1", nombre="charla", carpeta_salida=salida,
+        original=Huella.de(original), final=Huella.de(final),
+        artefactos={
+            BASE: Artefacto("b", "base.mp4", {"silencios": {}}, LINEA),
+            HORIZONTAL: Artefacto("h"),
+            TRANSCRIPCION: Artefacto("t", "transcripcion.json", {}, LINEA),
+        })
+    ficha.carpeta.mkdir(parents=True)
+    ficha.ruta("base.mp4").write_bytes(b"BASE")
+    _escribir_json(ficha.ruta("transcripcion.json"),
+                   [asdict(p) for p in _palabras_charla()])
+    guardar(ficha)
+
+    e = SimpleNamespace(
+        ficha=ficha, config=PipelineConfig(video=original, caption_seo=True),
+        carpeta=salida / "charla", cortes=[], captions=[], caras=[],
+        falla_corte=None,  # número de la llamada a convertir_vertical que falla
+        notas={"f11": (0.9, 3.5), "f25": (0.8, 2.5), "f15": (0.9, 3.0)},
+    )
+
+    class ServidorFalso:
+        def cerrar(self):
+            pass
+
+    def falso_convertir(video, salida_, filtro, cwd, usa_ass, desde_original=False,
+                        on_percent=None, tramo=None):
+        comandos = cwd / "cara.cmd"
+        e.cortes.append({"video": video, "tramo": tramo, "filtro": filtro,
+                         "usa_ass": usa_ass, "desde_original": desde_original,
+                         "cara": comandos.read_text() if comandos.is_file() else None})
+        if e.falla_corte == len(e.cortes):
+            raise PasoFallido("ffmpeg explotó")
+        salida_.write_bytes(b"SHORT")
+
+    def falso_seguimiento(video, ancho, alto, ruta_cmd, on_percent=None,
+                          detector=None):
+        e.caras.append(video)
+        ruta_cmd.write_text(_comandos_cara())
+        return 0
+
+    def falso_caption(transcripcion, contexto_marca, modelo, cliente=None,
+                      idioma="es", terminos=()):
+        e.captions.append(transcripcion)
+        return Caption(titulo="T", caption="C", hashtags=["#a"],
+                       palabras_clave=["k"])
+
+    def falso_tev1(modelo, texto, preguntas, **kw):
+        si, score = e.notas.get(texto.split()[0], (0.9, 1.0))
+        return _tev1(si, score)
+
+    monkeypatch.setattr(shorts, "duracion_video", lambda video: 400.0)
+    monkeypatch.setattr(shorts, "asegurar_servidor", ServidorFalso)
+    monkeypatch.setattr(shorts, "chat_json",
+                        lambda *a, **kw: {"candidatos": PROPUESTOS})
+    monkeypatch.setattr(shorts, "systemone", falso_tev1)
+    monkeypatch.setattr(pipeline, "convertir_vertical", falso_convertir)
+    monkeypatch.setattr(pipeline, "asegurar_servidor", ServidorFalso)
+    monkeypatch.setattr(pipeline, "generar_caption", falso_caption)
+    for modulo in (pipeline, reproceso):
+        monkeypatch.setattr(modulo, "resolucion_video", lambda video: (1920, 1080))
+    monkeypatch.setattr(reproceso, "preparar_seguimiento", falso_seguimiento)
+    return e
+
+
+def _crear(e, opciones=None, eventos=None):
+    recibidos = [] if eventos is None else eventos
+    return shorts.crear(e.ficha, e.config, opciones or shorts.OpcionesShorts(),
+                        recibidos.append)
+
+
+def _leer_json(ruta):
+    return json.loads(ruta.read_text(encoding="utf-8"))
+
+
+def test_opciones_shorts_de_datos():
+    assert shorts.OpcionesShorts.de_datos({}) == shorts.OpcionesShorts(True, "cara")
+    assert shorts.OpcionesShorts.de_datos(
+        {"subtitulos": False, "encuadre": "barras"}) == shorts.OpcionesShorts(
+        False, "barras")
+    with pytest.raises(ValueError, match="encuadre"):
+        shorts.OpcionesShorts.de_datos({"encuadre": "zoom"})
+
+
+def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
+    e = ficha_con_base
+    eventos = []
+    resultado = _crear(e, eventos=eventos)
+
+    assert resultado == shorts.Resultado(e.carpeta, 2)
+    archivos = [f"{stem}{sufijo}" for stem in (MEJOR, SEGUNDO)
+                for sufijo in (".mp4", ".srt", ".md")]
+    assert sorted(p.name for p in e.carpeta.iterdir()) == sorted(
+        archivos + ["shorts.json"])
+    datos = _leer_json(e.carpeta / "shorts.json")
+    assert (datos["version"], datos["video"], datos["juez"], datos["maximo"]) == (
+        1, "charla", "tev1:0.8b", 2)
+    assert datos["archivos"] == archivos
+    assert [(c["titulo"], c["descarte"], c["archivo"]) for c in datos["candidatos"]] == [
+        ("El mejor trozo", "", MEJOR + ".mp4"), ("El segundo", "", SEGUNDO + ".mp4"),
+        ("Solapado", "solapa", ""), ("Corto", "duracion", ""),
+    ]
+    assert datos["candidatos"][0]["interes"] == pytest.approx(3.5)
+    assert not (e.carpeta / shorts.TMP).exists()
+    # La cara se detectó una vez sobre la base y queda en la ficha.
+    assert e.caras == [e.ficha.ruta("base.mp4")]
+    assert (cargar("f1").artefactos[SEGUIMIENTO].clave
+            == clave_seguimiento(LINEA))
+    etiquetas = [ev["label"] for ev in eventos if "step" in ev]
+    propias = etiquetas[etiquetas.index("Buscando trozos para shorts"):]
+    assert list(dict.fromkeys(propias)) == [
+        "Buscando trozos para shorts", "Puntuando los trozos",
+        "Creando short 1 de 2", "Creando short 2 de 2"]
+    assert [ev["warning"] for ev in eventos if "warning" in ev] == []
+
+
+def test_crear_corta_cada_tramo_con_subtitulos_desde_cero(ficha_con_base):
+    e = ficha_con_base
+    _crear(e)
+
+    assert [c["tramo"] for c in e.cortes] == [(100.0, 180.0), (240.0, 320.0)]
+    assert all(c["video"] == e.ficha.ruta("base.mp4") and c["usa_ass"]
+               and not c["desde_original"] for c in e.cortes)
+    srt = (e.carpeta / f"{MEJOR}.srt").read_text(encoding="utf-8")
+    assert srt.startswith("1\n00:00:00,000 --> ")
+    # El caption de cada short es el de su trozo.
+    assert e.captions[0].split()[0] == "f11" and "f10" not in e.captions[0]
+    assert e.captions[1].split()[0] == "f25"
+
+
+def test_crear_sustituye_solo_lo_que_lista_el_json_anterior(ficha_con_base):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
+    (e.carpeta / "notas.txt").write_text("del usuario")
+    (e.carpeta.parent / "fuera.txt").write_text("del usuario")
+    (e.carpeta / "shorts.json").write_text(json.dumps(
+        {"archivos": ["01 - Viejo.mp4", "../fuera.txt", "..", ".", "", 7]}))
+
+    assert _crear(e).n == 2
+
+    assert not (e.carpeta / "01 - Viejo.mp4").exists()
+    assert (e.carpeta / "notas.txt").read_text() == "del usuario"
+    assert (e.carpeta.parent / "fuera.txt").read_text() == "del usuario"
+    assert (e.carpeta / f"{MEJOR}.mp4").is_file()
+
+
+def test_crear_un_fallo_conserva_los_anteriores(ficha_con_base):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    viejo = json.dumps({"archivos": ["01 - Viejo.mp4"]})
+    (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
+    (e.carpeta / "shorts.json").write_text(viejo)
+    e.falla_corte = 2
+
+    with pytest.raises(PasoFallido, match="ffmpeg explotó"):
+        _crear(e)
+
+    assert sorted(p.name for p in e.carpeta.iterdir()) == ["01 - Viejo.mp4",
+                                                           "shorts.json"]
+    assert (e.carpeta / "shorts.json").read_text() == viejo
+    assert (e.carpeta / "01 - Viejo.mp4").read_bytes() == b"VIEJO"
+
+
+def test_crear_no_pisa_archivos_ajenos(ficha_con_base):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    ajeno = e.carpeta / f"{MEJOR}.mp4"
+    ajeno.write_bytes(b"MIO")
+
+    with pytest.raises(PasoFallido, match="no lo creó la app"):
+        _crear(e)
+
+    assert e.cortes == []
+    assert ajeno.read_bytes() == b"MIO"
+    assert not (e.carpeta / shorts.TMP).exists()
+
+
+def test_crear_sin_final_o_sin_base_falla_claro(ficha_con_base):
+    e = ficha_con_base
+    e.ficha.ruta("base.mp4").unlink()
+    with pytest.raises(PasoFallido, match="ya no está"):
+        _crear(e)
+    e.ficha.final = None
+    with pytest.raises(PasoFallido, match="aún no tiene vídeo procesado"):
+        _crear(e)
+    assert e.cortes == []
+
+
+def test_crear_subs_quemados_sin_base_falla_claro(ficha_con_base):
+    e = ficha_con_base
+    del e.ficha.artefactos[BASE]
+    e.ficha.original, e.ficha.legado = None, True
+    e.ficha.subs_quemados_sin_base = True
+
+    with pytest.raises(PasoFallido, match="lleva los subtítulos quemados"):
+        _crear(e)
+    assert e.cortes == []
+
+
+def test_crear_final_cambiado_fuera_falla_claro(ficha_con_base):
+    e = ficha_con_base
+    e.ficha.artefactos[BASE].archivo = None  # la base es el final
+    e.ficha.final.ruta.write_bytes(b"EDITADO FUERA")
+
+    with pytest.raises(PasoFallido, match="ha cambiado fuera de la app"):
+        _crear(e)
+    assert e.cortes == []
+
+
+def test_crear_video_corto_falla_claro(ficha_con_base, monkeypatch):
+    e = ficha_con_base
+    monkeypatch.setattr(shorts, "duracion_video", lambda video: 170.0)
+
+    with pytest.raises(PasoFallido, match="dura menos de 3 minutos"):
+        _crear(e)
+    assert e.cortes == [] and not e.carpeta.exists()
+
+
+def test_crear_transcribe_si_no_hay_transcripcion_de_la_base(ficha_con_base,
+                                                            monkeypatch):
+    e = ficha_con_base
+    del e.ficha.artefactos[TRANSCRIPCION]
+    e.ficha.ruta("transcripcion.json").unlink()
+    transcritos = []
+
+    def falso_transcribir(config, fuente, final, on_progress, paso, total,
+                          degradar, wav_continuo=None):
+        transcritos.append(fuente)
+        return _palabras_charla(), None
+
+    monkeypatch.setattr(reproceso, "_transcribir_subs", falso_transcribir)
+    assert _crear(e).n == 2
+    assert transcritos == [e.ficha.ruta("base.mp4")]
+    assert cargar("f1").artefactos[TRANSCRIPCION].linea_tiempo == LINEA
+
+    def falla(*args, **kwargs):
+        raise RuntimeError("whisper explotó")
+
+    del e.ficha.artefactos[TRANSCRIPCION]
+    monkeypatch.setattr(reproceso, "_transcribir_subs", falla)
+    with pytest.raises(PasoFallido, match="No se pudo transcribir"):
+        _crear(e)
+
+
+def test_crear_cara_recorta_los_comandos_del_tramo(ficha_con_base):
+    e = ficha_con_base
+    e.ficha.artefactos[SEGUIMIENTO] = Artefacto(
+        clave_seguimiento(LINEA), "cara.cmd", {"x_inicial": 0})
+    e.ficha.ruta("cara.cmd").write_text(_comandos_cara())
+
+    _crear(e)
+
+    assert e.caras == []  # no se vuelve a detectar
+    primero, segundo = e.cortes
+    assert primero["cara"].startswith("0.000 crop@v x 100;\n10.000 crop@v x 110;\n")
+    assert segundo["cara"].startswith("0.000 crop@v x 240;\n")
+    assert all("sendcmd" in c["filtro"] for c in e.cortes)
+
+
+def test_crear_sin_subtitulos_ni_caption(ficha_con_base):
+    e = ficha_con_base
+    e.config = replace(e.config, caption_seo=False)
+
+    _crear(e, shorts.OpcionesShorts(subtitulos=False, encuadre="central"))
+
+    assert sorted(p.name for p in e.carpeta.iterdir()) == [
+        f"{MEJOR}.mp4", f"{SEGUNDO}.mp4", "shorts.json"]
+    assert all(not c["usa_ass"] and "ass=" not in c["filtro"] for c in e.cortes)
+    assert e.captions == [] and e.caras == []
+
+
+def test_crear_sin_ninguno_bueno_no_toca_la_carpeta(ficha_con_base):
+    e = ficha_con_base
+    e.notas = {}  # todos con interés 1
+    eventos = []
+
+    assert _crear(e, eventos=eventos) == shorts.Resultado(e.carpeta, 0)
+
+    assert [ev["warning"] for ev in eventos if "warning" in ev] == [
+        'Ningún trozo de "charla" es lo bastante bueno para un short: no se ha '
+        'creado ninguno.']
+    assert not e.carpeta.exists() and e.cortes == []
+
+
+def test_limpiar_temporal_borra_la_subcarpeta(ficha_con_base):
+    e = ficha_con_base
+    tmp = e.carpeta / shorts.TMP
+    tmp.mkdir(parents=True)
+    (tmp / "a medias.mp4").write_bytes(b"x")
+    (e.carpeta / "notas.txt").write_text("del usuario")
+
+    shorts.limpiar_temporal(e.ficha)
+    shorts.limpiar_temporal(e.ficha)  # sin nada que borrar, tampoco falla
+
+    assert not tmp.exists() and (e.carpeta / "notas.txt").is_file()
+    assert shorts.carpeta_shorts(e.ficha) == e.carpeta
+
+
+def test_hay_shorts(ficha_con_base):
+    e = ficha_con_base
+    assert not shorts.hay_shorts(e.ficha)
+    e.carpeta.mkdir()
+    (e.carpeta / "shorts.json").write_text("{}")
+    assert shorts.hay_shorts(e.ficha)

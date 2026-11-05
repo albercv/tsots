@@ -15,6 +15,7 @@ from videopipeline.reproceso_plan import (
     Accion, Consulta, Decisiones, ajustes_audio, ajustes_caption,
     ajustes_silencios, ajustes_subtitulos, ajustes_transcripcion,
     ajustes_vertical, clave, clave_seguimiento, planificar, revisar,
+    seguimiento_vale,
 )
 
 A = Accion
@@ -296,6 +297,18 @@ def test_vertical_cara_antiguo_no_se_da_por_desactualizado(tmp_path):
                       Decisiones())
 
     assert plan.vacio and not plan.marcar_desactualizado
+
+
+def test_seguimiento_vale(tmp_path):
+    ficha = _completa(tmp_path, **{
+        SEGUIMIENTO: Artefacto(clave_seguimiento(L_AS), "cara.cmd",
+                               {"x_inicial": 10})})
+
+    assert seguimiento_vale(ficha, L_AS)
+    assert not seguimiento_vale(ficha, L_S)  # de otra base
+    ficha.ruta("cara.cmd").unlink()
+    assert not seguimiento_vale(ficha, L_AS)  # R0
+    assert not seguimiento_vale(_completa(tmp_path), L_AS)
 
 
 def _solo_vertical(tmp_path, subs) -> Ficha:

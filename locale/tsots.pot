@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 09:34+0100\n"
+"POT-Creation-Date: 2026-11-05 09:49+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -26,11 +26,23 @@ msgid " en «{paso}»"
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" dura menos de 3 minutos: es demasiado corto para sacar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ellos de la que cortar los shorts. Arrastra el original y vuelve a procesarlo."
 msgstr ""
 
 #, python-brace-format
@@ -167,6 +179,9 @@ msgid "Borrador (lo terminas en Facebook)"
 msgstr ""
 
 msgid "Borrador (lo terminas en la app)"
+msgstr ""
+
+msgid "Buscando trozos para shorts"
 msgstr ""
 
 msgid "Buscando…"
@@ -312,6 +327,10 @@ msgid "Cortar"
 msgstr ""
 
 msgid "Corte de silencios"
+msgstr ""
+
+#, python-brace-format
+msgid "Creando short {n} de {total}"
 msgstr ""
 
 msgid "Cuenta"
@@ -735,6 +754,10 @@ msgstr ""
 msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
 msgstr ""
 
+#, python-brace-format
+msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
+msgstr ""
+
 msgid "Leyendo la API key del Llavero…"
 msgstr ""
 
@@ -851,6 +874,10 @@ msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y est
 msgstr ""
 
 msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
+msgstr ""
+
+#, python-brace-format
+msgid "Ningún trozo de \"{nombre}\" es lo bastante bueno para un short: no se ha creado ninguno."
 msgstr ""
 
 #, python-brace-format
@@ -1040,6 +1067,10 @@ msgid "No se pudo preparar la consulta ({tipo})."
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo transcribir \"{nombre}\": sin transcripción no se pueden buscar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr ""
 
@@ -1052,6 +1083,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
+msgstr ""
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": no lo creó la app. Muévelo o bórralo y vuelve a crear los shorts."
 msgstr ""
 
 msgid "Nombre del perfil en el servicio"
@@ -1225,6 +1260,9 @@ msgid "Publicar en redes"
 msgstr ""
 
 msgid "Publicar…"
+msgstr ""
+
+msgid "Puntuando los trozos"
 msgstr ""
 
 msgid "Página de Facebook en la que se publica. La lista sale de las páginas conectadas en el servicio: pulsa «Comprobar conexión» para verla."
