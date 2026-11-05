@@ -146,35 +146,20 @@ def motivo_pesado(modelo: Modelo, memoria: int) -> str:
     ).format(total=_gb(modelo.tamano + MARGEN_CONTEXTO), memoria=_gb(memoria))
 
 
-def chat_json(
-    modelo: str,
-    mensajes: list[dict],
-    esquema: dict,
-    url: str = URL,
-    timeout: float = 300.0,
-) -> dict:
-    """POST /api/chat con salida forzada a `esquema`. Devuelve el JSON parseado."""
-    cuerpo = json.dumps({
-        "model": modelo,
-        "messages": mensajes,
-        "stream": False,
-        "format": esquema,
-        "think": False,
-        # Descargar el modelo nada más responder: si no, Ollama lo retiene
-        # 5 min y el siguiente vídeo de la cola limpia audio y transcribe con
-        # esos GB ocupados.
-        "keep_alive": 0,
-        "options": {"temperature": 0.7, "num_ctx": 16384},
-    }).encode("utf-8")
+def _post_json(ruta: str, cuerpo: dict, modelo: str, url: str, timeout: float) -> object:
+    """POST JSON a `url + ruta` y devuelve el JSON de la respuesta, ya parseado.
+
+    Traduce los fallos de HTTP, de red y de JSON a `PasoFallido`.
+    """
     peticion = urllib.request.Request(
-        f"{url}/api/chat", data=cuerpo,
+        f"{url}{ruta}", data=json.dumps(cuerpo).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(peticion, timeout=timeout) as r:
             cuerpo_bruto = r.read()
         try:
-            respuesta = json.loads(cuerpo_bruto)
+            return json.loads(cuerpo_bruto)
         except (json.JSONDecodeError, ValueError):
             # El cuerpo no es JSON válido
             detalle = cuerpo_bruto.decode("utf-8", errors="replace")
@@ -196,6 +181,29 @@ def chat_json(
         raise PasoFallido(
             _("Ollama no responde en {url}").format(url=url), detalle=str(error)
         ) from None
+
+
+def chat_json(
+    modelo: str,
+    mensajes: list[dict],
+    esquema: dict,
+    url: str = URL,
+    timeout: float = 300.0,
+    temperatura: float = 0.7,
+) -> dict:
+    """POST /api/chat con salida forzada a `esquema`. Devuelve el JSON parseado."""
+    respuesta = _post_json("/api/chat", {
+        "model": modelo,
+        "messages": mensajes,
+        "stream": False,
+        "format": esquema,
+        "think": False,
+        # Descargar el modelo nada más responder: si no, Ollama lo retiene
+        # 5 min y el siguiente vídeo de la cola limpia audio y transcribe con
+        # esos GB ocupados.
+        "keep_alive": 0,
+        "options": {"temperature": temperatura, "num_ctx": 16384},
+    }, modelo, url, timeout)
     try:
         contenido = respuesta.get("message", {}).get("content", "")
     except (AttributeError, TypeError):
@@ -211,3 +219,26 @@ def chat_json(
             _("La respuesta del modelo no es JSON válido"),
             detalle=str(contenido)[:2000],
         ) from None
+
+
+def systemone(
+    modelo: str,
+    estado: str,
+    preguntas: dict,
+    url: str = URL,
+    timeout: float = 60.0,
+) -> dict:
+    """POST /v1/systemone (ruta de Ollama sin documentar, la de `tev1`).
+
+    Devuelve `answers`: una respuesta por cada clave de `preguntas`.
+    """
+    respuesta = _post_json("/v1/systemone", {
+        "model": modelo, "state": estado, "questions": preguntas,
+    }, modelo, url, timeout)
+    respuestas = respuesta.get("answers") if isinstance(respuesta, dict) else None
+    if not isinstance(respuestas, dict):
+        raise PasoFallido(
+            _("Ollama devolvió una respuesta no válida"),
+            detalle=json.dumps(respuesta)[:2000],
+        )
+    return respuestas

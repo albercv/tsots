@@ -6,10 +6,10 @@ import pytest
 
 from videopipeline import pipeline
 from videopipeline.config import PipelineConfig
-from videopipeline.steps import PasoFallido
+from videopipeline.steps import PasoFallido, filtro_ass
 
 from tests.falsos_pipeline import (  # noqa: F401 — fixtures
-    entorno, entorno_caption, entorno_subs, entorno_vertical,
+    entorno, entorno_caption, entorno_subs, entorno_titulo, entorno_vertical,
 )
 
 
@@ -598,7 +598,7 @@ def test_vertical_con_subs_transcribe_una_vez(entorno_vertical, tmp_path):
     assert "ass:75:(1080, 1920):100" in llamadas
     vertical = next(l for l in llamadas if l.startswith("vertical"))
     assert vertical.startswith("vertical:.f_tmp.mp4:True:False:")
-    assert vertical.endswith("ass=subs_vertical.ass,format=yuv420p[v]")
+    assert vertical.endswith(f",{filtro_ass('subs_vertical.ass')},format=yuv420p[v]")
     assert (tmp_path / "f.mp4").read_bytes() == b"MP4SUBS"
     assert {e["total"] for e in eventos if "step" in e} == {7}
     assert _sin_temporales(tmp_path)
@@ -631,6 +631,16 @@ def test_solo_vertical_cara_con_subs(entorno_vertical, tmp_path):
     assert etiquetas[-1] == "Convirtiendo a vertical"
     assert "caras" in llamadas and "crop@v=1440:1080:10:0" in llamadas[-1]
     assert llamadas[-1].split(":")[2] == "True"
+
+
+def test_fase_vertical_pasa_el_tramo(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline._fase_vertical(
+        PipelineConfig(video=video, salida=tmp_path), video, tmp_path / "s.mp4",
+        None, tmp_path / "trabajo", None, 1, 1, degradar=False,
+        desde_original=False, tramo=(1.0, 61.0))
+    assert "tramo:1.0:61.0" in llamadas
+    assert llamadas[-1].startswith("vertical:")
 
 
 def test_vertical_falla_degrada(entorno_vertical, tmp_path, monkeypatch):
@@ -838,3 +848,106 @@ def test_vertical_nunca_sobrescribe_la_entrada(entorno_vertical, tmp_path):
         pipeline.run(PipelineConfig(video=entrada, salida=tmp_path / "X.mp4",
                                     paso_vertical=True), None)
     assert entrada.read_bytes() == b"ORIGINAL" and llamadas == []
+
+
+# --- título de inicio --------------------------------------------------------------
+
+def test_titulo_sin_subtitulos_transcribe_y_quema_solo_el_titulo(entorno_titulo, tmp_path):
+    llamadas, video, _, _ = entorno_titulo
+    salida = tmp_path / "f.mp4"
+    pipeline.run(PipelineConfig(video=video, salida=salida, paso_audio=False,
+                                titulo=True), None)
+    orden = ["cortar", "transcribir:es:turbo", "ollama:asegurar",
+             "titulo:qwen3.5:9b:es", "ollama:cerrar", "ass:titulo", "quemar"]
+    posiciones = [next(i for i, l in enumerate(llamadas) if l.startswith(o))
+                  for o in orden]
+    assert posiciones == sorted(posiciones)
+    assert not any(l.startswith("agrupar") for l in llamadas)
+    assert not salida.with_suffix(".srt").exists()
+    assert salida.read_bytes() == b"MP4SUBS"
+
+
+def test_titulo_y_subtitulos_en_el_mismo_ass(entorno_titulo, tmp_path):
+    llamadas, video, _, _ = entorno_titulo
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                subtitulos=True, titulo=True), None)
+    assert llamadas.count("transcribir:es:turbo") == 1
+    assert llamadas.count("quemar") == 1
+    assert "ass:titulo" in llamadas
+    assert (tmp_path / "f.srt").is_file()
+
+
+def test_titulo_fallido_avisa_y_guarda_el_video(entorno_titulo, tmp_path):
+    llamadas, video, _, estado = entorno_titulo
+    estado["falla"] = True
+    salida = tmp_path / "f.mp4"
+    eventos: list[dict] = []
+    pipeline.run(PipelineConfig(video=video, salida=salida, paso_audio=False,
+                                titulo=True), eventos.append)
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert len(avisos) == 1 and "título" in avisos[0]
+    assert "Ollama no responde" in avisos[0] and "sin título" in avisos[0]
+    assert "quemar" not in llamadas and "ass:titulo" not in llamadas
+    assert "ollama:cerrar" in llamadas  # el servidor se cierra aunque falle
+    assert salida.read_bytes() == b"MP4FINAL"
+
+
+def test_titulo_sin_transcripcion_avisa_y_guarda_el_video(entorno_titulo, tmp_path,
+                                                          monkeypatch):
+    llamadas, video, _, _ = entorno_titulo
+
+    def revienta(video_, idioma, modelo, prompt=None):
+        raise RuntimeError("whisper caído")
+
+    monkeypatch.setattr(pipeline, "transcribir", revienta)
+    salida = tmp_path / "f.mp4"
+    eventos: list[dict] = []
+    pipeline.run(PipelineConfig(video=video, salida=salida, paso_audio=False,
+                                titulo=True), eventos.append)
+    avisos = [e["warning"] for e in eventos if "warning" in e]
+    assert len(avisos) == 1
+    assert avisos[0].startswith("No se pudo transcribir para el título: whisper caído")
+    assert not any(l.startswith("titulo:") or l == "quemar" for l in llamadas)
+    assert salida.read_bytes() == b"MP4FINAL"
+
+
+def test_titulo_en_el_vertical(entorno_titulo, entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_audio=False, paso_vertical=True,
+                                titulo=True), None)
+    vertical = next(l for l in llamadas if l.startswith("vertical"))
+    assert vertical.startswith("vertical:.f_tmp.mp4:True:False:")
+    assert filtro_ass("subs_vertical.ass") in vertical
+    assert llamadas.count("ass:titulo") == 2  # horizontal y vertical
+    assert _sin_temporales(tmp_path)
+
+
+def test_caption_reutiliza_la_transcripcion_del_titulo(entorno_titulo, tmp_path):
+    llamadas, video, _, _ = entorno_titulo
+    pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
+                                paso_audio=False, titulo=True,
+                                caption_seo=True), None)
+    assert llamadas.count("transcribir:es:turbo") == 1
+    assert (tmp_path / "f.md").is_file()
+
+
+@pytest.mark.parametrize("pasos, total", [
+    ({"paso_audio": False, "titulo": True}, 4),
+    ({"paso_audio": False, "paso_silencios": False, "subtitulos": True,
+      "titulo": True}, 3),
+    ({"paso_audio": False, "titulo": True, "caption_seo": True}, 5),
+    ({"paso_audio": False, "paso_silencios": False, "paso_vertical": True,
+      "encuadre": "cara", "titulo": True}, 4),
+    ({"paso_audio": False, "paso_silencios": False, "paso_vertical": True,
+      "titulo": True}, 3),
+])
+def test_total_pasos_con_titulo(entorno_titulo, entorno_vertical, tmp_path, pasos,
+                                total):
+    _, video, _, _ = entorno_vertical
+    config = PipelineConfig(video=video, salida=tmp_path / "f.mp4", **pasos)
+    assert pipeline.total_pasos(config) == total
+    eventos: list[dict] = []
+    pipeline.run(config, eventos.append)
+    assert {e["total"] for e in eventos if "step" in e} == {total}
+    assert max(e["step"] for e in eventos if "step" in e) == total

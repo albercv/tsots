@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import statistics
 import subprocess
 import tempfile
@@ -219,3 +220,23 @@ def escribir_comandos(
             lineas.append(f"{t:.3f} crop@v x {x};")
             anterior = x
     ruta.write_text("\n".join(lineas) + "\n", encoding="utf-8")
+
+
+def recortar_comandos(texto: str, inicio: float, fin: float) -> tuple[str, int | None]:
+    """Las órdenes de un ``cara.cmd`` que caen en (inicio, fin), desplazadas.
+
+    Delante va la x vigente en ``inicio`` (la de la última orden anterior, o la
+    primera si no hay ninguna) en el instante 0. Devuelve ``(texto, x0)``; sin
+    órdenes (sin caras), ``("", None)``.
+    """
+    ordenes = [
+        (float(t), int(x))
+        for t, x in re.findall(r"^(\S+) crop@v x (\d+);$", texto, re.MULTILINE)
+    ]
+    if not ordenes:
+        return "", None
+    x0 = next((x for t, x in reversed(ordenes) if t <= inicio), ordenes[0][1])
+    lineas = [f"0.000 crop@v x {x0};"] + [
+        f"{t - inicio:.3f} crop@v x {x};" for t, x in ordenes if inicio < t < fin
+    ]
+    return "\n".join(lineas) + "\n", x0

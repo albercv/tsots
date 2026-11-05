@@ -94,6 +94,15 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      posición, tamaño, idioma y tamaño del modelo Whisper. La pestaña
      **Previsualización** te enseña cómo quedan sobre un fotograma real del
      vídeo seleccionado.
+   - **Título al inicio** (casilla de la sección Subtítulos, activada por
+     defecto): 3 a 5 palabras clave del vídeo, grandes y arriba, durante sus
+     5 primeros segundos. Las escribe Ollama, con el mismo modelo del caption,
+     a partir de la transcripción; sin Ollama el vídeo sale sin título y la
+     fila muestra un aviso. La fuente, Titan One, va incluida con licencia OFL
+     (`videopipeline/fuentes/OFL.txt`). Tiene un coste: aunque los subtítulos
+     estén desactivados, la casilla sigue transcribiendo el vídeo (la primera
+     vez puede descargar el modelo Whisper) y lo recodifica; desmárcala para
+     evitarlo.
    - **Caption SEO**: genera `nombre_limpio.md` con título, caption y
      los 5 hashtags que mejor describen lo que se dice en el vídeo. **Marca…** guarda un
      texto con quién eres, tu tono y tu llamada a la acción para que el
@@ -106,6 +115,15 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      (por defecto), fondo difuminado (16:9), barras negras o **seguir la cara (4:3)**
      (más lento; la primera vez descarga el detector, ~90 MB). Se desmarca
      al reabrir la app: es un paso ocasional.
+   - **Shorts**: **Crear shorts** saca los mejores trozos de 1 a 3 minutos
+     del vídeo elegido (el modelo de IA local los elige y los puntúa, de
+     mejor a peor) en clips verticales con subtítulos, en una carpeta con
+     el nombre del vídeo junto a sus salidas, cada uno con su propio
+     caption (`.md`, si el caption SEO está activo). **Crear shorts al
+     procesar** lo hace al final de cada procesado. Volver a crearlos
+     sustituye solo los shorts que hizo la app. Si el modelo `tev1:0.8b` no
+     está instalado en Ollama, los puntúa el modelo del caption (más
+     despacio).
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que
      Whisper los escriba bien en los subtítulos y el caption. Después de
      `=`, las formas en que Whisper se equivoca; se corrigen solas:

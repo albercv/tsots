@@ -135,8 +135,9 @@ QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/t
 
 ```
 app/                 PySide6 GUI (main window, queue model, worker, widgets)
-videopipeline/       pipeline (steps, subtitles, caption, glossary, ollama
-                     client, errors → diagnostics, runner subprocess, i18n)
+videopipeline/       pipeline (steps, subtitles, caption, opening title,
+                     glossary, ollama client, errors → diagnostics, runner
+                     subprocess, i18n)
 videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
@@ -207,14 +208,39 @@ stands in for it. Planner and executor use the same helper.
 | `audio` | `audio_limpio.flac` | task + model | `tarea`, `modelo`; `linea_tiempo` is that of the video it was cleaned from (R9) |
 | `base` | `base.mp4`, or none when the final is the base (R3) | settings of the steps applied + timeline | `{"audio": …, "silencios": …}`, only the steps applied |
 | `transcripcion` | `transcripcion.json` | language, Whisper model, glossary key | the same; `linea_tiempo` is that of the base it came from |
-| `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings | `{"subtitulos": …}` if burned |
+| `titulo` | none: the text is the whole artifact | `clave(texto)` | `{"texto": …}`, from the transcript (action `TITULO`); no timeline, so valid while present |
+| `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings + title text | `{"subtitulos": …}` if burned, `"titulo"` if it has a title |
 | `caption` | `caption.md` (the `.md` next to the final is a copy) | `modelo_caption` | `{"caption": …}` |
 | `seguimiento` | `cara.cmd` | timeline of the base only: the picture depends on the cuts, not the audio | `x_inicial` |
-| `vertical` | none: `ficha.vertical`, or `ficha.final` if it is the only output | timeline + framing (+ subtitle settings) | `{"vertical": …}` and `{"subtitulos": …}` if burned |
+| `vertical` | none: `ficha.vertical`, or `ficha.final` if it is the only output | timeline + framing (+ subtitle and title settings) | `{"vertical": …}`, `{"subtitulos": …}` if burned, `"titulo"` if it has a title |
 
 `Ficha.pasos_hechos()` derives the ✓ in the queue from these.
 `ficha.desactualizado` (`{"vertical"}`) marks an output that no longer
 matches its base.
+
+**Opening title in a record.** `TITULO` is an internal action, not a
+panel step, and asks nothing in the reprocess dialog. It runs between
+`TRANSCRIBIR` and `QUEMAR` (progress label "Generando título"). The text
+is generated when it is missing (box just ticked, new video, or a new
+subtitle transcript, e.g. "redo the subtitles"), reused when only the cut
+changes and no subtitles are burned (with subtitles, a new cut means a new
+transcript, hence a new title), and not touched by redoing the caption. If
+regenerating fails, the previous title stays and is the one burned. Ticking
+or unticking the box re-burns only the outputs the app made, still on disk
+and unchanged since (its `Huella` matches the file), whose base still holds,
+and only on a record with a true original (`Ficha.original_verdadero()`):
+horizontal and vertical, without the R7 question. An output the user edited
+or deleted outside the app is never touched for the title alone. It does not
+transcribe again when the record already has a transcript; with none (e.g. a
+video processed without subtitles or caption), ticking the box transcribes
+first. On legacy or adopted outputs, or when no base can be rebuilt, the title
+is only added when that output is rebuilt for another reason. Without a true
+original the old final stands in for it and may already carry subtitles or a
+title, so no title is burned on it at all (R2, wider than
+`subs_quemados_sin_base`). With the box on and the model
+unavailable, each "Process again" retries the title and burns it again.
+The title text is part of the `clave` of the burned outputs, so a different
+title re-burns them.
 
 **Rules.** Implemented in `reproceso_plan.py` (the executor only does what
 the plan says); numbers match comments in the code.
@@ -337,6 +363,201 @@ silences, subtitles and caption; look inside `fichas/<id>/` (`ficha.json`,
 `clip_limpio.mp4` in again (same row, back to "waiting", ✓ summary) and
 tick only **Vertical** (no new transcription, one video encode); then tick
 **Silence cutting** with another margin and read the warning.
+
+### Opening title
+
+The first 5 seconds of the horizontal and the vertical (and, through the
+contract below, of the shorts) can carry a title: 3 to 5 keywords in large
+type at the top, Titan One, white with a black border and a gold outline
+shifted down-right. The checkbox **Título al inicio** (*Opening title* in
+the English UI) sits in the Subtitles section and is on by default.
+`PipelineConfig.titulo` defaults to `False`, so the CLI (which has no flag
+for it) and old runner JSON are unchanged.
+
+- `videopipeline/titulo.py`: `generar_titulo` (never raises: `None` and a
+  log warning), `pedir_titulo` (the same, but raises `PasoFallido`), the
+  prompt and its validation, and `lineas_titulo`, which turns the text into
+  ASS styles and events (`DURACION = 5.0`). The size is fitted to the width
+  with the measured per-glyph table `_ANCHOS` (advance of each glyph of
+  Titan One per point of font size) and the letter spacing `ESPACIADO`.
+- `subtitles.generar_ass(..., extra=(estilos, eventos))` appends those lines
+  to the subtitles' `.ass`; `bloques` may be `[]`. The title is burned in the
+  same encoding pass as the subtitles (`pipeline._quemar_subs`), or alone
+  when there are none.
+- `steps.filtro_ass` adds `fontsdir=videopipeline/fuentes/`, so libass finds
+  `TitanOne-Regular.ttf` without the font installed. The licence, `OFL.txt`,
+  sits next to it.
+- The text comes from `pipeline._fase_titulo`: one call to the caption model
+  (`modelo_caption`, through `ollama.chat_json`) on the transcript, before
+  anything is burned. The JSON is `{"idioma", "titulo"}` with `idioma` first,
+  so the model names the transcript's language before writing the title.
+  Validation keeps the first 5 words and drops answers with fewer than 3. If
+  Ollama fails, the video is saved without a title and the row shows a
+  warning. The prompt is not in gettext: it is two fixed texts in `titulo.py`.
+
+**Contract for shorts.** Two public functions are shared with the shorts
+branch (`feature/shorts`); keep their names and signatures:
+
+```python
+generar_titulo(transcripcion: str, idioma: str, modelo: str, cliente=chat_json) -> str | None
+lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
+              duracion: float = DURACION) -> tuple[list[str], list[str]]
+```
+
+`generar_titulo` returns `None` on any failure, and `lineas_titulo` returns
+`([], [])` for an empty text. `generar_titulo` does **not** start Ollama: the
+caller must run `servidor = asegurar_servidor()` (from `videopipeline.ollama`)
+before it and `servidor.cerrar()` after, as `pipeline._fase_titulo` does. With
+the server down every title comes back `None` and the only trace is a log
+line. Writing a short's `.ass` with its title:
+
+```python
+servidor = asegurar_servidor()  # may raise PasoFallido (Ollama missing)
+try:
+    texto = generar_titulo(tramo_transcripcion, idioma, modelo_caption)  # None on failure
+finally:
+    servidor.cerrar()
+generar_ass(bloques, diseno, posicion, resolucion, ass_path,
+            extra=lineas_titulo(texto or "", resolucion))
+```
+
+Tests: `tests/test_titulo.py` (validation, ASS lines and width, with the
+client passed in as a fake, so no Ollama is needed).
+
+### Shorts
+
+Vertical clips of 1:00 to 2:59 cut from a processed video, best first, in
+their own folder. Design: `docs/superpowers/specs/2026-11-05-shorts-design.md`.
+All the logic is in `videopipeline/shorts.py`; the GUI only has the
+**Shorts** section in `panel_opciones.py` (subtitles, framing, **Create
+shorts when processing**, **Create shorts** button).
+
+**Flow (`shorts.crear`).**
+
+1. Checks what it can cut from: shorts are always cut from the base
+   (`_Pasada`: the `base` artifact's file, i.e. `base.mp4` or the final
+   when the final is the base; with no `base` artifact, because no audio or
+   silence step was done, the original), never from a video with burned
+   subtitles. A final with them and no base
+   (`subs_quemados_sin_base`), or a base that is missing or was edited
+   outside the app, is a clear error. Each short's subtitles are made from
+   the existing transcript, shifted to the clip's start and laid out for
+   vertical; there is no second transcription.
+2. Transcribes the base and follows the face if the record lacks them
+   (both are recorded in the record like in a normal pass).
+3. Splits the word-level transcript into numbered sentences
+   (`trocear_frases`: punctuation, a pause over `PAUSA_FRASE`, or
+   `MAX_PALABRAS_FRASE` words, because Whisper sometimes omits full stops).
+4. Asks the caption model (`chat_json`) for up to `2 × max` candidates as
+   sentence ranges, where `max = int(duration // 180)` of the base (worked
+   out before step 2; 0 is a clear "too short" error). Long videos go in
+   parts of `MINUTOS_PARTE` minutes overlapping `MINUTOS_SOLAPE` (3, more
+   than the longest short, so any allowed stretch fits whole in some part)
+   (`partes`); the same range proposed twice is kept once.
+5. `validar` discards ranges out of bounds, reversed, outside
+   `DURACION_MIN`–`DURACION_MAX` (60–179 s) or repeated, and tolerates
+   numbers sent as text. Cuts always fall on a sentence boundary, with
+   `MARGEN_CORTE` of air that never crosses a neighbouring sentence and
+   never falls inside the short's own first or last sentence (if Whisper
+   overlaps neighbouring sentences, the cut steps on the neighbour instead
+   of losing words).
+6. The judge scores each survivor (`puntuar`): probability of "stands
+   alone" and interest 0–4. `elegir` drops interest `< UMBRAL_INTERES`
+   (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
+   best first, skips anything sharing a sentence with a chosen one, and
+   keeps at most `max`.
+7. Each chosen short gets its title (`generar_titulo` on the text of its
+   stretch, with `idioma_subs` and `modelo_caption`, while Ollama is still
+   up; if it returns `None` the candidate's own title is used). It is
+   burned for every short, whatever the panel's **Opening title** checkbox
+   says.
+8. Each short is encoded with the vertical step (`_fase_vertical`, which
+   burns the title at 0-5 s with the subtitles) into `.shorts_tmp/`, plus
+   its `.srt` and, with the SEO caption on, its `.md`.
+
+Progress is `2 + n` steps (search, scoring and the titles, one per short).
+Cancelling kills the runner before its cleanup, so the app deletes
+`.shorts_tmp` and, if the folder is then empty, the folder itself
+(`limpiar_temporal`).
+
+**Constants to tune** (module level, tune them against real videos):
+`DURACION_MIN` / `DURACION_MAX`, `UMBRAL_INTERES`, `UMBRAL_INDEPENDIENTE`,
+`PAUSA_FRASE`, `MAX_PALABRAS_FRASE`, `MARGEN_CORTE`, `MINUTOS_PARTE` /
+`MINUTOS_SOLAPE`, `JUEZ`. The prompts and the questions put to the judge
+are in Spanish and not translated.
+
+**The judge and its fallback.** `JUEZ = "tev1:0.8b"` answers
+`POST /v1/systemone` of the Ollama server (`ollama.systemone`): a score
+question and a choice question, ~0.15 s per clip and the same in two
+passes. **That route is undocumented**; it was checked on Ollama 0.40.14 and
+may change or disappear, and the installer does not pull the model. If
+the model is missing, the route fails or the answer has another shape,
+`puntuar` scores *every* candidate again with the caption model through
+`chat_json` at temperature 0 (~9 s per clip; one scale, never two mixed)
+and emits a warning. If that fails too, there are no shorts and the job
+reports why. The judge's name goes in `shorts.json`.
+
+**Output.** `<output folder>/<video name>/` (`carpeta_shorts`):
+`NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:
+
+```json
+{ "version": 1, "ficha": "a1b2c3", "video": "talk", "juez": "tev1:0.8b",
+  "maximo": 10,
+  "archivos": ["01 - Title.mp4", "01 - Title.srt", "01 - Title.md"],
+  "candidatos": [ { "frase_inicio": 12, "frase_fin": 31, "titulo": "…",
+                    "motivo": "…", "inicio": 63.4, "fin": 171.9,
+                    "independiente": 0.92, "interes": 2.7,
+                    "descarte": "", "archivo": "01 - Title.mp4",
+                    "titulo_video": "…" } ] }
+```
+
+`candidatos` lists the chosen ones in order, then the rest with
+`descarte` (`fuera_de_rango`, `duracion`, `repetido`, `flojo`,
+`no_se_entiende_solo`, `solapa`, `sobra`). `titulo` is the model's
+proposal with the stretch and only names the file (decided before encoding,
+for the collision check); `titulo_video` is the text burned into the video
+(`""` for the discarded).
+
+**Redoing.** Only the files the previous `shorts.json` lists (`archivos`)
+are ever deleted, and only when its `ficha` is the current record's id (a
+folder left by a forgotten record, or by another video with the same name,
+lists nothing, so nothing is deleted). Nothing else in the folder is
+touched: if a file that is not listed already has the name of a new short,
+the run stops with a clear error before encoding anything. New shorts are
+encoded in the `.shorts_tmp` subfolder and replace the old ones only when
+all of them are done. The replacement order is crash-safe: `shorts.json` is
+written first listing old ∪ new, then the old files are deleted and the new
+ones moved in, and finally `shorts.json` is written again with the new
+list. A run cancelled or failed while encoding leaves the previous shorts
+and JSON as they were; one cut short while publishing leaves a JSON that
+lists both, so the next run still knows what to delete. A damaged
+`shorts.json` lists nothing either. The button asks before replacing;
+**Create shorts when processing** replaces without asking.
+
+**Runner protocol.** The `shorts` key of the job JSON, popped before
+`PipelineConfig.from_datos` like `reproceso`:
+
+```json
+{ "video": "…", "…": "…",
+  "shorts": { "ficha": "3f9c1a2b7d40", "subtitulos": true, "encuadre": "cara" } }
+```
+
+- `shorts` without `reproceso` is the button path (`_shorts_desde_boton`):
+  if the video has no final yet the runner processes it first with the
+  panel settings, then makes the shorts; a failure of the shorts fails the
+  job.
+- `shorts` with `reproceso` is the checkbox path (the app always sends
+  `reproceso` from **Process**): the shorts run after it, and a failure of
+  the shorts is a warning, never a failed job.
+- The final event adds `"shorts": {"carpeta": …, "n": …}` when any were
+  made (`n > 0`).
+
+**Testing.** `tests/test_shorts.py` replaces `chat_json`, `systemone`,
+`convertir_vertical` and `duracion_video`: no ffmpeg or model. It covers
+transcripts with no punctuation, garbage from the model, user files in
+the shorts folder, a failure halfway and a base edited outside the app.
+To check by hand: **Create shorts** on a 5+ minute video, open
+`shorts.json`, then run it again and read the replace prompt.
 
 ## Glossary of terms
 

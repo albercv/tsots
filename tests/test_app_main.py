@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QMessageBox
 from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
 from app.settings import Ajustes
+from videopipeline import shorts
 from videopipeline.caption import leer_md
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
@@ -1470,3 +1471,215 @@ def test_boton_programadas_junto_a_redes_y_abre_el_calendario(qtbot, tmp_path, m
     monkeypatch.setattr("app.main.DialogoProgramadas", Falso)
     ventana.boton_programadas.click()
     assert Falso.abiertos == [(ventana.ajustes,)]
+
+
+# --- shorts ---
+
+def _con_shorts_hechos(ficha) -> Path:
+    """La carpeta de shorts de la ficha, con un short y su `shorts.json`."""
+    carpeta = shorts.carpeta_shorts(ficha)
+    carpeta.mkdir(parents=True)
+    (carpeta / "01 - Uno.mp4").write_bytes(b"SHORT")
+    (carpeta / "shorts.json").write_text('{"archivos": ["01 - Uno.mp4"]}')
+    return carpeta
+
+
+def _eligiendo_la_fila(ventana, fila=0):
+    ventana.vista_cola.setCurrentIndex(ventana.modelo_cola.index(fila))
+
+
+def test_boton_crear_shorts_activo_solo_con_fila_y_sin_procesar(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    boton = ventana.panel.boton_crear_shorts
+    assert not boton.isEnabled()  # cola vacía
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    assert not boton.isEnabled()  # sin fila elegida
+    _eligiendo_la_fila(ventana)
+    assert boton.isEnabled()
+    monkeypatch.setattr(ventana.ejecutor, "iniciar", lambda t: None)
+    ventana.procesar()
+    assert not boton.isEnabled()  # mientras procesa
+    ventana.ejecutor.cola_terminada.emit()
+    assert boton.isEnabled()
+    ventana.vista_cola.selectionModel().clearSelection()
+    assert not boton.isEnabled()
+
+
+def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    ventana.panel.check_shorts_subtitulos.setChecked(False)
+    panel = ventana.panel
+    panel.combo_encuadre_shorts.setCurrentIndex(
+        panel.combo_encuadre_shorts.findData("barras"))
+    lanzados = _lanzando(ventana, monkeypatch)
+    panel.boton_crear_shorts.click()
+    [(fila, texto)] = lanzados
+    datos = json.loads(texto)
+    assert fila == 0
+    assert datos["shorts"] == {
+        "ficha": ficha.id, "subtitulos": False, "encuadre": "barras"}
+    assert "reproceso" not in datos
+    assert ventana._procesando
+    guardado = ventana.ajustes.cargar_panel()
+    assert (guardado["shorts_encuadre"], guardado["modo"]) == ("barras", "completo")
+
+
+def test_crear_shorts_limpia_el_error_el_aviso_y_el_diagnostico_viejos(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(
+        0, estado=EstadoTrabajo.HECHO,
+        error="x", aviso="Los shorts fallaron: Ollama no responde.",
+        diagnostico={"titulo": "t"})
+    _eligiendo_la_fila(ventana)
+    _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert (trabajo.error, trabajo.aviso, trabajo.diagnostico) == ("", "", None)
+
+
+def test_crear_shorts_no_hace_nada_sin_fila_o_procesando(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana._crear_shorts()  # sin fila elegida
+    _eligiendo_la_fila(ventana)
+    ventana._procesando = True
+    ventana._crear_shorts()
+    assert lanzados == []
+
+
+def test_crear_shorts_reconoce_la_fila_sin_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ventana.modelo_cola.actualizar(0, ficha_id=None)
+    _eligiendo_la_fila(ventana)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    [(fila, texto)] = lanzados
+    ficha_id = ventana.modelo_cola.trabajo(0).ficha_id
+    assert ficha_id is not None
+    assert json.loads(texto)["shorts"]["ficha"] == ficha_id
+
+
+def test_crear_shorts_lleva_las_salidas_de_una_ficha_nueva_a_la_carpeta_de_ahora(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.carpeta_salida = tmp_path / "otra"
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    _eligiendo_la_fila(ventana)
+    _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    ficha = cargar(ventana.modelo_cola.trabajo(0).ficha_id)
+    assert shorts.carpeta_shorts(ficha) == tmp_path / "otra" / "a"
+
+
+@pytest.mark.parametrize("respuesta, se_lanza", [
+    (QMessageBox.StandardButton.No, False),
+    (QMessageBox.StandardButton.Yes, True),
+], ids=["no", "si"])
+def test_crear_shorts_pregunta_si_ya_hay_shorts(
+        qtbot, tmp_path, monkeypatch, respuesta, se_lanza):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    preguntas = _respondiendo(monkeypatch, respuesta)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    [(_padre, titulo, texto, _botones, por_defecto)] = preguntas
+    assert titulo == "Crear shorts"
+    assert '"a.mp4"' in texto and str(carpeta) in texto
+    assert por_defecto == QMessageBox.StandardButton.No
+    assert len(lanzados) == int(se_lanza)
+    assert ventana._procesando is se_lanza
+
+
+def test_crear_shorts_sin_shorts_previos_no_pregunta(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    monkeypatch.setattr("app.main.QMessageBox.question", lambda *a, **k: 1 / 0)
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    assert len(lanzados) == 1
+
+
+@pytest.mark.parametrize("al_procesar", [False, True])
+def test_procesar_con_shorts_al_procesar_los_anade(
+        qtbot, tmp_path, monkeypatch, al_procesar):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
+    panel = ventana.panel
+    panel.check_shorts_al_procesar.setChecked(al_procesar)
+    panel.check_shorts_subtitulos.setChecked(False)
+    panel.combo_encuadre_shorts.setCurrentIndex(
+        panel.combo_encuadre_shorts.findData("central"))
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert len(lanzados) == 2
+    for fila, texto in lanzados:
+        datos = json.loads(texto)
+        assert "reproceso" in datos
+        if al_procesar:
+            assert datos["shorts"] == {
+                "ficha": ventana.modelo_cola.trabajo(fila).ficha_id,
+                "subtitulos": False, "encuadre": "central"}
+        else:
+            assert "shorts" not in datos
+
+
+def test_procesar_con_shorts_envia_aunque_no_haya_nada_que_hacer(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)  # caption hecho y con vídeo final
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _solo_caption(ventana)
+    ventana.panel.check_shorts_al_procesar.setChecked(True)
+    _preguntando(monkeypatch, _mantener)  # Mantener: el plan queda vacío
+    informaciones = _capturando(monkeypatch, "information")
+    lanzados = _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert informaciones == []  # no hay «Nada que hacer»
+    [(fila, texto)] = lanzados
+    assert json.loads(texto)["shorts"]["ficha"] == ficha.id
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.ESPERA
+    assert ventana._procesando
+
+
+def test_cancelar_borra_la_carpeta_temporal_de_shorts(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)  # shorts de una pasada anterior
+    temporal = carpeta / shorts.TMP
+    temporal.mkdir()
+    (temporal / "02 - A medias.mp4").write_bytes(b"MEDIO")
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.ejecutor.trabajo_terminado.emit(0, False, "", "Cancelado")
+    assert ventana.modelo_cola.trabajo(0).estado == EstadoTrabajo.CANCELADO
+    assert not temporal.exists()
+    assert sorted(p.name for p in carpeta.iterdir()) == ["01 - Uno.mp4", "shorts.json"]
+
+
+def test_salida_shorts_actualiza_la_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    carpeta = tmp_path / "salidas" / "a"
+    ventana.ejecutor.salida_shorts.emit(0, str(carpeta), 3)
+    # Con el botón el runner da la carpeta de shorts como salida: la fila sigue
+    # abriendo el vídeo final de su ficha.
+    ventana.ejecutor.trabajo_terminado.emit(0, True, str(carpeta), "")
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert (trabajo.shorts, trabajo.n_shorts) == (carpeta, 3)
+    assert trabajo.estado == EstadoTrabajo.HECHO
+    assert trabajo.salida == ficha.final.ruta
+    assert "+ 3 shorts" in ventana.modelo_cola.data(ventana.modelo_cola.index(0))

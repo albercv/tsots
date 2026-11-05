@@ -94,6 +94,7 @@ class PanelOpciones(QWidget):
     refrescar_modelos = Signal()
     seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
     pasos_cambiados = Signal()
+    crear_shorts = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -165,6 +166,16 @@ class PanelOpciones(QWidget):
             "subtitulos", _("Subtítulos"), QFormLayout
         )
         self.check_subtitulos = QCheckBox(_("Añadir subtítulos"))
+        # No es un paso: acompaña al vídeo que salga, con o sin subtítulos.
+        self.check_titulo = QCheckBox(_("Título al inicio"))
+        self.check_titulo.setToolTip(
+            _(
+                "Tres a cinco palabras clave arriba durante los 5 primeros "
+                "segundos, escritas por el modelo del caption (Ollama) a "
+                "partir de la transcripción."
+            )
+        )
+        self.check_titulo.setChecked(True)
         self.combo_diseno = QComboBox()
         for etiqueta, valor in ETIQUETA_DISENO.items():
             self.combo_diseno.addItem(_(etiqueta), valor)
@@ -191,6 +202,7 @@ class PanelOpciones(QWidget):
         self.aviso_whisper.setStyleSheet("color: #b8860b;")
         self.aviso_whisper.setWordWrap(True)
         form_subs.addRow(self.check_subtitulos)
+        form_subs.addRow(self.check_titulo)
         form_subs.addRow(_("Diseño:"), self.combo_diseno)
         form_subs.addRow(_("Posición vertical:"), self.spin_posicion)
         fila_tamano = QHBoxLayout()
@@ -208,6 +220,7 @@ class PanelOpciones(QWidget):
         # Fila propia: junto al combo ensancharía la columna de opciones.
         form_subs.addRow("", self.boton_glosario)
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
+        self.check_titulo.toggled.connect(self._actualizar_subtitulos)
         self.combo_modelo_whisper.currentIndexChanged.connect(
             self._refrescar_aviso_whisper
         )
@@ -230,9 +243,10 @@ class PanelOpciones(QWidget):
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
         caption_layout.addLayout(fila_caption)
-        # El glosario sirve a subtítulos y caption: activo si hay alguno.
+        # El glosario sirve a subtítulos, caption y título: activo si hay alguno.
         self.check_subtitulos.toggled.connect(self._actualizar_glosario)
         self.check_caption.toggled.connect(self._actualizar_glosario)
+        self.check_titulo.toggled.connect(self._actualizar_glosario)
         self._actualizar_glosario()
         # Selector de modelo: se rellena con los modelos instalados en Ollama
         # (poblar_modelos); los que no caben en memoria quedan deshabilitados.
@@ -286,6 +300,39 @@ class PanelOpciones(QWidget):
         self.combo_encuadre.currentIndexChanged.connect(
             self._refrescar_aviso_encuadre
         )
+
+        # Los shorts no son un paso (no están en `_casillas_pasos`): se lanzan
+        # con su botón o, con la casilla, al final de cada procesado.
+        form_shorts = self._seccion("shorts", _("Shorts"), QFormLayout)
+        self.check_shorts_subtitulos = QCheckBox(_("Subtítulos"))
+        self.check_shorts_subtitulos.setChecked(True)
+        self.check_shorts_subtitulos.setToolTip(
+            _("Con el estilo de la sección Subtítulos.")
+        )
+        # Propio: el del vertical se desactiva sin el paso vertical.
+        self.combo_encuadre_shorts = QComboBox()
+        for etiqueta, valor in ETIQUETA_ENCUADRE.items():
+            self.combo_encuadre_shorts.addItem(_(etiqueta), valor)
+        self.combo_encuadre_shorts.setCurrentIndex(
+            self.combo_encuadre_shorts.findData("cara")
+        )
+        self.check_shorts_al_procesar = QCheckBox(_("Crear shorts al procesar"))
+        self.check_shorts_al_procesar.setToolTip(
+            _("Al terminar de procesar cada vídeo, saca sus mejores trozos de "
+              "1 a 3 minutos en vertical.")
+        )
+        self.boton_crear_shorts = QPushButton(_("Crear shorts"))
+        self.boton_crear_shorts.setToolTip(
+            _("Saca los shorts del vídeo elegido en la cola a una carpeta con "
+              "su nombre, junto a sus salidas.")
+        )
+        self.boton_crear_shorts.clicked.connect(self.crear_shorts)
+        form_shorts.addRow(self.check_shorts_subtitulos)
+        form_shorts.addRow(_("Encuadre:"), self.combo_encuadre_shorts)
+        form_shorts.addRow(self.check_shorts_al_procesar)
+        # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
+        form_shorts.addRow("", self.boton_crear_shorts)
+        self.check_shorts_al_procesar.toggled.connect(self._actualizar_cabecera_shorts)
 
         for seccion in self.secciones.values():
             layout.addWidget(seccion)
@@ -366,8 +413,7 @@ class PanelOpciones(QWidget):
     def _actualizar_pasos(self, *args) -> None:
         casillas = self._casillas_pasos()
         for clave, casilla in casillas.items():
-            marca = MARCA_ACTIVO if casilla.isChecked() else ""
-            self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+            self._marcar_cabecera(clave, casilla)
         marcadas = sum(c.isChecked() for c in casillas.values())
         estado = (
             Qt.CheckState.Checked if marcadas == len(casillas)
@@ -379,6 +425,13 @@ class PanelOpciones(QWidget):
         self.check_completo.blockSignals(False)
         self._actualizar_habilitados()
         self.pasos_cambiados.emit()
+
+    def _marcar_cabecera(self, clave: str, casilla: QCheckBox) -> None:
+        marca = MARCA_ACTIVO if casilla.isChecked() else ""
+        self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+
+    def _actualizar_cabecera_shorts(self, *args) -> None:
+        self._marcar_cabecera("shorts", self.check_shorts_al_procesar)
 
     def _actualizar_habilitados(self, *args) -> None:
         audio = self.check_audio.isChecked()
@@ -406,21 +459,25 @@ class PanelOpciones(QWidget):
         activo = self.check_subtitulos.isChecked()
         for control in (
             self.combo_diseno, self.spin_posicion, self.slider_tamano,
-            self.combo_idioma_subs, self.combo_modelo_whisper,
         ):
             control.setEnabled(activo)
+        # El título también transcribe: necesita idioma y modelo.
+        transcribe = activo or self.check_titulo.isChecked()
+        for control in (self.combo_idioma_subs, self.combo_modelo_whisper):
+            control.setEnabled(transcribe)
         self._refrescar_aviso_whisper()
 
     def _actualizar_glosario(self, *args) -> None:
         self.boton_glosario.setEnabled(
             self.check_subtitulos.isChecked() or self.check_caption.isChecked()
+            or self.check_titulo.isChecked()
         )
 
     def _emitir_cambio_subs(self, *args) -> None:
         self.opciones_subs_cambiadas.emit()
 
     def _refrescar_aviso_whisper(self, *args) -> None:
-        if not self.check_subtitulos.isChecked():
+        if not (self.check_subtitulos.isChecked() or self.check_titulo.isChecked()):
             self.aviso_whisper.setText("")
             return
         modelo = self.combo_modelo_whisper.currentData()
@@ -511,12 +568,21 @@ class PanelOpciones(QWidget):
             "silencios": self.combo_silencios.currentData(),
             "velocidad_silencios": self.spin_velocidad.value(),
             "subtitulos": self.check_subtitulos.isChecked(),
+            "titulo": self.check_titulo.isChecked(),
             "diseno": self.combo_diseno.currentData(),
             "posicion_subs": self.spin_posicion.value(),
             "tamano_subs": self.slider_tamano.value(),
             "idioma_subs": self.combo_idioma_subs.currentData(),
             "modelo_whisper": self.combo_modelo_whisper.currentData(),
             "caption_seo": self.check_caption.isChecked(),
+        }
+
+    def valores_shorts(self) -> dict:
+        """Aparte de `valores`, que se pasa entero a `PipelineConfig`."""
+        return {
+            "shorts_subtitulos": self.check_shorts_subtitulos.isChecked(),
+            "shorts_encuadre": self.combo_encuadre_shorts.currentData(),
+            "shorts_al_procesar": self.check_shorts_al_procesar.isChecked(),
         }
 
     def cargar(self, valores: dict) -> None:
@@ -560,6 +626,7 @@ class PanelOpciones(QWidget):
             if not isinstance(valores.get("subtitulos"), bool)
             else valores.get("subtitulos", False)
         )
+        self.check_titulo.setChecked(_como_bool(valores.get("titulo"), True))
         diseno = valores.get("diseno", "reels_bold")
         indice = self.combo_diseno.findData(diseno)
         if indice >= 0:
@@ -582,5 +649,13 @@ class PanelOpciones(QWidget):
                 valor if isinstance(valor, bool)
                 else str(valor).lower() in ("true", "1")
             )
+        self.check_shorts_subtitulos.setChecked(
+            _como_bool(valores.get("shorts_subtitulos"), True))
+        indice = self.combo_encuadre_shorts.findData(
+            valores.get("shorts_encuadre", "cara"))
+        if indice >= 0:
+            self.combo_encuadre_shorts.setCurrentIndex(indice)
+        # Como el vertical, «al procesar» es ocasional: nunca se restaura.
+        self.check_shorts_al_procesar.setChecked(False)
         self._actualizar_pasos()
         self._actualizar_subtitulos()

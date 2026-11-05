@@ -66,3 +66,12 @@ def test_catalogo_real_ingles_existe_y_traduce_una_cadena_clave():
         assert i18n._("Extrayendo audio") == "Extracting audio"
     finally:
         i18n.instalar("es")
+
+
+def test_catalogo_ingles_traduce_los_shorts():
+    i18n.instalar("en")
+    try:
+        assert i18n._("Crear shorts") == "Create shorts"
+        assert i18n._("Crear shorts al procesar") == "Create shorts when processing"
+    finally:
+        i18n.instalar("es")
