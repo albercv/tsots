@@ -165,6 +165,16 @@ class PanelOpciones(QWidget):
             "subtitulos", _("Subtítulos"), QFormLayout
         )
         self.check_subtitulos = QCheckBox(_("Añadir subtítulos"))
+        # No es un paso: acompaña al vídeo que salga, con o sin subtítulos.
+        self.check_titulo = QCheckBox(_("Título al inicio"))
+        self.check_titulo.setToolTip(
+            _(
+                "Tres a cinco palabras clave arriba durante los 5 primeros "
+                "segundos, escritas por el modelo del caption (Ollama) a "
+                "partir de la transcripción."
+            )
+        )
+        self.check_titulo.setChecked(True)
         self.combo_diseno = QComboBox()
         for etiqueta, valor in ETIQUETA_DISENO.items():
             self.combo_diseno.addItem(_(etiqueta), valor)
@@ -191,6 +201,7 @@ class PanelOpciones(QWidget):
         self.aviso_whisper.setStyleSheet("color: #b8860b;")
         self.aviso_whisper.setWordWrap(True)
         form_subs.addRow(self.check_subtitulos)
+        form_subs.addRow(self.check_titulo)
         form_subs.addRow(_("Diseño:"), self.combo_diseno)
         form_subs.addRow(_("Posición vertical:"), self.spin_posicion)
         fila_tamano = QHBoxLayout()
@@ -208,6 +219,7 @@ class PanelOpciones(QWidget):
         # Fila propia: junto al combo ensancharía la columna de opciones.
         form_subs.addRow("", self.boton_glosario)
         self.check_subtitulos.toggled.connect(self._actualizar_subtitulos)
+        self.check_titulo.toggled.connect(self._actualizar_subtitulos)
         self.combo_modelo_whisper.currentIndexChanged.connect(
             self._refrescar_aviso_whisper
         )
@@ -230,9 +242,10 @@ class PanelOpciones(QWidget):
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
         caption_layout.addLayout(fila_caption)
-        # El glosario sirve a subtítulos y caption: activo si hay alguno.
+        # El glosario sirve a subtítulos, caption y título: activo si hay alguno.
         self.check_subtitulos.toggled.connect(self._actualizar_glosario)
         self.check_caption.toggled.connect(self._actualizar_glosario)
+        self.check_titulo.toggled.connect(self._actualizar_glosario)
         self._actualizar_glosario()
         # Selector de modelo: se rellena con los modelos instalados en Ollama
         # (poblar_modelos); los que no caben en memoria quedan deshabilitados.
@@ -406,21 +419,25 @@ class PanelOpciones(QWidget):
         activo = self.check_subtitulos.isChecked()
         for control in (
             self.combo_diseno, self.spin_posicion, self.slider_tamano,
-            self.combo_idioma_subs, self.combo_modelo_whisper,
         ):
             control.setEnabled(activo)
+        # El título también transcribe: necesita idioma y modelo.
+        transcribe = activo or self.check_titulo.isChecked()
+        for control in (self.combo_idioma_subs, self.combo_modelo_whisper):
+            control.setEnabled(transcribe)
         self._refrescar_aviso_whisper()
 
     def _actualizar_glosario(self, *args) -> None:
         self.boton_glosario.setEnabled(
             self.check_subtitulos.isChecked() or self.check_caption.isChecked()
+            or self.check_titulo.isChecked()
         )
 
     def _emitir_cambio_subs(self, *args) -> None:
         self.opciones_subs_cambiadas.emit()
 
     def _refrescar_aviso_whisper(self, *args) -> None:
-        if not self.check_subtitulos.isChecked():
+        if not (self.check_subtitulos.isChecked() or self.check_titulo.isChecked()):
             self.aviso_whisper.setText("")
             return
         modelo = self.combo_modelo_whisper.currentData()
@@ -511,6 +528,7 @@ class PanelOpciones(QWidget):
             "silencios": self.combo_silencios.currentData(),
             "velocidad_silencios": self.spin_velocidad.value(),
             "subtitulos": self.check_subtitulos.isChecked(),
+            "titulo": self.check_titulo.isChecked(),
             "diseno": self.combo_diseno.currentData(),
             "posicion_subs": self.spin_posicion.value(),
             "tamano_subs": self.slider_tamano.value(),
@@ -560,6 +578,7 @@ class PanelOpciones(QWidget):
             if not isinstance(valores.get("subtitulos"), bool)
             else valores.get("subtitulos", False)
         )
+        self.check_titulo.setChecked(_como_bool(valores.get("titulo"), True))
         diseno = valores.get("diseno", "reels_bold")
         indice = self.combo_diseno.findData(diseno)
         if indice >= 0:
