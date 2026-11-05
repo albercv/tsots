@@ -249,10 +249,24 @@ from videopipeline.steps import (
 )
 
 
+@pytest.mark.parametrize("ruta, esperado", [
+    ("/Users/a/b c/fuentes", "/Users/a/b c/fuentes"),
+    ("/x:y", "/x\\\\:y"),
+    ("/a'b", "/a\\\\\\'b"),
+    ("/a,b;c[d]", "/a\\,b\\;c\\[d\\]"),])
+def test_valor_filtro_escapa_los_dos_niveles(ruta, esperado):
+    assert steps._valor_filtro(ruta) == esperado
+
+
+def test_filtro_ass_pasa_la_carpeta_de_fuentes(monkeypatch, tmp_path):
+    monkeypatch.setattr(steps, "DIR_FUENTES", tmp_path / "a b")
+    assert steps.filtro_ass("subs.ass") == f"ass=subs.ass:fontsdir={tmp_path}/a b"
+
+
 def test_cmd_quemar_subtitulos():
     cmd = cmd_quemar_subtitulos("ffmpeg", Path("/a/v.mp4"), "subs.ass",
                                 Path("/a/o.mp4"))
-    assert "-vf" in cmd and cmd[cmd.index("-vf") + 1] == "ass=subs.ass"
+    assert "-vf" in cmd and cmd[cmd.index("-vf") + 1] == steps.filtro_ass("subs.ass")
     assert "libx264" in cmd and "18" in cmd and "medium" in cmd
     assert "copy" in cmd
     assert "-progress" in cmd and "pipe:1" in cmd

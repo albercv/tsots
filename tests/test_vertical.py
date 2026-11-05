@@ -11,6 +11,7 @@ from videopipeline.steps import (
     FILTRO_HUECOS_AUDIO,
     PasoFallido,
     cmd_quemar_subtitulos,
+    filtro_ass,
     resolucion_video,
 )
 from videopipeline.vertical import (
@@ -131,7 +132,7 @@ def test_filtro_encuadre_desconocido_falla():
 
 def test_filtro_ass_al_final():
     f = filtro_vertical("difuminado", 1920, 1080, ass_nombre="subs_vertical.ass")
-    assert f.endswith("ass=subs_vertical.ass,format=yuv420p[v]")
+    assert f.endswith(f",{filtro_ass('subs_vertical.ass')},format=yuv420p[v]")
 
 
 def test_cmd_convertir_copia_audio():

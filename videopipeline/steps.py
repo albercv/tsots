@@ -8,6 +8,8 @@ from typing import Callable
 from .i18n import _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+# Fuentes propias: libass las lee de aquí, sin depender de que estén instaladas.
+DIR_FUENTES = Path(__file__).resolve().parent / "fuentes"
 
 
 class PasoFallido(RuntimeError):
@@ -509,6 +511,16 @@ def ejecutar_ffmpeg_con_progreso(
     return proceso.returncode, "".join(lineas)
 
 
+def _valor_filtro(texto: str) -> str:
+    """Escapa un valor de opción de filtro: nivel 1 (opción) y nivel 2 (grafo)."""
+    nivel1 = "".join(f"\\{c}" if c in "\\':" else c for c in texto)
+    return "".join(f"\\{c}" if c in "\\'[],;" else c for c in nivel1)
+
+
+def filtro_ass(ass_nombre: str) -> str:
+    return f"ass={ass_nombre}:fontsdir={_valor_filtro(str(DIR_FUENTES))}"
+
+
 def cmd_quemar_subtitulos(
     ffmpeg: str, video: Path, ass_nombre: str, salida: Path,
     desde_original: bool = False, fps: str | None = None,
@@ -523,7 +535,7 @@ def cmd_quemar_subtitulos(
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
         "-i", str(video),
-        "-vf", f"ass={ass_nombre}",
+        "-vf", filtro_ass(ass_nombre),
         *tasa,
         "-c:v", "libx264", "-crf", "18", "-preset", "medium",
         *audio,
