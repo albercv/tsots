@@ -306,7 +306,7 @@ def test_vertical_con_seguimiento_guardado_no_detecta_otra_vez(
             paso_vertical=True, encuadre="cara")
 
     assert "caras" not in falsos
-    assert "crop@v=1080:1080:10:0" in falsos[-1]
+    assert "crop@v=1440:1080:10:0" in falsos[-1]
     assert comandos == ["0.000 crop@v x 10;"]
 
 
@@ -333,7 +333,7 @@ def test_vertical_sin_caras_centra_la_ventana_ancha(falsos, tmp_path, monkeypatc
     _pasada(_ficha(tmp_path), [A.SEGUIMIENTO, A.VERTICAL], eventos=[],
             paso_vertical=True, encuadre="cara")
 
-    assert "[0:v]crop=1080:1080,split" in falsos[-1] and "sendcmd" not in falsos[-1]
+    assert "[0:v]crop=1440:1080,split" in falsos[-1] and "sendcmd" not in falsos[-1]
 
 
 def test_desactualizado_se_marca_y_se_limpia_al_regenerar(tmp_path):

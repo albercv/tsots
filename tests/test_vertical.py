@@ -60,14 +60,14 @@ def test_ancho_recorte():
 
 
 def test_ancho_ventana_cara():
-    # 1:1 por defecto: más ancha que el 9:16 de máximo zoom (606 a 1080 de alto).
-    assert PROPORCION_VENTANA_CARA == 1
-    assert [ancho_ventana_cara(1920, a) for a in (1080, 720, 480)] == [1080, 720, 480]
+    # 4:3 por defecto: más ancha que el 9:16 de máximo zoom (606 a 1080 de alto).
+    assert PROPORCION_VENTANA_CARA == 4 / 3
+    assert [ancho_ventana_cara(1920, a) for a in (1080, 720, 480)] == [1440, 960, 640]
     assert all(ancho_ventana_cara(1920, a) > ancho_recorte(a) for a in (1080, 720))
 
 
 def test_ancho_ventana_cara_no_pasa_del_fotograma_y_es_par():
-    assert ancho_ventana_cara(600, 1080) == 600  # fuente más estrecha que 1:1
+    assert ancho_ventana_cara(600, 1080) == 600  # fuente más estrecha que 4:3
     assert ancho_ventana_cara(601, 1080) == 600  # ancho impar: sigue siendo par
     assert ancho_ventana_cara(1080, 1080) == 1080  # cuadrado
 
@@ -97,7 +97,7 @@ def test_filtro_difuminado():
 
 def test_filtro_cara():
     f = filtro_vertical("cara", 1920, 1080, x_cara=300)
-    assert f.startswith("[0:v]sendcmd=f=cara.cmd,crop@v=1080:1080:300:0,")
+    assert f.startswith("[0:v]sendcmd=f=cara.cmd,crop@v=1440:1080:300:0,")
     assert f.endswith("format=yuv420p[v]")
     assert "crop@v=606" not in f
 
@@ -113,14 +113,14 @@ def test_filtro_cara_rellena_con_el_fondo_difuminado_de_la_ventana():
 
 
 def test_filtro_cara_acota_x_al_fotograma():
-    # 1920 - 1080 = 840: una x vieja (de la ventana de 606) no saca la ventana.
-    assert "crop@v=1080:1080:840:0" in filtro_vertical("cara", 1920, 1080, x_cara=1314)
-    assert "crop@v=1080:1080:0:0" in filtro_vertical("cara", 1920, 1080, x_cara=-5)
+    # 1920 - 1440 = 480: una x vieja (de la ventana de 606) no saca la ventana.
+    assert "crop@v=1440:1080:480:0" in filtro_vertical("cara", 1920, 1080, x_cara=1314)
+    assert "crop@v=1440:1080:0:0" in filtro_vertical("cara", 1920, 1080, x_cara=-5)
 
 
 def test_filtro_cara_sin_x_centra_la_ventana_sin_seguimiento():
     f = filtro_vertical("cara", 1920, 1080)
-    assert "sendcmd" not in f and f.startswith("[0:v]crop=1080:1080,split")
+    assert "sendcmd" not in f and f.startswith("[0:v]crop=1440:1080,split")
     assert "boxblur" in f and "crop=606" not in f
 
 

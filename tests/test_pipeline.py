@@ -629,7 +629,7 @@ def test_solo_vertical_cara_con_subs(entorno_vertical, tmp_path):
     etiquetas = [e["label"] for e in pasos]
     assert "Detectando caras" in etiquetas
     assert etiquetas[-1] == "Convirtiendo a vertical"
-    assert "caras" in llamadas and "crop@v=1080:1080:10:0" in llamadas[-1]
+    assert "caras" in llamadas and "crop@v=1440:1080:10:0" in llamadas[-1]
     assert llamadas[-1].split(":")[2] == "True"
 
 
@@ -692,8 +692,8 @@ def test_cara_sin_caras_centra_la_ventana_ancha(entorno_vertical, tmp_path, monk
                        encuadre="cara"),
         eventos.append,
     )
-    # La misma ventana 1:1 con fondo difuminado, quieta en el centro (no el 9:16).
-    assert "[0:v]crop=1080:1080,split" in llamadas[-1] and "boxblur" in llamadas[-1]
+    # La misma ventana 4:3 con fondo difuminado, quieta en el centro (no el 9:16).
+    assert "[0:v]crop=1440:1080,split" in llamadas[-1] and "boxblur" in llamadas[-1]
     assert "sendcmd" not in llamadas[-1] and "crop=606" not in llamadas[-1]
     assert any(
         e.get("warning", "").startswith("No se detectó ninguna cara") for e in eventos
@@ -775,7 +775,7 @@ def test_cara_sin_detector_centra_la_ventana_ancha(entorno_vertical, tmp_path, m
     eventos: list[dict] = []
     pipeline.run(PipelineConfig(video=video, salida=tmp_path / "f.mp4",
                                 paso_vertical=True, encuadre="cara"), eventos.append)
-    assert "[0:v]crop=1080:1080,split" in llamadas[-1] and "sendcmd" not in llamadas[-1]
+    assert "[0:v]crop=1440:1080,split" in llamadas[-1] and "sendcmd" not in llamadas[-1]
     assert any("detector de caras" in e.get("warning", "") for e in eventos)
 
 
