@@ -7,6 +7,13 @@ import subprocess
 import pytest
 
 from videopipeline import steps
+from videopipeline.titulo import (
+    ANCHO_CARACTER,
+    ANCHO_UTIL,
+    BORDE_DORADO,
+    DESPLAZAMIENTO,
+    lineas_titulo,
+)
 
 ASS = """\
 [Script Info]
@@ -50,3 +57,70 @@ def test_quema_real_usa_la_fuente_del_repo(tmp_path, monkeypatch):
     assert f"Loading font file '{copia}/TitanOne-Regular.ttf'" in resultado.stderr
     assert re.search(r"fontselect: \(Titan One, \d+, \d+\) -> TitanOne",
                      resultado.stderr)
+
+
+def _estilo(linea: str) -> list[str]:
+    return linea.split(":", 1)[1].strip().split(",")
+
+
+def _texto(evento: str) -> str:
+    return re.sub(r"^\{[^}]*\}", "", evento.split(",", 9)[9])
+
+
+def _ancho_en_fs(n: int) -> float:
+    return n * ANCHO_CARACTER + 2 * BORDE_DORADO + DESPLAZAMIENTO
+
+
+def test_dos_capas_arriba_centradas():
+    estilos, eventos = lineas_titulo("Audio limpio ya", (1920, 1080))
+    assert [_estilo(e)[0] for e in estilos] == ["TituloDorado", "Titulo"]
+    assert all(_estilo(e)[1] == "Titan One" and _estilo(e)[2] == "76"
+               and _estilo(e)[18] == "8" for e in estilos)
+    assert eventos[0].startswith(
+        "Dialogue: 0,0:00:00.00,0:00:05.00,TituloDorado,")
+    assert "\\pos(965,91)" in eventos[0]
+    assert eventos[1].startswith("Dialogue: 1,0:00:00.00,0:00:05.00,Titulo,")
+    assert "\\an8\\pos(960,86)\\fad(300,300)" in eventos[1]
+    assert _texto(eventos[0]) == _texto(eventos[1]) == "AUDIO LIMPIO YA"
+
+
+def test_vertical_usa_su_tamano():
+    estilos, eventos = lineas_titulo("Audio limpio ya", (1080, 1920))
+    assert _estilo(estilos[1])[2] == "106"
+    assert "\\pos(540,154)" in eventos[1]
+
+
+def test_largo_parte_en_dos_y_cabe():
+    estilos, eventos = lineas_titulo(
+        "Inteligencia artificial para limpiar audio", (1080, 1920))
+    texto = _texto(eventos[1])
+    assert "\\N" in texto
+    n = max(len(linea) for linea in texto.split("\\N"))
+    fs = int(_estilo(estilos[1])[2])
+    assert _ancho_en_fs(n) * fs <= ANCHO_UTIL * 1080
+
+
+def test_palabra_sola_larguisima_reduce_la_letra():
+    estilos, eventos = lineas_titulo("Supercalifragilisticoespialidoso",
+                                     (1080, 1920))
+    texto = _texto(eventos[1])
+    fs = int(_estilo(estilos[1])[2])
+    assert "\\N" not in texto
+    assert _ancho_en_fs(len(texto)) * fs <= ANCHO_UTIL * 1080
+    assert fs >= 8
+
+
+def test_quita_llaves_y_barras():
+    _, eventos = lineas_titulo("{\\b1}Hola\\N mundo raro", (1920, 1080))
+    texto = _texto(eventos[1])
+    assert "{" not in texto and "}" not in texto
+    assert texto.replace("\\N", "").count("\\") == 0
+
+
+def test_inicio_y_duracion():
+    _, eventos = lineas_titulo("Hola", (1920, 1080), inicio=12.5, duracion=5.0)
+    assert all("0:00:12.50,0:00:17.50" in e for e in eventos)
+
+
+def test_texto_vacio_no_da_nada():
+    assert lineas_titulo("  {} ", (1920, 1080)) == ([], [])

@@ -11,7 +11,9 @@ from videopipeline.subtitles import (
     agrupar,
     generar_ass,
     generar_srt,
+    partir_en_dos,
 )
+from videopipeline.titulo import lineas_titulo
 
 
 def _palabras(*tuplas) -> list[Palabra]:
@@ -384,3 +386,32 @@ def test_transcribir_faster_pasa_initial_prompt(tmp_path, monkeypatch):
     monkeypatch.setattr(subtitles, "_crear_whisper", lambda modelo: falso)
     transcribir(tmp_path / "v.mp4", "es", "small", prompt="Anthropic.")
     assert falso.kwargs["initial_prompt"] == "Anthropic."
+
+
+def test_partir_en_dos():
+    assert partir_en_dos("uno dos tres cuatro") == "uno dos\\Ntres cuatro"
+    assert partir_en_dos("palabra") == "palabra"
+
+
+def test_generar_ass_con_extra(tmp_path):
+    estilos, eventos = lineas_titulo("Audio limpio ya", (1920, 1080))
+    bloques = [Bloque(_palabras(("hola", 6.0, 6.5)), 6.0, 6.5)]
+    ruta = tmp_path / "s.ass"
+    generar_ass(bloques, "reels_bold", 75, (1920, 1080), ruta,
+                extra=(estilos, eventos))
+    lineas = ruta.read_text(encoding="utf-8").splitlines()
+    sub = next(i for i, l in enumerate(lineas) if l.startswith("Style: Sub,"))
+    assert lineas[sub + 1:sub + 3] == estilos
+    assert lineas[sub + 3:sub + 5] == ["", "[Events]"]
+    dialogos = [l for l in lineas if l.startswith("Dialogue:")]
+    assert dialogos[:2] == eventos
+    assert len(dialogos) == 3 and ",Sub," in dialogos[2]
+
+
+def test_generar_ass_solo_titulo(tmp_path):
+    extra = lineas_titulo("Audio limpio ya", (1920, 1080))
+    ruta = tmp_path / "s.ass"
+    generar_ass([], "reels_bold", 75, (1920, 1080), ruta, extra=extra)
+    dialogos = [l for l in ruta.read_text(encoding="utf-8").splitlines()
+                if l.startswith("Dialogue:")]
+    assert dialogos == extra[1]
