@@ -654,6 +654,79 @@ def test_revisar_no_pregunta_por_el_titulo(tmp_path):
     assert revisar(_completa(tmp_path), _panel(titulo=True)) == []
 
 
+def _vertical_antiguo_sin_original(tmp_path) -> Ficha:
+    return _ficha(tmp_path, {}, final="vertical", original=False, legado=True)
+
+
+def _subs_sin_original(tmp_path) -> Ficha:
+    """Solo subtítulos sobre el original (sin BASE), que ya no está."""
+    ficha = _ficha(tmp_path, {HORIZONTAL: _horizontal(),
+                              TRANSCRIPCION: _transcripcion("original")})
+    ficha.original.ruta.unlink()
+    return ficha
+
+
+@pytest.mark.parametrize("ficha, panel, esperado", [
+    (_vertical_antiguo_sin_original, dict(caption_seo=True),
+     [A.TRANSCRIBIR, A.CAPTION]),
+    (_vertical_antiguo_sin_original, dict(), []),
+    (_subs_sin_original, dict(caption_seo=True), [A.CAPTION]),
+    (_legado, dict(), []),  # adoptada: no se vuelve a quemar sobre el original
+], ids=["vertical_antiguo_caption", "vertical_antiguo_nada",
+        "subs_sin_original_caption", "legado_adoptado_nada"])
+def test_titulo_no_obliga_a_rehacer_una_salida_que_no_hizo_la_app_o_sin_base(
+        tmp_path, ficha, panel, esperado):
+    ficha = ficha(tmp_path)
+
+    sin = planificar(ficha, _panel(**panel), Decisiones())
+    con = planificar(ficha, _panel(**panel, titulo=True), Decisiones())
+
+    assert sin.error == con.error == ""
+    assert sin.acciones == con.acciones == esperado
+
+
+def test_titulo_va_con_los_subtitulos_de_una_salida_antigua_adoptada(tmp_path):
+    plan = planificar(_legado(tmp_path), _panel(subtitulos=True, titulo=True),
+                      Decisiones())
+
+    assert plan.acciones == [A.TRANSCRIBIR, A.TITULO, A.QUEMAR]
+
+
+def test_vertical_unico_que_gana_horizontal_lleva_el_titulo(tmp_path):
+    # La base ya recortada no cambia: el horizontal nuevo se quema con el título.
+    ficha = _ficha(tmp_path, {BASE: _base(silencios=True), VERTICAL: _vertical()},
+                   final="vertical")
+
+    plan = planificar(ficha, _panel(paso_silencios=True, titulo=True),
+                      Decisiones())
+
+    assert plan.acciones == [A.TRANSCRIBIR, A.TITULO, A.QUEMAR, A.VERTICAL,
+                             A.RETIRAR_VERTICAL_UNICO]
+
+
+def test_vertical_que_vuelve_a_transcribir_conserva_el_titulo(tmp_path):
+    # El horizontal no se vuelve a quemar: el vertical lleva el mismo título.
+    ficha = _completa(tmp_path, **{HORIZONTAL: _horizontal(titulo=T),
+                                   TITULO: _titulo(),
+                                   VERTICAL: _vertical(subs=True, titulo=T)})
+    ficha.ruta("transcripcion.json").unlink()
+
+    plan = planificar(ficha, _panel(paso_vertical=True, encuadre="cara",
+                                    titulo=True),
+                      Decisiones(rehacer=frozenset({"vertical"})))
+
+    assert plan.acciones == [A.TRANSCRIBIR, A.SEGUIMIENTO, A.VERTICAL]
+
+
+def test_titulo_sin_texto_cuenta_como_que_falta(tmp_path):
+    ficha = _completa(tmp_path, **{HORIZONTAL: _horizontal(titulo=T),
+                                   TITULO: Artefacto("t", None, {})})
+
+    plan = planificar(ficha, _panel(titulo=True), Decisiones())
+
+    assert plan.acciones == [A.TITULO, A.QUEMAR]
+
+
 def test_ajustes_y_clave():
     c = _panel(diseno="caja", glosario="Anthropic")
     assert ajustes_audio(c) == {"tarea": c.tarea, "modelo": c.modelo}

@@ -34,7 +34,6 @@ def falsos(entorno_vertical, entorno_caption, entorno_titulo, tmp_path,
            monkeypatch):
     """Todos los pasos falsos; las fichas y las salidas, dentro de tmp_path."""
     llamadas, video, _, _ = entorno_vertical
-    _, _, _, _ = entorno_titulo
     monkeypatch.setattr(modulo_ficha, "DIR_FICHAS", tmp_path / "fichas")
 
     def falso_flac(wav, flac):
@@ -804,21 +803,6 @@ def test_quitar_el_titulo_sin_subtitulos_escribe_el_final_desde_la_base(
     assert _sin_restos(ficha)
 
 
-def test_quitar_el_titulo_de_una_salida_antigua_no_mueve_su_original(tmp_path):
-    antigua = _antigua(tmp_path)
-    legado = _pasada(reconocer(antigua, None)[0],
-                     [A.TRANSCRIBIR, A.TITULO, A.QUEMAR], titulo=True)
-    guardado = legado.original.ruta
-    assert guardado.parent == legado.carpeta.resolve()
-
-    legado = _pasada(legado, [A.ESCRIBIR_FINAL], titulo=False)
-
-    assert antigua.read_bytes() == b"ANTIGUA" and legado.final.coincide(antigua)
-    assert guardado.read_bytes() == b"ANTIGUA"  # la copia guardada se queda
-    assert legado.artefactos[HORIZONTAL].ajustes == {}
-    assert _sin_restos(legado)
-
-
 def test_titulo_en_el_vertical_se_registra(falsos, tmp_path):
     ficha = _pasada(_ficha(tmp_path), [*CON_TITULO, A.VERTICAL],
                     paso_silencios=True, paso_vertical=True, titulo=True)
@@ -847,3 +831,18 @@ def test_titulo_que_falla_al_regenerar_conserva_el_anterior(
     horizontal = ficha.artefactos[HORIZONTAL].ajustes
     assert horizontal["titulo"] == "Viejo título aquí"
     assert "subtitulos" in horizontal
+
+
+def test_titulo_sin_texto_en_la_ficha_no_se_quema(entorno_titulo, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    subtitulos=True, titulo=True)
+    ficha.artefactos[TITULO].ajustes = {}  # ficha.json editada a mano
+    guardar(ficha)
+    entorno_titulo[3]["falla"] = True
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.TITULO, A.QUEMAR], eventos=eventos,
+                    subtitulos=True, titulo=True)
+
+    assert len(_avisos(eventos)) == 1
+    assert set(ficha.artefactos[HORIZONTAL].ajustes) == {"subtitulos"}

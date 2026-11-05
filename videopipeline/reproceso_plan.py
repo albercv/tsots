@@ -16,7 +16,8 @@ guarda en cada uno:
   `{"vertical": ajustes_vertical}`.
 - TITULO: `{"texto": ...}`, sin archivo: vale si está. Se genera si falta o
   con una transcripción nueva para los subtítulos; cambiar la casilla rehace
-  las salidas quemadas sin preguntar (tampoco R7).
+  sin preguntar (tampoco R7) las salidas que hizo la app sobre una base que
+  vale; las demás lo llevan cuando se rehacen por otra cosa.
 - CAPTION: `{"caption": ajustes_caption}`.
 - SEGUIMIENTO: clave = `clave_seguimiento(línea de tiempo de la base)`; la
   imagen solo depende de los cortes, no del audio, y las x guardadas son las de
@@ -359,16 +360,20 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     # y sin original.
     quiere_titulo = config.titulo and not _subs_bloqueados(ficha)
     titulo_art = ficha.artefactos.get(TITULO)
-    titulo = (None if not quiere_titulo
-              else titulo_art.ajustes["texto"] if titulo_art else _NUEVO)
+    # Sin texto (ficha.json editada a mano) cuenta como que falta.
+    texto = titulo_art.ajustes.get("texto") if titulo_art else None
+    titulo = (texto or _NUEVO) if quiere_titulo else None
     efectiva = replace(efectiva, paso_audio=audio is not None,
                        paso_silencios=silencios is not None,
                        subtitulos=subs is not None, titulo=quiere_titulo)
 
-    def titulo_de(tipo: str) -> str | None:
-        """El título quemado en esa salida, o None."""
+    def fuerza_titulo(tipo: str) -> bool:
+        """Un título distinto del quemado obliga a rehacer la salida solo si la
+        hizo la app y su base vale; si no, va con ella cuando se rehace por
+        otra cosa: nunca da un error por una base que no se puede rehacer."""
         artefacto = ficha.artefactos.get(tipo)
-        return artefacto.ajustes.get("titulo") if artefacto else None
+        return (artefacto is not None and _base_vale(ficha)
+                and titulo != artefacto.ajustes.get("titulo"))
 
     # 2. ¿Cambia la base? Rehacer un paso de base invalida lo que depende de ella.
     audio_antes, silencios_antes = _hecho(ficha, "audio"), _hecho(ficha, "silencios")
@@ -393,7 +398,7 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     cambia_quemado = horizontal and (
         (subs is not None
          and (crea_horizontal or subs != subs_antes or retranscribir))
-        or titulo != titulo_de(HORIZONTAL))
+        or fuerza_titulo(HORIZONTAL))
 
     hay_vertical = _existe(ficha.vertical if ficha.hay_horizontal() else ficha.final)
     r10 = crea_horizontal and hay_vertical  # solo tenía vertical
@@ -405,7 +410,7 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     # Un vertical marcado como desactualizado no vale (R0, R7).
     vertical_vale = hay_vertical and "vertical" not in ficha.desactualizado
     # Cambiar la casilla del título rehace el vertical sin preguntar (sin R7).
-    cambia_titulo = titulo != titulo_de(VERTICAL)
+    cambia_titulo = fuerza_titulo(VERTICAL)
 
     def genera_vertical(cambia: bool) -> tuple[bool, bool]:
         """(se genera, quedaría desactualizado) — R7, R10."""
@@ -465,7 +470,8 @@ def planificar(ficha: Ficha, config: PipelineConfig,
         and transcripcion.ajustes.get("idioma") == efectiva.idioma_subs
         and transcripcion.ajustes.get("modelo_whisper") == efectiva.modelo_whisper)
     quema = subs is not None or titulo is not None
-    quemar = horizontal and quema and (rehace_base or cambia_quemado)
+    quemar = horizontal and quema and (rehace_base or crea_horizontal
+                                       or cambia_quemado)
     if quemar:
         elegidas.add(Accion.QUEMAR)
     elif horizontal and not quema and (rehace_base or crea_horizontal
@@ -473,10 +479,11 @@ def planificar(ficha: Ficha, config: PipelineConfig,
         elegidas.add(Accion.ESCRIBIR_FINAL)
     transcribe_subs = subs is not None and not transcripcion_vale and (
         quemar or genera)
-    # Transcripción nueva → título nuevo; si no, el de la ficha. Para el texto
+    # Transcripción nueva → título nuevo, si el horizontal se vuelve a quemar
+    # (o no lo hay): si no, el vertical llevaría otro que él. Para el texto
     # vale cualquier transcripción, como para el caption (R5).
     genera_titulo = titulo is not None and (quemar or genera) and (
-        titulo is _NUEVO or transcribe_subs)
+        titulo is _NUEVO or (transcribe_subs and (quemar or not horizontal)))
     if transcribe_subs or (genera_titulo and transcripcion is None):
         elegidas.add(Accion.TRANSCRIBIR)
     if genera_titulo:

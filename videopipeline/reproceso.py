@@ -156,7 +156,9 @@ class _Pasada:
     def _titulo(self) -> str | None:
         """El título que se quema: el de la ficha, si esta pasada lo lleva."""
         titulo = self.ficha.artefactos.get(TITULO)
-        return titulo.ajustes["texto"] if self.c.titulo and titulo else None
+        # Sin texto (ficha.json editada a mano) cuenta como que falta.
+        return (titulo.ajustes.get("texto") or None
+                if self.c.titulo and titulo else None)
 
     def _publicar(self, origen: Path, destino: Path) -> None:
         """Mueve el temporal `origen` a `destino` por otro oculto a su lado:
@@ -351,12 +353,6 @@ class _Pasada:
 
     def escribir_final(self, paso: int) -> None:
         self._paso(paso, _("Guardando el vídeo"))
-        if self.base == self.fuente:
-            # Quitar el título de un final sin pasos de base: el final es una
-            # copia del original, que nunca se mueve.
-            copia = self.tmp / "base.mp4"
-            shutil.copyfile(self.base, copia)
-            self.base = copia
         # Una base de esta pasada o la guardada aparte (quitar el título de un
         # final sin subtítulos); nunca el original ni su copia en la ficha.
         assert (self.base.parent == self.tmp
