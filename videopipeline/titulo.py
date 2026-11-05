@@ -68,8 +68,15 @@ TAMANO_HORIZONTAL = 0.07
 TAMANO_VERTICAL = 0.055  # fracción de la altura; vertical si alto > ancho
 ANCHO_UTIL = 0.90
 MARGEN_SUPERIOR = 0.08
-ANCHO_LETRA = 0.58  # avance medio de una mayúscula de Titan One por punto de Fontsize
-ANCHO_ESPACIO = 0.20  # avance del espacio, ídem
+# Avance de cada glifo de Titan One por punto de Fontsize de libass (medido), por ancho.
+_ANCHOS = {c: ancho for ancho, cs in {
+    0.20: " ", 0.23: "'", 0.26: ".,:;", 0.29: "!¡", 0.31: "I", 0.32: "Í", 0.36: "J",
+    0.40: "1", 0.47: "7", 0.48: "L-+", 0.51: "F", 0.52: "?¿", 0.53: "E35",
+    0.54: "É24", 0.55: "Z", 0.57: "CST", 0.58: "Ç689", 0.59: "G", 0.61: "Y",
+    0.62: "BKP", 0.63: "RUX0", 0.64: "DHNVÚÜÑ", 0.65: "AÁQ", 0.66: "O",
+    0.68: "Ó&", 0.77: "M", 0.85: "%", 0.89: "W",
+}.items() for c in cs}
+ANCHO_DESCONOCIDO = 0.70  # glifo fuera de la tabla: conservador
 ESPACIADO = 0.04  # `Spacing` entre letras, fracción del tamaño de letra
 # BORDE, BORDE_DORADO y DESPLAZAMIENTO: fracciones del tamaño de letra.
 BORDE = 0.08
@@ -80,9 +87,8 @@ FUNDIDO_MS = 300
 
 
 def _ancho_en_fs(linea: str) -> float:
-    """Ancho estimado de la línea en múltiplos del tamaño de letra."""
-    espacios = linea.count(" ")
-    return ((len(linea) - espacios) * ANCHO_LETRA + espacios * ANCHO_ESPACIO
+    """Ancho estimado de la línea (ya en mayúsculas) en múltiplos del tamaño de letra."""
+    return (sum(_ANCHOS.get(c, ANCHO_DESCONOCIDO) for c in linea)
             + len(linea) * ESPACIADO + 2 * BORDE_DORADO + DESPLAZAMIENTO)
 
 

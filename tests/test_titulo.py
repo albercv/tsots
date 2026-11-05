@@ -9,6 +9,7 @@ import pytest
 from videopipeline import steps
 from videopipeline.steps import PasoFallido
 from videopipeline.titulo import (
+    _ANCHOS,
     ANCHO_UTIL,
     ESQUEMA,
     _ancho_en_fs,
@@ -96,6 +97,23 @@ def test_titulo_corto_en_vertical_cabe_en_una_linea():
     estilos, eventos = lineas_titulo("Audio limpio ya", (1080, 1920))
     assert "\\N" not in _texto(eventos[1])
     assert _estilo(estilos[1])[2] == "106"
+
+
+def test_tabla_de_anchos_cubre_lo_habitual():
+    habitual = "ABCDEFGHIJKLMNOPQRSTUVWXYZÁÉÍÓÚÜÑÇ0123456789 ¿?¡!.,:;'-&%+"
+    assert all(c in _ANCHOS for c in habitual)
+
+
+@pytest.mark.parametrize("texto, parte", [
+    ("Cómo grabar vídeos con el móvil", True),
+    ("Mmm wow wow", False),
+])
+def test_titulo_ancho_en_vertical_no_pasa_del_90(texto, parte):
+    estilos, eventos = lineas_titulo(texto, (1080, 1920))
+    lineas = _texto(eventos[1]).split("\\N")
+    assert (len(lineas) == 2) is parte
+    fs = int(_estilo(estilos[1])[2])
+    assert all(_ancho_en_fs(linea) * fs <= ANCHO_UTIL * 1080 for linea in lineas)
 
 
 def test_largo_parte_en_dos_y_cabe():
