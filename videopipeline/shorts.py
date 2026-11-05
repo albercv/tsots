@@ -461,7 +461,12 @@ def hay_shorts(ficha: Ficha) -> bool:
 
 
 def limpiar_temporal(ficha: Ficha) -> None:
-    shutil.rmtree(carpeta_shorts(ficha) / TMP, ignore_errors=True)
+    carpeta = carpeta_shorts(ficha)
+    shutil.rmtree(carpeta / TMP, ignore_errors=True)
+    # Cancelar mata al runner antes de su `finally`: una primera pasada
+    # cancelada dejaría la carpeta vacía. `rmdir` nunca quita una con algo.
+    with suppress(OSError):
+        carpeta.rmdir()
 
 
 def _transcrita(ficha: Ficha, linea: str) -> bool:

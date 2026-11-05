@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 10:10+0100\n"
+"POT-Creation-Date: 2026-11-05 10:18+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -53,6 +53,10 @@ msgstr "\"{nombre}\" will be redone from the original: the subtitles will be tra
 #, python-brace-format
 msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
 msgstr "\"{nombre}\" already has the subtitles burned in and there is no version without them. Drag in the original to redo them."
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene shorts en {carpeta}. Se sustituirán los que creó la app; lo demás de esa carpeta no se toca. ¿Crearlos de nuevo?"
+msgstr "\"{nombre}\" already has shorts in {carpeta}. The ones the app created will be replaced; nothing else in that folder is touched. Create them again?"
 
 #, python-brace-format
 msgid "\"{nombre}\" ya tiene {paso} con otros ajustes ({cambios}). ¿Rehacerlo?"
@@ -142,6 +146,9 @@ msgstr "System Settings → Privacy & Security → Files and Folders: grant acce
 
 msgid "Al publicar"
 msgstr "When publishing"
+
+msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
+msgstr "When each video finishes processing, cuts its best 1 to 3 minute pieces in vertical."
 
 msgid "Amarillo"
 msgstr "Yellow"
@@ -287,6 +294,9 @@ msgstr "Check that the video plays in QuickTime. If it is an intermediate file i
 msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un solo post."
 msgstr "With Premium, TSOTS allows longer videos and long texts in a single post."
 
+msgid "Con el estilo de la sección Subtítulos."
+msgstr "With the style of the Subtitles section."
+
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
 msgstr "Connect to the internet and process again; models are downloaded only once."
 
@@ -335,6 +345,12 @@ msgstr "Silence cutting"
 #, python-brace-format
 msgid "Creando short {n} de {total}"
 msgstr "Creating short {n} of {total}"
+
+msgid "Crear shorts"
+msgstr "Create shorts"
+
+msgid "Crear shorts al procesar"
+msgstr "Create shorts when processing"
 
 msgid "Cuenta"
 msgstr "Account"
@@ -1396,6 +1412,9 @@ msgstr "SIGSEGV: segmentation fault in a native library (torch, ctranslate2, PyA
 msgid "SIGTERM: el proceso fue terminado desde fuera"
 msgstr "SIGTERM: the process was terminated from outside"
 
+msgid "Saca los shorts del vídeo elegido en la cola a una carpeta con su nombre, junto a sus salidas."
+msgstr "Cuts the shorts of the video selected in the queue into a folder named after it, next to its outputs."
+
 msgid "Salida del proceso (últimas líneas):"
 msgstr "Process output (last lines):"
 
@@ -1466,6 +1485,9 @@ msgstr "Service:"
 
 msgid "Short público"
 msgstr "Public Short"
+
+msgid "Shorts"
+msgstr "Shorts"
 
 #, python-brace-format
 msgid "Shorts: {ruta}"

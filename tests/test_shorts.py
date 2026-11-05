@@ -869,6 +869,27 @@ def test_limpiar_temporal_borra_la_subcarpeta(ficha_con_base):
     assert shorts.carpeta_shorts(e.ficha) == e.carpeta
 
 
+def test_limpiar_temporal_quita_la_carpeta_vacia(ficha_con_base):
+    """Cancelar mata al runner antes de su limpieza: una primera pasada
+    cancelada no debe dejar la carpeta vacía, pero nunca se quita con algo."""
+    e = ficha_con_base
+    tmp = e.carpeta / shorts.TMP
+    tmp.mkdir(parents=True)
+    (tmp / "a medias.mp4").write_bytes(b"x")
+
+    shorts.limpiar_temporal(e.ficha)
+
+    assert not e.carpeta.exists()
+    shorts.limpiar_temporal(e.ficha)  # ni carpeta ni nada: tampoco falla
+
+    tmp.mkdir(parents=True)
+    (e.carpeta / "notas.txt").write_text("del usuario")
+    shorts.limpiar_temporal(e.ficha)
+
+    assert not tmp.exists()
+    assert (e.carpeta / "notas.txt").read_text() == "del usuario"
+
+
 def test_hay_shorts(ficha_con_base):
     e = ficha_con_base
     assert not shorts.hay_shorts(e.ficha)

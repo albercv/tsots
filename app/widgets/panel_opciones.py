@@ -94,6 +94,7 @@ class PanelOpciones(QWidget):
     refrescar_modelos = Signal()
     seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
     pasos_cambiados = Signal()
+    crear_shorts = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -287,6 +288,39 @@ class PanelOpciones(QWidget):
             self._refrescar_aviso_encuadre
         )
 
+        # Los shorts no son un paso (no están en `_casillas_pasos`): se lanzan
+        # con su botón o, con la casilla, al final de cada procesado.
+        form_shorts = self._seccion("shorts", _("Shorts"), QFormLayout)
+        self.check_shorts_subtitulos = QCheckBox(_("Subtítulos"))
+        self.check_shorts_subtitulos.setChecked(True)
+        self.check_shorts_subtitulos.setToolTip(
+            _("Con el estilo de la sección Subtítulos.")
+        )
+        # Propio: el del vertical se desactiva sin el paso vertical.
+        self.combo_encuadre_shorts = QComboBox()
+        for etiqueta, valor in ETIQUETA_ENCUADRE.items():
+            self.combo_encuadre_shorts.addItem(_(etiqueta), valor)
+        self.combo_encuadre_shorts.setCurrentIndex(
+            self.combo_encuadre_shorts.findData("cara")
+        )
+        self.check_shorts_al_procesar = QCheckBox(_("Crear shorts al procesar"))
+        self.check_shorts_al_procesar.setToolTip(
+            _("Al terminar de procesar cada vídeo, saca sus mejores trozos de "
+              "1 a 3 minutos en vertical.")
+        )
+        self.boton_crear_shorts = QPushButton(_("Crear shorts"))
+        self.boton_crear_shorts.setToolTip(
+            _("Saca los shorts del vídeo elegido en la cola a una carpeta con "
+              "su nombre, junto a sus salidas.")
+        )
+        self.boton_crear_shorts.clicked.connect(self.crear_shorts)
+        form_shorts.addRow(self.check_shorts_subtitulos)
+        form_shorts.addRow(_("Encuadre:"), self.combo_encuadre_shorts)
+        form_shorts.addRow(self.check_shorts_al_procesar)
+        # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
+        form_shorts.addRow("", self.boton_crear_shorts)
+        self.check_shorts_al_procesar.toggled.connect(self._actualizar_cabecera_shorts)
+
         for seccion in self.secciones.values():
             layout.addWidget(seccion)
             self._acordeon.anadir(seccion)
@@ -366,8 +400,7 @@ class PanelOpciones(QWidget):
     def _actualizar_pasos(self, *args) -> None:
         casillas = self._casillas_pasos()
         for clave, casilla in casillas.items():
-            marca = MARCA_ACTIVO if casilla.isChecked() else ""
-            self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+            self._marcar_cabecera(clave, casilla)
         marcadas = sum(c.isChecked() for c in casillas.values())
         estado = (
             Qt.CheckState.Checked if marcadas == len(casillas)
@@ -379,6 +412,13 @@ class PanelOpciones(QWidget):
         self.check_completo.blockSignals(False)
         self._actualizar_habilitados()
         self.pasos_cambiados.emit()
+
+    def _marcar_cabecera(self, clave: str, casilla: QCheckBox) -> None:
+        marca = MARCA_ACTIVO if casilla.isChecked() else ""
+        self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+
+    def _actualizar_cabecera_shorts(self, *args) -> None:
+        self._marcar_cabecera("shorts", self.check_shorts_al_procesar)
 
     def _actualizar_habilitados(self, *args) -> None:
         audio = self.check_audio.isChecked()
@@ -519,6 +559,14 @@ class PanelOpciones(QWidget):
             "caption_seo": self.check_caption.isChecked(),
         }
 
+    def valores_shorts(self) -> dict:
+        """Aparte de `valores`, que se pasa entero a `PipelineConfig`."""
+        return {
+            "shorts_subtitulos": self.check_shorts_subtitulos.isChecked(),
+            "shorts_encuadre": self.combo_encuadre_shorts.currentData(),
+            "shorts_al_procesar": self.check_shorts_al_procesar.isChecked(),
+        }
+
     def cargar(self, valores: dict) -> None:
         if "paso_audio" in valores or "paso_silencios" in valores:
             pasos = {
@@ -582,5 +630,13 @@ class PanelOpciones(QWidget):
                 valor if isinstance(valor, bool)
                 else str(valor).lower() in ("true", "1")
             )
+        self.check_shorts_subtitulos.setChecked(
+            _como_bool(valores.get("shorts_subtitulos"), True))
+        indice = self.combo_encuadre_shorts.findData(
+            valores.get("shorts_encuadre", "cara"))
+        if indice >= 0:
+            self.combo_encuadre_shorts.setCurrentIndex(indice)
+        # Como el vertical, «al procesar» es ocasional: nunca se restaura.
+        self.check_shorts_al_procesar.setChecked(False)
         self._actualizar_pasos()
         self._actualizar_subtitulos()

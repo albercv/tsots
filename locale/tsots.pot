@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 10:10+0100\n"
+"POT-Creation-Date: 2026-11-05 10:18+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -55,6 +55,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene shorts en {carpeta}. Se sustituirán los que creó la app; lo demás de esa carpeta no se toca. ¿Crearlos de nuevo?"
 msgstr ""
 
 #, python-brace-format
@@ -144,6 +148,9 @@ msgid "Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas: c
 msgstr ""
 
 msgid "Al publicar"
+msgstr ""
+
+msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
 msgstr ""
 
 msgid "Amarillo"
@@ -288,6 +295,9 @@ msgstr ""
 msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un solo post."
 msgstr ""
 
+msgid "Con el estilo de la sección Subtítulos."
+msgstr ""
+
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
 msgstr ""
 
@@ -335,6 +345,12 @@ msgstr ""
 
 #, python-brace-format
 msgid "Creando short {n} de {total}"
+msgstr ""
+
+msgid "Crear shorts"
+msgstr ""
+
+msgid "Crear shorts al procesar"
 msgstr ""
 
 msgid "Cuenta"
@@ -1387,6 +1403,9 @@ msgstr ""
 msgid "SIGTERM: el proceso fue terminado desde fuera"
 msgstr ""
 
+msgid "Saca los shorts del vídeo elegido en la cola a una carpeta con su nombre, junto a sus salidas."
+msgstr ""
+
 msgid "Salida del proceso (últimas líneas):"
 msgstr ""
 
@@ -1453,6 +1472,9 @@ msgid "Servicio:"
 msgstr ""
 
 msgid "Short público"
+msgstr ""
+
+msgid "Shorts"
 msgstr ""
 
 #, python-brace-format

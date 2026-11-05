@@ -689,15 +689,15 @@ def test_panel_secciones_en_orden_y_audio_abierto(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     assert list(panel.secciones) == [
-        "audio", "silencios", "subtitulos", "caption", "vertical",
+        "audio", "silencios", "subtitulos", "caption", "vertical", "shorts",
     ]
     assert [s.cabecera.text() for s in panel.secciones.values()] == [
         "✓ Limpieza de audio", "✓ Corte de silencios", "Subtítulos",
-        "Caption SEO", "Formato vertical",
+        "Caption SEO", "Formato vertical", "Shorts",
     ]
     assert panel.seccion_abierta() == "audio"
     assert [s.esta_abierta() for s in panel.secciones.values()] == [
-        True, False, False, False, False,
+        True, False, False, False, False, False,
     ]
 
 
@@ -843,6 +843,78 @@ def test_panel_encuadres_traducidos():
         encoding="utf-8")
     traducidas = dict(re.findall(r'^msgid "(.+)"\nmsgstr "(.+)"$', po, re.M))
     assert [e for e in ETIQUETA_ENCUADRE if e not in traducidas] == []
+
+
+def test_seccion_shorts_valores_por_defecto(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.valores_shorts() == {
+        "shorts_subtitulos": True, "shorts_encuadre": "cara",
+        "shorts_al_procesar": False,
+    }
+    assert panel.check_shorts_subtitulos.text() == "Subtítulos"
+    assert panel.check_shorts_al_procesar.text() == "Crear shorts al procesar"
+    assert panel.boton_crear_shorts.text() == "Crear shorts"
+    assert panel.combo_encuadre_shorts.count() == panel.combo_encuadre.count()
+    # Propio: el del vertical se desactiva sin el paso vertical.
+    assert not panel.combo_encuadre.isEnabled()
+    assert panel.combo_encuadre_shorts.isEnabled()
+    for control in (panel.check_shorts_subtitulos, panel.check_shorts_al_procesar,
+                    panel.boton_crear_shorts):
+        assert control.toolTip()
+
+
+def test_cargar_restaura_shorts_menos_al_procesar(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"shorts_subtitulos": "false", "shorts_encuadre": "barras",
+                  "shorts_al_procesar": "true"})
+    assert panel.valores_shorts() == {
+        "shorts_subtitulos": False, "shorts_encuadre": "barras",
+        "shorts_al_procesar": False,
+    }
+    panel.cargar({})  # ajustes de antes de los shorts: valores por defecto
+    assert panel.valores_shorts() == {
+        "shorts_subtitulos": True, "shorts_encuadre": "cara",
+        "shorts_al_procesar": False,
+    }
+
+
+def test_boton_crear_shorts_emite_senal(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    with qtbot.waitSignal(panel.crear_shorts, timeout=1000):
+        panel.boton_crear_shorts.click()
+
+
+def test_valores_sigue_siendo_un_pipeline_config(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_shorts_al_procesar.setChecked(True)
+    PipelineConfig(video=Path("x.mp4"), **panel.valores())
+
+
+def test_cabecera_shorts_marcada_al_procesar(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.secciones["shorts"].cabecera.text() == "Shorts"
+    panel.check_shorts_al_procesar.setChecked(True)
+    assert panel.secciones["shorts"].cabecera.text() == "✓ Shorts"
+    panel.check_shorts_al_procesar.setChecked(False)
+    assert panel.secciones["shorts"].cabecera.text() == "Shorts"
+
+
+def test_shorts_no_cuentan_como_paso(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_completo.click()  # todo marcado
+    panel.check_completo.click()  # todo desmarcado
+    panel.check_shorts_al_procesar.setChecked(True)
+    assert not panel.hay_pasos()
+    assert panel.check_completo.checkState() == Qt.CheckState.Unchecked
+    panel.check_completo.click()  # marca los pasos, no los shorts
+    panel.check_shorts_al_procesar.setChecked(False)
+    assert panel.check_completo.checkState() == Qt.CheckState.Checked
 
 
 def test_panel_hay_pasos_cuenta_el_caption(qtbot):
