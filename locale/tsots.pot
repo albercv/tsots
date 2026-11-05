@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 12:46+0100\n"
+"POT-Creation-Date: 2026-11-05 13:57+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -26,11 +26,23 @@ msgid " en «{paso}»"
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" dura menos de 3 minutos: es demasiado corto para sacar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ellos de la que cortar los shorts. Arrastra el original y vuelve a procesarlo."
 msgstr ""
 
 #, python-brace-format
@@ -43,6 +55,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene shorts en {carpeta}. Se sustituirán los que creó la app; lo demás de esa carpeta no se toca. ¿Crearlos de nuevo?"
 msgstr ""
 
 #, python-brace-format
@@ -78,7 +94,14 @@ msgstr ""
 msgid "(sin título)"
 msgstr ""
 
+msgid "+ 1 short"
+msgstr ""
+
 msgid "+ vertical"
+msgstr ""
+
+#, python-brace-format
+msgid "+ {n} shorts"
 msgstr ""
 
 #, python-brace-format
@@ -130,6 +153,9 @@ msgstr ""
 msgid "Al publicar"
 msgstr ""
 
+msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
+msgstr ""
+
 msgid "Amarillo"
 msgstr ""
 
@@ -167,6 +193,9 @@ msgid "Borrador (lo terminas en Facebook)"
 msgstr ""
 
 msgid "Borrador (lo terminas en la app)"
+msgstr ""
+
+msgid "Buscando trozos para shorts"
 msgstr ""
 
 msgid "Buscando…"
@@ -269,6 +298,9 @@ msgstr ""
 msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un solo post."
 msgstr ""
 
+msgid "Con el estilo de la sección Subtítulos."
+msgstr ""
+
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
 msgstr ""
 
@@ -312,6 +344,16 @@ msgid "Cortar"
 msgstr ""
 
 msgid "Corte de silencios"
+msgstr ""
+
+#, python-brace-format
+msgid "Creando short {n} de {total}"
+msgstr ""
+
+msgid "Crear shorts"
+msgstr ""
+
+msgid "Crear shorts al procesar"
 msgstr ""
 
 msgid "Cuenta"
@@ -719,10 +761,17 @@ msgstr ""
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
 msgstr ""
 
+#, python-brace-format
+msgid "La respuesta de {juez} no es válida"
+msgstr ""
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr ""
 
 msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
+msgstr ""
+
+msgid "La respuesta del modelo no es válida: faltan los candidatos"
 msgstr ""
 
 msgid "La respuesta del modelo no trae un título"
@@ -743,6 +792,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
+msgstr ""
+
+#, python-brace-format
+msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
 msgstr ""
 
 msgid "Leyendo la API key del Llavero…"
@@ -776,6 +829,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "Logo de {app}"
+msgstr ""
+
+#, python-brace-format
+msgid "Los shorts fallaron: {error}. El vídeo se ha procesado igual."
 msgstr ""
 
 #, python-brace-format
@@ -861,6 +918,10 @@ msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y est
 msgstr ""
 
 msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
+msgstr ""
+
+#, python-brace-format
+msgid "Ningún trozo de \"{nombre}\" es lo bastante bueno para un short: no se ha creado ninguno."
 msgstr ""
 
 #, python-brace-format
@@ -973,6 +1034,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
 msgstr ""
 
@@ -1050,6 +1115,10 @@ msgid "No se pudo preparar la consulta ({tipo})."
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo transcribir \"{nombre}\": sin transcripción no se pueden buscar shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo transcribir para el título: {error}. Vídeo guardado sin título."
 msgstr ""
 
@@ -1057,11 +1126,19 @@ msgstr ""
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr ""
 
+#, python-brace-format
+msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
+msgstr ""
+
 msgid "No se puede añadir"
 msgstr ""
 
 #, python-brace-format
 msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
+msgstr ""
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": no lo creó la app. Muévelo o bórralo y vuelve a crear los shorts."
 msgstr ""
 
 msgid "Nombre del perfil en el servicio"
@@ -1237,6 +1314,9 @@ msgstr ""
 msgid "Publicar…"
 msgstr ""
 
+msgid "Puntuando los trozos"
+msgstr ""
+
 msgid "Página de Facebook en la que se publica. La lista sale de las páginas conectadas en el servicio: pulsa «Comprobar conexión» para verla."
 msgstr ""
 
@@ -1354,6 +1434,9 @@ msgstr ""
 msgid "SIGTERM: el proceso fue terminado desde fuera"
 msgstr ""
 
+msgid "Saca los shorts del vídeo elegido en la cola a una carpeta con su nombre, junto a sus salidas."
+msgstr ""
+
 msgid "Salida del proceso (últimas líneas):"
 msgstr ""
 
@@ -1420,6 +1503,13 @@ msgid "Servicio:"
 msgstr ""
 
 msgid "Short público"
+msgstr ""
+
+msgid "Shorts"
+msgstr ""
+
+#, python-brace-format
+msgid "Shorts: {ruta}"
 msgstr ""
 
 msgid "Sigue procesándose"

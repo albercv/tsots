@@ -286,8 +286,10 @@ class _Pasada:
                 wav_continuo=(self.tmp / "subs.wav"
                               if self.base == self.fuente else None),
             )[0]
-        except Exception as error:  # noqa: BLE001 — el caption lo reintenta y avisa él
-            if para_subs:
+        except Exception as error:  # noqa: BLE001 — el caption o el título se degradan
+            # Sin caption ni título que lo absorban (los shorts), el error sube.
+            absorben = {Accion.CAPTION, Accion.TITULO} & set(self.acciones)
+            if para_subs or not absorben:
                 raise
             if Accion.TITULO in self.acciones:
                 _avisar(self.on_progress,

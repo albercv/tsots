@@ -633,6 +633,16 @@ def test_solo_vertical_cara_con_subs(entorno_vertical, tmp_path):
     assert llamadas[-1].split(":")[2] == "True"
 
 
+def test_fase_vertical_pasa_el_tramo(entorno_vertical, tmp_path):
+    llamadas, video, _, _ = entorno_vertical
+    pipeline._fase_vertical(
+        PipelineConfig(video=video, salida=tmp_path), video, tmp_path / "s.mp4",
+        None, tmp_path / "trabajo", None, 1, 1, degradar=False,
+        desde_original=False, tramo=(1.0, 61.0))
+    assert "tramo:1.0:61.0" in llamadas
+    assert llamadas[-1].startswith("vertical:")
+
+
 def test_vertical_falla_degrada(entorno_vertical, tmp_path, monkeypatch):
     _, video, _, _ = entorno_vertical
 

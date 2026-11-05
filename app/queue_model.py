@@ -55,6 +55,8 @@ class Trabajo:
     aviso: str = ""
     salida: Path | None = None
     salida_vertical: Path | None = None
+    shorts: Path | None = None  # carpeta de shorts
+    n_shorts: int = 0
     diagnostico: dict | None = None  # titulo, causa, solucion, detalle, paso, log
     ficha_id: str | None = None
     resumen: str = ""
@@ -85,6 +87,9 @@ class ModeloCola(QAbstractListModel):
                 partes.append(f"· {trabajo.error.splitlines()[0]}")
             if trabajo.estado == EstadoTrabajo.HECHO and trabajo.salida_vertical:
                 partes.append(_("+ vertical"))
+            if trabajo.estado == EstadoTrabajo.HECHO and trabajo.n_shorts:
+                partes.append(_("+ 1 short") if trabajo.n_shorts == 1
+                              else _("+ {n} shorts").format(n=trabajo.n_shorts))
             if trabajo.resumen:
                 partes.append(trabajo.resumen)
             if trabajo.ocupa > 0:
@@ -96,6 +101,8 @@ class ModeloCola(QAbstractListModel):
             piezas = [t for t in (trabajo.error, trabajo.aviso) if t]
             if trabajo.salida_vertical:
                 piezas.append(_("Vertical: {ruta}").format(ruta=trabajo.salida_vertical))
+            if trabajo.shorts:
+                piezas.append(_("Shorts: {ruta}").format(ruta=trabajo.shorts))
             return "\n".join(piezas) if piezas else None
         if role == Qt.ItemDataRole.ForegroundRole:
             if trabajo.estado == EstadoTrabajo.ERROR:

@@ -16,8 +16,8 @@ from videopipeline.ficha import (
 )
 from videopipeline.reproceso import ejecutar
 from videopipeline.reproceso_plan import (
-    Accion, Decisiones, ajustes_silencios, clave_seguimiento, planificar,
-    revisar,
+    Accion, Decisiones, Plan, ajustes_silencios, clave_seguimiento,
+    planificar, revisar,
 )
 from videopipeline.steps import PasoFallido
 
@@ -449,6 +449,43 @@ def test_caption_fallido_conserva_el_anterior(tmp_path, monkeypatch):
     assert ficha.ruta("caption.md").read_bytes() == antes
     assert any(e.get("warning", "").startswith("Caption SEO falló")
                for e in eventos)
+
+
+def test_transcripcion_fallida_solo_se_traga_si_la_reintenta_el_caption(
+        tmp_path, monkeypatch):
+    ficha = _pasada(_ficha(tmp_path), [A.CORTAR, A.ESCRIBIR_FINAL],
+                    paso_silencios=True)
+    monkeypatch.setattr(pipeline, "transcribir", _revienta)
+    eventos: list[dict] = []
+
+    ficha = _pasada(ficha, [A.TRANSCRIBIR, A.CAPTION], eventos=eventos,
+                    caption_seo=True)
+
+    assert any(e.get("warning", "").startswith("Caption SEO falló")
+               for e in eventos)
+    assert TRANSCRIPCION not in ficha.artefactos
+    # Sin caption que la reintente, el fallo sube con su causa.
+    with pytest.raises(PasoFallido, match="ffmpeg explotó"):
+        ejecutar(ficha, Plan([A.TRANSCRIBIR], _panel(), []))
+    assert _sin_restos(ficha)
+
+
+def test_transcripcion_fallida_se_traga_si_la_reintenta_el_titulo(
+        tmp_path, monkeypatch):
+    ficha = _pasada(_ficha(tmp_path), [A.CORTAR, A.ESCRIBIR_FINAL],
+                    paso_silencios=True)
+    monkeypatch.setattr(pipeline, "transcribir", _revienta)
+    eventos: list[dict] = []
+
+    # Sin caption ni subtítulos, solo el título absorbe el fallo con su aviso.
+    ejecutar(ficha, Plan([A.TRANSCRIBIR, A.TITULO], _panel(titulo=True), []),
+             eventos.append)
+
+    assert any("No se pudo transcribir para el título" in e.get("warning", "")
+               for e in eventos)
+    ficha = cargar(ficha.id)
+    assert TRANSCRIPCION not in ficha.artefactos and TITULO not in ficha.artefactos
+    assert _sin_restos(ficha)
 
 
 # --- Ronda de arreglos 1 -------------------------------------------------------

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 12:46+0100\n"
+"POT-Creation-Date: 2026-11-05 13:12+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -23,12 +23,24 @@ msgid " en «{paso}»"
 msgstr " at “{paso}”"
 
 #, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
+msgstr "\"{nombre}\" has no processed video yet to make shorts from."
+
+#, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
 msgstr "\"{nombre}\" has no processed video yet: a caption can only be requested for an already processed video"
 
 #, python-brace-format
+msgid "\"{nombre}\" dura menos de 3 minutos: es demasiado corto para sacar shorts."
+msgstr "\"{nombre}\" is shorter than 3 minutes: too short to make shorts from."
+
+#, python-brace-format
 msgid "\"{nombre}\" ha cambiado fuera de la app: lo que se hizo a partir de él se rehará. No se borra nada de lo guardado."
 msgstr "\"{nombre}\" was changed outside the app: what was made from it will be redone. Nothing saved is deleted."
+
+#, python-brace-format
+msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ellos de la que cortar los shorts. Arrastra el original y vuelve a procesarlo."
+msgstr "\"{nombre}\" has the subtitles burned in and there is no version without them to cut the shorts from. Drag in the original and process it again."
 
 #, python-brace-format
 msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
@@ -41,6 +53,10 @@ msgstr "\"{nombre}\" will be redone from the original: the subtitles will be tra
 #, python-brace-format
 msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
 msgstr "\"{nombre}\" already has the subtitles burned in and there is no version without them. Drag in the original to redo them."
+
+#, python-brace-format
+msgid "\"{nombre}\" ya tiene shorts en {carpeta}. Se sustituirán los que creó la app; lo demás de esa carpeta no se toca. ¿Crearlos de nuevo?"
+msgstr "\"{nombre}\" already has shorts in {carpeta}. The ones the app created will be replaced; nothing else in that folder is touched. Create them again?"
 
 #, python-brace-format
 msgid "\"{nombre}\" ya tiene {paso} con otros ajustes ({cambios}). ¿Rehacerlo?"
@@ -75,8 +91,15 @@ msgstr "(none selected)"
 msgid "(sin título)"
 msgstr "(untitled)"
 
+msgid "+ 1 short"
+msgstr "+ 1 short"
+
 msgid "+ vertical"
 msgstr "+ vertical"
+
+#, python-brace-format
+msgid "+ {n} shorts"
+msgstr "+ {n} shorts"
 
 #, python-brace-format
 msgid "+{n} más"
@@ -127,6 +150,9 @@ msgstr "System Settings → Privacy & Security → Files and Folders: grant acce
 msgid "Al publicar"
 msgstr "When publishing"
 
+msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
+msgstr "When each video finishes processing, cuts its best 1 to 3 minute pieces in vertical."
+
 msgid "Amarillo"
 msgstr "Yellow"
 
@@ -167,6 +193,9 @@ msgstr "Draft (finish it in Facebook)"
 
 msgid "Borrador (lo terminas en la app)"
 msgstr "Draft (finish it in the app)"
+
+msgid "Buscando trozos para shorts"
+msgstr "Looking for clips for shorts"
 
 msgid "Buscando…"
 msgstr "Searching…"
@@ -268,6 +297,9 @@ msgstr "Check that the video plays in QuickTime. If it is an intermediate file i
 msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un solo post."
 msgstr "With Premium, TSOTS allows longer videos and long texts in a single post."
 
+msgid "Con el estilo de la sección Subtítulos."
+msgstr "With the style of the Subtitles section."
+
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
 msgstr "Connect to the internet and process again; models are downloaded only once."
 
@@ -312,6 +344,16 @@ msgstr "Cut"
 
 msgid "Corte de silencios"
 msgstr "Silence cutting"
+
+#, python-brace-format
+msgid "Creando short {n} de {total}"
+msgstr "Creating short {n} of {total}"
+
+msgid "Crear shorts"
+msgstr "Create shorts"
+
+msgid "Crear shorts al procesar"
+msgstr "Create shorts when processing"
 
 msgid "Cuenta"
 msgstr "Account"
@@ -724,11 +766,18 @@ msgstr "Face detection failed (code {codigo})"
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
 msgstr "The scheduled time has already passed: it was not sent. Pick another one."
 
+#, python-brace-format
+msgid "La respuesta de {juez} no es válida"
+msgstr "The response from {juez} is not valid"
+
 msgid "La respuesta del modelo no es JSON válido"
 msgstr "The model's response is not valid JSON"
 
 msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
 msgstr "The model's response is not valid: missing fields or wrong types"
+
+msgid "La respuesta del modelo no es válida: faltan los candidatos"
+msgstr "The model's response is not valid: the candidates are missing"
 
 msgid "La respuesta del modelo no trae un título"
 msgstr "The model's response has no title"
@@ -749,6 +798,10 @@ msgstr "The location every video is posted with"
 #, python-brace-format
 msgid "La versión anterior del vídeo que se guardó ahí (\"{archivo}\") también se borra."
 msgstr "The earlier version of the video that was saved there (\"{archivo}\") is also deleted."
+
+#, python-brace-format
+msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
+msgstr "The version of \"{nombre}\" without subtitles is gone. Process it again to make shorts."
 
 msgid "Leyendo la API key del Llavero…"
 msgstr "Reading the API key from the Keychain…"
@@ -782,6 +835,10 @@ msgstr "What you have scheduled in the service"
 #, python-brace-format
 msgid "Logo de {app}"
 msgstr "{app} logo"
+
+#, python-brace-format
+msgid "Los shorts fallaron: {error}. El vídeo se ha procesado igual."
+msgstr "Shorts failed: {error}. The video was processed anyway."
 
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
@@ -867,6 +924,10 @@ msgstr "Needs ~{total} GB of memory ({modelo} GB for the model + context) and th
 
 msgid "Ningún ffmpeg disponible soporta subtítulos (libass). Instala ffmpeg-full: brew install ffmpeg-full"
 msgstr "No available ffmpeg supports subtitles (libass). Install ffmpeg-full: brew install ffmpeg-full"
+
+#, python-brace-format
+msgid "Ningún trozo de \"{nombre}\" es lo bastante bueno para un short: no se ha creado ninguno."
+msgstr "No clip of \"{nombre}\" is good enough for a short: none was created."
 
 #, python-brace-format
 msgid "No conectada en {servicio}"
@@ -982,6 +1043,10 @@ msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
 
 #, python-brace-format
+msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
+msgstr "The stretches could not be scored: neither {juez} nor {modelo} responds."
+
+#, python-brace-format
 msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
 msgstr "Could not delete the TikTok place from the Keychain (code {codigo})."
 
@@ -1059,6 +1124,10 @@ msgid "No se pudo preparar la consulta ({tipo})."
 msgstr "The check could not be prepared ({tipo})."
 
 #, python-brace-format
+msgid "No se pudo transcribir \"{nombre}\": sin transcripción no se pueden buscar shorts."
+msgstr "Could not transcribe \"{nombre}\": without a transcript no shorts can be found."
+
+#, python-brace-format
 msgid "No se pudo transcribir para el título: {error}. Vídeo guardado sin título."
 msgstr "Could not transcribe for the title: {error}. Video saved without a title."
 
@@ -1066,12 +1135,20 @@ msgstr "Could not transcribe for the title: {error}. Video saved without a title
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr "Could not use the Keychain ({tipo})."
 
+#, python-brace-format
+msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
+msgstr "Could not use {juez} to score ({error}): {modelo} scores instead, more slowly."
+
 msgid "No se puede añadir"
 msgstr "Cannot add"
 
 #, python-brace-format
 msgid "No se toca \"{ruta}\": ha cambiado fuera de la app o no lo creó ella. Muévelo o bórralo y vuelve a procesar."
 msgstr "Won't touch \"{ruta}\": it was changed outside the app or the app did not create it. Move or delete it and process again."
+
+#, python-brace-format
+msgid "No se toca \"{ruta}\": no lo creó la app. Muévelo o bórralo y vuelve a crear los shorts."
+msgstr "Won't touch \"{ruta}\": the app did not create it. Move or delete it and create the shorts again."
 
 msgid "Nombre del perfil en el servicio"
 msgstr "Profile name in the service"
@@ -1246,6 +1323,9 @@ msgstr "Publish to social networks"
 msgid "Publicar…"
 msgstr "Publish…"
 
+msgid "Puntuando los trozos"
+msgstr "Scoring the clips"
+
 msgid "Página de Facebook en la que se publica. La lista sale de las páginas conectadas en el servicio: pulsa «Comprobar conexión» para verla."
 msgstr "Facebook Page to post to. The list comes from the Pages connected in the service: press “Check connection” to see it."
 
@@ -1363,6 +1443,9 @@ msgstr "SIGSEGV: segmentation fault in a native library (torch, ctranslate2, PyA
 msgid "SIGTERM: el proceso fue terminado desde fuera"
 msgstr "SIGTERM: the process was terminated from outside"
 
+msgid "Saca los shorts del vídeo elegido en la cola a una carpeta con su nombre, junto a sus salidas."
+msgstr "Cuts the shorts of the video selected in the queue into a folder named after it, next to its outputs."
+
 msgid "Salida del proceso (últimas líneas):"
 msgstr "Process output (last lines):"
 
@@ -1436,6 +1519,13 @@ msgstr "Service:"
 
 msgid "Short público"
 msgstr "Public Short"
+
+msgid "Shorts"
+msgstr "Shorts"
+
+#, python-brace-format
+msgid "Shorts: {ruta}"
+msgstr "Shorts: {ruta}"
 
 msgid "Sigue procesándose"
 msgstr "Still processing"

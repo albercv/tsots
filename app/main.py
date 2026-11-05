@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from videopipeline import i18n
+from videopipeline import i18n, shorts
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.ficha import (
@@ -241,6 +241,7 @@ class VentanaPrincipal(QMainWindow):
         self.ejecutor.cola_terminada.connect(self._al_terminar_cola)
         self.ejecutor.aviso.connect(self._al_avisar)
         self.ejecutor.salida_vertical.connect(self._al_salida_vertical)
+        self.ejecutor.salida_shorts.connect(self._al_salida_shorts)
         self.ejecutor.diagnostico.connect(self._al_diagnosticar)
         self.modelo_cola.rowsInserted.connect(self._refrescar_boton)
         self.modelo_cola.rowsRemoved.connect(self._refrescar_boton)
@@ -255,9 +256,14 @@ class VentanaPrincipal(QMainWindow):
         self.panel.refrescar_modelos.connect(self._cargar_modelos_ollama)
         self.panel.seccion_abierta_cambiada.connect(self._al_abrir_seccion)
         self.panel.pasos_cambiados.connect(self._refrescar_boton)
+        self.panel.crear_shorts.connect(self._crear_shorts)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
+        )
+        # «Crear shorts» pide una fila elegida.
+        self.vista_cola.selectionModel().selectionChanged.connect(
+            self._refrescar_boton
         )
 
         geometria = self.ajustes.cargar_geometria()
@@ -623,33 +629,17 @@ class VentanaPrincipal(QMainWindow):
         pendientes = self.modelo_cola.pendientes()
         if not pendientes:
             return
-        valores = self.panel.valores()
-        # Las versiones anteriores comparten estos ajustes y solo leen `modo`.
-        self.ajustes.guardar_panel({
-            **valores,
-            "modo": modo_equivalente(valores["paso_audio"], valores["paso_silencios"]),
-        })
-        carpeta = self.ajustes.carpeta_salida
+        valores = self._guardar_panel()
+        shorts_al_procesar = self.panel.valores_shorts()["shorts_al_procesar"]
         filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
         avisos = []
         for fila in pendientes:
             trabajo = self.modelo_cola.trabajo(fila)
             if trabajo.ficha_id is None and not self._reconocer_fila(fila, avisos):
                 continue
-            config = PipelineConfig(
-                video=trabajo.ruta, salida=carpeta,
-                contexto_marca=self.ajustes.contexto_marca,
-                glosario=self.ajustes.glosario,
-                modelo_caption=self.ajustes.modelo_caption,
-                idioma_ui=i18n.idioma_actual(),
-                **valores,
-            )
             ficha = self._ficha_de(trabajo)
-            if ficha is not None and ficha.final is None and ficha.vertical is None:
-                # Aún sin salidas: van a la carpeta de ahora. Las demás fichas
-                # conservan la suya, que es donde están sus archivos.
-                mover_salidas(ficha, carpeta)
-            filas.append((fila, config, ficha))
+            self._mover_salidas_nuevas(ficha)
+            filas.append((fila, self._config_de(trabajo, valores), ficha))
         if avisos:
             QMessageBox.information(self, _("Aviso"), "\n".join(avisos))
 
@@ -671,7 +661,9 @@ class VentanaPrincipal(QMainWindow):
                         fila, estado=EstadoTrabajo.ERROR, error=plan.error,
                         percent=None, etiqueta="")
                     continue
-                if plan.vacio:
+                # Con shorts pedidos se envía igual: el runner muestra lo que
+                # hay y saca los shorts.
+                if plan.vacio and not shorts_al_procesar:
                     sin_nada.append(trabajo.ruta.name)
                     if ficha.final is not None:  # lo que ya hay es el resultado
                         self._al_terminar_trabajo(
@@ -682,6 +674,8 @@ class VentanaPrincipal(QMainWindow):
                 "rehacer": sorted(decision.rehacer),
                 "regenerar_vertical": decision.regenerar_vertical,
             }
+            if shorts_al_procesar:
+                datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -692,6 +686,79 @@ class VentanaPrincipal(QMainWindow):
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _guardar_panel(self) -> dict:
+        """Guarda las opciones del panel y devuelve las del pipeline."""
+        valores = self.panel.valores()
+        # Las versiones anteriores comparten estos ajustes y solo leen `modo`.
+        self.ajustes.guardar_panel({
+            **valores, **self.panel.valores_shorts(),
+            "modo": modo_equivalente(valores["paso_audio"], valores["paso_silencios"]),
+        })
+        return valores
+
+    def _config_de(self, trabajo, valores: dict) -> PipelineConfig:
+        return PipelineConfig(
+            video=trabajo.ruta, salida=self.ajustes.carpeta_salida,
+            contexto_marca=self.ajustes.contexto_marca,
+            glosario=self.ajustes.glosario,
+            modelo_caption=self.ajustes.modelo_caption,
+            idioma_ui=i18n.idioma_actual(),
+            **valores,
+        )
+
+    def _mover_salidas_nuevas(self, ficha: Ficha | None) -> None:
+        if ficha is not None and ficha.final is None and ficha.vertical is None:
+            # Aún sin salidas: van a la carpeta de ahora. Las demás fichas
+            # conservan la suya, que es donde están sus archivos.
+            mover_salidas(ficha, self.ajustes.carpeta_salida)
+
+    def _datos_shorts(self, ficha_id: str) -> dict:
+        """El pedido `shorts` del JSON del runner."""
+        valores = self.panel.valores_shorts()
+        return {
+            "ficha": ficha_id,
+            "subtitulos": valores["shorts_subtitulos"],
+            "encuadre": valores["shorts_encuadre"],
+        }
+
+    def _crear_shorts(self) -> None:
+        """Botón «Crear shorts»: solo shorts del vídeo elegido, sin `reproceso`
+        (el runner lo procesa antes si aún no lo está)."""
+        indices = self.vista_cola.selectedIndexes()
+        if self._procesando or not indices:
+            return
+        fila = indices[0].row()
+        trabajo = self.modelo_cola.trabajo(fila)
+        avisos: list[str] = []
+        if trabajo.ficha_id is None and not self._reconocer_fila(fila, avisos):
+            return
+        if avisos:
+            QMessageBox.information(self, _("Aviso"), "\n".join(avisos))
+        valores = self._guardar_panel()
+        ficha = self._ficha_de(trabajo)
+        self._mover_salidas_nuevas(ficha)
+        if ficha is not None and shorts.hay_shorts(ficha):
+            respuesta = QMessageBox.question(
+                self,
+                _("Crear shorts"),
+                _('"{nombre}" ya tiene shorts en {carpeta}. Se sustituirán los '
+                  'que creó la app; lo demás de esa carpeta no se toca. '
+                  '¿Crearlos de nuevo?').format(
+                    nombre=trabajo.ruta.name, carpeta=shorts.carpeta_shorts(ficha)),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if respuesta != QMessageBox.StandardButton.Yes:
+                return
+        datos = json.loads(self._config_de(trabajo, valores).to_json())
+        datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
+        self._procesando = True
+        self._refrescar_boton()
+        # La fila puede venir de un intento anterior: sin esto conservaría su
+        # error, aviso y diagnóstico (solo `volver_a_espera` los limpia).
+        self.modelo_cola.actualizar(fila, error="", aviso="", diagnostico=None)
+        self.ejecutor.iniciar([(fila, json.dumps(datos, ensure_ascii=False))])
 
     def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:
         """Una fila sin ficha (p. ej. tras «Olvidar este vídeo») se reconoce
@@ -754,6 +821,9 @@ class VentanaPrincipal(QMainWindow):
     def _al_salida_vertical(self, fila: int, ruta: str) -> None:
         self.modelo_cola.actualizar(fila, salida_vertical=Path(ruta))
 
+    def _al_salida_shorts(self, fila: int, carpeta: str, n: int) -> None:
+        self.modelo_cola.actualizar(fila, shorts=Path(carpeta), n_shorts=n)
+
     def _al_avisar(self, fila: int, texto: str) -> None:
         self.modelo_cola.actualizar(fila, aviso=texto)
 
@@ -793,6 +863,7 @@ class VentanaPrincipal(QMainWindow):
         ficha = self._ficha_de(trabajo)
         if ficha is not None:
             limpiar_temporales(ficha)
+            shorts.limpiar_temporal(ficha)
             return
         video, carpeta = trabajo.ruta, self.ajustes.carpeta_salida
         # Los pasos del trabajo cancelado no se conocen aquí: se prueban todos
@@ -838,6 +909,10 @@ class VentanaPrincipal(QMainWindow):
         self.boton_limpiar.setEnabled(not self._procesando)
         self.boton_reprocesar.setEnabled(not self._procesando)
         self.boton_olvidar.setEnabled(not self._procesando)
+        self.panel.boton_crear_shorts.setEnabled(
+            not self._procesando
+            and self.vista_cola.selectionModel().hasSelection()
+        )
 
     # --- idioma ---
 

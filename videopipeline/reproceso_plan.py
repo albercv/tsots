@@ -240,6 +240,14 @@ def _base_vale(ficha: Ficha) -> bool:
     return _fuente_vale(ficha)
 
 
+def seguimiento_vale(ficha: Ficha, linea: str) -> bool:
+    """El seguimiento de la cara está (R0) y es de la base con esa línea y de
+    la ventana actual."""
+    seguimiento = _vale(ficha, SEGUIMIENTO)
+    return (seguimiento is not None
+            and seguimiento.clave == clave_seguimiento(linea))
+
+
 def _subs_bloqueados(ficha: Ficha) -> bool:
     """Subtítulos quemados sin base limpia ni original del que rehacerla. Un
     original dentro de la ficha es el propio final antiguo, que los lleva."""
@@ -503,10 +511,7 @@ def planificar(ficha: Ficha, config: PipelineConfig,
     # 7-8. Vertical y R10.
     if genera:
         elegidas.add(Accion.VERTICAL)
-        seguimiento = _vale(ficha, SEGUIMIENTO)
-        if efectiva.encuadre == "cara" and (
-                seguimiento is None
-                or seguimiento.clave != clave_seguimiento(linea)):
+        if efectiva.encuadre == "cara" and not seguimiento_vale(ficha, linea):
             elegidas.add(Accion.SEGUIMIENTO)
     if r10:
         elegidas.add(Accion.RETIRAR_VERTICAL_UNICO if genera

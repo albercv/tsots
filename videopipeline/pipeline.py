@@ -309,13 +309,15 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                    on_progress: Progreso | None, paso: int, total: int,
                    degradar: bool, desde_original: bool,
                    seguimiento: tuple[int | None, Path] | None = None,
-                   titulo: str | None = None) -> None:
+                   titulo: str | None = None,
+                   tramo: tuple[float, float] | None = None) -> None:
     """Convierte `fuente` (sin subtítulos) a vertical y lo publica en `destino`.
 
     Con `degradar`, un fallo deja solo un aviso (el horizontal ya está
     publicado); sin él, el error se propaga. Con `seguimiento` (x inicial y
     comandos, ya calculados) no se detecta la cara otra vez: x None (sin
-    caras) deja la ventana ancha quieta, en el centro.
+    caras) deja la ventana ancha quieta, en el centro. Con `tramo` (inicio,
+    fin) solo se convierte ese trozo.
     """
     tmp = destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
     ass = trabajo / "subs_vertical.ass"
@@ -372,6 +374,7 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
             on_percent=lambda p: _emitir(
                 on_progress, paso, total, _("Convirtiendo a vertical"), p
             ),
+            tramo=tramo,
         )
         tmp.replace(destino)
     except Exception as error:  # noqa: BLE001 — degradación deliberada

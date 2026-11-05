@@ -5,6 +5,11 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Features
 
+- [ ] **Publish shorts from the app.** Out of the scope of the shorts spec:
+      the publish dialog is per video (`name_limpio.publicado.json` next to
+      one video). Needs a way to pick one or several shorts from
+      `<output>/<name>/shorts.json` and their `.md`, and a registry per
+      short.
 - [ ] **Change the time of a scheduled post** from the calendar (Upload-Post
       `PATCH /api/uploadposts/schedule/<job_id>`; today: cancel and
       schedule again).
