@@ -161,6 +161,28 @@ def test_pedir_titulo_quita_almohadilla_y_puntuacion_final():
         pedir_titulo("x", "es", "m", _Cliente({"titulo": "uno dos ."}))
 
 
+@pytest.mark.parametrize("bruto, limpio", [
+    ("Don't stop the music", "Don't stop the music"),
+    ("C# vs Rust hoy", "C# vs Rust hoy"),
+    ("#Python para principiantes", "Python para principiantes"),
+    ("\"Don't\" stop 'the music'", "Don't stop the music"),
+])
+def test_pedir_titulo_solo_quita_comillas_y_almohadilla_de_los_bordes(bruto, limpio):
+    assert pedir_titulo("x", "es", "m", _Cliente({"titulo": bruto})) == limpio
+
+
+@pytest.mark.parametrize("respuesta", [["uno dos tres"], "uno dos tres", 3, None])
+def test_pedir_titulo_con_respuesta_que_no_es_dict_falla(respuesta):
+    with pytest.raises(PasoFallido, match="no trae un título"):
+        pedir_titulo("x", "es", "m", _Cliente(respuesta))
+
+
+def test_esquema_pide_el_idioma_antes_del_titulo():
+    # Ollama genera los campos en este orden: el modelo nombra el idioma primero.
+    assert list(ESQUEMA["properties"]) == ["idioma", "titulo"]
+    assert ESQUEMA["required"] == ["idioma", "titulo"]
+
+
 def test_pedir_titulo_recorta_a_cinco_palabras():
     cliente = _Cliente({"titulo": "uno dos tres cuatro cinco seis siete"})
     assert pedir_titulo("x", "es", "m", cliente) == "uno dos tres cuatro cinco"
@@ -192,12 +214,15 @@ def test_generar_titulo_devuelve_el_titulo():
         "hola", "es", "m", _Cliente({"titulo": "uno dos tres"})) == "uno dos tres"
 
 
-@pytest.mark.parametrize("idioma, marca, etiqueta", [
-    ("en", "3 to 5", "Transcript"),
-    ("es", "3 a 5", "Transcripción"),
-    ("auto", "3 a 5", "Transcripción"),
+@pytest.mark.parametrize("idioma, marca, etiqueta, de_idioma", [
+    ("en", "3 to 5", "Transcript", "in that language"),
+    ("es", "3 a 5", "Transcripción", "en ese idioma"),
+    ("auto", "3 a 5", "Transcripción", "en ese idioma"),
 ])
-def test_mensajes_por_idioma(idioma, marca, etiqueta):
+def test_mensajes_por_idioma(idioma, marca, etiqueta, de_idioma):
     sistema, usuario = construir_mensajes("hola mundo", idioma)
     assert sistema["role"] == "system" and marca in sistema["content"]
+    # El idioma lo fija la transcripción, no el prompt.
+    assert "- idioma:" in sistema["content"] and de_idioma in sistema["content"]
+    assert "España" not in sistema["content"]
     assert usuario == {"role": "user", "content": f"{etiqueta}:\nhola mundo"}

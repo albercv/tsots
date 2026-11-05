@@ -13,20 +13,21 @@ log = logging.getLogger(__name__)
 
 MIN_PALABRAS = 3
 MAX_PALABRAS = 5
-_QUITAR = str.maketrans("", "", "\"'«»“”#")
+_COMILLAS = "\"'«»“”"
 
 # Prompt del LLM: no es texto de interfaz (no se traduce con gettext). Hay una
-# variante fija por idioma; `construir_mensajes` elige según `idioma`.
+# variante fija por idioma de las instrucciones; `construir_mensajes` elige según
+# `idioma`, pero el idioma del título lo marca la transcripción (también con "auto").
 _SYSTEM_ES = (
-    "Eres un experto en vídeo corto (Instagram Reels, TikTok, YouTube Shorts) en "
-    "español de España. A partir de la transcripción de un vídeo escribe el "
-    "título que se sobreimprime en grande durante los primeros segundos:\n"
-    f"- titulo: de {MIN_PALABRAS} a {MAX_PALABRAS} palabras clave que digan de qué "
-    "trata el vídeo, con los temas, nombres o conceptos concretos que se "
-    "mencionan.\n"
+    "Eres un experto en vídeo corto (Instagram Reels, TikTok, YouTube Shorts). "
+    "A partir de la transcripción de un vídeo escribe el título que se "
+    "sobreimprime en grande durante los primeros segundos:\n"
+    "- idioma: el idioma en que está la transcripción.\n"
+    f"- titulo: de {MIN_PALABRAS} a {MAX_PALABRAS} palabras clave en ese idioma que "
+    "digan de qué trata el vídeo, con los temas, nombres o conceptos concretos "
+    "que se mencionan, en un orden que se lea como un titular corto.\n"
     "- Nada genérico (\"vídeo interesante\", \"mira esto\").\n"
     "- Sin emojis, hashtags, comillas ni punto final.\n"
-    "- En el mismo idioma que la transcripción.\n"
     "No inventes datos que no estén en la transcripción. Responde solo JSON."
 )
 
@@ -34,19 +35,32 @@ _SYSTEM_EN = (
     "You are a short-form video expert (Instagram Reels, TikTok, YouTube Shorts). "
     "From a video transcript write the title that is overlaid in large type "
     "during the first seconds:\n"
-    f"- titulo: {MIN_PALABRAS} to {MAX_PALABRAS} keywords that say what the video "
-    "is about, using the specific topics, names or concepts it mentions.\n"
+    "- idioma: the language the transcript is in.\n"
+    f"- titulo: {MIN_PALABRAS} to {MAX_PALABRAS} keywords in that language that say "
+    "what the video is about, using the specific topics, names or concepts it "
+    "mentions, in an order that reads like a short headline.\n"
     "- Nothing generic (\"interesting video\", \"look at this\").\n"
     "- No emojis, hashtags, quotes or final period.\n"
-    "- In the same language as the transcript.\n"
     "Do not invent data that isn't in the transcript. Respond only with JSON."
 )
 
 ESQUEMA: dict = {
     "type": "object",
-    "properties": {"titulo": {"type": "string"}},
-    "required": ["titulo"],
+    "properties": {
+        # Orden importante: Ollama genera los campos en este orden, así el modelo
+        # nombra el idioma antes de escribir el título. La validación solo lee
+        # "titulo".
+        "idioma": {"type": "string"},
+        "titulo": {"type": "string"},
+    },
+    "required": ["idioma", "titulo"],
 }
+
+
+def _limpiar_palabra(palabra: str) -> str:
+    """Quita comillas de los bordes y `#` del principio; respeta «Don't» y «C#»."""
+    return palabra.lstrip(_COMILLAS + "#").rstrip(_COMILLAS)
+
 
 DURACION = 5.0
 FUENTE = "Titan One"
@@ -122,10 +136,11 @@ def pedir_titulo(transcripcion: str, idioma: str, modelo: str,
         raise PasoFallido(
             _("La transcripción está vacía; no hay texto para el título"))
     datos = cliente(modelo, construir_mensajes(transcripcion, idioma), ESQUEMA)
-    titulo = datos.get("titulo")
+    titulo = datos.get("titulo") if isinstance(datos, dict) else None
     if not isinstance(titulo, str):
         raise PasoFallido(_("La respuesta del modelo no trae un título"))
-    titulo = " ".join(titulo.translate(_QUITAR).split()[:MAX_PALABRAS]).rstrip(".,;: ")
+    palabras = [p for p in map(_limpiar_palabra, titulo.split()) if p]
+    titulo = " ".join(palabras[:MAX_PALABRAS]).rstrip(".,;: " + _COMILLAS)
     if len(titulo.split()) < MIN_PALABRAS:
         raise PasoFallido(
             _("El modelo no propuso un título de 3 a 5 palabras: «{titulo}»")
