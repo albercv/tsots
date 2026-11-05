@@ -353,3 +353,30 @@ def test_done_salida_vertical(qtbot, tmp_path, valor, esperado):
     with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
         ejecutor.iniciar([(0, "{}")])
     assert verticales == esperado
+
+
+@pytest.mark.parametrize("valor, esperado", [
+    ('{"carpeta": "/tmp/shorts/v", "n": 3}', [(0, "/tmp/shorts/v", 3)]),
+    ("None", []),
+    ('{"carpeta": "/tmp/shorts/v"}', []),  # evento mal formado: se ignora
+    ('{"carpeta": "/tmp/shorts/v", "n": "tres"}', [])])
+def test_done_con_shorts_emite_salida_shorts(qtbot, tmp_path, valor, esperado):
+    script = _runner_falso(
+        tmp_path,
+        f"""
+        import json
+        print(json.dumps({{"done": True, "salida": "/tmp/out.mp4",
+                          "shorts": {valor}}}), flush=True)
+        """,
+    )
+    ejecutor = EjecutorCola()
+    ejecutor.PROGRAMA = [sys.executable, str(script)]
+    hechos = []
+    ejecutor.salida_shorts.connect(lambda f, c, n: hechos.append((f, c, n)))
+    terminados = []
+    ejecutor.trabajo_terminado.connect(
+        lambda fila, ok, salida, error: terminados.append((ok, salida)))
+    with qtbot.waitSignal(ejecutor.cola_terminada, timeout=10000):
+        ejecutor.iniciar([(0, "{}")])
+    assert hechos == esperado
+    assert terminados == [(True, "/tmp/out.mp4")]

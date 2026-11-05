@@ -25,6 +25,7 @@ class EjecutorCola(QObject):
     diagnostico = Signal(int, dict)
     aviso = Signal(int, str)  # fila, texto
     salida_vertical = Signal(int, str)  # fila, ruta del vídeo vertical
+    salida_shorts = Signal(int, str, int)  # fila, carpeta de shorts, cuántos
     cola_terminada = Signal()
 
     PROGRAMA = [sys.executable, "-m", "videopipeline.runner"]
@@ -123,6 +124,11 @@ class EjecutorCola(QObject):
                     self.salida_vertical.emit(
                         self._fila_actual, str(evento["salida_vertical"])
                     )
+                shorts = evento.get("shorts")
+                if (isinstance(shorts, dict) and shorts.get("carpeta")
+                        and isinstance(shorts.get("n"), int)):
+                    self.salida_shorts.emit(
+                        self._fila_actual, str(shorts["carpeta"]), shorts["n"])
             elif "warning" in evento:
                 self.aviso.emit(self._fila_actual, str(evento["warning"]))
             else:

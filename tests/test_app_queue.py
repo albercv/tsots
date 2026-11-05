@@ -169,6 +169,27 @@ def test_fila_muestra_vertical():
         indice, Qt.ItemDataRole.ToolTipRole)
 
 
+def test_fila_hecha_muestra_los_shorts():
+    modelo = ModeloCola()
+    modelo.anadir([(Path("/v/a.mp4"), None)])
+    modelo.actualizar(0, estado=EstadoTrabajo.HECHO, salida=Path("/v/a_limpio.mp4"),
+                      salida_vertical=Path("/v/a_limpio_vertical.mp4"),
+                      shorts=Path("/s/a"), n_shorts=3)
+    indice = modelo.index(0)
+    texto = modelo.data(indice, Qt.ItemDataRole.DisplayRole)
+    assert "+ vertical + 3 shorts" in texto
+    assert "Shorts: /s/a" in modelo.data(indice, Qt.ItemDataRole.ToolTipRole)
+
+
+def test_fila_sin_shorts_no_los_muestra():
+    modelo = ModeloCola()
+    modelo.anadir([(Path("/v/a.mp4"), None)])
+    modelo.actualizar(0, estado=EstadoTrabajo.HECHO, salida=Path("/v/a_limpio.mp4"))
+    indice = modelo.index(0)
+    assert "shorts" not in modelo.data(indice, Qt.ItemDataRole.DisplayRole)
+    assert modelo.data(indice, Qt.ItemDataRole.ToolTipRole) is None
+
+
 TERMINADOS = (EstadoTrabajo.HECHO, EstadoTrabajo.ERROR, EstadoTrabajo.CANCELADO)
 
 

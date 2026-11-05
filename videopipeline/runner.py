@@ -11,10 +11,10 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 
-from . import i18n
+from . import i18n, shorts
 from .config import PipelineConfig
 from .errores import explicar
-from .ficha import cargar
+from .ficha import Ficha, cargar
 from .i18n import _
 from .pipeline import Progreso, run
 from .reproceso import ejecutar
@@ -64,17 +64,22 @@ def _ruta_log(config_path: Path) -> Path:
     return DIR_LOGS / f"{stem}_{datetime.now():%Y%m%d-%H%M%S}.log"
 
 
+def _cargar_ficha(id_: str) -> Ficha:
+    ficha = cargar(id_)
+    if ficha is None:
+        raise PasoFallido(
+            _("No se encuentra la ficha de este vídeo ({id}). Arrastra el "
+              "original para procesarlo de nuevo.").format(id=id_))
+    return ficha
+
+
 def _reprocesar(config: PipelineConfig, reproceso: dict, on_progress: Progreso
                 ) -> tuple[Path, Path | None]:
     """Una pasada sobre la ficha. Devuelve la salida principal y el vertical que
     acompaña a un horizontal (si lo hay)."""
     # «Solo caption» no marca ningún paso de vídeo.
     config.validar(exigir_paso_de_video=False)
-    ficha = cargar(reproceso["ficha"])
-    if ficha is None:
-        raise PasoFallido(
-            _("No se encuentra la ficha de este vídeo ({id}). Arrastra el "
-              "original para procesarlo de nuevo.").format(id=reproceso["ficha"]))
+    ficha = _cargar_ficha(reproceso["ficha"])
     plan = planificar(ficha, config, Decisiones(
         rehacer=frozenset(reproceso.get("rehacer", ())),
         regenerar_vertical=bool(reproceso.get("regenerar_vertical", False))))
@@ -89,6 +94,25 @@ def _reprocesar(config: PipelineConfig, reproceso: dict, on_progress: Progreso
     else:
         salida = ejecutar(ficha, plan, on_progress)  # deja la ficha al día
     return salida, ficha.vertical.ruta if ficha.vertical else None
+
+
+def _crear_shorts(config: PipelineConfig, pedido: dict, on_progress: Progreso
+                  ) -> shorts.Resultado:
+    """Los shorts de la ficha, ya procesada (la carga de nuevo: `ejecutar` actualiza
+    la suya, no la que tenga quien llama)."""
+    opciones = shorts.OpcionesShorts.de_datos(pedido)
+    return shorts.crear(_cargar_ficha(pedido["ficha"]), config, opciones, on_progress)
+
+
+def _shorts_desde_boton(config: PipelineConfig, pedido: dict, on_progress: Progreso
+                        ) -> tuple[shorts.Resultado, Path | None]:
+    """Solo shorts: si el vídeo aún no está procesado, lo procesa antes con los
+    ajustes del panel. Devuelve también el vertical que haya salido de ahí."""
+    config.validar(exigir_paso_de_video=False)
+    vertical = None
+    if _cargar_ficha(pedido["ficha"]).final is None:
+        _, vertical = _reprocesar(config, {"ficha": pedido["ficha"]}, on_progress)
+    return _crear_shorts(config, pedido, on_progress), vertical
 
 
 def _escrito_ahora(ruta: Path | None, inicio: float) -> Path | None:
@@ -162,16 +186,37 @@ def main(argv: list[str] | None = None) -> int:
     try:
         datos = json.loads(config_path.read_text(encoding="utf-8"))
         reproceso = datos.pop("reproceso", None)  # no es un campo de PipelineConfig
+        pedido_shorts = datos.pop("shorts", None)  # ni este
         config = PipelineConfig.from_datos(datos)
         i18n.instalar(config.idioma_ui)
         log.escribir("config: " + json.dumps(asdict(config), ensure_ascii=False,
                                              default=str))
-        if reproceso is None:
-            salida = run(config, on_progress)
-            vertical = config.ruta_salida_vertical()
+        resultado_shorts = None
+        if pedido_shorts is not None:
+            log.escribir("shorts: " + json.dumps(pedido_shorts, ensure_ascii=False))
+        if reproceso is None and pedido_shorts is not None:  # el botón de shorts
+            resultado_shorts, vertical = _shorts_desde_boton(
+                config, pedido_shorts, on_progress)
+            salida = resultado_shorts.carpeta
         else:
-            log.escribir("reproceso: " + json.dumps(reproceso, ensure_ascii=False))
-            salida, vertical = _reprocesar(config, reproceso, on_progress)
+            if reproceso is None:
+                salida = run(config, on_progress)
+                vertical = config.ruta_salida_vertical()
+            else:
+                log.escribir("reproceso: " + json.dumps(reproceso, ensure_ascii=False))
+                salida, vertical = _reprocesar(config, reproceso, on_progress)
+            if pedido_shorts is not None:
+                # Con «crear shorts al procesar» un fallo de los shorts no hace
+                # fallar el procesado: es un aviso.
+                try:
+                    resultado_shorts = _crear_shorts(config, pedido_shorts, on_progress)
+                except Exception as error:  # noqa: BLE001
+                    log.escribir("".join(traceback.format_exception(error)))
+                    motivo = (str(error) if isinstance(error, PasoFallido)
+                              else f"{type(error).__name__}: {error}")
+                    on_progress({"warning": _(
+                        "Los shorts fallaron: {error}. El vídeo se ha procesado "
+                        "igual.").format(error=motivo)})
     except PasoFallido as error:
         return fallar(str(error), error.detalle)
     except Exception as error:  # noqa: BLE001 — el subproceso reporta todo por JSON
@@ -191,6 +236,9 @@ def main(argv: list[str] | None = None) -> int:
     }
     if reproceso is not None:
         evento["ficha"] = reproceso["ficha"]
+    if resultado_shorts is not None and resultado_shorts.n > 0:
+        evento["shorts"] = {
+            "carpeta": str(resultado_shorts.carpeta), "n": resultado_shorts.n}
     _imprimir(evento)
     return 0
 

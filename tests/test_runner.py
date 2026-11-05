@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from videopipeline import i18n, runner
+from videopipeline import i18n, runner, shorts
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import Ficha, Huella
 from videopipeline.reproceso_plan import Accion, Decisiones, Plan
@@ -436,3 +436,175 @@ def test_runner_reproceso_de_un_vertical_unico(tmp_path, monkeypatch, capsys):
     _, lineas, _ = _reprocesar(tmp_path, monkeypatch, capsys, ficha)
     assert lineas[-1]["salida"] == str(ficha.final.ruta)
     assert lineas[-1]["salida_vertical"] is None
+
+
+def _shorts(tmp_path, monkeypatch, capsys, fichas, crear, reproceso=False):
+    """Corre el runner con la clave `shorts` (y `reproceso` si se pide) y todo
+    falso. `fichas` son las sucesivas cargas; `crear(ficha, opciones)` hace de
+    `shorts.crear`. Devuelve (código, líneas de stdout, orden de las llamadas)."""
+    ruta = _config_json(tmp_path)
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    datos["shorts"] = {"ficha": ID_FICHA, "subtitulos": False, "encuadre": "barras"}
+    if reproceso:
+        datos["reproceso"] = {"ficha": ID_FICHA}
+    ruta.write_text(json.dumps(datos), encoding="utf-8")
+    orden = []
+
+    def falso_cargar(id_):
+        return fichas.pop(0) if len(fichas) > 1 else fichas[0]
+
+    def falso_reprocesar(config, reproceso_, on_progress):
+        orden.append("reprocesar")
+        return tmp_path / "salidas" / "v_limpio.mp4", None
+
+    def falso_crear(ficha, config, opciones, on_progress=None):
+        orden.append("crear")
+        return crear(ficha, opciones)
+
+    monkeypatch.setattr(runner, "cargar", falso_cargar)
+    monkeypatch.setattr(runner, "_reprocesar", falso_reprocesar)
+    monkeypatch.setattr(shorts, "crear", falso_crear)
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    codigo = runner.main(["--config", str(ruta)])
+    lineas = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
+    return codigo, lineas, orden
+
+
+def _tres_shorts(tmp_path):
+    return lambda ficha, opciones: shorts.Resultado(tmp_path / "shorts" / "v", 3)
+
+
+def test_shorts_desde_boton_procesa_primero_si_no_hay_final(
+        tmp_path, monkeypatch, capsys):
+    sin_final, con_final = _ficha(tmp_path, final=False), _ficha(tmp_path)
+    recibido = []
+
+    def crear(ficha, opciones):
+        recibido.append((ficha, opciones))
+        return shorts.Resultado(tmp_path / "shorts" / "v", 3)
+
+    codigo, lineas, orden = _shorts(
+        tmp_path, monkeypatch, capsys, [sin_final, con_final], crear)
+    assert codigo == 0
+    assert orden == ["reprocesar", "crear"]
+    # Los shorts salen de la ficha ya procesada, no de la que no tenía final.
+    assert recibido == [(con_final, shorts.OpcionesShorts(False, "barras"))]
+    carpeta = str(tmp_path / "shorts" / "v")
+    assert lineas[-1]["done"] is True and lineas[-1]["salida"] == carpeta
+    assert lineas[-1]["shorts"] == {"carpeta": carpeta, "n": 3}
+
+
+def test_shorts_desde_boton_con_final_no_reprocesa(tmp_path, monkeypatch, capsys):
+    codigo, lineas, orden = _shorts(
+        tmp_path, monkeypatch, capsys, [_ficha(tmp_path)], _tres_shorts(tmp_path))
+    assert codigo == 0
+    assert orden == ["crear"]
+    assert lineas[-1]["shorts"]["n"] == 3
+
+
+def test_shorts_desde_boton_un_fallo_es_error(tmp_path, monkeypatch, capsys):
+    def crear(ficha, opciones):
+        raise PasoFallido("Sin transcripción no hay shorts.")
+
+    codigo, lineas, _orden = _shorts(
+        tmp_path, monkeypatch, capsys, [_ficha(tmp_path)], crear)
+    assert codigo == 1
+    assert lineas[-1]["error"] == "Sin transcripción no hay shorts."
+    assert "done" not in lineas[-1]
+
+
+def test_shorts_desde_boton_con_el_procesado_fallido_no_crea(
+        tmp_path, monkeypatch, capsys):
+    def reprocesar_falla(config, reproceso, on_progress):
+        raise PasoFallido("falló el procesado")
+
+    monkeypatch.setattr(runner, "_reprocesar", reprocesar_falla)
+    ruta = _config_json(tmp_path)
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    ruta.write_text(json.dumps({**datos, "shorts": {"ficha": ID_FICHA}}),
+                    encoding="utf-8")
+    monkeypatch.setattr(runner, "cargar", lambda id_: _ficha(tmp_path, final=False))
+    monkeypatch.setattr(shorts, "crear", lambda *a, **k: pytest.fail("no debe crear"))
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 1
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])[
+        "error"] == "falló el procesado"
+
+
+def test_shorts_al_procesar_van_en_el_done(tmp_path, monkeypatch, capsys):
+    codigo, lineas, orden = _shorts(
+        tmp_path, monkeypatch, capsys, [_ficha(tmp_path)], _tres_shorts(tmp_path),
+        reproceso=True)
+    assert codigo == 0
+    assert orden == ["reprocesar", "crear"]
+    # La salida es la del procesado; los shorts van aparte.
+    assert lineas[-1]["salida"] == str(tmp_path / "salidas" / "v_limpio.mp4")
+    assert lineas[-1]["shorts"] == {"carpeta": str(tmp_path / "shorts" / "v"), "n": 3}
+
+
+@pytest.mark.parametrize("error, texto", [
+    (PasoFallido("boom"), "boom"),
+    (RuntimeError("boom"), "RuntimeError: boom")])
+def test_shorts_al_procesar_un_fallo_solo_avisa(
+        tmp_path, monkeypatch, capsys, error, texto):
+    def crear(ficha, opciones):
+        raise error
+
+    codigo, lineas, orden = _shorts(
+        tmp_path, monkeypatch, capsys, [_ficha(tmp_path)], crear, reproceso=True)
+    assert codigo == 0
+    assert orden == ["reprocesar", "crear"]
+    assert "shorts" not in lineas[-1] and lineas[-1]["done"] is True
+    avisos = [l["warning"] for l in lineas if "warning" in l]
+    assert avisos == [f"Los shorts fallaron: {texto}. El vídeo se ha procesado igual."]
+    log = next((tmp_path / "logs").glob("*.log")).read_text(encoding="utf-8")
+    assert "Traceback" in log and "boom" in log
+
+
+def test_shorts_al_procesar_con_encuadre_invalido_solo_avisa(
+        tmp_path, monkeypatch, capsys):
+    ruta = _config_json(tmp_path)
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    ruta.write_text(json.dumps({
+        **datos, "reproceso": {"ficha": ID_FICHA},
+        "shorts": {"ficha": ID_FICHA, "encuadre": "inexistente"}}), encoding="utf-8")
+    monkeypatch.setattr(runner, "cargar", lambda id_: _ficha(tmp_path))
+    monkeypatch.setattr(runner, "_reprocesar", lambda c, r, p: (tmp_path / "o.mp4", None))
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 0
+    lineas = [json.loads(l) for l in capsys.readouterr().out.strip().splitlines()]
+    assert "Los shorts fallaron" in lineas[-2]["warning"]
+    assert lineas[-1]["done"] is True
+
+
+def test_shorts_al_procesar_con_el_procesado_fallido_no_crea(
+        tmp_path, monkeypatch, capsys):
+    def reprocesar_falla(config, reproceso, on_progress):
+        raise PasoFallido("falló el procesado")
+
+    ruta = _config_json(tmp_path)
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    ruta.write_text(json.dumps({
+        **datos, "reproceso": {"ficha": ID_FICHA}, "shorts": {"ficha": ID_FICHA}}),
+        encoding="utf-8")
+    monkeypatch.setattr(runner, "_reprocesar", reprocesar_falla)
+    monkeypatch.setattr(shorts, "crear", lambda *a, **k: pytest.fail("no debe crear"))
+    monkeypatch.setattr(runner, "DIR_LOGS", tmp_path / "logs")
+    monkeypatch.setattr(runner.os, "chdir", lambda r: None)
+    assert runner.main(["--config", str(ruta)]) == 1
+    assert "falló el procesado" in json.loads(
+        capsys.readouterr().out.strip().splitlines()[-1])["error"]
+
+
+@pytest.mark.parametrize("reproceso", [False, True])
+def test_shorts_sin_ninguno_no_van_en_el_done(
+        tmp_path, monkeypatch, capsys, reproceso):
+    codigo, lineas, _orden = _shorts(
+        tmp_path, monkeypatch, capsys, [_ficha(tmp_path)],
+        lambda ficha, opciones: shorts.Resultado(tmp_path / "shorts" / "v", 0),
+        reproceso=reproceso)
+    assert codigo == 0
+    assert lineas[-1]["done"] is True and "shorts" not in lineas[-1]

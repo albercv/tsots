@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 09:49+0100\n"
+"POT-Creation-Date: 2026-11-05 10:10+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -91,6 +91,10 @@ msgid "(sin título)"
 msgstr ""
 
 msgid "+ vertical"
+msgstr ""
+
+#, python-brace-format
+msgid "+ {n} shorts"
 msgstr ""
 
 #, python-brace-format
@@ -792,6 +796,10 @@ msgid "Logo de {app}"
 msgstr ""
 
 #, python-brace-format
+msgid "Los shorts fallaron: {error}. El vídeo se ha procesado igual."
+msgstr ""
+
+#, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
 msgstr ""
 
@@ -1445,6 +1453,10 @@ msgid "Servicio:"
 msgstr ""
 
 msgid "Short público"
+msgstr ""
+
+#, python-brace-format
+msgid "Shorts: {ruta}"
 msgstr ""
 
 msgid "Sigue procesándose"
