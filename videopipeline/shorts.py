@@ -12,6 +12,7 @@ import json
 import re
 import shutil
 from collections.abc import Callable
+from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
@@ -513,26 +514,32 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
                             'Vuelve a procesarlo para sacar shorts.'
                             ).format(nombre=nombre))
     pasada = _Pasada(ficha, Plan([], config, []), on_progress)
+    # Antes de transcribir o seguir la cara, que no cambian la base.
+    duracion = duracion_video(pasada.base)
+    maximo = maximo_shorts(duracion)
+    if maximo == 0:
+        raise PasoFallido(_('"{nombre}" dura menos de 3 minutos: es demasiado '
+                            'corto para sacar shorts.').format(nombre=nombre))
+    sin_transcripcion = _('No se pudo transcribir "{nombre}": sin transcripción '
+                          'no se pueden buscar shorts.').format(nombre=nombre)
     acciones = []
     if not _transcrita(ficha, pasada.linea):
         acciones.append(Accion.TRANSCRIBIR)
     if opciones.encuadre == "cara" and not seguimiento_vale(ficha, pasada.linea):
         acciones.append(Accion.SEGUIMIENTO)
     if acciones:
-        ejecutar(ficha, Plan(acciones, config, []), on_progress)
+        try:
+            ejecutar(ficha, Plan(acciones, config, []), on_progress)
+        except Exception as error:
+            if _transcrita(ficha, pasada.linea):
+                raise  # falló el seguimiento, no la transcripción
+            detalle = f"{error}\n{getattr(error, 'detalle', '')}".strip()
+            raise PasoFallido(sin_transcripcion, detalle=detalle) from error
         pasada = _Pasada(ficha, Plan([], config, []), on_progress)
-    # `_Pasada.transcribir` traga el fallo cuando no es para subtítulos.
+    # Por si `_Pasada.transcribir` acaba sin palabras y sin lanzar nada.
     if not _transcrita(ficha, pasada.linea):
-        raise PasoFallido(_('No se pudo transcribir "{nombre}": sin '
-                            'transcripción no se pueden buscar shorts.'
-                            ).format(nombre=nombre))
+        raise PasoFallido(sin_transcripcion)
     palabras = pasada._palabras()
-
-    duracion = duracion_video(pasada.base)
-    maximo = maximo_shorts(duracion)
-    if maximo == 0:
-        raise PasoFallido(_('"{nombre}" dura menos de 3 minutos: es demasiado '
-                            'corto para sacar shorts.').format(nombre=nombre))
     frases = trocear_frases(palabras)
     total = 2 + maximo
 
@@ -605,24 +612,27 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             if config.caption_seo:  # escribe el .md o deja su propio aviso
                 _fase_caption(config, mp4, mp4, tramo, progreso, 2 + i, total)
 
-        # Todos han salido: sustituyen a los anteriores.
-        for anterior in anteriores:
-            if (carpeta / anterior).is_file():
-                (carpeta / anterior).unlink()
-        archivos = []
-        for stem in nombres:
-            for sufijo in _SUFIJOS:
-                nuevo = tmp / (stem + sufijo)
-                if nuevo.is_file():
-                    nuevo.replace(carpeta / nuevo.name)
-                    archivos.append(nuevo.name)
-        _escribir_json(carpeta / "shorts.json", {
+        # Todos han salido: sustituyen a los anteriores. El JSON lista antes
+        # los viejos y los nuevos, para que un corte a medias no deje en la
+        # carpeta archivos de la app que no lista.
+        nuevos = [stem + sufijo for stem in nombres for sufijo in _SUFIJOS
+                  if (tmp / (stem + sufijo)).is_file()]
+        datos = {
             "version": 1, "video": nombre, "juez": juez, "maximo": maximo,
-            "archivos": archivos,
+            "archivos": anteriores + [n for n in nuevos if n not in anteriores],
             # Los elegidos en orden y luego los demás, con su descarte.
             "candidatos": [asdict(c) for c in
                            elegidos + [c for c in candidatos if c.descarte]],
-        })
+        }
+        _escribir_json(carpeta / "shorts.json", datos)
+        for anterior in anteriores:
+            if anterior not in nuevos and (carpeta / anterior).is_file():
+                (carpeta / anterior).unlink()
+        for nuevo in nuevos:
+            (tmp / nuevo).replace(carpeta / nuevo)
+        _escribir_json(carpeta / "shorts.json", {**datos, "archivos": nuevos})
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+        with suppress(OSError):
+            carpeta.rmdir()  # solo si ha quedado vacía: un primer intento fallido
     return Resultado(carpeta, len(elegidos))

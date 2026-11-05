@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -681,6 +683,48 @@ def test_crear_un_fallo_conserva_los_anteriores(ficha_con_base):
     assert (e.carpeta / "01 - Viejo.mp4").read_bytes() == b"VIEJO"
 
 
+def test_crear_un_fallo_la_primera_vez_no_deja_carpeta(ficha_con_base):
+    e = ficha_con_base
+    e.falla_corte = 1
+    with pytest.raises(PasoFallido):
+        _crear(e)
+    assert not e.carpeta.exists()
+
+    e.carpeta.mkdir()
+    (e.carpeta / "notas.txt").write_text("del usuario")
+    e.cortes.clear()
+    with pytest.raises(PasoFallido):
+        _crear(e)
+    assert [p.name for p in e.carpeta.iterdir()] == ["notas.txt"]
+
+
+def test_crear_un_corte_al_publicar_deja_el_json_con_todo(ficha_con_base,
+                                                          monkeypatch):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
+    (e.carpeta / "notas.txt").write_text("del usuario")
+    (e.carpeta / "shorts.json").write_text(json.dumps({"archivos": ["01 - Viejo.mp4"]}))
+    reemplazar = os.replace
+
+    def corte(origen, destino):
+        if Path(origen).name == f"{MEJOR}.srt":  # el segundo archivo nuevo
+            raise OSError("se fue la luz")
+        reemplazar(origen, destino)
+
+    monkeypatch.setattr(os, "replace", corte)
+    with pytest.raises(OSError, match="se fue la luz"):
+        _crear(e)
+
+    archivos = _leer_json(e.carpeta / "shorts.json")["archivos"]
+    assert archivos == ["01 - Viejo.mp4"] + [
+        f"{stem}{sufijo}" for stem in (MEJOR, SEGUNDO)
+        for sufijo in (".mp4", ".srt", ".md")]
+    en_disco = {p.name for p in e.carpeta.iterdir()} - {"shorts.json", "notas.txt"}
+    assert en_disco == {f"{MEJOR}.mp4"} and en_disco <= set(archivos)
+    assert (e.carpeta / "notas.txt").read_text() == "del usuario"
+
+
 def test_crear_no_pisa_archivos_ajenos(ficha_con_base):
     e = ficha_con_base
     e.carpeta.mkdir()
@@ -729,10 +773,16 @@ def test_crear_final_cambiado_fuera_falla_claro(ficha_con_base):
 
 def test_crear_video_corto_falla_claro(ficha_con_base, monkeypatch):
     e = ficha_con_base
+    del e.ficha.artefactos[TRANSCRIPCION]
+    transcritos = []
+    monkeypatch.setattr(reproceso, "_transcribir_subs",
+                        lambda *a, **kw: transcritos.append(a))
     monkeypatch.setattr(shorts, "duracion_video", lambda video: 170.0)
 
     with pytest.raises(PasoFallido, match="dura menos de 3 minutos"):
         _crear(e)
+    # Falla antes de lo caro: ni transcribe ni sigue la cara.
+    assert transcritos == [] and e.caras == []
     assert e.cortes == [] and not e.carpeta.exists()
 
 
@@ -754,12 +804,15 @@ def test_crear_transcribe_si_no_hay_transcripcion_de_la_base(ficha_con_base,
     assert cargar("f1").artefactos[TRANSCRIPCION].linea_tiempo == LINEA
 
     def falla(*args, **kwargs):
-        raise RuntimeError("whisper explotó")
+        raise PasoFallido("whisper explotó", detalle="falta el modelo")
 
     del e.ficha.artefactos[TRANSCRIPCION]
     monkeypatch.setattr(reproceso, "_transcribir_subs", falla)
-    with pytest.raises(PasoFallido, match="No se pudo transcribir"):
+    with pytest.raises(PasoFallido, match="No se pudo transcribir") as error:
         _crear(e)
+    # La causa no se pierde.
+    assert "whisper explotó" in error.value.detalle
+    assert "falta el modelo" in error.value.detalle
 
 
 def test_crear_cara_recorta_los_comandos_del_tramo(ficha_con_base):

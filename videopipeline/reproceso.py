@@ -278,7 +278,7 @@ class _Pasada:
                               if self.base == self.fuente else None),
             )[0]
         except Exception:  # noqa: BLE001 — solo era para el caption: lo reintenta y avisa él
-            if para_subs:
+            if para_subs or Accion.CAPTION not in self.acciones:
                 raise
         if self.palabras is None:
             return
