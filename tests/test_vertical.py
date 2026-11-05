@@ -195,6 +195,9 @@ def test_convertir_vertical_tramo_recodifica_audio_y_mide_el_tramo(
         desde_original=desde_original, tramo=(12.5, 72.75))
     cmd = recibido["cmd"]
     assert recibido["duracion"] == 60.25
+    assert cmd[cmd.index("-ss") + 1] == "12.500"
+    assert cmd[cmd.index("-t") + 1] == "60.250"
+    assert cmd.index("-ss") < cmd.index("-i")
     assert cmd[cmd.index("-c:a") + 1] == "aac"
     assert ("-af" in cmd) == (audio == "rellenar")
 
