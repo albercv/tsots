@@ -338,6 +338,120 @@ silences, subtitles and caption; look inside `fichas/<id>/` (`ficha.json`,
 tick only **Vertical** (no new transcription, one video encode); then tick
 **Silence cutting** with another margin and read the warning.
 
+### Shorts
+
+Vertical clips of 1:00 to 2:59 cut from a processed video, best first, in
+their own folder. Design: `docs/superpowers/specs/2026-11-05-shorts-design.md`.
+All the logic is in `videopipeline/shorts.py`; the GUI only has the
+**Shorts** section in `panel_opciones.py` (subtitles, framing, **Create
+shorts when processing**, **Create shorts** button).
+
+**Flow (`shorts.crear`).**
+
+1. Checks what it can cut from: shorts are always cut from the base
+   (`base.mp4`, or the final when it has no burned subtitles), never from a
+   video with burned subtitles. A final with them and no base
+   (`subs_quemados_sin_base`), or a base that is missing or was edited
+   outside the app, is a clear error. Each short's subtitles are made from
+   the existing transcript, shifted to the clip's start and laid out for
+   vertical; there is no second transcription.
+2. Transcribes the base and follows the face if the record lacks them
+   (both are recorded in the record like in a normal pass).
+3. Splits the word-level transcript into numbered sentences
+   (`trocear_frases`: punctuation, a pause over `PAUSA_FRASE`, or
+   `MAX_PALABRAS_FRASE` words, because Whisper sometimes omits full stops).
+4. Asks the caption model (`chat_json`) for up to `2 × max` candidates as
+   sentence ranges, where `max = int(duration // 180)` of the base (worked
+   out before step 2; 0 is a clear "too short" error). Long videos go in
+   parts of `MINUTOS_PARTE` minutes overlapping `MINUTOS_SOLAPE`
+   (`partes`); the same range proposed twice is kept once.
+5. `validar` discards ranges out of bounds, reversed, outside
+   `DURACION_MIN`–`DURACION_MAX` (60–179 s) or repeated, and tolerates
+   numbers sent as text. Cuts always fall on a sentence boundary, with
+   `MARGEN_CORTE` of air that never crosses a neighbouring sentence.
+6. The judge scores each survivor (`puntuar`): probability of "stands
+   alone" and interest 0–4. `elegir` drops interest `< UMBRAL_INTERES`
+   (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
+   best first, skips anything sharing a sentence with a chosen one, and
+   keeps at most `max`.
+7. Each short is encoded with the vertical step (`_fase_vertical`) into
+   `.shorts_tmp/`, plus its `.srt` and, with the SEO caption on, its `.md`.
+
+Progress is `2 + n` steps (search, scoring, one per short). Cancelling
+kills the runner before its cleanup, so the app deletes `.shorts_tmp` and,
+if the folder is then empty, the folder itself (`limpiar_temporal`).
+
+**Constants to tune** (module level, tune them against real videos):
+`DURACION_MIN` / `DURACION_MAX`, `UMBRAL_INTERES`, `UMBRAL_INDEPENDIENTE`,
+`PAUSA_FRASE`, `MAX_PALABRAS_FRASE`, `MARGEN_CORTE`, `MINUTOS_PARTE` /
+`MINUTOS_SOLAPE`, `JUEZ`. The prompts and the questions put to the judge
+are in Spanish and not translated.
+
+**The judge and its fallback.** `JUEZ = "tev1:0.8b"` answers
+`POST /v1/systemone` of the Ollama server (`ollama.systemone`): a score
+question and a choice question, ~0.15 s per clip and the same in two
+passes. **That route is undocumented**; it was checked on Ollama 0.40.14 and
+may change or disappear, and the installer does not pull the model. If
+the model is missing, the route fails or the answer has another shape,
+`puntuar` scores *every* candidate again with the caption model through
+`chat_json` at temperature 0 (~9 s per clip; one scale, never two mixed)
+and emits a warning. If that fails too, there are no shorts and the job
+reports why. The judge's name goes in `shorts.json`.
+
+**Output.** `<output folder>/<video name>/` (`carpeta_shorts`):
+`NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:
+
+```json
+{ "version": 1, "video": "talk", "juez": "tev1:0.8b", "maximo": 10,
+  "archivos": ["01 - Title.mp4", "01 - Title.srt", "01 - Title.md"],
+  "candidatos": [ { "frase_inicio": 12, "frase_fin": 31, "titulo": "…",
+                    "motivo": "…", "inicio": 63.4, "fin": 171.9,
+                    "independiente": 0.92, "interes": 2.7,
+                    "descarte": "", "archivo": "01 - Title.mp4" } ] }
+```
+
+`candidatos` lists the chosen ones in order, then the rest with
+`descarte` (`fuera_de_rango`, `duracion`, `repetido`, `flojo`,
+`no_se_entiende_solo`, `solapa`, `sobra`). The title only names the file
+and sits in the JSON; it is not burned into the video yet (see
+`docs/TODO.md`).
+
+**Redoing.** Only the files the previous `shorts.json` lists (`archivos`)
+are ever deleted, and nothing else in the folder is touched: if a file
+that is not listed already has the name of a new short, the run stops with
+a clear error before encoding anything. New shorts are encoded in the
+`.shorts_tmp` subfolder and replace the old ones only when all of them
+are done. The replacement order is crash-safe: `shorts.json` is written
+first listing old ∪ new, then the old files are deleted and the new ones
+moved in, and finally `shorts.json` is written again with the new list.
+A run cancelled or failed while encoding leaves the previous shorts and
+JSON as they were; one cut short while publishing leaves a JSON that
+lists both, so the next run still knows what to delete. A damaged `shorts.json` lists nothing, so nothing is deleted. The button
+asks before replacing; **Create shorts when processing** replaces without
+asking.
+
+**Runner protocol.** The `shorts` key of the job JSON, popped before
+`PipelineConfig.from_datos` like `reproceso`:
+
+```json
+{ "video": "…", "…": "…",
+  "shorts": { "ficha": "3f9c1a2b7d40", "subtitulos": true, "encuadre": "cara" } }
+```
+
+- Alone (the button): if the video is not processed yet the runner
+  processes it first with the panel settings, then makes the shorts.
+- With `reproceso` or a normal run (the checkbox): the shorts run after
+  it, and a failure of the shorts is a warning, never a failed job.
+- The final event adds `"shorts": {"carpeta": …, "n": …}` when any were
+  made (`n > 0`).
+
+**Testing.** `tests/test_shorts.py` replaces `chat_json`, `systemone`,
+`convertir_vertical` and `duracion_video`: no ffmpeg or model. It covers
+transcripts with no punctuation, garbage from the model, user files in
+the shorts folder, a failure halfway and a base edited outside the app.
+To check by hand: **Create shorts** on a 5+ minute video, open
+`shorts.json`, then run it again and read the replace prompt.
+
 ## Glossary of terms
 
 `videopipeline/glosario.py` (pure, no I/O). The user's text (QSettings key
