@@ -601,7 +601,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             seguimiento = None
             if opciones.encuadre == "cara":
                 # Siempre con seguimiento: sin él, `_fase_vertical` buscaría la
-                # cara en toda la base. Sin uno válido, x None: recorte central.
+                # cara en toda la base. Sin uno válido, x None: ventana centrada.
                 x0 = None
                 if cara is not None:
                     texto, x0 = recortar_comandos(cara, c.inicio, c.fin)
