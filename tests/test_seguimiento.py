@@ -20,6 +20,7 @@ from videopipeline.seguimiento import (
     muestrear_centros,
     posiciones_recorte,
     preparar_seguimiento,
+    recortar_comandos,
     suavizar,
 )
 from videopipeline.steps import PasoFallido
@@ -286,3 +287,19 @@ def test_pesos_fallo_borra_parciales_de_gdown(tmp_path, monkeypatch):
     with pytest.raises(PasoFallido):
         asegurar_pesos_s3fd(ruta)
     assert list(tmp_path.iterdir()) == []
+
+
+def test_recortar_comandos_desplaza_y_empieza_en_la_x_del_inicio():
+    texto = ("0.000 crop@v x 10;\n5.000 crop@v x 20;\n"
+             "12.000 crop@v x 30;\n20.000 crop@v x 40;\n")
+    assert recortar_comandos(texto, 6, 15) == (
+        "0.000 crop@v x 20;\n6.000 crop@v x 30;\n", 20)
+
+
+def test_recortar_comandos_sin_ordenes_antes_usa_la_primera():
+    assert recortar_comandos("8.000 crop@v x 7;\n9.000 crop@v x 8;\n", 2, 20) == (
+        "0.000 crop@v x 7;\n6.000 crop@v x 7;\n7.000 crop@v x 8;\n", 7)
+
+
+def test_recortar_comandos_sin_caras():
+    assert recortar_comandos("", 3, 9) == ("", None)

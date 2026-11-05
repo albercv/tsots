@@ -132,7 +132,9 @@ def entorno_vertical(entorno_subs, monkeypatch):
     _parchear(monkeypatch, "resolucion_video", lambda v: resolucion["valor"])
 
     def falso_convertir(video_, salida, filtro, cwd, usa_ass, desde_original=False,
-                        on_percent=None):
+                        on_percent=None, tramo=None):
+        if tramo is not None:  # antes de la llamada: `llamadas[-1]` sigue siendo ella
+            llamadas.append(f"tramo:{tramo[0]}:{tramo[1]}")
         llamadas.append(
             f"vertical:{Path(video_).name}:{usa_ass}:{desde_original}:{filtro}")
         salida.write_bytes(b"VERTICAL")

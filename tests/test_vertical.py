@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from videopipeline import vertical
 from videopipeline.steps import (
     FILTRO_HUECOS_AUDIO,
     PasoFallido,
@@ -160,6 +161,42 @@ def test_cmd_convertir_rellena_audio():
     i = cmd.index("-c:a")
     assert cmd[i + 1:i + 4] == ["aac", "-b:a", "192k"]
     assert cmd[cmd.index("-r") + 1] == "30000/1001"
+
+
+def test_cmd_convertir_vertical_tramo_busca_antes_de_la_entrada():
+    cmd = cmd_convertir_vertical(
+        "ffmpeg", Path("in.mp4"), "[0:v]null[v]", Path("o.mp4"), "30", "aac",
+        tramo=(12.5, 72.75))
+    assert cmd[cmd.index("-ss") + 1] == "12.500"
+    assert cmd[cmd.index("-t") + 1] == "60.250"
+    assert cmd.index("-t") < cmd.index("-i")
+    sin_tramo = cmd_convertir_vertical(
+        "ffmpeg", Path("in.mp4"), "[0:v]null[v]", Path("o.mp4"), "30", "aac")
+    assert "-ss" not in sin_tramo and "-t" not in sin_tramo
+
+
+@pytest.mark.parametrize("desde_original, audio", [(False, "aac"), (True, "rellenar")])
+def test_convertir_vertical_tramo_recodifica_audio_y_mide_el_tramo(
+        tmp_path, monkeypatch, desde_original, audio):
+    recibido = {}
+
+    def falso_ffmpeg(cmd, cwd, duracion, on_percent):
+        recibido.update(cmd=cmd, duracion=duracion)
+        Path(cmd[-1]).write_bytes(b"V")
+        return 0, ""
+
+    monkeypatch.setattr(vertical, "ejecutar_ffmpeg_con_progreso", falso_ffmpeg)
+    monkeypatch.setattr(vertical, "audio_cabe_en_mp4", lambda v: True)
+    monkeypatch.setattr(vertical, "fps_objetivo", lambda v: "30")
+    monkeypatch.setattr(vertical, "duracion_video", lambda v: 3600.0)
+    monkeypatch.setattr(vertical, "_binario", lambda nombre: nombre)
+    convertir_vertical(
+        Path("in.mp4"), tmp_path / "o.mp4", "[0:v]null[v]", tmp_path, usa_ass=False,
+        desde_original=desde_original, tramo=(12.5, 72.75))
+    cmd = recibido["cmd"]
+    assert recibido["duracion"] == 60.25
+    assert cmd[cmd.index("-c:a") + 1] == "aac"
+    assert ("-af" in cmd) == (audio == "rellenar")
 
 
 def test_convertir_desde_original_fuerza_fps_y_rellena_audio(tmp_path):

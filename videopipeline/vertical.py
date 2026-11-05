@@ -90,17 +90,25 @@ def filtro_vertical(
 
 
 def cmd_convertir_vertical(
-    ffmpeg: str, video: Path, filtro: str, salida: Path, fps: str, audio: str
+    ffmpeg: str, video: Path, filtro: str, salida: Path, fps: str, audio: str,
+    tramo: tuple[float, float] | None = None,
 ) -> list[str]:
     """`audio`: "copiar", "aac" o "rellenar" (AAC rellenando los huecos del
-    audio del iPhone, para fuentes sin procesar)."""
+    audio del iPhone, para fuentes sin procesar). Con `tramo` (inicio, fin) solo
+    se convierte ese trozo; los tiempos de salida empiezan en 0."""
     pista = {
         "copiar": ["-c:a", "copy"],
         "aac": ["-c:a", "aac", "-b:a", "192k"],
         "rellenar": ["-af", FILTRO_HUECOS_AUDIO, "-c:a", "aac", "-b:a", "192k"],
     }[audio]
+    # Búsqueda en la entrada: exacta al recodificar, y el `.ass` y el `sendcmd`
+    # ya cuentan desde el inicio del tramo.
+    corte = (
+        ["-ss", f"{tramo[0]:.3f}", "-t", f"{tramo[1] - tramo[0]:.3f}"] if tramo else []
+    )
     return [
         ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        *corte,
         "-i", str(video),
         "-filter_complex", filtro,
         "-map", "[v]", "-map", "0:a:0?",
@@ -138,18 +146,23 @@ def convertir_vertical(
     usa_ass: bool,
     desde_original: bool = False,
     on_percent: Callable[[float], None] | None = None,
+    tramo: tuple[float, float] | None = None,
 ) -> None:
     salida.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg = ffmpeg_con_ass() if usa_ass else _binario("ffmpeg")
     if desde_original:
         audio = "rellenar"
+    elif tramo is not None or not audio_cabe_en_mp4(video):
+        # Copiar AAC desde un punto de búsqueda descuadra el inicio del audio.
+        audio = "aac"
     else:
-        audio = "copiar" if audio_cabe_en_mp4(video) else "aac"
+        audio = "copiar"
     cmd = cmd_convertir_vertical(
-        ffmpeg, video, filtro, salida, fps_objetivo(video), audio
+        ffmpeg, video, filtro, salida, fps_objetivo(video), audio, tramo
     )
+    duracion = tramo[1] - tramo[0] if tramo else duracion_video(video)
     codigo, salida_ffmpeg = ejecutar_ffmpeg_con_progreso(
-        cmd, cwd, duracion_video(video), on_percent
+        cmd, cwd, duracion, on_percent
     )
     if codigo != 0:
         raise PasoFallido(
