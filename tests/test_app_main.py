@@ -1528,6 +1528,22 @@ def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
     assert (guardado["shorts_encuadre"], guardado["modo"]) == ("barras", "completo")
 
 
+def test_crear_shorts_limpia_el_error_el_aviso_y_el_diagnostico_viejos(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _ficha_hecha(tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(
+        0, estado=EstadoTrabajo.HECHO,
+        error="x", aviso="Los shorts fallaron: Ollama no responde.",
+        diagnostico={"titulo": "t"})
+    _eligiendo_la_fila(ventana)
+    _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert (trabajo.error, trabajo.aviso, trabajo.diagnostico) == ("", "", None)
+
+
 def test_crear_shorts_no_hace_nada_sin_fila_o_procesando(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.anadir_videos(_videos(tmp_path, "a.mp4"))

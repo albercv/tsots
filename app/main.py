@@ -755,6 +755,9 @@ class VentanaPrincipal(QMainWindow):
         datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
         self._procesando = True
         self._refrescar_boton()
+        # La fila puede venir de un intento anterior: sin esto conservaría su
+        # error, aviso y diagnóstico (solo `volver_a_espera` los limpia).
+        self.modelo_cola.actualizar(fila, error="", aviso="", diagnostico=None)
         self.ejecutor.iniciar([(fila, json.dumps(datos, ensure_ascii=False))])
 
     def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:

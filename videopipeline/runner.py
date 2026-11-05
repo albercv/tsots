@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
                               else f"{type(error).__name__}: {error}")
                     on_progress({"warning": _(
                         "Los shorts fallaron: {error}. El vídeo se ha procesado "
-                        "igual.").format(error=motivo)})
+                        "igual.").format(error=motivo.rstrip("."))})
     except PasoFallido as error:
         return fallar(str(error), error.detalle)
     except Exception as error:  # noqa: BLE001 — el subproceso reporta todo por JSON

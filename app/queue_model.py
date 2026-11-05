@@ -88,7 +88,8 @@ class ModeloCola(QAbstractListModel):
             if trabajo.estado == EstadoTrabajo.HECHO and trabajo.salida_vertical:
                 partes.append(_("+ vertical"))
             if trabajo.estado == EstadoTrabajo.HECHO and trabajo.n_shorts:
-                partes.append(_("+ {n} shorts").format(n=trabajo.n_shorts))
+                partes.append(_("+ 1 short") if trabajo.n_shorts == 1
+                              else _("+ {n} shorts").format(n=trabajo.n_shorts))
             if trabajo.resumen:
                 partes.append(trabajo.resumen)
             if trabajo.ocupa > 0:

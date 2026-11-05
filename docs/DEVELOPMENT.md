@@ -365,12 +365,16 @@ shorts when processing**, **Create shorts** button).
 4. Asks the caption model (`chat_json`) for up to `2 × max` candidates as
    sentence ranges, where `max = int(duration // 180)` of the base (worked
    out before step 2; 0 is a clear "too short" error). Long videos go in
-   parts of `MINUTOS_PARTE` minutes overlapping `MINUTOS_SOLAPE`
+   parts of `MINUTOS_PARTE` minutes overlapping `MINUTOS_SOLAPE` (3, more
+   than the longest short, so any allowed stretch fits whole in some part)
    (`partes`); the same range proposed twice is kept once.
 5. `validar` discards ranges out of bounds, reversed, outside
    `DURACION_MIN`–`DURACION_MAX` (60–179 s) or repeated, and tolerates
    numbers sent as text. Cuts always fall on a sentence boundary, with
-   `MARGEN_CORTE` of air that never crosses a neighbouring sentence.
+   `MARGEN_CORTE` of air that never crosses a neighbouring sentence and
+   never falls inside the short's own first or last sentence (if Whisper
+   overlaps neighbouring sentences, the cut steps on the neighbour instead
+   of losing words).
 6. The judge scores each survivor (`puntuar`): probability of "stands
    alone" and interest 0–4. `elegir` drops interest `< UMBRAL_INTERES`
    (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
@@ -404,7 +408,8 @@ reports why. The judge's name goes in `shorts.json`.
 `NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:
 
 ```json
-{ "version": 1, "video": "talk", "juez": "tev1:0.8b", "maximo": 10,
+{ "version": 1, "ficha": "a1b2c3", "video": "talk", "juez": "tev1:0.8b",
+  "maximo": 10,
   "archivos": ["01 - Title.mp4", "01 - Title.srt", "01 - Title.md"],
   "candidatos": [ { "frase_inicio": 12, "frase_fin": 31, "titulo": "…",
                     "motivo": "…", "inicio": 63.4, "fin": 171.9,
@@ -419,18 +424,20 @@ and sits in the JSON; it is not burned into the video yet (see
 `docs/TODO.md`).
 
 **Redoing.** Only the files the previous `shorts.json` lists (`archivos`)
-are ever deleted, and nothing else in the folder is touched: if a file
-that is not listed already has the name of a new short, the run stops with
-a clear error before encoding anything. New shorts are encoded in the
-`.shorts_tmp` subfolder and replace the old ones only when all of them
-are done. The replacement order is crash-safe: `shorts.json` is written
-first listing old ∪ new, then the old files are deleted and the new ones
-moved in, and finally `shorts.json` is written again with the new list.
-A run cancelled or failed while encoding leaves the previous shorts and
-JSON as they were; one cut short while publishing leaves a JSON that
-lists both, so the next run still knows what to delete. A damaged `shorts.json` lists nothing, so nothing is deleted. The button
-asks before replacing; **Create shorts when processing** replaces without
-asking.
+are ever deleted, and only when its `ficha` is the current record's id (a
+folder left by a forgotten record, or by another video with the same name,
+lists nothing, so nothing is deleted). Nothing else in the folder is
+touched: if a file that is not listed already has the name of a new short,
+the run stops with a clear error before encoding anything. New shorts are
+encoded in the `.shorts_tmp` subfolder and replace the old ones only when
+all of them are done. The replacement order is crash-safe: `shorts.json` is
+written first listing old ∪ new, then the old files are deleted and the new
+ones moved in, and finally `shorts.json` is written again with the new
+list. A run cancelled or failed while encoding leaves the previous shorts
+and JSON as they were; one cut short while publishing leaves a JSON that
+lists both, so the next run still knows what to delete. A damaged
+`shorts.json` lists nothing either. The button asks before replacing;
+**Create shorts when processing** replaces without asking.
 
 **Runner protocol.** The `shorts` key of the job JSON, popped before
 `PipelineConfig.from_datos` like `reproceso`:

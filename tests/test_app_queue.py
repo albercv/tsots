@@ -181,6 +181,15 @@ def test_fila_hecha_muestra_los_shorts():
     assert "Shorts: /s/a" in modelo.data(indice, Qt.ItemDataRole.ToolTipRole)
 
 
+def test_fila_con_un_solo_short_va_en_singular():
+    modelo = ModeloCola()
+    modelo.anadir([(Path("/v/a.mp4"), None)])
+    modelo.actualizar(0, estado=EstadoTrabajo.HECHO, salida=Path("/v/a_limpio.mp4"),
+                      shorts=Path("/s/a"), n_shorts=1)
+    texto = modelo.data(modelo.index(0), Qt.ItemDataRole.DisplayRole)
+    assert "+ 1 short" in texto and "shorts" not in texto
+
+
 def test_fila_sin_shorts_no_los_muestra():
     modelo = ModeloCola()
     modelo.anadir([(Path("/v/a.mp4"), None)])

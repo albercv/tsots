@@ -91,11 +91,20 @@ def test_partes_largas_se_solapan():
     assert len(partes) > 1
     for desde, hasta in partes:
         assert frases[hasta - 1].fin - frases[desde].inicio <= 20 * 60
-    assert frases[partes[1][0]].inicio == 18 * 60
+    assert frases[partes[1][0]].inicio == 17 * 60
     assert partes[0][1] > partes[1][0]  # se solapan
     assert partes[-1][1] == len(frases)
     # Sin huecos: cada parte empieza antes de que acabe la anterior.
     assert all(b[0] < a[1] for a, b in zip(partes, partes[1:]))
+
+
+def test_partes_contienen_cualquier_trozo_valido():
+    frases = _frases_de(300, 10)  # 50 minutos
+    partes = shorts.partes(frases)
+    seguidas = int(shorts.DURACION_MAX // 10)  # 17 frases = 170 s
+    for ini in range(len(frases) - seguidas + 1):
+        fin = ini + seguidas
+        assert any(desde <= ini and fin <= hasta for desde, hasta in partes), ini
 
 
 def test_validar_descarta_rango_duracion_y_repetidos():
@@ -166,6 +175,23 @@ def test_validar_corte_con_margen_sin_pisar_vecinas():
     c = shorts.validar({"candidatos": [_cand(3, 9)]}, sueltas, duracion=300.0)[0]
     assert c.inicio == pytest.approx(sueltas[2].inicio - shorts.MARGEN_CORTE)
     assert c.fin == pytest.approx(sueltas[8].fin + shorts.MARGEN_CORTE)
+
+
+def test_validar_nunca_corta_dentro_de_las_frases_del_short():
+    # Whisper solapa vecinas: la anterior acaba en 10,3 s y el short empieza en
+    # 10,1; el short acaba en 74,8 y la siguiente empieza en 74,5.
+    def frase(inicio: float, fin: float, n: int) -> shorts.Frase:
+        paso = (fin - inicio) / n
+        return shorts.Frase([Palabra(f"p{inicio}-{i}", inicio + i * paso,
+                                     inicio + (i + 1) * paso) for i in range(n)])
+
+    frases = [frase(0.0, 10.3, 4), frase(10.1, 42.0, 16), frase(42.0, 74.8, 16),
+              frase(74.5, 90.0, 4)]
+    palabras = [p for f in frases[1:3] for p in f.palabras]
+    c = shorts.validar({"candidatos": [_cand(2, 3)]}, frases, duracion=90.0)[0]
+    assert c.descarte == ""
+    assert c.inicio <= frases[1].inicio and c.fin >= frases[2].fin
+    assert len(shorts.tramo_palabras(palabras, c.inicio, c.fin)) == len(palabras) == 32
 
 
 def test_validar_sin_lista_falla():
@@ -334,7 +360,7 @@ def test_buscar_candidatos_partes_y_repetidos(monkeypatch):
     assert len(llamadas) == len(shorts.partes(frases)) == 3
     # Cada parte numera sus frases con los números globales.
     primeras = [m["mensajes"][1]["content"].split("\n")[1] for m in llamadas]
-    assert [p.split("]")[0] for p in primeras] == ["[1", "[109", "[217"]
+    assert [p.split("]")[0] for p in primeras] == ["[1", "[103", "[205"]
     assert [c.descarte for c in candidatos] == ["", "repetido"]
     assert porcentajes == pytest.approx([100 / 3, 200 / 3, 100.0])
 
@@ -614,8 +640,8 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
     assert sorted(p.name for p in e.carpeta.iterdir()) == sorted(
         archivos + ["shorts.json"])
     datos = _leer_json(e.carpeta / "shorts.json")
-    assert (datos["version"], datos["video"], datos["juez"], datos["maximo"]) == (
-        1, "charla", "tev1:0.8b", 2)
+    assert (datos["version"], datos["ficha"], datos["video"], datos["juez"],
+            datos["maximo"]) == (1, "f1", "charla", "tev1:0.8b", 2)
     assert datos["archivos"] == archivos
     assert [(c["titulo"], c["descarte"], c["archivo"]) for c in datos["candidatos"]] == [
         ("El mejor trozo", "", MEJOR + ".mp4"), ("El segundo", "", SEGUNDO + ".mp4"),
@@ -656,7 +682,8 @@ def test_crear_sustituye_solo_lo_que_lista_el_json_anterior(ficha_con_base):
     (e.carpeta / "notas.txt").write_text("del usuario")
     (e.carpeta.parent / "fuera.txt").write_text("del usuario")
     (e.carpeta / "shorts.json").write_text(json.dumps(
-        {"archivos": ["01 - Viejo.mp4", "../fuera.txt", "..", ".", "", 7]}))
+        {"ficha": "f1",
+         "archivos": ["01 - Viejo.mp4", "../fuera.txt", "..", ".", "", 7]}))
 
     assert _crear(e).n == 2
 
@@ -666,10 +693,48 @@ def test_crear_sustituye_solo_lo_que_lista_el_json_anterior(ficha_con_base):
     assert (e.carpeta / f"{MEJOR}.mp4").is_file()
 
 
+_DE_OTRA_FICHA = [
+    {"ficha": "otra", "archivos": ["01 - Viejo.mp4", f"{MEJOR}.mp4"]},
+    {"archivos": ["01 - Viejo.mp4", f"{MEJOR}.mp4"]},
+]
+
+
+@pytest.mark.parametrize("viejo", _DE_OTRA_FICHA, ids=["otra_ficha", "sin_ficha"])
+def test_crear_no_se_fia_del_json_de_otra_ficha(ficha_con_base, viejo):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
+    (e.carpeta / f"{MEJOR}.mp4").write_bytes(b"MIO")
+    (e.carpeta / "shorts.json").write_text(json.dumps(viejo))
+
+    # Lo que lista ese json no se da por de la app: un nombre repetido frena.
+    with pytest.raises(PasoFallido, match="no lo creó la app"):
+        _crear(e)
+
+    assert (e.carpeta / "01 - Viejo.mp4").read_bytes() == b"VIEJO"
+    assert (e.carpeta / f"{MEJOR}.mp4").read_bytes() == b"MIO"
+    assert e.cortes == []
+
+
+@pytest.mark.parametrize("viejo", _DE_OTRA_FICHA, ids=["otra_ficha", "sin_ficha"])
+def test_crear_con_el_json_de_otra_ficha_no_borra_nada(ficha_con_base, viejo):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
+    (e.carpeta / "shorts.json").write_text(json.dumps(viejo))
+
+    assert _crear(e).n == 2
+
+    assert (e.carpeta / "01 - Viejo.mp4").read_bytes() == b"VIEJO"
+    datos = _leer_json(e.carpeta / "shorts.json")
+    assert datos["ficha"] == "f1"
+    assert "01 - Viejo.mp4" not in datos["archivos"]
+
+
 def test_crear_un_fallo_conserva_los_anteriores(ficha_con_base):
     e = ficha_con_base
     e.carpeta.mkdir()
-    viejo = json.dumps({"archivos": ["01 - Viejo.mp4"]})
+    viejo = json.dumps({"ficha": "f1", "archivos": ["01 - Viejo.mp4"]})
     (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
     (e.carpeta / "shorts.json").write_text(viejo)
     e.falla_corte = 2
@@ -704,7 +769,8 @@ def test_crear_un_corte_al_publicar_deja_el_json_con_todo(ficha_con_base,
     e.carpeta.mkdir()
     (e.carpeta / "01 - Viejo.mp4").write_bytes(b"VIEJO")
     (e.carpeta / "notas.txt").write_text("del usuario")
-    (e.carpeta / "shorts.json").write_text(json.dumps({"archivos": ["01 - Viejo.mp4"]}))
+    (e.carpeta / "shorts.json").write_text(
+        json.dumps({"ficha": "f1", "archivos": ["01 - Viejo.mp4"]}))
     reemplazar = os.replace
 
     def corte(origen, destino):

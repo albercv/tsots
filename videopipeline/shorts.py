@@ -37,7 +37,7 @@ PAUSA_FRASE = 1.0  # s de silencio que cierran una frase sin puntuación
 MAX_PALABRAS_FRASE = 60
 MARGEN_CORTE = 0.25  # s de aire antes y después del trozo
 MINUTOS_PARTE = 20
-MINUTOS_SOLAPE = 2
+MINUTOS_SOLAPE = 3  # > DURACION_MAX: un trozo cortado cabe entero en otra parte
 MAX_NOMBRE = 60
 JUEZ = "tev1:0.8b"
 
@@ -153,7 +153,7 @@ def validar(datos: dict, frases: list[Frase], duracion: float) -> list[Candidato
 
     Los que no valen quedan con su código en `descarte`; a los que valen se
     les calcula el corte (`inicio`/`fin`), con margen pero sin pisar las
-    frases vecinas.
+    frases vecinas, y nunca dentro de las del propio short.
     """
     entradas = datos.get("candidatos") if isinstance(datos, dict) else None
     if not isinstance(entradas, list):
@@ -188,8 +188,11 @@ def validar(datos: dict, frases: list[Frase], duracion: float) -> list[Candidato
             vistos.add((ini, fin))
             anterior = frases[ini - 2].fin if ini > 1 else 0.0
             siguiente = frases[fin].inicio if fin < len(frases) else duracion
-            c.inicio = max(frases[ini - 1].inicio - MARGEN_CORTE, anterior)
-            c.fin = min(frases[fin - 1].fin + MARGEN_CORTE, siguiente)
+            # Si Whisper solapa a las vecinas, el corte no entra en las frases
+            # del propio short: pisa a la vecina antes que perder palabras.
+            primera, ultima = frases[ini - 1], frases[fin - 1]
+            c.inicio = min(primera.inicio, max(primera.inicio - MARGEN_CORTE, anterior))
+            c.fin = max(ultima.fin, min(ultima.fin + MARGEN_CORTE, siguiente))
     return candidatos
 
 
@@ -474,12 +477,15 @@ def _transcrita(ficha: Ficha, linea: str) -> bool:
     return transcripcion is not None and transcripcion.linea_tiempo == linea
 
 
-def _anteriores(carpeta: Path) -> list[str]:
+def _anteriores(carpeta: Path, ficha_id: str) -> list[str]:
     """Lo que la app escribió la vez anterior, según su `shorts.json`. Solo
-    nombres sueltos: nunca se borra fuera de la carpeta. Dañado, nada."""
+    nombres sueltos: nunca se borra fuera de la carpeta. Dañado, o de otra
+    ficha (un registro olvidado, otro vídeo con el mismo nombre), nada."""
     try:
-        archivos = json.loads(
-            (carpeta / "shorts.json").read_text(encoding="utf-8"))["archivos"]
+        datos = json.loads((carpeta / "shorts.json").read_text(encoding="utf-8"))
+        archivos = datos["archivos"]
+        if datos["ficha"] != ficha_id:
+            return []
     except (OSError, ValueError, KeyError, TypeError):
         return []
     if not isinstance(archivos, list):
@@ -571,7 +577,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
                                ).format(nombre=nombre))
         return Resultado(carpeta, 0)
 
-    anteriores = _anteriores(carpeta)
+    anteriores = _anteriores(carpeta, ficha.id)
     nombres = [nombre_archivo(i, c.titulo) for i, c in enumerate(elegidos, 1)]
     for c, stem in zip(elegidos, nombres):
         c.archivo = stem + ".mp4"
@@ -623,7 +629,8 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         nuevos = [stem + sufijo for stem in nombres for sufijo in _SUFIJOS
                   if (tmp / (stem + sufijo)).is_file()]
         datos = {
-            "version": 1, "video": nombre, "juez": juez, "maximo": maximo,
+            "version": 1, "ficha": ficha.id, "video": nombre, "juez": juez,
+            "maximo": maximo,
             "archivos": anteriores + [n for n in nuevos if n not in anteriores],
             # Los elegidos en orden y luego los demás, con su descarte.
             "candidatos": [asdict(c) for c in

@@ -546,6 +546,7 @@ def test_shorts_al_procesar_van_en_el_done(tmp_path, monkeypatch, capsys):
 
 @pytest.mark.parametrize("error, texto", [
     (PasoFallido("boom"), "boom"),
+    (PasoFallido("boom."), "boom"),  # sin «..»: los avisos de shorts acaban en punto
     (RuntimeError("boom"), "RuntimeError: boom")])
 def test_shorts_al_procesar_un_fallo_solo_avisa(
         tmp_path, monkeypatch, capsys, error, texto):
@@ -559,6 +560,7 @@ def test_shorts_al_procesar_un_fallo_solo_avisa(
     assert "shorts" not in lineas[-1] and lineas[-1]["done"] is True
     avisos = [l["warning"] for l in lineas if "warning" in l]
     assert avisos == [f"Los shorts fallaron: {texto}. El vídeo se ha procesado igual."]
+    assert ".." not in avisos[0]
     log = next((tmp_path / "logs").glob("*.log")).read_text(encoding="utf-8")
     assert "Traceback" in log and "boom" in log
 
