@@ -328,7 +328,7 @@ class _Pasada:
                 degradar=self.degradar_subs, titulo=titulo)
         if quemado is None:
             if self.base.parent != self.tmp:  # sin base nueva no hay nada que guardar
-                if not c.subtitulos:
+                if not c.subtitulos and self.ficha.hay_horizontal():
                     return  # el título falló: el final se queda como estaba
                 raise PasoFallido(
                     _("No se pudieron añadir los subtítulos: la transcripción "

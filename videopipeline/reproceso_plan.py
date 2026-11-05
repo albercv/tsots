@@ -356,9 +356,9 @@ def planificar(ficha: Ficha, config: PipelineConfig,
             efectiva = replace(efectiva, **{
                 campo: ajustes[nombre] for nombre, campo in _CAMPOS[paso].items()
                 if nombre in ajustes})
-    # R2: el título nunca va sobre una salida antigua con subtítulos quemados
-    # y sin original.
-    quiere_titulo = config.titulo and not _subs_bloqueados(ficha)
+    # R2: el título solo va sobre una base que la app ve: sin original verdadero
+    # el final antiguo puede llevar ya subtítulos o un título.
+    quiere_titulo = config.titulo and ficha.original_verdadero()
     titulo_art = ficha.artefactos.get(TITULO)
     # Sin texto (ficha.json editada a mano) cuenta como que falta.
     texto = titulo_art.ajustes.get("texto") if titulo_art else None
@@ -369,10 +369,14 @@ def planificar(ficha: Ficha, config: PipelineConfig,
 
     def fuerza_titulo(tipo: str) -> bool:
         """Un título distinto del quemado obliga a rehacer la salida solo si la
-        hizo la app y su base vale; si no, va con ella cuando se rehace por
-        otra cosa: nunca da un error por una base que no se puede rehacer."""
+        hizo la app, sigue en disco sin cambios y su base vale; si no, va con
+        ella cuando se rehace por otra cosa: nunca da un error por una salida
+        que el usuario tocó ni la escribe de nuevo si la borró."""
         artefacto = ficha.artefactos.get(tipo)
-        return (artefacto is not None and _base_vale(ficha)
+        salida = (ficha.vertical if tipo == VERTICAL and ficha.hay_horizontal()
+                  else ficha.final)
+        return (artefacto is not None and salida is not None
+                and salida.coincide(salida.ruta) and _base_vale(ficha)
                 and titulo != artefacto.ajustes.get("titulo"))
 
     # 2. ¿Cambia la base? Rehacer un paso de base invalida lo que depende de ella.

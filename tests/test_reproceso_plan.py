@@ -685,6 +685,66 @@ def test_titulo_no_obliga_a_rehacer_una_salida_que_no_hizo_la_app_o_sin_base(
     assert sin.acciones == con.acciones == esperado
 
 
+def _horizontal_editado(tmp_path) -> Ficha:
+    ficha = _completa(tmp_path)
+    ficha.final.ruta.write_bytes(b"editado fuera de la app, otro tamano")
+    return ficha
+
+
+def _horizontal_borrado(tmp_path) -> Ficha:
+    ficha = _completa(tmp_path)
+    ficha.final.ruta.unlink()
+    return ficha
+
+
+def _vertical_unico_editado(tmp_path) -> Ficha:
+    ficha = _ficha(tmp_path, {BASE: _base(silencios=True),
+                              TRANSCRIPCION: _transcripcion(L_S),
+                              VERTICAL: _vertical(subs=True)}, final="vertical")
+    ficha.final.ruta.write_bytes(b"editado fuera de la app, otro tamano")
+    return ficha
+
+
+@pytest.mark.parametrize("ficha", [_horizontal_editado, _horizontal_borrado,
+                                   _vertical_unico_editado])
+def test_titulo_no_obliga_a_rehacer_una_salida_editada_o_borrada(tmp_path, ficha):
+    # El título solo fuerza rehacer una salida de la app que sigue en disco sin
+    # cambios: tocar la que el usuario editó daría «No se toca…» y la borrada
+    # volvería a escribirse.
+    ficha = ficha(tmp_path)
+    pedido = dict(caption_seo=True)
+    rehacer = Decisiones(rehacer=frozenset({"caption"}))
+
+    sin = planificar(ficha, _panel(**pedido), rehacer)
+    con = planificar(ficha, _panel(**pedido, titulo=True), rehacer)
+
+    assert sin.error == con.error == ""
+    assert sin.acciones == con.acciones == [A.CAPTION]
+
+
+def test_titulo_con_el_vertical_editado_quema_solo_el_horizontal(tmp_path):
+    ficha = _completa(tmp_path, **{VERTICAL: _vertical(subs=True)})
+    ficha.vertical.ruta.write_bytes(b"editado fuera de la app, otro tamano")
+
+    plan = planificar(ficha, _panel(titulo=True), Decisiones())
+
+    assert plan.error == ""
+    assert plan.acciones == [A.TITULO, A.QUEMAR]  # el vertical editado no se toca
+
+
+def test_legado_sin_original_ni_subtitulos_no_lleva_titulo(tmp_path):
+    # Sin original verdadero el final antiguo hace de base y puede llevar ya
+    # subtítulos o un título: quemar otro encima lo duplicaría (R2).
+    ficha = _ficha(tmp_path, {}, original=False, legado=True)
+
+    plan = planificar(ficha, _panel(paso_silencios=True, titulo=True),
+                      Decisiones())
+
+    assert plan.error == ""
+    assert A.TITULO not in plan.acciones
+    assert plan.config.titulo is False
+
+
 def test_titulo_va_con_los_subtitulos_de_una_salida_antigua_adoptada(tmp_path):
     plan = planificar(_legado(tmp_path), _panel(subtitulos=True, titulo=True),
                       Decisiones())

@@ -116,6 +116,16 @@ def test_titulo_ancho_en_vertical_no_pasa_del_90(texto, parte):
     assert all(_ancho_en_fs(linea) * fs <= ANCHO_UTIL * 1080 for linea in lineas)
 
 
+def test_tabla_de_anchos_fija_el_resultado():
+    # Valores literales: los tests de cabida reutilizan la propia estimación, así
+    # que sin esto un cambio de la tabla pasaría desapercibido.
+    estilos, eventos = lineas_titulo("Cómo grabar vídeos con el móvil", (1080, 1920))
+    assert [_estilo(e)[2] for e in estilos] == ["85", "85"]
+    assert (_texto(eventos[0]) == _texto(eventos[1])
+            == "CÓMO GRABAR VÍDEOS\\NCON EL MÓVIL")
+    assert _ancho_en_fs("W") > _ancho_en_fs("I")
+
+
 def test_largo_parte_en_dos_y_cabe():
     estilos, eventos = lineas_titulo(
         "Inteligencia artificial para limpiar audio", (1080, 1920))
