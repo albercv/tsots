@@ -22,7 +22,7 @@ ALTO_VERTICAL = 1920
 # zoom (la cara llena la pantalla); más ancha deja ver más escena y la altura
 # que sobra se rellena con fondo difuminado. Si cambia, el seguimiento guardado
 # en las fichas deja de valer (su clave la incluye: `clave_seguimiento`).
-PROPORCION_VENTANA_CARA = 3 / 4
+PROPORCION_VENTANA_CARA = 1 / 1
 
 _AUDIO_COMPATIBLE_MP4 = {"aac", "mp3", "alac", "ac3", "eac3"}
 

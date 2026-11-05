@@ -273,7 +273,7 @@ def _con_seguimiento_de_la_ventana_9_16(tmp_path) -> Ficha:
         SEGUIMIENTO: Artefacto(L_AS, "cara.cmd", {"x_inicial": 10})})
 
 
-def test_seguimiento_de_la_ventana_9_16_no_vale_para_la_ventana_3_4(tmp_path):
+def test_seguimiento_de_la_ventana_9_16_no_vale_para_la_ventana_ancha(tmp_path):
     plan = planificar(_con_seguimiento_de_la_ventana_9_16(tmp_path),
                       _panel(paso_vertical=True, encuadre="cara"),
                       Decisiones(rehacer=frozenset({"vertical"})))
