@@ -6,7 +6,7 @@ import pytest
 
 from videopipeline import pipeline
 from videopipeline.config import PipelineConfig
-from videopipeline.steps import PasoFallido
+from videopipeline.steps import PasoFallido, filtro_ass
 
 from tests.falsos_pipeline import (  # noqa: F401 — fixtures
     entorno, entorno_caption, entorno_subs, entorno_vertical,
@@ -598,7 +598,7 @@ def test_vertical_con_subs_transcribe_una_vez(entorno_vertical, tmp_path):
     assert "ass:75:(1080, 1920):100" in llamadas
     vertical = next(l for l in llamadas if l.startswith("vertical"))
     assert vertical.startswith("vertical:.f_tmp.mp4:True:False:")
-    assert vertical.endswith("ass=subs_vertical.ass,format=yuv420p[v]")
+    assert vertical.endswith(f",{filtro_ass('subs_vertical.ass')},format=yuv420p[v]")
     assert (tmp_path / "f.mp4").read_bytes() == b"MP4SUBS"
     assert {e["total"] for e in eventos if "step" in e} == {7}
     assert _sin_temporales(tmp_path)
