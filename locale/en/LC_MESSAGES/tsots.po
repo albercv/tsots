@@ -632,8 +632,8 @@ msgstr "February"
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr "Text file with your own terms for the transcription (one line per term; \"Term = variant, variant\")."
 
-msgid "Fondo difuminado"
-msgstr "Blurred background"
+msgid "Fondo difuminado (16:9)"
+msgstr "Blurred background (16:9)"
 
 msgid "Formato vertical"
 msgstr "Vertical format"
@@ -1379,8 +1379,8 @@ msgstr "You can schedule up to one year ahead."
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr "Used for every post. In Publish you can change it for a single video."
 
-msgid "Seguir la cara"
-msgstr "Follow the face"
+msgid "Seguir la cara (4:3)"
+msgstr "Follow the face (4:3)"
 
 msgid "Selecciona un vídeo de la cola"
 msgstr "Select a video from the queue"
