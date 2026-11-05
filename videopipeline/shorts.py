@@ -16,6 +16,7 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from .caption import texto_plano
 from .config import ENCUADRES, PipelineConfig
 from .ficha import TRANSCRIPCION, Ficha, _escribir_json
 from .i18n import _
@@ -28,6 +29,7 @@ from .reproceso_plan import (
 from .seguimiento import recortar_comandos
 from .steps import PasoFallido, duracion_video
 from .subtitles import Palabra, agrupar, generar_srt
+from .titulo import generar_titulo
 
 DURACION_MIN = 60.0
 DURACION_MAX = 179.0
@@ -81,6 +83,7 @@ class Candidato:
     interes: float | None = None  # de 0 a 4
     descarte: str = ""
     archivo: str = ""  # nombre del .mp4 si salió
+    titulo_video: str = ""  # el título quemado en el short, si salió
 
 
 def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
@@ -566,10 +569,19 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         juez = puntuar(candidatos, frases, config.modelo_caption,
                        on_aviso=lambda texto: _avisar(on_progress, texto),
                        on_percent=avance(2, _("Puntuando los trozos")))
+        elegidos = elegir(candidatos, maximo)
+        # Todo short lleva su título quemado, con o sin el de inicio del panel:
+        # el del modelo sobre su trozo o, si falla, el del candidato.
+        titulado = avance(2, _("Generando título")) if elegidos else None
+        for k, c in enumerate(elegidos, 1):
+            tramo = tramo_palabras(palabras, c.inicio, c.fin)
+            c.titulo_video = generar_titulo(
+                texto_plano(tramo), config.idioma_subs, config.modelo_caption
+            ) or c.titulo
+            titulado(100.0 * k / len(elegidos))
     finally:
         servidor.cerrar()
 
-    elegidos = elegir(candidatos, maximo)
     carpeta = carpeta_shorts(ficha)
     if not elegidos:
         _avisar(on_progress, _('Ningún trozo de "{nombre}" es lo bastante bueno '
@@ -617,7 +629,8 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             _fase_vertical(config_vertical, pasada.base, mp4, bloques, tmp, progreso,
                            2 + i, total, degradar=False,
                            desde_original=pasada.base == pasada.fuente,
-                           seguimiento=seguimiento, tramo=(c.inicio, c.fin))
+                           seguimiento=seguimiento, titulo=c.titulo_video,
+                           tramo=(c.inicio, c.fin))
             if bloques:
                 generar_srt(bloques, mp4.with_suffix(".srt"))
             if config.caption_seo:  # escribe el .md o deja su propio aviso

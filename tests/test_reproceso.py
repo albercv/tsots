@@ -470,6 +470,24 @@ def test_transcripcion_fallida_solo_se_traga_si_la_reintenta_el_caption(
     assert _sin_restos(ficha)
 
 
+def test_transcripcion_fallida_se_traga_si_la_reintenta_el_titulo(
+        tmp_path, monkeypatch):
+    ficha = _pasada(_ficha(tmp_path), [A.CORTAR, A.ESCRIBIR_FINAL],
+                    paso_silencios=True)
+    monkeypatch.setattr(pipeline, "transcribir", _revienta)
+    eventos: list[dict] = []
+
+    # Sin caption ni subtítulos, solo el título absorbe el fallo con su aviso.
+    ejecutar(ficha, Plan([A.TRANSCRIBIR, A.TITULO], _panel(titulo=True), []),
+             eventos.append)
+
+    assert any("No se pudo transcribir para el título" in e.get("warning", "")
+               for e in eventos)
+    ficha = cargar(ficha.id)
+    assert TRANSCRIPCION not in ficha.artefactos and TITULO not in ficha.artefactos
+    assert _sin_restos(ficha)
+
+
 # --- Ronda de arreglos 1 -------------------------------------------------------
 
 def test_vertical_fallido_tras_cambiar_el_final_queda_desactualizado(

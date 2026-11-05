@@ -10,12 +10,6 @@ Pending work, most urgent first. Remove an item when it is merged into
       one video). Needs a way to pick one or several shorts from
       `<output>/<name>/shorts.json` and their `.md`, and a registry per
       short.
-- [ ] **Burn the title on each short.** Depends on `feature/titulo-inicio`
-      reaching `develop`: use its `generar_titulo(transcripcion, idioma,
-      modelo)` on each short's stretch and `lineas_titulo(texto,
-      resolucion, inicio, duracion)` to add the title to each short's
-      `.ass`. Until then the title only names the file and goes in
-      `shorts.json` (`shorts.crear` in `videopipeline/shorts.py`).
 - [ ] **Change the time of a scheduled post** from the calendar (Upload-Post
       `PATCH /api/uploadposts/schedule/<job_id>`; today: cancel and
       schedule again).

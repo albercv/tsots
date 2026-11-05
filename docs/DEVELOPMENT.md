@@ -466,12 +466,19 @@ shorts when processing**, **Create shorts** button).
    (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
    best first, skips anything sharing a sentence with a chosen one, and
    keeps at most `max`.
-7. Each short is encoded with the vertical step (`_fase_vertical`) into
-   `.shorts_tmp/`, plus its `.srt` and, with the SEO caption on, its `.md`.
+7. Each chosen short gets its title (`generar_titulo` on the text of its
+   stretch, with `idioma_subs` and `modelo_caption`, while Ollama is still
+   up; if it returns `None` the candidate's own title is used). It is
+   burned for every short, whatever the panel's **Opening title** checkbox
+   says.
+8. Each short is encoded with the vertical step (`_fase_vertical`, which
+   burns the title at 0-5 s with the subtitles) into `.shorts_tmp/`, plus
+   its `.srt` and, with the SEO caption on, its `.md`.
 
-Progress is `2 + n` steps (search, scoring, one per short). Cancelling
-kills the runner before its cleanup, so the app deletes `.shorts_tmp` and,
-if the folder is then empty, the folder itself (`limpiar_temporal`).
+Progress is `2 + n` steps (search, scoring and the titles, one per short).
+Cancelling kills the runner before its cleanup, so the app deletes
+`.shorts_tmp` and, if the folder is then empty, the folder itself
+(`limpiar_temporal`).
 
 **Constants to tune** (module level, tune them against real videos):
 `DURACION_MIN` / `DURACION_MAX`, `UMBRAL_INTERES`, `UMBRAL_INDEPENDIENTE`,
@@ -500,14 +507,16 @@ reports why. The judge's name goes in `shorts.json`.
   "candidatos": [ { "frase_inicio": 12, "frase_fin": 31, "titulo": "…",
                     "motivo": "…", "inicio": 63.4, "fin": 171.9,
                     "independiente": 0.92, "interes": 2.7,
-                    "descarte": "", "archivo": "01 - Title.mp4" } ] }
+                    "descarte": "", "archivo": "01 - Title.mp4",
+                    "titulo_video": "…" } ] }
 ```
 
 `candidatos` lists the chosen ones in order, then the rest with
 `descarte` (`fuera_de_rango`, `duracion`, `repetido`, `flojo`,
-`no_se_entiende_solo`, `solapa`, `sobra`). The title only names the file
-and sits in the JSON; it is not burned into the video yet (see
-`docs/TODO.md`).
+`no_se_entiende_solo`, `solapa`, `sobra`). `titulo` is the model's
+proposal with the stretch and only names the file (decided before encoding,
+for the collision check); `titulo_video` is the text burned into the video
+(`""` for the discarded).
 
 **Redoing.** Only the files the previous `shorts.json` lists (`archivos`)
 are ever deleted, and only when its `ficha` is the current record's id (a

@@ -19,6 +19,7 @@ from videopipeline.ficha import (
 from videopipeline.reproceso_plan import clave_seguimiento
 from videopipeline.steps import PasoFallido
 from videopipeline.subtitles import Palabra
+from videopipeline.titulo import lineas_titulo
 
 
 def _frases_de(n: int, segundos: float) -> list[shorts.Frase]:
@@ -563,19 +564,26 @@ def ficha_con_base(tmp_path, monkeypatch):
         ficha=ficha, config=PipelineConfig(video=original, caption_seo=True),
         carpeta=salida / "charla", cortes=[], captions=[], caras=[],
         falla_corte=None,  # número de la llamada a convertir_vertical que falla
+        titulos=[],  # (texto, idioma, modelo, ¿Ollama arrancado?) de cada generar_titulo
+        titulo_modelo="Título del tramo",  # lo que devuelve generar_titulo; None si falla
+        servidor_abierto=False,
         notas={"f11": (0.9, 3.5), "f25": (0.8, 2.5), "f15": (0.9, 3.0)},
     )
 
     class ServidorFalso:
+        def __init__(self):
+            e.servidor_abierto = True
+
         def cerrar(self):
-            pass
+            e.servidor_abierto = False
 
     def falso_convertir(video, salida_, filtro, cwd, usa_ass, desde_original=False,
                         on_percent=None, tramo=None):
-        comandos = cwd / "cara.cmd"
+        comandos, ass = cwd / "cara.cmd", cwd / "subs_vertical.ass"
         e.cortes.append({"video": video, "tramo": tramo, "filtro": filtro,
                          "usa_ass": usa_ass, "desde_original": desde_original,
-                         "cara": comandos.read_text() if comandos.is_file() else None})
+                         "cara": comandos.read_text() if comandos.is_file() else None,
+                         "ass": ass.read_text(encoding="utf-8") if ass.is_file() else None})
         if e.falla_corte == len(e.cortes):
             raise PasoFallido("ffmpeg explotó")
         salida_.write_bytes(b"SHORT")
@@ -592,6 +600,10 @@ def ficha_con_base(tmp_path, monkeypatch):
         return Caption(titulo="T", caption="C", hashtags=["#a"],
                        palabras_clave=["k"])
 
+    def falso_titulo(transcripcion, idioma, modelo, cliente=None):
+        e.titulos.append((transcripcion, idioma, modelo, e.servidor_abierto))
+        return e.titulo_modelo
+
     def falso_tev1(modelo, texto, preguntas, **kw):
         si, score = e.notas.get(texto.split()[0], (0.9, 1.0))
         return _tev1(si, score)
@@ -601,6 +613,7 @@ def ficha_con_base(tmp_path, monkeypatch):
     monkeypatch.setattr(shorts, "chat_json",
                         lambda *a, **kw: {"candidatos": PROPUESTOS})
     monkeypatch.setattr(shorts, "systemone", falso_tev1)
+    monkeypatch.setattr(shorts, "generar_titulo", falso_titulo)
     monkeypatch.setattr(pipeline, "convertir_vertical", falso_convertir)
     monkeypatch.setattr(pipeline, "asegurar_servidor", ServidorFalso)
     monkeypatch.setattr(pipeline, "generar_caption", falso_caption)
@@ -657,7 +670,7 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
     propias = etiquetas[etiquetas.index("Buscando trozos para shorts"):]
     assert list(dict.fromkeys(propias)) == [
         "Buscando trozos para shorts", "Puntuando los trozos",
-        "Creando short 1 de 2", "Creando short 2 de 2"]
+        "Generando título", "Creando short 1 de 2", "Creando short 2 de 2"]
     assert [ev["warning"] for ev in eventos if "warning" in ev] == []
 
 
@@ -673,6 +686,60 @@ def test_crear_corta_cada_tramo_con_subtitulos_desde_cero(ficha_con_base):
     # El caption de cada short es el de su trozo.
     assert e.captions[0].split()[0] == "f11" and "f10" not in e.captions[0]
     assert e.captions[1].split()[0] == "f25"
+
+
+def _eventos_del_titulo(texto):
+    return lineas_titulo(texto, (1080, 1920))[1]
+
+
+def test_crear_quema_el_titulo_del_short(ficha_con_base):
+    e = ficha_con_base
+    _crear(e)
+
+    # El texto es el del tramo de cada short, y Ollama sigue arrancado.
+    assert [(t.split()[0], i, m, abierto) for t, i, m, abierto in e.titulos] == [
+        ("f11", "es", e.config.modelo_caption, True),
+        ("f25", "es", e.config.modelo_caption, True)]
+    assert "f10" not in e.titulos[0][0]
+    assert e.servidor_abierto is False
+    # Los eventos de `lineas_titulo` están en el `.ass` de cada corte, de 0 a 5 s.
+    eventos = _eventos_del_titulo("Título del tramo")
+    assert len(eventos) == 2 and all("0:00:00.00,0:00:05.00" in ev for ev in eventos)
+    assert all(c["usa_ass"] and all(ev in c["ass"] for ev in eventos)
+               for c in e.cortes)
+    # El nombre de archivo sigue siendo el del candidato; el JSON guarda lo quemado.
+    assert (e.carpeta / f"{MEJOR}.mp4").is_file()
+    candidatos = _leer_json(e.carpeta / "shorts.json")["candidatos"]
+    assert [(c["archivo"], c["titulo_video"]) for c in candidatos] == [
+        (MEJOR + ".mp4", "Título del tramo"), (SEGUNDO + ".mp4", "Título del tramo"),
+        ("", ""), ("", "")]
+
+
+def test_crear_sin_titulo_del_modelo_usa_el_del_candidato(ficha_con_base):
+    e = ficha_con_base
+    e.titulo_modelo = None
+
+    _crear(e)
+
+    for corte, titulo in zip(e.cortes, ("El mejor trozo", "El segundo")):
+        assert all(ev in corte["ass"] for ev in _eventos_del_titulo(titulo))
+    candidatos = _leer_json(e.carpeta / "shorts.json")["candidatos"]
+    assert [c["titulo_video"] for c in candidatos[:2]] == ["El mejor trozo",
+                                                           "El segundo"]
+
+
+def test_crear_quema_el_titulo_sin_subtitulos(ficha_con_base):
+    e = ficha_con_base
+
+    _crear(e, shorts.OpcionesShorts(subtitulos=False))
+
+    eventos = _eventos_del_titulo("Título del tramo")
+    for corte in e.cortes:
+        assert corte["usa_ass"] and "ass=subs_vertical.ass" in corte["filtro"]
+        # Solo el título: sus dos eventos y ninguno de subtítulos.
+        assert [linea for linea in corte["ass"].splitlines()
+                if linea.startswith("Dialogue:")] == eventos
+    assert not list(e.carpeta.glob("*.srt"))
 
 
 def test_crear_sustituye_solo_lo_que_lista_el_json_anterior(ficha_con_base):
@@ -904,7 +971,6 @@ def test_crear_sin_subtitulos_ni_caption(ficha_con_base):
 
     assert sorted(p.name for p in e.carpeta.iterdir()) == [
         f"{MEJOR}.mp4", f"{SEGUNDO}.mp4", "shorts.json"]
-    assert all(not c["usa_ass"] and "ass=" not in c["filtro"] for c in e.cortes)
     assert e.captions == [] and e.caras == []
 
 

@@ -140,5 +140,5 @@ Es una sección plegable más del panel, como las de hoy (`SeccionPlegable`), co
   - `generar_titulo(transcripcion, idioma, modelo)`, llamado con el tramo del short;
   - `lineas_titulo(texto, resolucion, inicio, duracion)`, para añadir el título al `.ass` del short.
 
-  Las dos ramas avanzan a la vez. Esta deja para el final la tarea de quemar el título y la hace cuando la del título esté en `develop`, rebasando. Hasta entonces el título de cada short es el que propone gemma4 junto con el trozo, y solo se guarda en `shorts.json` y en el nombre del archivo.
+  Las dos ramas avanzan a la vez. Esta deja para el final la tarea de quemar el título y la hace cuando la del título esté en `develop`, rebasando. Hecho: cada short quema el título que `generar_titulo` saca de su trozo o, si falla, el que propone gemma4 junto con el trozo; el nombre del archivo sigue siendo el del candidato y el texto quemado se guarda en `shorts.json` (`titulo_video`).
 - **PR #25 (`fix/zoom-cara`).** Los shorts usan el vertical. Si #25 se mergea antes, se rebasa para tener la ventana 4:3.
