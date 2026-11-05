@@ -9,11 +9,9 @@ import pytest
 from videopipeline import steps
 from videopipeline.steps import PasoFallido
 from videopipeline.titulo import (
-    ANCHO_CARACTER,
     ANCHO_UTIL,
-    BORDE_DORADO,
-    DESPLAZAMIENTO,
     ESQUEMA,
+    _ancho_en_fs,
     construir_mensajes,
     generar_titulo,
     lineas_titulo,
@@ -72,10 +70,6 @@ def _texto(evento: str) -> str:
     return re.sub(r"^\{[^}]*\}", "", evento.split(",", 9)[9])
 
 
-def _ancho_en_fs(n: int) -> float:
-    return n * ANCHO_CARACTER + 2 * BORDE_DORADO + DESPLAZAMIENTO
-
-
 def test_dos_capas_arriba_centradas():
     estilos, eventos = lineas_titulo("Audio limpio ya", (1920, 1080))
     assert [_estilo(e)[0] for e in estilos] == ["TituloDorado", "Titulo"]
@@ -87,12 +81,21 @@ def test_dos_capas_arriba_centradas():
     assert eventos[1].startswith("Dialogue: 1,0:00:00.00,0:00:05.00,Titulo,")
     assert "\\an8\\pos(960,86)\\fad(300,300)" in eventos[1]
     assert _texto(eventos[0]) == _texto(eventos[1]) == "AUDIO LIMPIO YA"
+    # Espaciado entre letras: round(76 * ESPACIADO) en ambas capas.
+    assert [_estilo(e)[13] for e in estilos] == ["3", "3"]
 
 
 def test_vertical_usa_su_tamano():
     estilos, eventos = lineas_titulo("Audio limpio ya", (1080, 1920))
     assert _estilo(estilos[1])[2] == "106"
     assert "\\pos(540,154)" in eventos[1]
+    assert [_estilo(e)[13] for e in estilos] == ["4", "4"]
+
+
+def test_titulo_corto_en_vertical_cabe_en_una_linea():
+    estilos, eventos = lineas_titulo("Audio limpio ya", (1080, 1920))
+    assert "\\N" not in _texto(eventos[1])
+    assert _estilo(estilos[1])[2] == "106"
 
 
 def test_largo_parte_en_dos_y_cabe():
@@ -100,9 +103,9 @@ def test_largo_parte_en_dos_y_cabe():
         "Inteligencia artificial para limpiar audio", (1080, 1920))
     texto = _texto(eventos[1])
     assert "\\N" in texto
-    n = max(len(linea) for linea in texto.split("\\N"))
     fs = int(_estilo(estilos[1])[2])
-    assert _ancho_en_fs(n) * fs <= ANCHO_UTIL * 1080
+    assert all(_ancho_en_fs(linea) * fs <= ANCHO_UTIL * 1080
+               for linea in texto.split("\\N"))
 
 
 def test_palabra_sola_larguisima_reduce_la_letra():
@@ -111,15 +114,21 @@ def test_palabra_sola_larguisima_reduce_la_letra():
     texto = _texto(eventos[1])
     fs = int(_estilo(estilos[1])[2])
     assert "\\N" not in texto
-    assert _ancho_en_fs(len(texto)) * fs <= ANCHO_UTIL * 1080
+    assert _ancho_en_fs(texto) * fs <= ANCHO_UTIL * 1080
     assert fs >= 8
 
 
 def test_quita_llaves_y_barras():
-    _, eventos = lineas_titulo("{\\b1}Hola\\N mundo raro", (1920, 1080))
+    # Sin partir: ni una barra en el texto tras el bloque de override.
+    _, eventos = lineas_titulo("{\\b1}Hola\\N mundo", (1920, 1080))
+    texto = _texto(eventos[1])
+    assert "\\" not in texto and "{" not in texto and "}" not in texto
+    # Largo: la única barra es la `\\N` de `partir_en_dos`.
+    _, eventos = lineas_titulo(
+        "{\\b1}Inteligencia\\N artificial para limpiar audio", (1080, 1920))
     texto = _texto(eventos[1])
     assert "{" not in texto and "}" not in texto
-    assert texto.replace("\\N", "").count("\\") == 0
+    assert texto.count("\\") == 1 and texto.count("\\N") == 1
 
 
 def test_inicio_y_duracion():

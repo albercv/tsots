@@ -68,8 +68,9 @@ TAMANO_HORIZONTAL = 0.07
 TAMANO_VERTICAL = 0.055  # fracción de la altura; vertical si alto > ancho
 ANCHO_UTIL = 0.90
 MARGEN_SUPERIOR = 0.08
-# Avance medio de una mayúscula de Titan One por punto de `Fontsize` de libass.
-ANCHO_CARACTER = 0.62
+ANCHO_LETRA = 0.58  # avance medio de una mayúscula de Titan One por punto de Fontsize
+ANCHO_ESPACIO = 0.20  # avance del espacio, ídem
+ESPACIADO = 0.04  # `Spacing` entre letras, fracción del tamaño de letra
 # BORDE, BORDE_DORADO y DESPLAZAMIENTO: fracciones del tamaño de letra.
 BORDE = 0.08
 BORDE_DORADO = 0.16
@@ -78,8 +79,11 @@ DORADO = "&H0000C8FF"  # #FFC800 en &HAABBGGRR
 FUNDIDO_MS = 300
 
 
-def _ancho_en_fs(n: int) -> float:
-    return n * ANCHO_CARACTER + 2 * BORDE_DORADO + DESPLAZAMIENTO
+def _ancho_en_fs(linea: str) -> float:
+    """Ancho estimado de la línea en múltiplos del tamaño de letra."""
+    espacios = linea.count(" ")
+    return ((len(linea) - espacios) * ANCHO_LETRA + espacios * ANCHO_ESPACIO
+            + len(linea) * ESPACIADO + 2 * BORDE_DORADO + DESPLAZAMIENTO)
 
 
 def lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
@@ -94,20 +98,21 @@ def lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
         return [], []
 
     fs = round(alto * (TAMANO_VERTICAL if alto > ancho else TAMANO_HORIZONTAL))
-    if _ancho_en_fs(len(texto)) * fs > ANCHO_UTIL * ancho:
+    if _ancho_en_fs(texto) * fs > ANCHO_UTIL * ancho:
         texto = partir_en_dos(texto)
-    n = max(len(linea) for linea in texto.split("\\N"))
-    fs = max(8, min(fs, int(ANCHO_UTIL * ancho / _ancho_en_fs(n))))
+    mas_ancha = max(map(_ancho_en_fs, texto.split("\\N")))
+    fs = max(8, min(fs, int(ANCHO_UTIL * ancho / mas_ancha)))
     borde = max(1, round(fs * BORDE))
     dorado = round(fs * BORDE_DORADO)
     d = max(1, round(fs * DESPLAZAMIENTO))
+    espaciado = round(fs * ESPACIADO)
     x, y = ancho // 2, round(alto * MARGEN_SUPERIOR)
 
     estilos = [
         f"Style: TituloDorado,{FUENTE},{fs},{DORADO},&H00FFFFFF,{DORADO},"
-        f"&H00000000,0,0,0,0,100,100,0,0,1,{dorado},0,8,0,0,0,1",
+        f"&H00000000,0,0,0,0,100,100,{espaciado},0,1,{dorado},0,8,0,0,0,1",
         f"Style: Titulo,{FUENTE},{fs},&H00FFFFFF,&H00FFFFFF,&H00000000,"
-        f"&H00000000,0,0,0,0,100,100,0,0,1,{borde},0,8,0,0,0,1",
+        f"&H00000000,0,0,0,0,100,100,{espaciado},0,1,{borde},0,8,0,0,0,1",
     ]
     tiempos = f"{_tiempo_ass(inicio)},{_tiempo_ass(inicio + duracion)}"
     fundido = f"\\fad({FUNDIDO_MS},{FUNDIDO_MS})"
