@@ -208,7 +208,7 @@ stands in for it. Planner and executor use the same helper.
 | `audio` | `audio_limpio.flac` | task + model | `tarea`, `modelo`; `linea_tiempo` is that of the video it was cleaned from (R9) |
 | `base` | `base.mp4`, or none when the final is the base (R3) | settings of the steps applied + timeline | `{"audio": …, "silencios": …}`, only the steps applied |
 | `transcripcion` | `transcripcion.json` | language, Whisper model, glossary key | the same; `linea_tiempo` is that of the base it came from |
-| `titulo` | none: the text is the whole artifact | `clave(texto)` | `{"texto": …}`, from the subtitles' transcript (action `TITULO`); no timeline, so valid while present |
+| `titulo` | none: the text is the whole artifact | `clave(texto)` | `{"texto": …}`, from the transcript (action `TITULO`); no timeline, so valid while present |
 | `horizontal` | none: the final `.mp4` is in `ficha.final` | timeline + subtitle settings + title text | `{"subtitulos": …}` if burned, `"titulo"` if it has a title |
 | `caption` | `caption.md` (the `.md` next to the final is a copy) | `modelo_caption` | `{"caption": …}` |
 | `seguimiento` | `cara.cmd` | timeline of the base only: the picture depends on the cuts, not the audio | `x_inicial` |
@@ -223,11 +223,14 @@ panel step, and asks nothing in the reprocess dialog. It runs between
 `TRANSCRIBIR` and `QUEMAR` (progress label "Generando título"). The text
 is generated when it is missing (box just ticked, new video, or a new
 subtitle transcript, e.g. "redo the subtitles"), reused when only the cut
-changes, and not touched by redoing the caption. If regenerating fails, the
-previous title stays and is the one burned. Ticking or unticking the box
-re-burns the app's own outputs whose base still holds (horizontal and
-vertical, without the R7 question) and does not transcribe again. On
-legacy or adopted outputs, or when no base can be rebuilt, the title is only
+changes and no subtitles are burned (with subtitles, a new cut means a new
+transcript, hence a new title), and not touched by redoing the caption. If
+regenerating fails, the previous title stays and is the one burned. Ticking
+or unticking the box re-burns the app's own outputs whose base still holds
+(horizontal and vertical, without the R7 question). It does not transcribe
+again when the record already has a transcript; with none (e.g. a video
+processed without subtitles or caption), ticking the box transcribes first.
+On legacy or adopted outputs, or when no base can be rebuilt, the title is only
 added when that output is rebuilt for another reason. It is never burned
 over `subs_quemados_sin_base` (R2). With the box on and the model
 unavailable, each "Process again" retries the title and burns it again.
