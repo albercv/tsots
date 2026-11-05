@@ -59,6 +59,8 @@ def test_suavizar_sigue_deriva_lenta():
 
 def test_posiciones_recorte_limites():
     assert posiciones_recorte([0.0, 0.5, 1.0], 1920, 606) == [0, 657, 1314]
+    # La ventana ancha de la cara (4:3) llega a 1920 - 1440 = 480, no más.
+    assert posiciones_recorte([0.0, 0.5, 1.0], 1920, 1440) == [0, 240, 480]
 
 
 def test_escribir_comandos_deduplica(tmp_path):
@@ -132,8 +134,17 @@ def test_preparar_sin_caras_devuelve_none(video_720p, tmp_path):
 def test_preparar_escribe_comandos(video_720p, tmp_path):
     ruta = tmp_path / "cara.cmd"
     x0 = preparar_seguimiento(video_720p, 1280, 720, ruta, detector=_detector_fijo)
-    assert x0 == posiciones_recorte([200 / 480], 1280, 404)[0] == 331
-    assert ruta.read_text().startswith("0.000 crop@v x 331;")
+    # Ventana 4:3 de 960 px (no los 404 del 9:16): centrada en la cara.
+    assert x0 == posiciones_recorte([200 / 480], 1280, 960)[0] == 53
+    assert ruta.read_text().startswith("0.000 crop@v x 53;")
+
+
+def test_preparar_acota_las_x_a_la_ventana_ancha(video_720p, tmp_path):
+    ruta = tmp_path / "cara.cmd"
+    cara_al_borde = lambda frame: np.array([[440, 20, 478, 220, 0.95]])  # x ~ 0.96
+    x0 = preparar_seguimiento(video_720p, 1280, 720, ruta, detector=cara_al_borde)
+    xs = [int(l.split()[3].rstrip(";")) for l in ruta.read_text().splitlines()]
+    assert x0 == 1280 - 960 and max(xs) == 1280 - 960  # y no los 1280 - 404
 
 
 def test_cara_real_ffmpeg_aplica_comandos(video_720p, tmp_path):
@@ -141,6 +152,17 @@ def test_cara_real_ffmpeg_aplica_comandos(video_720p, tmp_path):
     salida = tmp_path / "cara.mp4"
     convertir_vertical(video_720p, salida,
                        filtro_vertical("cara", 1280, 720, x_cara=0),
+                       cwd=tmp_path, usa_ass=False)
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=width,height", "-of", "csv=p=0", str(salida)],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert out == "1080,1920"
+
+
+def test_cara_real_ffmpeg_sin_seguimiento_centra_la_ventana(video_720p, tmp_path):
+    salida = tmp_path / "cara.mp4"
+    convertir_vertical(video_720p, salida, filtro_vertical("cara", 1280, 720),
                        cwd=tmp_path, usa_ass=False)
     out = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0",

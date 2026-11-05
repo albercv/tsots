@@ -632,8 +632,8 @@ msgstr "February"
 msgid "Fichero de texto con términos propios para la transcripción (una línea por término; «Término = variante, variante»)."
 msgstr "Text file with your own terms for the transcription (one line per term; \"Term = variant, variant\")."
 
-msgid "Fondo difuminado"
-msgstr "Blurred background"
+msgid "Fondo difuminado (16:9)"
+msgstr "Blurred background (16:9)"
 
 msgid "Formato vertical"
 msgstr "Vertical format"
@@ -883,8 +883,8 @@ msgstr "There is no server at http://localhost:11434 and `ollama serve` could no
 msgid "No queda espacio en disco"
 msgstr "No space left on disk"
 
-msgid "No se detectó ninguna cara: se usa recorte central."
-msgstr "No face was detected: using a centre crop."
+msgid "No se detectó ninguna cara: se encuadra al centro."
+msgstr "No face was detected: framing the centre."
 
 msgid "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"
 msgstr "The API key was not found in the Keychain. Save it again in Networks…"
@@ -1026,8 +1026,8 @@ msgid "No se pudo leer la resolución del vídeo: {video}"
 msgstr "Could not read the video resolution: {video}"
 
 #, python-brace-format
-msgid "No se pudo preparar el detector de caras: {error}. Se usa recorte central."
-msgstr "Could not prepare the face detector: {error}. Using a centre crop."
+msgid "No se pudo preparar el detector de caras: {error}. Se encuadra al centro."
+msgstr "Could not prepare the face detector: {error}. Framing the centre."
 
 #, python-brace-format
 msgid "No se pudo preparar el servicio ({tipo}). Detalles en el registro."
@@ -1379,8 +1379,8 @@ msgstr "You can schedule up to one year ahead."
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr "Used for every post. In Publish you can change it for a single video."
 
-msgid "Seguir la cara"
-msgstr "Follow the face"
+msgid "Seguir la cara (4:3)"
+msgstr "Follow the face (4:3)"
 
 msgid "Selecciona un vídeo de la cola"
 msgstr "Select a video from the queue"

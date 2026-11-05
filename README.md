@@ -101,7 +101,7 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
    - **Vertical format**: also saves `name_limpio_vertical.mp4` (9:16,
      1080x1920) for Reels and TikTok; without audio or silences selected,
      only `name_vertical.mp4` is written. Framings: centre crop (default),
-     blurred background, black bars or **follow the face** (slower; the
+     blurred background (16:9), black bars or **follow the face (4:3)** (slower; the
      first time it downloads the detector, ~90 MB). It is unticked when the
      app reopens: it is an occasional step.
    - **Terms…**: your brands and proper names, one per line, so Whisper

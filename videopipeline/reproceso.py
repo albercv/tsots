@@ -27,6 +27,7 @@ from .pipeline import (
 from .reproceso_plan import (
     Accion, Plan, ajustes_audio, ajustes_caption, ajustes_silencios,
     ajustes_subtitulos, ajustes_transcripcion, ajustes_vertical, clave,
+    clave_seguimiento,
 )
 from .seguimiento import RUTA_PESOS, preparar_seguimiento
 from .steps import (
@@ -97,7 +98,10 @@ class _Pasada:
         self.transcrito = False
         self.publicados: set[Path] = set()  # lo que ha escrito esta pasada
         seguimiento = ficha.artefactos.get(SEGUIMIENTO)
-        self.x_cara = seguimiento.ajustes.get("x_inicial") if seguimiento else None
+        # Solo las x de la ventana y la línea de tiempo actuales: nunca las viejas.
+        vale = (seguimiento is not None
+                and seguimiento.clave == clave_seguimiento(self.linea))
+        self.x_cara = seguimiento.ajustes.get("x_inicial") if vale else None
         # El vertical único, por si esta pasada crea el horizontal (R10).
         self.vertical_unico = None if ficha.hay_horizontal() else ficha.final
 
@@ -412,16 +416,16 @@ class _Pasada:
         except Exception as error:  # noqa: BLE001 — degradación deliberada
             self.x_cara = None
             _avisar(self.on_progress,
-                    _("No se pudo preparar el detector de caras: {error}. Se usa "
-                      "recorte central.").format(error=error))
+                    _("No se pudo preparar el detector de caras: {error}. Se "
+                      "encuadra al centro.").format(error=error))
             return
         if self.x_cara is None:
-            _avisar(self.on_progress, _("No se detectó ninguna cara: se usa "
-                                        "recorte central."))
+            _avisar(self.on_progress, _("No se detectó ninguna cara: se "
+                                        "encuadra al centro."))
             comandos.touch()  # «sin caras» también es un resultado: no se repite
         comandos.replace(self.ficha.ruta("cara.cmd"))
         self.ficha.artefactos[SEGUIMIENTO] = Artefacto(
-            self.linea, "cara.cmd", {"x_inicial": self.x_cara})
+            clave_seguimiento(self.linea), "cara.cmd", {"x_inicial": self.x_cara})
         guardar(self.ficha)
 
     def vertical(self, paso: int) -> None:

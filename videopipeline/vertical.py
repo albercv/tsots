@@ -18,6 +18,12 @@ from .steps import (
 ANCHO_VERTICAL = 1080
 ALTO_VERTICAL = 1920
 
+# Proporción ancho/alto de la ventana que sigue la cara. 9:16 sería el máximo
+# zoom (la cara llena la pantalla); más ancha deja ver más escena y la altura
+# que sobra se rellena con fondo difuminado. Si cambia, el seguimiento guardado
+# en las fichas deja de valer (su clave la incluye: `clave_seguimiento`).
+PROPORCION_VENTANA_CARA = 4 / 3
+
 _AUDIO_COMPATIBLE_MP4 = {"aac", "mp3", "alac", "ac3", "eac3"}
 
 
@@ -26,8 +32,27 @@ def ancho_recorte(alto: int) -> int:
     return int(alto * 9 / 16) // 2 * 2
 
 
+def ancho_ventana_cara(ancho: int, alto: int) -> int:
+    """Ancho par de la ventana que sigue la cara, sin pasar del fotograma."""
+    return min(round(alto * PROPORCION_VENTANA_CARA), ancho) // 2 * 2
+
+
 def es_ya_vertical(ancho: int, alto: int) -> bool:
     return alto * 9 >= ancho * 16
+
+
+def _sobre_fondo_difuminado(w: int, h: int) -> str:
+    """Tramo de filtros que centra la imagen de entrada sobre su propio fondo
+    desenfocado, a w x h."""
+    return (
+        "split[a][b];"
+        # Desenfoque a 1/4 de resolución: a tamaño completo es ~5x más lento.
+        f"[a]scale={w // 4}:{h // 4}:force_original_aspect_ratio=increase,"
+        f"crop={w // 4}:{h // 4},boxblur=5:2,scale={w}:{h}[bg];"
+        f"[b]scale={w}:{h}:force_original_aspect_ratio=decrease"
+        ":force_divisible_by=2[fg];"
+        "[bg][fg]overlay=(W-w)/2:(H-h)/2"
+    )
 
 
 def filtro_vertical(
@@ -37,7 +62,11 @@ def filtro_vertical(
     x_cara: int | None = None,
     ass_nombre: str | None = None,
 ) -> str:
-    """Grafo de filtros completo ``[0:v]…[v]`` para salida 1080x1920."""
+    """Grafo de filtros completo ``[0:v]…[v]`` para salida 1080x1920.
+
+    En ``"cara"``, ``x_cara`` es la x inicial de la ventana (la mueve
+    ``cara.cmd``); sin ella (no hay caras) la ventana queda quieta, centrada.
+    """
     w, h = ANCHO_VERTICAL, ALTO_VERTICAL
     final = f"setsar=1{f',ass={ass_nombre}' if ass_nombre else ''},format=yuv420p[v]"
     if encuadre == "central":
@@ -48,22 +77,15 @@ def filtro_vertical(
             f":force_divisible_by=2,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,{final}"
         )
     if encuadre == "difuminado":
-        return (
-            "[0:v]split[a][b];"
-            # Desenfoque a 1/4 de resolución: a tamaño completo es ~5x más lento.
-            f"[a]scale={w // 4}:{h // 4}:force_original_aspect_ratio=increase,"
-            f"crop={w // 4}:{h // 4},boxblur=5:2,scale={w}:{h}[bg];"
-            f"[b]scale={w}:{h}:force_original_aspect_ratio=decrease"
-            ":force_divisible_by=2[fg];"
-            f"[bg][fg]overlay=(W-w)/2:(H-h)/2,{final}"
-        )
+        return f"[0:v]{_sobre_fondo_difuminado(w, h)},{final}"
     if encuadre == "cara":
+        ancho_v = ancho_ventana_cara(ancho, alto)
         if x_cara is None:
-            raise ValueError("el encuadre 'cara' necesita x_cara")
-        return (
-            f"[0:v]sendcmd=f=cara.cmd,crop@v={ancho_recorte(alto)}:{alto}"
-            f":{x_cara}:0,scale={w}:{h},{final}"
-        )
+            ventana = f"crop={ancho_v}:{alto}"  # x por defecto: centrada
+        else:
+            x = max(0, min(x_cara, ancho - ancho_v))
+            ventana = f"sendcmd=f=cara.cmd,crop@v={ancho_v}:{alto}:{x}:0"
+        return f"[0:v]{ventana},{_sobre_fondo_difuminado(w, h)},{final}"
     raise ValueError(f"encuadre desconocido: {encuadre!r}")
 
 

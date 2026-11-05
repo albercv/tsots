@@ -268,8 +268,8 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
 
     Con `degradar`, un fallo deja solo un aviso (el horizontal ya está
     publicado); sin él, el error se propaga. Con `seguimiento` (x inicial y
-    comandos, ya calculados) no se detecta la cara otra vez: x None es
-    recorte central.
+    comandos, ya calculados) no se detecta la cara otra vez: x None (sin
+    caras) deja la ventana ancha quieta, en el centro.
     """
     tmp = destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
     ass = trabajo / "subs_vertical.ass"
@@ -286,9 +286,7 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
         if config.encuadre == "cara" and seguimiento is not None:
             if encuadre == "cara":
                 x_cara, ruta_comandos = seguimiento
-                if x_cara is None:
-                    encuadre = "central"
-                else:  # el filtro lee `cara.cmd` en `trabajo`
+                if x_cara is not None:  # el filtro lee `cara.cmd` en `trabajo`
                     shutil.copyfile(ruta_comandos, comandos)
         elif config.encuadre == "cara":
             if encuadre == "cara":
@@ -306,13 +304,11 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                     )
                     if x_cara is None:
                         _avisar(on_progress, _("No se detectó ninguna cara: "
-                                               "se usa recorte central."))
+                                               "se encuadra al centro."))
                 except Exception as error:  # noqa: BLE001 — degradación deliberada
                     _avisar(on_progress,
                             _("No se pudo preparar el detector de caras: "
-                              "{error}. Se usa recorte central.").format(error=error))
-                if x_cara is None:
-                    encuadre = "central"
+                              "{error}. Se encuadra al centro.").format(error=error))
             paso += 1  # el total cuenta el paso aunque se salte
         if bloques:
             generar_ass(bloques, config.diseno, config.posicion_subs,

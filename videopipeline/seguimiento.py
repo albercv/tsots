@@ -11,7 +11,7 @@ import numpy as np
 
 from .i18n import _
 from .steps import BASE_DIR, PasoFallido, _binario, duracion_video
-from .vertical import ancho_recorte
+from .vertical import ancho_ventana_cara
 
 Detector = Callable[[np.ndarray], np.ndarray]
 
@@ -142,7 +142,7 @@ def preparar_seguimiento(
     camara = suavizar(muestrear_centros(video, ancho, alto, on_percent, detector))
     if camara is None:
         return None
-    posiciones = posiciones_recorte(camara, ancho, ancho_recorte(alto))
+    posiciones = posiciones_recorte(camara, ancho, ancho_ventana_cara(ancho, alto))
     # Por encima de este salto es un cambio de plano: se corta, no se interpola.
     escribir_comandos(posiciones, ruta_cmd,
                       salto_px=int((SALTO_PLANO - ZONA_MUERTA) * ancho))
