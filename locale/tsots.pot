@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 13:57+0100\n"
+"POT-Creation-Date: 2026-11-06 11:56+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -156,6 +156,11 @@ msgstr ""
 msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
 msgstr ""
 
+msgid ""
+"Altura a la que se apoyan los subtítulos, medida desde arriba del vídeo: 50 % es el centro y 95 % casi el borde inferior.\n"
+"Sube el valor para bajar el texto y viceversa. Por defecto 75 %."
+msgstr ""
+
 msgid "Amarillo"
 msgstr ""
 
@@ -168,6 +173,13 @@ msgstr ""
 msgid ""
 "Arrastra vídeos aquí\n"
 "(o haz clic para abrir)"
+msgstr ""
+
+msgid ""
+"Audio que se conserva antes y después de cada tramo con voz para no cortar palabras. Por defecto 0.2s.\n"
+"Una pausa solo se corta si dura más de 2 × margen + 0,2 s, y de una pausa cortada queda más o menos 2 × margen.\n"
+"Más bajo: pausas más cortas entre frases, pero cortes más secos (0s se come consonantes). Más alto: más natural, menos recorte.\n"
+"Admite dos valores, «antes,después»: 0.05s,0.1s."
 msgstr ""
 
 msgid "Autodetectar"
@@ -343,6 +355,11 @@ msgstr ""
 msgid "Cortar"
 msgstr ""
 
+msgid ""
+"Cortar: elimina los silencios del vídeo.\n"
+"Acelerar: no los quita, los reproduce más rápido (ver Velocidad) y el vídeo conserva su ritmo."
+msgstr ""
+
 msgid "Corte de silencios"
 msgstr ""
 
@@ -363,6 +380,14 @@ msgid "Cuentas conectadas"
 msgstr ""
 
 msgid "Cuándo:"
+msgstr ""
+
+msgid ""
+"Cómo se adapta un vídeo horizontal a 9:16.\n"
+"Recorte central: corta una franja del centro.\n"
+"Fondo difuminado: el vídeo entero sobre su propio fondo borroso.\n"
+"Barras negras: el vídeo entero con bandas negras.\n"
+"Seguir la cara: recorte 4:3 que sigue al hablante sobre fondo difuminado (más lento, analiza el vídeo)."
 msgstr ""
 
 msgid "Deportes"
@@ -387,6 +412,9 @@ msgid "Detectando caras"
 msgstr ""
 
 msgid "Diciembre"
+msgstr ""
+
+msgid "Diseño de los subtítulos"
 msgstr ""
 
 msgid "Diseño:"
@@ -514,6 +542,9 @@ msgstr ""
 msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr ""
 
+msgid "El vídeo elegido no tiene shorts en su carpeta."
+msgstr ""
+
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr ""
 
@@ -541,6 +572,12 @@ msgid "En Upload-Post es el nombre del perfil que aparece en Manage Users (app.u
 msgstr ""
 
 msgid "En cola"
+msgstr ""
+
+msgid "Encuadre de los shorts"
+msgstr ""
+
+msgid "Encuadre vertical"
 msgstr ""
 
 msgid "Encuadre:"
@@ -597,6 +634,11 @@ msgstr ""
 msgid "Error: {titulo}"
 msgstr ""
 
+msgid ""
+"Escala el tamaño del texto respecto al del diseño elegido: 100 % es el tamaño original, de 50 % a 150 %.\n"
+"Si un subtítulo no cabe en el ancho, se reduce solo."
+msgstr ""
+
 msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
@@ -611,6 +653,11 @@ msgid "Esperando a que el servicio termine: {lista}…"
 msgstr ""
 
 msgid "Esperando confirmación…"
+msgstr ""
+
+msgid ""
+"Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
+"Los Karaoke resaltan cada palabra a medida que se dice."
 msgstr ""
 
 #, python-brace-format
@@ -641,7 +688,15 @@ msgstr ""
 msgid "Facebook no está conectada en {servicio}."
 msgstr ""
 
+msgid ""
+"Factor de aceleración de los silencios cuando eliges Acelerar: 4 significa que se reproducen 4 veces más rápido.\n"
+"Solo se usa con Acelerar; con Cortar no hace nada. Por defecto 4."
+msgstr ""
+
 msgid "Falló en todas"
+msgstr ""
+
+msgid "Falló en todos"
 msgstr ""
 
 msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
@@ -720,7 +775,21 @@ msgstr ""
 msgid "Idioma"
 msgstr ""
 
+msgid ""
+"Idioma del audio, para que Whisper transcriba bien.\n"
+"Autodetectar lo deduce de la grabación; si ya lo sabes, elegirlo evita errores en vídeos con poca voz o mezcla de idiomas.\n"
+"Lo usan los subtítulos y el título del inicio."
+msgstr ""
+
+msgid "Idioma hablado"
+msgstr ""
+
 msgid "Idioma:"
+msgstr ""
+
+msgid ""
+"Igual que el encuadre del formato vertical, pero propio de los shorts.\n"
+"Recorte central, Fondo difuminado, Barras negras o Seguir la cara (por defecto; más lento porque analiza el vídeo)."
 msgstr ""
 
 msgid "Impacto"
@@ -851,6 +920,9 @@ msgstr ""
 msgid "Marca al menos un paso."
 msgstr ""
 
+msgid "Marca al menos un short y una plataforma."
+msgstr ""
+
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr ""
 
@@ -858,6 +930,9 @@ msgid "Marcas y nombres propios que Whisper debe escribir bien."
 msgstr ""
 
 msgid "Marca…"
+msgstr ""
+
+msgid "Margen"
 msgstr ""
 
 msgid "Margen:"
@@ -887,11 +962,31 @@ msgstr ""
 msgid "Mié"
 msgstr ""
 
+msgid "Modelo Whisper"
+msgstr ""
+
 msgid "Modelo de Ollama no descargado"
+msgstr ""
+
+msgid "Modelo de audio"
+msgstr ""
+
+msgid "Modelo del caption"
+msgstr ""
+
+msgid ""
+"Modelo local de Ollama que escribe el título, el caption, los hashtags y el título del inicio a partir de la transcripción.\n"
+"Uno más grande suele escribir mejor, pero tarda más y gasta más memoria; los que no caben en tu Mac salen deshabilitados."
 msgstr ""
 
 #, python-brace-format
 msgid "Modelo no descargado: {modelo}"
+msgstr ""
+
+msgid ""
+"Modelo que transcribe el audio.\n"
+"small: rápido y ligero (~500 MB). medium: más preciso (~1,5 GB). turbo: la mejor relación calidad/velocidad (~1,6 GB) y el recomendado.\n"
+"Se descarga la primera vez que se usa."
 msgstr ""
 
 msgid "Modelo:"
@@ -954,6 +1049,9 @@ msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama s
 msgstr ""
 
 msgid "No queda espacio en disco"
+msgstr ""
+
+msgid "No queda ninguna plataforma para este short."
 msgstr ""
 
 msgid "No se detectó ninguna cara: se encuadra al centro."
@@ -1228,6 +1326,9 @@ msgstr ""
 msgid "Por confirmar"
 msgstr ""
 
+msgid "Posición vertical"
+msgstr ""
+
 msgid "Posición vertical:"
 msgstr ""
 
@@ -1265,6 +1366,9 @@ msgstr ""
 msgid "Proceso en curso"
 msgstr ""
 
+msgid "Programa en redes los shorts ya creados del vídeo elegido, cada uno con su fecha."
+msgstr ""
+
 msgid "Programada"
 msgstr ""
 
@@ -1279,10 +1383,18 @@ msgid "Programado en {ok} de {total}"
 msgstr ""
 
 #, python-brace-format
+msgid "Programados {ok} de {total} shorts"
+msgstr ""
+
+#, python-brace-format
 msgid "Programando: {lista}…"
 msgstr ""
 
 msgid "Programar"
+msgstr ""
+
+#, python-brace-format
+msgid "Programar {n} shorts"
 msgstr ""
 
 msgid "Publicación cancelada: no se ha enviado nada."
@@ -1309,6 +1421,12 @@ msgid "Publicar en TikTok, YouTube, Instagram, X y Facebook"
 msgstr ""
 
 msgid "Publicar en redes"
+msgstr ""
+
+msgid "Publicar shorts"
+msgstr ""
+
+msgid "Publicar shorts…"
 msgstr ""
 
 msgid "Publicar…"
@@ -1341,6 +1459,16 @@ msgstr ""
 msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
 msgstr ""
 
+msgid ""
+"Qué hace el modelo con la voz.\n"
+"Mejora de voz: quita ruido y limpia la grabación (lo habitual).\n"
+"Separación de hablantes: aísla cada voz de una conversación.\n"
+"Super-resolución: reconstruye el agudo de un audio de poca calidad."
+msgstr ""
+
+msgid "Qué hacer con los silencios"
+msgstr ""
+
 #, python-brace-format
 msgid "Qué hacer: {solucion}"
 msgstr ""
@@ -1364,6 +1492,12 @@ msgid "Recortar silencios cambia los tiempos de \"{nombre}\": se volverán a tra
 msgstr ""
 
 msgid "Recorte central"
+msgstr ""
+
+msgid ""
+"Red neuronal que hace la limpieza; la lista depende de la tarea.\n"
+"La cifra final (16K, 48K) es la frecuencia de muestreo: 48K conserva más agudos y es el modelo por defecto.\n"
+"Si no está descargado, se baja la primera vez que se usa."
 msgstr ""
 
 msgid "Redes sociales"
@@ -1467,6 +1601,15 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Se programarán {n} shorts:\n"
+"\n"
+"{lista}\n"
+"\n"
+"{resumen}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
 "{resumen}"
@@ -1505,11 +1648,21 @@ msgstr ""
 msgid "Short público"
 msgstr ""
 
+#, python-brace-format
+msgid "Short {n} de {total}"
+msgstr ""
+
 msgid "Shorts"
+msgstr ""
+
+msgid "Shorts: elige cuáles y cuándo"
 msgstr ""
 
 #, python-brace-format
 msgid "Shorts: {ruta}"
+msgstr ""
+
+msgid "Si sigues, saldrán repetidos."
 msgstr ""
 
 msgid "Sigue procesándose"
@@ -1595,7 +1748,13 @@ msgstr ""
 msgid "TSOTS publica a través de un servicio que ya tiene permiso de TikTok, YouTube, Instagram, X y Facebook. Crea una cuenta en el servicio, conecta allí tus redes y pega aquí su API key: se guarda en el Llavero de macOS, nunca en la app."
 msgstr ""
 
+msgid "Tamaño de los subtítulos"
+msgstr ""
+
 msgid "Tamaño:"
+msgstr ""
+
+msgid "Tarea de audio"
 msgstr ""
 
 msgid "Tarea:"
@@ -1657,10 +1816,22 @@ msgstr ""
 msgid "Ubicación: {ubicacion}"
 msgstr ""
 
+msgid "Umbral de silencio"
+msgstr ""
+
 msgid "Umbral:"
 msgstr ""
 
+msgid ""
+"Un fragmento cuenta como silencio si su volumen máximo queda por debajo de este % del nivel máximo posible (2 % ≈ −34 dBFS). Es absoluto, no relativo a tu vídeo.\n"
+"Más alto: corta más (respiraciones, finales de palabra suaves). Más bajo: corta menos.\n"
+"El corte se hace sobre el audio ya limpio, así que con la mejora activada suele bastar 2–3 %; por encima de 4–5 % puede comerse sílabas suaves. Por defecto 4 %."
+msgstr ""
+
 msgid "Una línea por término: marcas, productos, nombres propios. Whisper los recibe como pista y el caption respeta su ortografía. Después de «=», las formas en que Whisper se equivoca, separadas por comas: se corrigen al transcribir. Las líneas con # son comentarios."
+msgstr ""
+
+msgid "Velocidad de los silencios"
 msgstr ""
 
 msgid "Velocidad:"
@@ -1824,6 +1995,9 @@ msgstr ""
 msgid "silencios"
 msgstr ""
 
+msgid "sin caption: vuelve a crear los shorts con «Título, caption y hashtags» activado"
+msgstr ""
+
 msgid "small (rápido)"
 msgstr ""
 
@@ -1891,6 +2065,14 @@ msgid "{redes}: «{titulo}» el {fecha}"
 msgstr ""
 
 #, python-brace-format
+msgid "{titulo}: {fecha} en {lista}"
+msgstr ""
+
+#, python-brace-format
+msgid "«{titulo}» ya estaba en {lista}"
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
@@ -1899,6 +2081,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "¿Programar para el {fecha}?"
+msgstr ""
+
+msgid "¿Programarlos?"
 msgstr ""
 
 msgid "¿Publicar ahora?"
@@ -1943,7 +2128,14 @@ msgstr ""
 msgid "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: compruébalo en la app antes de publicar otra vez."
 msgstr ""
 
+msgid "⚠ Ya publicado o programado antes:"
+msgstr ""
+
 msgid "⚠ el perfil parece un email: revísalo en Redes…"
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ ya se publicó o programó en: {lista}"
 msgstr ""
 
 msgid "✓ En borradores: termínalo en Facebook"

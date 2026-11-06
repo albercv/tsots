@@ -760,6 +760,25 @@ def test_crear_sustituye_solo_lo_que_lista_el_json_anterior(ficha_con_base):
     assert (e.carpeta / f"{MEJOR}.mp4").is_file()
 
 
+def test_crear_borra_el_registro_de_publicacion_de_los_shorts_viejos(ficha_con_base):
+    e = ficha_con_base
+    e.carpeta.mkdir()
+    # Un viejo con otro nombre y otro con el nombre de uno nuevo: ninguno
+    # debe dejar un «ya publicado» al que herede el short nuevo.
+    for nombre in ("01 - Viejo", MEJOR):
+        (e.carpeta / f"{nombre}.mp4").write_bytes(b"VIEJO")
+        (e.carpeta / f"{nombre}.publicado.json").write_text("{}")
+    (e.carpeta / "ajeno.publicado.json").write_text("{}")
+    (e.carpeta / "shorts.json").write_text(json.dumps(
+        {"ficha": "f1", "archivos": ["01 - Viejo.mp4", f"{MEJOR}.mp4"]}))
+
+    _crear(e)
+
+    assert not (e.carpeta / "01 - Viejo.publicado.json").exists()
+    assert not (e.carpeta / f"{MEJOR}.publicado.json").exists()
+    assert (e.carpeta / "ajeno.publicado.json").exists()  # no lo listaba el json
+
+
 _DE_OTRA_FICHA = [
     {"ficha": "otra", "archivos": ["01 - Viejo.mp4", f"{MEJOR}.mp4"]},
     {"archivos": ["01 - Viejo.mp4", f"{MEJOR}.mp4"]},

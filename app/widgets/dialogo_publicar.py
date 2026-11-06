@@ -263,6 +263,7 @@ class DialogoPublicar(QDialog):
         cabecera = QLabel(self.video.name)
         cabecera.setStyleSheet("font-weight: bold;")
         raiz.addWidget(cabecera)
+        self.cabecera = cabecera
         self.aviso_publicado = QLabel()
         self.aviso_publicado.setWordWrap(True)
         self.aviso_publicado.setStyleSheet(f"color: {COLOR_AVISO};")
@@ -297,6 +298,7 @@ class DialogoPublicar(QDialog):
         fila_x.addWidget(self.contador_x, 0, Qt.AlignmentFlag.AlignTop)
         formulario.addRow(_("Texto para X:"), fila_x)
         raiz.addWidget(grupo_textos)
+        self.grupo_textos = grupo_textos
 
         grupo_plataformas = QGroupBox(_("Plataformas (en este orden)"))
         rejilla = QGridLayout(grupo_plataformas)
@@ -351,7 +353,8 @@ class DialogoPublicar(QDialog):
         raiz.addLayout(fila_ubicacion)
 
         fila_cuando = QHBoxLayout()
-        fila_cuando.addWidget(QLabel(_("Cuándo:")))
+        self.etiqueta_cuando = QLabel(_("Cuándo:"))
+        fila_cuando.addWidget(self.etiqueta_cuando)
         self.radio_ahora = QRadioButton(_("Ahora"))
         self.radio_programar = QRadioButton(_("Programar"))
         self.radio_programar.setToolTip(_(
@@ -360,13 +363,10 @@ class DialogoPublicar(QDialog):
         grupo_cuando.addButton(self.radio_ahora)
         grupo_cuando.addButton(self.radio_programar)
         self.radio_ahora.setChecked(True)
-        self.campo_fecha = QDateTimeEdit()
-        self.campo_fecha.setCalendarPopup(True)
-        self.campo_fecha.setDisplayFormat("dd/MM/yyyy HH:mm")
         # La siguiente hora en punto a más de una hora vista.
-        inicio = (self._ahora() + timedelta(hours=2)).replace(minute=0, second=0,
-                                                               microsecond=0)
-        self.campo_fecha.setDateTime(QDateTime(inicio.date(), inicio.time()))
+        self._fecha_inicial = (self._ahora() + timedelta(hours=2)).replace(
+            minute=0, second=0, microsecond=0)
+        self.campo_fecha = self._nuevo_campo_fecha(self._fecha_inicial)
         self.campo_fecha.setEnabled(False)
         self.aviso_fecha = QLabel()
         self.aviso_fecha.setStyleSheet(f"color: {COLOR_AVISO};")
@@ -455,11 +455,23 @@ class DialogoPublicar(QDialog):
             programada=self.programada(),
         )
 
+    @staticmethod
+    def _nuevo_campo_fecha(inicio: datetime) -> QDateTimeEdit:
+        campo = QDateTimeEdit()
+        campo.setCalendarPopup(True)
+        campo.setDisplayFormat("dd/MM/yyyy HH:mm")
+        campo.setDateTime(QDateTime(inicio.date(), inicio.time()))
+        return campo
+
     def programada(self) -> datetime | None:
         """Fecha elegida, en la hora del Mac; `None` con «Ahora»."""
         if not self.radio_programar.isChecked():
             return None
-        elegida = self.campo_fecha.dateTime().toPython().replace(second=0, microsecond=0)
+        return self._fecha_de(self.campo_fecha)
+
+    def _fecha_de(self, campo: QDateTimeEdit) -> datetime:
+        """La fecha de un campo de fecha, en la hora del Mac."""
+        elegida = campo.dateTime().toPython().replace(second=0, microsecond=0)
         if isinstance(self._zona, ZoneInfo):
             return elegida.replace(tzinfo=self._zona)
         # Zona sin nombre (desfase fijo): el desfase de esa fecha, no el de hoy.
@@ -467,7 +479,10 @@ class DialogoPublicar(QDialog):
 
     def _motivo_fecha(self) -> str:
         """Por qué no vale la fecha elegida, o "" si vale (o si es «Ahora»)."""
-        programada = self.programada()
+        return self._motivo_de(self.programada())
+
+    def _motivo_de(self, programada: datetime | None) -> str:
+        """Por qué no vale esa fecha, o "" si vale (o si es `None`, «Ahora»)."""
         if programada is None:
             return ""
         ahora = self._ahora()
@@ -838,44 +853,10 @@ class DialogoPublicar(QDialog):
         if motivo_fecha:
             self._terminar_sin_enviar(motivo_fecha, COLOR_AVISO, marcar=False)
             return
-        self._poner_estado(_("Leyendo la API key del Llavero…"))
-        self.etiqueta_estado.repaint()
-        try:
-            clave = self.llavero.leer(nombre)
-        except credenciales.ErrorLlavero as e:
-            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero: {motivo}").format(
-                motivo=str(e)))
+        proveedor = self._abrir_servicio(nombre)
+        if proveedor is None:
             return
-        except Exception as e:
-            log.exception("Llavero: excepción inesperada al leer la clave")
-            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero ({tipo}).").format(
-                tipo=type(e).__name__))
-            return
-        if not clave:
-            log.warning("Llavero: la entrada existe pero la lectura no devolvió ninguna clave.")
-            self.refrescar_servicio()
-            self._terminar_sin_enviar(_(
-                "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"))
-            return
-        if self._diario is not None:
-            self._diario.ocultar(clave)
-        log.info("Llavero: clave leída.")
-        try:
-            proveedor = self.fabrica(nombre, clave, self.ajustes.ajustes_proveedor())
-        except Exception as e:
-            log.exception("No se pudo crear el proveedor")
-            self._terminar_sin_enviar(_(
-                "No se pudo preparar el servicio ({tipo}). Detalles en el registro.").format(
-                tipo=type(e).__name__))
-            return
-        finally:
-            del clave
-        # Lo que el usuario quiere marcado, también lo que hoy no se puede
-        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
-        self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
-        self.ajustes.tiktok_modo = opciones.tiktok_modo
-        self.ajustes.instagram_modo = opciones.instagram_modo
-        self.ajustes.facebook_modo = opciones.facebook_modo
+        self._recordar_eleccion(opciones)
         self._hilo = HiloPublicacion(proveedor, self.publicacion(), opciones,
                                      plataformas, nombre, self._diario, self._ahora)
         self._hilo.progreso.connect(self._al_progresar)
@@ -887,11 +868,61 @@ class DialogoPublicar(QDialog):
         log.info("Hilo de publicación en marcha.")
         self._hilo.start()
 
+    def _abrir_servicio(self, nombre: str):
+        """Lee la clave del Llavero y crea el proveedor. Si falla, lo dice
+        (`_terminar_sin_enviar`) y devuelve `None`."""
+        self._poner_estado(_("Leyendo la API key del Llavero…"))
+        self.etiqueta_estado.repaint()
+        try:
+            clave = self.llavero.leer(nombre)
+        except credenciales.ErrorLlavero as e:
+            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero: {motivo}").format(
+                motivo=str(e)))
+            return None
+        except Exception as e:
+            log.exception("Llavero: excepción inesperada al leer la clave")
+            self._terminar_sin_enviar(_("No se pudo leer la API key del Llavero ({tipo}).").format(
+                tipo=type(e).__name__))
+            return None
+        if not clave:
+            log.warning("Llavero: la entrada existe pero la lectura no devolvió ninguna clave.")
+            self.refrescar_servicio()
+            self._terminar_sin_enviar(_(
+                "No se encontró la API key en el Llavero. Vuelve a guardarla en Redes…"))
+            return None
+        if self._diario is not None:
+            self._diario.ocultar(clave)
+        log.info("Llavero: clave leída.")
+        try:
+            proveedor = self.fabrica(nombre, clave, self.ajustes.ajustes_proveedor())
+        except Exception as e:
+            log.exception("No se pudo crear el proveedor")
+            self._terminar_sin_enviar(_(
+                "No se pudo preparar el servicio ({tipo}). Detalles en el registro.").format(
+                tipo=type(e).__name__))
+            return None
+        finally:
+            del clave
+        return proveedor
+
+    def _recordar_eleccion(self, opciones: Opciones) -> None:
+        # Lo que el usuario quiere marcado, también lo que hoy no se puede
+        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
+        self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
+        self.ajustes.tiktok_modo = opciones.tiktok_modo
+        self.ajustes.instagram_modo = opciones.instagram_modo
+        self.ajustes.facebook_modo = opciones.facebook_modo
+
     # --- estado y registro ---
 
     def _preparar(self, plataformas: list[Plataforma], opciones: Opciones) -> None:
         """Deja el diálogo listo para un intento nuevo y abre su registro."""
         self._cerrar_diario()
+        self._reiniciar(plataformas, opciones)
+        self._abrir_diario(self.video, opciones)
+
+    def _reiniciar(self, plataformas: list[Plataforma], opciones: Opciones) -> None:
+        """Las filas de las plataformas, listas para mostrar un envío nuevo."""
         self._en_curso = list(plataformas)
         self._opciones_en_curso = opciones
         self._procesando = set()
@@ -904,7 +935,10 @@ class DialogoPublicar(QDialog):
             etiqueta.setToolTip("")
             etiqueta.setStyleSheet("")
         self._refrescar()  # las demás filas vuelven a mostrar su cuenta
-        self._diario = diario.Diario(self.video)
+
+    def _abrir_diario(self, ruta: Path, opciones: Opciones) -> None:
+        """Abre el registro del intento, con el nombre de `ruta`."""
+        self._diario = diario.Diario(ruta)
         if opciones.ubicacion.tiktok is not None:  # el id es de la cuenta
             self._diario.ocultar(opciones.ubicacion.tiktok.id)
         self.ruta_log = self._diario.ruta
