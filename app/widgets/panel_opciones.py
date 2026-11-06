@@ -24,6 +24,7 @@ from videopipeline.ollama import (
     Modelo, cabe, motivo_no_cabe, motivo_pesado, pesado,
 )
 
+from .info import IconoInfo, etiqueta_con_info
 from .seccion_plegable import Acordeon, SeccionPlegable
 
 # clearvoice/app/widgets/panel_opciones.py → clearvoice/checkpoints
@@ -76,6 +77,113 @@ MARGEN_CONTENIDO = 22
 # solo se ve una abierta y así se sabe qué pasos van a correr.
 MARCA_ACTIVO = "✓ "
 
+# Ayuda de cada valor editable: clave = atributo del control → (título, cuerpo).
+AYUDAS = {
+    "combo_tarea": (
+        N_("Tarea de audio"),
+        N_("Qué hace el modelo con la voz.\n"
+           "Mejora de voz: quita ruido y limpia la grabación (lo habitual).\n"
+           "Separación de hablantes: aísla cada voz de una conversación.\n"
+           "Super-resolución: reconstruye el agudo de un audio de poca calidad."),
+    ),
+    "combo_modelo": (
+        N_("Modelo de audio"),
+        N_("Red neuronal que hace la limpieza; la lista depende de la tarea.\n"
+           "La cifra final (16K, 48K) es la frecuencia de muestreo: 48K "
+           "conserva más agudos y es el modelo por defecto.\n"
+           "Si no está descargado, se baja la primera vez que se usa."),
+    ),
+    "campo_margen": (
+        N_("Margen"),
+        N_("Audio que se conserva antes y después de cada tramo con voz para "
+           "no cortar palabras. Por defecto 0.2s.\n"
+           "Una pausa solo se corta si dura más de 2 × margen + 0,2 s, y de "
+           "una pausa cortada queda más o menos 2 × margen.\n"
+           "Más bajo: pausas más cortas entre frases, pero cortes más secos "
+           "(0s se come consonantes). Más alto: más natural, menos recorte.\n"
+           "Admite dos valores, «antes,después»: 0.05s,0.1s."),
+    ),
+    "campo_umbral": (
+        N_("Umbral de silencio"),
+        N_("Un fragmento cuenta como silencio si su volumen máximo queda por "
+           "debajo de este % del nivel máximo posible (2 % ≈ −34 dBFS). Es "
+           "absoluto, no relativo a tu vídeo.\n"
+           "Más alto: corta más (respiraciones, finales de palabra suaves). "
+           "Más bajo: corta menos.\n"
+           "El corte se hace sobre el audio ya limpio, así que con la mejora "
+           "activada suele bastar 2–3 %; por encima de 4–5 % puede comerse "
+           "sílabas suaves. Por defecto 4 %."),
+    ),
+    "combo_silencios": (
+        N_("Qué hacer con los silencios"),
+        N_("Cortar: elimina los silencios del vídeo.\n"
+           "Acelerar: no los quita, los reproduce más rápido (ver Velocidad) "
+           "y el vídeo conserva su ritmo."),
+    ),
+    "spin_velocidad": (
+        N_("Velocidad de los silencios"),
+        N_("Factor de aceleración de los silencios cuando eliges Acelerar: "
+           "4 significa que se reproducen 4 veces más rápido.\n"
+           "Solo se usa con Acelerar; con Cortar no hace nada. Por defecto 4."),
+    ),
+    "combo_diseno": (
+        N_("Diseño de los subtítulos"),
+        N_("Estilo del texto quemado en el vídeo: fuente, color, contorno o "
+           "caja de fondo y tamaño base.\n"
+           "Los Karaoke resaltan cada palabra a medida que se dice."),
+    ),
+    "spin_posicion": (
+        N_("Posición vertical"),
+        N_("Altura a la que se apoyan los subtítulos, medida desde arriba del "
+           "vídeo: 50 % es el centro y 95 % casi el borde inferior.\n"
+           "Sube el valor para bajar el texto y viceversa. Por defecto 75 %."),
+    ),
+    "slider_tamano": (
+        N_("Tamaño de los subtítulos"),
+        N_("Escala el tamaño del texto respecto al del diseño elegido: 100 % "
+           "es el tamaño original, de 50 % a 150 %.\n"
+           "Si un subtítulo no cabe en el ancho, se reduce solo."),
+    ),
+    "combo_idioma_subs": (
+        N_("Idioma hablado"),
+        N_("Idioma del audio, para que Whisper transcriba bien.\n"
+           "Autodetectar lo deduce de la grabación; si ya lo sabes, elegirlo "
+           "evita errores en vídeos con poca voz o mezcla de idiomas.\n"
+           "Lo usan los subtítulos y el título del inicio."),
+    ),
+    "combo_modelo_whisper": (
+        N_("Modelo Whisper"),
+        N_("Modelo que transcribe el audio.\n"
+           "small: rápido y ligero (~500 MB). medium: más preciso (~1,5 GB). "
+           "turbo: la mejor relación calidad/velocidad (~1,6 GB) y el "
+           "recomendado.\n"
+           "Se descarga la primera vez que se usa."),
+    ),
+    "combo_modelo_caption": (
+        N_("Modelo del caption"),
+        N_("Modelo local de Ollama que escribe el título, el caption, los "
+           "hashtags y el título del inicio a partir de la transcripción.\n"
+           "Uno más grande suele escribir mejor, pero tarda más y gasta más "
+           "memoria; los que no caben en tu Mac salen deshabilitados."),
+    ),
+    "combo_encuadre": (
+        N_("Encuadre vertical"),
+        N_("Cómo se adapta un vídeo horizontal a 9:16.\n"
+           "Recorte central: corta una franja del centro.\n"
+           "Fondo difuminado: el vídeo entero sobre su propio fondo borroso.\n"
+           "Barras negras: el vídeo entero con bandas negras.\n"
+           "Seguir la cara: recorte 4:3 que sigue al hablante sobre fondo "
+           "difuminado (más lento, analiza el vídeo)."),
+    ),
+    "combo_encuadre_shorts": (
+        N_("Encuadre de los shorts"),
+        N_("Igual que el encuadre del formato vertical, pero propio de los "
+           "shorts.\n"
+           "Recorte central, Fondo difuminado, Barras negras o Seguir la "
+           "cara (por defecto; más lento porque analiza el vídeo)."),
+    ),
+}
+
 
 def _como_bool(valor, defecto: bool) -> bool:
     """Booleano de QSettings: puede llegar como bool o como "true"/"1"."""
@@ -103,6 +211,7 @@ class PanelOpciones(QWidget):
         layout.setSpacing(0)
         # Secciones plegables en acordeón: solo una abierta, Audio al arrancar.
         self.secciones: dict[str, SeccionPlegable] = {}
+        self.iconos_info: dict[str, IconoInfo] = {}
         self._titulos: dict[str, str] = {}
         self._acordeon = Acordeon(self)
         self._acordeon.cambiada.connect(self._emitir_seccion_abierta)
@@ -134,8 +243,8 @@ class PanelOpciones(QWidget):
         self.combo_modelo.currentTextChanged.connect(
             self._refrescar_aviso_modelo
         )
-        form_audio.addRow(_("Tarea:"), self.combo_tarea)
-        form_audio.addRow(_("Modelo:"), self.combo_modelo)
+        form_audio.addRow(self._etiqueta(_("Tarea:"), "combo_tarea"), self.combo_tarea)
+        form_audio.addRow(self._etiqueta(_("Modelo:"), "combo_modelo"), self.combo_modelo)
         form_audio.addRow("", self.aviso_modelo)
         self._repoblar_modelos()
         self._refrescar_aviso_modelo()
@@ -157,10 +266,10 @@ class PanelOpciones(QWidget):
         self.combo_silencios.currentIndexChanged.connect(
             self._actualizar_habilitados
         )
-        form_sil.addRow(_("Margen:"), self.campo_margen)
-        form_sil.addRow(_("Umbral:"), self.campo_umbral)
-        form_sil.addRow(_("Silencios:"), self.combo_silencios)
-        form_sil.addRow(_("Velocidad:"), self.spin_velocidad)
+        form_sil.addRow(self._etiqueta(_("Margen:"), "campo_margen"), self.campo_margen)
+        form_sil.addRow(self._etiqueta(_("Umbral:"), "campo_umbral"), self.campo_umbral)
+        form_sil.addRow(self._etiqueta(_("Silencios:"), "combo_silencios"), self.combo_silencios)
+        form_sil.addRow(self._etiqueta(_("Velocidad:"), "spin_velocidad"), self.spin_velocidad)
 
         form_subs = self._seccion(
             "subtitulos", _("Subtítulos"), QFormLayout
@@ -203,19 +312,21 @@ class PanelOpciones(QWidget):
         self.aviso_whisper.setWordWrap(True)
         form_subs.addRow(self.check_subtitulos)
         form_subs.addRow(self.check_titulo)
-        form_subs.addRow(_("Diseño:"), self.combo_diseno)
-        form_subs.addRow(_("Posición vertical:"), self.spin_posicion)
+        form_subs.addRow(self._etiqueta(_("Diseño:"), "combo_diseno"), self.combo_diseno)
+        form_subs.addRow(
+            self._etiqueta(_("Posición vertical:"), "spin_posicion"), self.spin_posicion)
         fila_tamano = QHBoxLayout()
         fila_tamano.addWidget(self.slider_tamano, 1)
         fila_tamano.addWidget(self.etiqueta_tamano)
-        form_subs.addRow(_("Tamaño:"), fila_tamano)
-        form_subs.addRow(_("Idioma:"), self.combo_idioma_subs)
+        form_subs.addRow(self._etiqueta(_("Tamaño:"), "slider_tamano"), fila_tamano)
+        form_subs.addRow(self._etiqueta(_("Idioma:"), "combo_idioma_subs"), self.combo_idioma_subs)
         self.boton_glosario = QPushButton(_("Términos…"))
         self.boton_glosario.setToolTip(
             _("Marcas y nombres propios que Whisper debe escribir bien.")
         )
         self.boton_glosario.clicked.connect(self.editar_glosario)
-        form_subs.addRow(_("Modelo:"), self.combo_modelo_whisper)
+        form_subs.addRow(
+            self._etiqueta(_("Modelo:"), "combo_modelo_whisper"), self.combo_modelo_whisper)
         form_subs.addRow("", self.aviso_whisper)
         # Fila propia: junto al combo ensancharía la columna de opciones.
         form_subs.addRow("", self.boton_glosario)
@@ -262,7 +373,7 @@ class PanelOpciones(QWidget):
         )
         self.boton_refrescar_modelos.setFixedWidth(32)
         self.boton_refrescar_modelos.clicked.connect(self.refrescar_modelos)
-        fila_modelo.addWidget(QLabel(_("Modelo:")))
+        fila_modelo.addWidget(self._etiqueta(_("Modelo:"), "combo_modelo_caption"))
         fila_modelo.addWidget(self.combo_modelo_caption, 1)
         fila_modelo.addWidget(self.boton_refrescar_modelos)
         caption_layout.addLayout(fila_modelo)
@@ -295,7 +406,7 @@ class PanelOpciones(QWidget):
         self.aviso_encuadre.setStyleSheet("color: #b8860b;")
         self.aviso_encuadre.setWordWrap(True)
         form_vertical.addRow(self.check_vertical)
-        form_vertical.addRow(_("Encuadre:"), self.combo_encuadre)
+        form_vertical.addRow(self._etiqueta(_("Encuadre:"), "combo_encuadre"), self.combo_encuadre)
         form_vertical.addRow("", self.aviso_encuadre)
         self.combo_encuadre.currentIndexChanged.connect(
             self._refrescar_aviso_encuadre
@@ -328,7 +439,8 @@ class PanelOpciones(QWidget):
         )
         self.boton_crear_shorts.clicked.connect(self.crear_shorts)
         form_shorts.addRow(self.check_shorts_subtitulos)
-        form_shorts.addRow(_("Encuadre:"), self.combo_encuadre_shorts)
+        form_shorts.addRow(
+            self._etiqueta(_("Encuadre:"), "combo_encuadre_shorts"), self.combo_encuadre_shorts)
         form_shorts.addRow(self.check_shorts_al_procesar)
         # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
         form_shorts.addRow("", self.boton_crear_shorts)
@@ -349,6 +461,13 @@ class PanelOpciones(QWidget):
         self.combo_diseno.currentIndexChanged.connect(self._emitir_cambio_subs)
         self.spin_posicion.valueChanged.connect(self._emitir_cambio_subs)
         self.slider_tamano.valueChanged.connect(self._emitir_cambio_subs)
+
+    def _etiqueta(self, texto: str, clave: str) -> QWidget:
+        """Etiqueta de fila con su icono de ayuda (`iconos_info[clave]`)."""
+        titulo, cuerpo = AYUDAS[clave]
+        icono = IconoInfo(_(titulo), _(cuerpo))
+        self.iconos_info[clave] = icono
+        return etiqueta_con_info(texto, icono)
 
     def _seccion(self, clave: str, titulo: str, tipo_layout):
         """Crea la sección plegable `clave` y devuelve el layout de su contenido.
@@ -436,11 +555,11 @@ class PanelOpciones(QWidget):
     def _actualizar_habilitados(self, *args) -> None:
         audio = self.check_audio.isChecked()
         for hijo in self._grupo_audio.findChildren(QWidget):
-            if hijo is not self.check_audio:
+            if hijo is not self.check_audio and not hijo.property("ayuda"):
                 hijo.setEnabled(audio)
         silencios = self.check_silencios.isChecked()
         for hijo in self._grupo_silencios.findChildren(QWidget):
-            if hijo is not self.check_silencios:
+            if hijo is not self.check_silencios and not hijo.property("ayuda"):
                 hijo.setEnabled(silencios)
         if silencios:
             acelerar = self.combo_silencios.currentData() == "acelerar"

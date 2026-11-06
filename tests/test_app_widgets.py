@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QMimeData, Qt, QUrl
-from PySide6.QtWidgets import QDialog, QDialogButtonBox, QGroupBox, QLabel
+from PySide6.QtWidgets import (
+    QApplication, QDialog, QDialogButtonBox, QGroupBox, QLabel,
+)
 
 from app.widgets.dialogo_reproceso import DialogoReproceso, preguntar_reproceso
 from app.widgets.panel_opciones import PanelOpciones
@@ -1079,3 +1081,40 @@ def test_preguntar_reproceso_devuelve_decisiones_o_none(qtbot, monkeypatch):
     monkeypatch.setattr(DialogoReproceso, "exec",
                         lambda dialogo: QDialog.DialogCode.Rejected)
     assert preguntar_reproceso(None, _consultas(), set()) is None
+
+
+def test_panel_cada_valor_tiene_icono_de_ayuda(qtbot):
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QEnterEvent
+    from PySide6.QtTest import QTest
+
+    from app.widgets.panel_opciones import AYUDAS
+
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.show()
+    assert set(panel.iconos_info) == set(AYUDAS)
+    assert len(AYUDAS) == 14
+    for clave, icono in panel.iconos_info.items():
+        assert hasattr(panel, clave)
+        assert icono.titulo.strip() and len(icono.cuerpo.strip()) > 20, clave
+
+    icono = panel.iconos_info["campo_umbral"]
+    panel.abrir_seccion("silencios")
+    assert not icono.tarjeta_visible()
+    centro = QPointF(icono.rect().center())
+    QApplication.sendEvent(icono, QEnterEvent(centro, centro, centro))
+    assert icono.tarjeta_visible()
+    QApplication.sendEvent(icono, QEvent(QEvent.Type.Leave))
+    assert not icono.tarjeta_visible()
+    QTest.mouseClick(icono, Qt.MouseButton.LeftButton)
+    assert icono.tarjeta_visible()
+    QTest.keyClick(icono, Qt.Key.Key_Escape)
+    assert not icono.tarjeta_visible()
+    QTest.keyClick(icono, Qt.Key.Key_Space)
+    assert icono.tarjeta_visible()
+    icono.ocultar()
+
+    # Con el paso desactivado el control se apaga, pero su ayuda sigue activa.
+    panel.check_silencios.setChecked(False)
+    assert not panel.campo_umbral.isEnabled() and icono.isEnabled()
