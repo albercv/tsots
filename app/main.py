@@ -47,6 +47,7 @@ from .widgets.dialogo_marca import DialogoMarca
 from .widgets import dialogo_publicar
 from .widgets.dialogo_programadas import DialogoProgramadas
 from .widgets.dialogo_publicar import DialogoPublicar
+from .widgets.dialogo_publicar_shorts import DialogoPublicarShorts
 from .widgets.dialogo_redes import DialogoRedes
 from .widgets.dialogo_reproceso import preguntar_reproceso
 from .widgets.panel_caption import PanelCaption
@@ -257,6 +258,7 @@ class VentanaPrincipal(QMainWindow):
         self.panel.seccion_abierta_cambiada.connect(self._al_abrir_seccion)
         self.panel.pasos_cambiados.connect(self._refrescar_boton)
         self.panel.crear_shorts.connect(self._crear_shorts)
+        self.panel.publicar_shorts.connect(self._publicar_shorts)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -392,6 +394,17 @@ class VentanaPrincipal(QMainWindow):
 
     def _ficha_de(self, trabajo) -> Ficha | None:
         return cargar(trabajo.ficha_id) if trabajo.ficha_id else None
+
+    def _carpeta_shorts_de(self, trabajo) -> Path | None:
+        """Carpeta de shorts: la de esta sesión o, si no, la de su ficha en disco."""
+        if trabajo is None:
+            return None
+        if trabajo.shorts:
+            return trabajo.shorts
+        ficha = self._ficha_de(trabajo)
+        if ficha is not None and shorts.hay_shorts(ficha):
+            return shorts.carpeta_shorts(ficha)
+        return None
 
     def _reprocesar_seleccionado(self) -> None:
         if self._procesando:
@@ -607,6 +620,24 @@ class VentanaPrincipal(QMainWindow):
         # El hilo de la subida no depende del diálogo (ver dialogo_publicar);
         # aun así, solo se libera cuando no publica.
         if not dialogo.publicando:
+            dialogo.deleteLater()
+
+    def _publicar_shorts(self) -> None:
+        """Botón «Publicar shorts…»: los shorts del vídeo elegido, en lote."""
+        indices = self.vista_cola.selectedIndexes()
+        trabajo = self.modelo_cola.trabajo(indices[0].row()) if indices else None
+        carpeta = self._carpeta_shorts_de(trabajo)
+        cortos = shorts.listar(carpeta) if carpeta else []
+        if not cortos:
+            QMessageBox.warning(
+                self, _("Publicar shorts"),
+                _("El vídeo elegido no tiene shorts en su carpeta."))
+            return
+        dialogo = DialogoPublicarShorts(cortos, self.ajustes, parent=self)
+        dialogo.configurar_redes.connect(
+            lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
+        dialogo.exec()
+        if not dialogo.publicando:  # como en `_publicar`
             dialogo.deleteLater()
 
     def _abrir_redes(self) -> None:
@@ -912,6 +943,11 @@ class VentanaPrincipal(QMainWindow):
         self.panel.boton_crear_shorts.setEnabled(
             not self._procesando
             and self.vista_cola.selectionModel().hasSelection()
+        )
+        indices = self.vista_cola.selectedIndexes()
+        self.panel.boton_publicar_shorts.setEnabled(
+            bool(indices) and self._carpeta_shorts_de(
+                self.modelo_cola.trabajo(indices[0].row())) is not None
         )
 
     # --- idioma ---

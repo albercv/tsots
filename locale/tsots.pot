@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-05 13:57+0100\n"
+"POT-Creation-Date: 2026-11-06 08:58+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -514,6 +514,9 @@ msgstr ""
 msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr ""
 
+msgid "El vídeo elegido no tiene shorts en su carpeta."
+msgstr ""
+
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr ""
 
@@ -642,6 +645,9 @@ msgid "Facebook no está conectada en {servicio}."
 msgstr ""
 
 msgid "Falló en todas"
+msgstr ""
+
+msgid "Falló en todos"
 msgstr ""
 
 msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
@@ -851,6 +857,9 @@ msgstr ""
 msgid "Marca al menos un paso."
 msgstr ""
 
+msgid "Marca al menos un short y una plataforma."
+msgstr ""
+
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr ""
 
@@ -954,6 +963,9 @@ msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama s
 msgstr ""
 
 msgid "No queda espacio en disco"
+msgstr ""
+
+msgid "No queda ninguna plataforma para este short."
 msgstr ""
 
 msgid "No se detectó ninguna cara: se encuadra al centro."
@@ -1265,6 +1277,9 @@ msgstr ""
 msgid "Proceso en curso"
 msgstr ""
 
+msgid "Programa en redes los shorts ya creados del vídeo elegido, cada uno con su fecha."
+msgstr ""
+
 msgid "Programada"
 msgstr ""
 
@@ -1279,10 +1294,18 @@ msgid "Programado en {ok} de {total}"
 msgstr ""
 
 #, python-brace-format
+msgid "Programados {ok} de {total} shorts"
+msgstr ""
+
+#, python-brace-format
 msgid "Programando: {lista}…"
 msgstr ""
 
 msgid "Programar"
+msgstr ""
+
+#, python-brace-format
+msgid "Programar {n} shorts"
 msgstr ""
 
 msgid "Publicación cancelada: no se ha enviado nada."
@@ -1309,6 +1332,12 @@ msgid "Publicar en TikTok, YouTube, Instagram, X y Facebook"
 msgstr ""
 
 msgid "Publicar en redes"
+msgstr ""
+
+msgid "Publicar shorts"
+msgstr ""
+
+msgid "Publicar shorts…"
 msgstr ""
 
 msgid "Publicar…"
@@ -1467,6 +1496,15 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Se programarán {n} shorts:\n"
+"\n"
+"{lista}\n"
+"\n"
+"{resumen}"
+msgstr ""
+
+#, python-brace-format
+msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
 "{resumen}"
@@ -1505,11 +1543,21 @@ msgstr ""
 msgid "Short público"
 msgstr ""
 
+#, python-brace-format
+msgid "Short {n} de {total}"
+msgstr ""
+
 msgid "Shorts"
+msgstr ""
+
+msgid "Shorts: elige cuáles y cuándo"
 msgstr ""
 
 #, python-brace-format
 msgid "Shorts: {ruta}"
+msgstr ""
+
+msgid "Si sigues, saldrán repetidos."
 msgstr ""
 
 msgid "Sigue procesándose"
@@ -1824,6 +1872,9 @@ msgstr ""
 msgid "silencios"
 msgstr ""
 
+msgid "sin caption: vuelve a crear los shorts con «Título, caption y hashtags» activado"
+msgstr ""
+
 msgid "small (rápido)"
 msgstr ""
 
@@ -1891,6 +1942,14 @@ msgid "{redes}: «{titulo}» el {fecha}"
 msgstr ""
 
 #, python-brace-format
+msgid "{titulo}: {fecha} en {lista}"
+msgstr ""
+
+#, python-brace-format
+msgid "«{titulo}» ya estaba en {lista}"
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
@@ -1899,6 +1958,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "¿Programar para el {fecha}?"
+msgstr ""
+
+msgid "¿Programarlos?"
 msgstr ""
 
 msgid "¿Publicar ahora?"
@@ -1943,7 +2005,14 @@ msgstr ""
 msgid "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: compruébalo en la app antes de publicar otra vez."
 msgstr ""
 
+msgid "⚠ Ya publicado o programado antes:"
+msgstr ""
+
 msgid "⚠ el perfil parece un email: revísalo en Redes…"
+msgstr ""
+
+#, python-brace-format
+msgid "⚠ ya se publicó o programó en: {lista}"
 msgstr ""
 
 msgid "✓ En borradores: termínalo en Facebook"

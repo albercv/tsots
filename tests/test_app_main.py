@@ -1506,6 +1506,56 @@ def test_boton_crear_shorts_activo_solo_con_fila_y_sin_procesar(
     assert not boton.isEnabled()
 
 
+def test_boton_publicar_shorts_activo_solo_con_una_fila_con_shorts(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    boton = ventana.panel.boton_publicar_shorts
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
+    _eligiendo_la_fila(ventana, 0)
+    assert not boton.isEnabled()  # fila sin shorts
+    ventana.modelo_cola.actualizar(1, shorts=tmp_path / "b", n_shorts=2)
+    assert not boton.isEnabled()  # la elegida sigue siendo la primera
+    _eligiendo_la_fila(ventana, 1)
+    assert boton.isEnabled()
+
+
+def test_publicar_shorts_abre_el_dialogo_con_los_de_la_carpeta(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    (carpeta / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "01 - Uno.mp4", "titulo": "Uno", "inicio": 0, "fin": 70}]}))
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    _eligiendo_la_fila(ventana)
+    abiertos = []
+    monkeypatch.setattr(
+        "app.widgets.dialogo_publicar_shorts.DialogoPublicarShorts.exec",
+        lambda self: abiertos.append([f.corto.mp4.name for f in self.filas]))
+    ventana.panel.boton_publicar_shorts.click()
+    assert abiertos == [["01 - Uno.mp4"]]
+
+
+def test_publicar_shorts_de_una_sesion_anterior_se_ofrece(
+        qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    (carpeta / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "01 - Uno.mp4", "titulo": "Uno", "inicio": 0, "fin": 70}]}))
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    assert ventana.modelo_cola.trabajo(0).shorts is None  # no es de esta sesión
+    assert ventana.panel.boton_publicar_shorts.isEnabled()
+    abiertos = []
+    monkeypatch.setattr(
+        "app.widgets.dialogo_publicar_shorts.DialogoPublicarShorts.exec",
+        lambda self: abiertos.append([f.corto.mp4.name for f in self.filas]))
+    ventana.panel.boton_publicar_shorts.click()
+    assert abiertos == [["01 - Uno.mp4"]]
+
+
 def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ficha = _ficha_hecha(tmp_path)
