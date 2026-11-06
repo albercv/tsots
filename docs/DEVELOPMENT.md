@@ -518,7 +518,8 @@ proposal with the stretch and only names the file (decided before encoding,
 for the collision check); `titulo_video` is the text burned into the video
 (`""` for the discarded).
 
-**Redoing.** Only the files the previous `shorts.json` lists (`archivos`)
+**Redoing.** (The old shorts' `.publicado.json` registries go with them, see
+*Publishing shorts*.) Only the files the previous `shorts.json` lists (`archivos`)
 are ever deleted, and only when its `ficha` is the current record's id (a
 folder left by a forgotten record, or by another video with the same name,
 lists nothing, so nothing is deleted). Nothing else in the folder is
@@ -800,6 +801,46 @@ adds the fields that are valid (`tiktok_location_id` +
 costs a post: no match, a failed lookup or a missing permission post
 TikTok without one, and a field the service refuses is ignored by
 Upload-Post, which says so in `warnings` (kept in the publication log).
+
+### Publishing shorts
+
+The **Publish shorts…** button in the Shorts section of the options panel
+(`panel_opciones.py`, enabled when the selected queue row has `shorts`)
+opens `DialogoPublicarShorts` (`app/widgets/dialogo_publicar_shorts.py`)
+with `shorts.listar(<folder>)`: the chosen shorts of `shorts.json`, best
+first, that still exist on disk, each with its `.md` caption read by
+`caption.leer_md` (`None` without one).
+
+It is a subclass of `DialogoPublicar`, not a second dialog: platforms and
+modes, location, account lookup, the Keychain read (`_abrir_servicio`), the
+scheduling validation (`_fecha_de`, `_motivo_de`, `MARGEN_MINIMO`/`MAXIMO`)
+and the upload thread (`HiloPublicacion`, with its guard against destroying
+the dialog mid-upload) are the base's. The subclass hides the text fields
+and the **When** row and adds the list: a checkbox, title, duration and its
+own date field per short (pre-filled one day apart, from the base's default
+date). Shorts without a `.md` are listed disabled with the reason and cannot
+be ticked.
+
+- The user picks networks and modes once and confirms once (the
+  confirmation lists every short with its date and warns about shorts that
+  `registro.ultimas` already knows).
+- The shorts go out one after another, each in its own `HiloPublicacion`
+  with its own `Opciones.programada` and the texts of its `.md` (loaded into
+  the base's hidden fields, so the default X text is the usual
+  `texto_x_por_defecto`). Progress shows on the platform rows and the status
+  line (`Short 2 of 5: …`); the result of each short stays on its row. One
+  log file for the whole batch (named after the shorts folder).
+- X without Premium is dropped per short (durations measured with ffprobe
+  for all of them when the dialog opens, same `limites.motivo_no_admite_x`),
+  with the reason on the row. A short left with no platform blocks the
+  button until it is unticked.
+- Each short has its own registry `<stem>.publicado.json` next to it,
+  written by the publisher as for any video. `shorts.crear` deletes the
+  registry of every short the previous `shorts.json` listed when it replaces
+  them, so a new short with the same name never inherits a false "already
+  published" (`.publicado.json` is not listed in `archivos`).
+- Not done: editing a short's texts in the batch dialog, and "Now" (every
+  short is scheduled). Tests: `tests/test_app_publicar_shorts.py`.
 
 ### Provider interface
 
