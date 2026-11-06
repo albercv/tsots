@@ -556,6 +556,9 @@ msgstr "The vertical version of \"{nombre}\" cannot have subtitles: they are alr
 msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr "The vertical version will be out of date unless you regenerate it."
 
+msgid "El vídeo elegido no tiene shorts en su carpeta."
+msgstr "The selected video has no shorts in its folder."
+
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr "The video is too large for the service (413)."
 
@@ -715,6 +718,9 @@ msgstr ""
 "Only used with Speed up; it does nothing with Cut. Default 4."
 
 msgid "Falló en todas"
+msgstr "Failed on all"
+
+msgid "Falló en todos"
 msgstr "Failed on all"
 
 msgid "Falta el modelo (ClearVoice o Whisper) en caché y no se ha podido descargar de HuggingFace."
@@ -943,6 +949,9 @@ msgstr "Tue"
 msgid "Marca al menos un paso."
 msgstr "Select at least one step."
 
+msgid "Marca al menos un short y una plataforma."
+msgstr "Select at least one short and one platform."
+
 msgid "Marca al menos una plataforma y escribe un título."
 msgstr "Tick at least one platform and enter a title."
 
@@ -1075,6 +1084,9 @@ msgstr "There is no server at http://localhost:11434 and `ollama serve` could no
 
 msgid "No queda espacio en disco"
 msgstr "No space left on disk"
+
+msgid "No queda ninguna plataforma para este short."
+msgstr "No platform is left for this short."
 
 msgid "No se detectó ninguna cara: se encuadra al centro."
 msgstr "No face was detected: framing the centre."
@@ -1392,6 +1404,9 @@ msgstr "Process completed successfully."
 msgid "Proceso en curso"
 msgstr "Process running"
 
+msgid "Programa en redes los shorts ya creados del vídeo elegido, cada uno con su fecha."
+msgstr "Schedules the already created shorts of the selected video on social networks, each with its own date."
+
 msgid "Programada"
 msgstr "Scheduled post"
 
@@ -1406,11 +1421,19 @@ msgid "Programado en {ok} de {total}"
 msgstr "Scheduled on {ok} of {total}"
 
 #, python-brace-format
+msgid "Programados {ok} de {total} shorts"
+msgstr "Scheduled {ok} of {total} shorts"
+
+#, python-brace-format
 msgid "Programando: {lista}…"
 msgstr "Scheduling: {lista}…"
 
 msgid "Programar"
 msgstr "Schedule"
+
+#, python-brace-format
+msgid "Programar {n} shorts"
+msgstr "Schedule {n} shorts"
 
 msgid "Publicación cancelada: no se ha enviado nada."
 msgstr "Publishing cancelled: nothing was sent."
@@ -1437,6 +1460,12 @@ msgstr "Publish to TikTok, YouTube, Instagram, X and Facebook"
 
 msgid "Publicar en redes"
 msgstr "Publish to social networks"
+
+msgid "Publicar shorts"
+msgstr "Publish shorts"
+
+msgid "Publicar shorts…"
+msgstr "Publish shorts…"
 
 msgid "Publicar…"
 msgstr "Publish…"
@@ -1620,6 +1649,20 @@ msgstr ""
 
 #, python-brace-format
 msgid ""
+"Se programarán {n} shorts:\n"
+"\n"
+"{lista}\n"
+"\n"
+"{resumen}"
+msgstr ""
+"{n} shorts will be scheduled:\n"
+"\n"
+"{lista}\n"
+"\n"
+"{resumen}"
+
+#, python-brace-format
+msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
 "{resumen}"
@@ -1661,12 +1704,22 @@ msgstr "Service:"
 msgid "Short público"
 msgstr "Public Short"
 
+#, python-brace-format
+msgid "Short {n} de {total}"
+msgstr "Short {n} of {total}"
+
 msgid "Shorts"
 msgstr "Shorts"
+
+msgid "Shorts: elige cuáles y cuándo"
+msgstr "Shorts: choose which and when"
 
 #, python-brace-format
 msgid "Shorts: {ruta}"
 msgstr "Shorts: {ruta}"
+
+msgid "Si sigues, saldrán repetidos."
+msgstr "If you go on, they will be posted twice."
 
 msgid "Sigue procesándose"
 msgstr "Still processing"
@@ -2001,6 +2054,9 @@ msgstr "unknown signal {numero}"
 msgid "silencios"
 msgstr "silences"
 
+msgid "sin caption: vuelve a crear los shorts con «Título, caption y hashtags» activado"
+msgstr "no caption: create the shorts again with “Title, caption and hashtags” turned on"
+
 msgid "small (rápido)"
 msgstr "small (fast)"
 
@@ -2068,6 +2124,14 @@ msgid "{redes}: «{titulo}» el {fecha}"
 msgstr "{redes}: “{titulo}” on {fecha}"
 
 #, python-brace-format
+msgid "{titulo}: {fecha} en {lista}"
+msgstr "{titulo}: {fecha} on {lista}"
+
+#, python-brace-format
+msgid "«{titulo}» ya estaba en {lista}"
+msgstr "“{titulo}” was already on {lista}"
+
+#, python-brace-format
 msgid ""
 "¿Cancelar estas publicaciones?\n"
 "\n"
@@ -2080,6 +2144,9 @@ msgstr ""
 #, python-brace-format
 msgid "¿Programar para el {fecha}?"
 msgstr "Schedule for {fecha}?"
+
+msgid "¿Programarlos?"
+msgstr "Schedule them?"
 
 msgid "¿Publicar ahora?"
 msgstr "Publish now?"
@@ -2123,8 +2190,15 @@ msgstr "⚠ Reconnect {plataforma} in {servicio}"
 msgid "⚠ Sin confirmar en: {lista}. El último intento pudo publicarse igualmente: compruébalo en la app antes de publicar otra vez."
 msgstr "⚠ Unconfirmed on: {lista}. The last attempt may have been published anyway: check the app before publishing again."
 
+msgid "⚠ Ya publicado o programado antes:"
+msgstr "⚠ Already published or scheduled before:"
+
 msgid "⚠ el perfil parece un email: revísalo en Redes…"
 msgstr "⚠ the profile looks like an email: check it in Networks…"
+
+#, python-brace-format
+msgid "⚠ ya se publicó o programó en: {lista}"
+msgstr "⚠ already published or scheduled on: {lista}"
 
 msgid "✓ En borradores: termínalo en Facebook"
 msgstr "✓ In drafts: finish it in Facebook"

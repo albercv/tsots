@@ -203,6 +203,7 @@ class PanelOpciones(QWidget):
     seccion_abierta_cambiada = Signal(str)  # clave de la sección abierta
     pasos_cambiados = Signal()
     crear_shorts = Signal()
+    publicar_shorts = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -438,12 +439,19 @@ class PanelOpciones(QWidget):
               "su nombre, junto a sus salidas.")
         )
         self.boton_crear_shorts.clicked.connect(self.crear_shorts)
+        self.boton_publicar_shorts = QPushButton(_("Publicar shorts…"))
+        self.boton_publicar_shorts.setToolTip(
+            _("Programa en redes los shorts ya creados del vídeo elegido, cada uno "
+              "con su fecha."))
+        self.boton_publicar_shorts.setEnabled(False)
+        self.boton_publicar_shorts.clicked.connect(self.publicar_shorts)
         form_shorts.addRow(self.check_shorts_subtitulos)
         form_shorts.addRow(
             self._etiqueta(_("Encuadre:"), "combo_encuadre_shorts"), self.combo_encuadre_shorts)
         form_shorts.addRow(self.check_shorts_al_procesar)
         # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
         form_shorts.addRow("", self.boton_crear_shorts)
+        form_shorts.addRow("", self.boton_publicar_shorts)
         self.check_shorts_al_procesar.toggled.connect(self._actualizar_cabecera_shorts)
 
         for seccion in self.secciones.values():

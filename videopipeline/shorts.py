@@ -16,12 +16,13 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
-from .caption import texto_plano
+from .caption import Caption, leer_md, texto_plano
 from .config import ENCUADRES, PipelineConfig
 from .ficha import TRANSCRIPCION, Ficha, _escribir_json
 from .i18n import _
 from .ollama import asegurar_servidor, chat_json, systemone
 from .pipeline import Progreso, _avisar, _emitir, _fase_caption, _fase_vertical
+from .redes import registro
 from .reproceso import _Pasada, ejecutar
 from .reproceso_plan import (
     Accion, Plan, _base_vale, _subs_bloqueados, _vale, seguimiento_vale,
@@ -466,6 +467,39 @@ def hay_shorts(ficha: Ficha) -> bool:
     return (carpeta_shorts(ficha) / "shorts.json").is_file()
 
 
+@dataclass(frozen=True)
+class Corto:
+    """Un short ya creado, tal como se ofrece para publicarlo."""
+    mp4: Path
+    titulo: str
+    duracion: float  # s, según el JSON (el vídeo real puede diferir una fracción)
+    caption: Caption | None  # `None`: sin `.md`, no se puede publicar
+
+
+def listar(carpeta: Path) -> list[Corto]:
+    """Los shorts elegidos de `carpeta/shorts.json`, de mejor a peor, que siguen
+    en disco. Un JSON ausente o dañado no lista nada."""
+    try:
+        candidatos = json.loads((carpeta / "shorts.json").read_text(
+            encoding="utf-8"))["candidatos"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
+    cortos = []
+    for c in candidatos if isinstance(candidatos, list) else []:
+        try:
+            archivo, duracion = c["archivo"], float(c["fin"]) - float(c["inicio"])
+            if not archivo or Path(archivo).name != archivo:
+                continue
+            mp4 = carpeta / archivo
+            if mp4.is_file():
+                cortos.append(Corto(mp4, str(c.get("titulo_video") or c.get("titulo") or
+                                             mp4.stem), duracion,
+                                    leer_md(mp4.with_suffix(".md"))))
+        except (KeyError, ValueError, TypeError, AttributeError):
+            continue
+    return cortos
+
+
 def limpiar_temporal(ficha: Ficha) -> None:
     carpeta = carpeta_shorts(ficha)
     shutil.rmtree(carpeta / TMP, ignore_errors=True)
@@ -653,6 +687,9 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         for anterior in anteriores:
             if anterior not in nuevos and (carpeta / anterior).is_file():
                 (carpeta / anterior).unlink()
+            # Un short nuevo con el mismo nombre no hereda un «ya publicado».
+            if anterior.endswith(".mp4"):
+                registro.ruta(carpeta / anterior).unlink(missing_ok=True)
         for nuevo in nuevos:
             (tmp / nuevo).replace(carpeta / nuevo)
         _escribir_json(carpeta / "shorts.json", {**datos, "archivos": nuevos})
