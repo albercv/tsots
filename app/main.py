@@ -395,6 +395,17 @@ class VentanaPrincipal(QMainWindow):
     def _ficha_de(self, trabajo) -> Ficha | None:
         return cargar(trabajo.ficha_id) if trabajo.ficha_id else None
 
+    def _carpeta_shorts_de(self, trabajo) -> Path | None:
+        """Carpeta de shorts: la de esta sesión o, si no, la de su ficha en disco."""
+        if trabajo is None:
+            return None
+        if trabajo.shorts:
+            return trabajo.shorts
+        ficha = self._ficha_de(trabajo)
+        if ficha is not None and shorts.hay_shorts(ficha):
+            return shorts.carpeta_shorts(ficha)
+        return None
+
     def _reprocesar_seleccionado(self) -> None:
         if self._procesando:
             return
@@ -615,7 +626,8 @@ class VentanaPrincipal(QMainWindow):
         """Botón «Publicar shorts…»: los shorts del vídeo elegido, en lote."""
         indices = self.vista_cola.selectedIndexes()
         trabajo = self.modelo_cola.trabajo(indices[0].row()) if indices else None
-        cortos = shorts.listar(trabajo.shorts) if trabajo and trabajo.shorts else []
+        carpeta = self._carpeta_shorts_de(trabajo)
+        cortos = shorts.listar(carpeta) if carpeta else []
         if not cortos:
             QMessageBox.warning(
                 self, _("Publicar shorts"),
@@ -934,7 +946,8 @@ class VentanaPrincipal(QMainWindow):
         )
         indices = self.vista_cola.selectedIndexes()
         self.panel.boton_publicar_shorts.setEnabled(
-            bool(indices) and bool(self.modelo_cola.trabajo(indices[0].row()).shorts)
+            bool(indices) and self._carpeta_shorts_de(
+                self.modelo_cola.trabajo(indices[0].row())) is not None
         )
 
     # --- idioma ---
