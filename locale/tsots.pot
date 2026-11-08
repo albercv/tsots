@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 21:47+0100\n"
+"POT-Creation-Date: 2026-11-08 21:51+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1052,6 +1052,9 @@ msgstr ""
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr ""
 
+msgid "No hay imágenes para LinkedIn"
+msgstr ""
+
 msgid "No hay nada programado."
 msgstr ""
 
@@ -1086,6 +1089,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
+msgid "No se encuentra la imagen: {nombre}"
 msgstr ""
 
 #, python-brace-format
@@ -1347,6 +1354,9 @@ msgid "Posición vertical"
 msgstr ""
 
 msgid "Posición vertical:"
+msgstr ""
+
+msgid "Post con fotos"
 msgstr ""
 
 msgid "Post público"

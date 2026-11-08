@@ -15,6 +15,7 @@ from videopipeline.redes.modelo import (
 )
 from videopipeline.redes.textos import (
     MAX_ETIQUETAS_YOUTUBE,
+    MAX_TEXTO,
     MAX_TEXTO_X,
     URL_X,
     etiquetas_youtube,
@@ -34,10 +35,11 @@ def _pub(**kw) -> Publicacion:
     return Publicacion(**base)
 
 
-def test_orden_fijo_tiktok_youtube_instagram_x_facebook():
+def test_orden_fijo_tiktok_youtube_instagram_x_facebook_linkedin():
     assert ORDEN == (Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM,
-                     Plataforma.X, Plataforma.FACEBOOK)
-    assert [p.nombre for p in ORDEN] == ["TikTok", "YouTube", "Instagram", "X", "Facebook"]
+                     Plataforma.X, Plataforma.FACEBOOK, Plataforma.LINKEDIN)
+    assert [p.nombre for p in ORDEN] == ["TikTok", "YouTube", "Instagram", "X", "Facebook",
+                                         "LinkedIn"]
 
 
 def test_opciones_por_defecto():
@@ -196,3 +198,7 @@ def test_facebook_texto_es_caption_mas_hashtags_y_titulo_el_titulo():
     assert texto_para(Plataforma.FACEBOOK, _pub()) == "Cuerpo\n\n#a #b"
     assert titulo_para(Plataforma.FACEBOOK, _pub()) == "Título"
     assert len(titulo_para(Plataforma.FACEBOOK, _pub(titulo="x " * 300))) <= 255
+
+
+def test_max_texto_linkedin():
+    assert MAX_TEXTO[Plataforma.LINKEDIN] == 3000

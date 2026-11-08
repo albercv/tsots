@@ -325,6 +325,7 @@ class DialogoPublicar(QDialog):
             Plataforma.INSTAGRAM: self.combo_instagram,
             Plataforma.X: QLabel(_("Post público")),
             Plataforma.FACEBOOK: self.combo_facebook,
+            Plataforma.LINKEDIN: QLabel(_("Post con fotos")),
         }
         for fila, plataforma in enumerate(ORDEN):
             casilla = QCheckBox(plataforma.nombre)

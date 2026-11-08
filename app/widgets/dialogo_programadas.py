@@ -58,7 +58,7 @@ DIAS = (N_("Lun"), N_("Mar"), N_("Mié"), N_("Jue"), N_("Vie"), N_("Sáb"), N_("
 # Siglas de cada red en las etiquetas, que son estrechas (marcas: no se
 # traducen). El nombre entero sale en el tooltip y en el detalle.
 SIGLAS = {Plataforma.TIKTOK: "TT", Plataforma.YOUTUBE: "YT", Plataforma.INSTAGRAM: "IG",
-          Plataforma.X: "X", Plataforma.FACEBOOK: "FB"}
+          Plataforma.X: "X", Plataforma.FACEBOOK: "FB", Plataforma.LINKEDIN: "LI"}
 # Etiquetas por día antes de resumir el resto en «+N más».
 MAX_ETIQUETAS = 3
 ESTILO_ETIQUETA = (

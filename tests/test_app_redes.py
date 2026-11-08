@@ -250,7 +250,8 @@ def _redes(qtbot, ajustes, proveedor, capturado=None):
 def _cuentas_variadas():
     return {T: Cuenta(T, "Mi TikTok", "yo_tt"), Y: None,
             I: Cuenta(I, "Insta", "yo_ig", reconectar=True),
-            X: Cuenta(X, "Yo", "yo_x", premium=True), F: Cuenta(F, "Mi página")}
+            X: Cuenta(X, "Yo", "yo_x", premium=True), F: Cuenta(F, "Mi página"),
+            Plataforma.LINKEDIN: None}
 
 
 def test_dialogo_redes_comprobar_conexion(qtbot, ajustes, llavero_falso):
@@ -471,9 +472,9 @@ def test_casillas_en_orden_y_modos_por_defecto(qtbot, video, ajustes, llavero_fa
     ajustes.tiktok_modo = ModoTikTok.PUBLICO
     ajustes.facebook_modo = ModoFacebook.VIDEO
     dialogo, _p = _dialogo(qtbot, video, ajustes)
-    assert list(dialogo.casillas) == [T, Y, I, X, F]
+    assert list(dialogo.casillas) == [T, Y, I, X, F, Plataforma.LINKEDIN]
     assert [c.text() for c in dialogo.casillas.values()] == [
-        "TikTok", "YouTube", "Instagram", "X", "Facebook"]
+        "TikTok", "YouTube", "Instagram", "X", "Facebook", "LinkedIn"]
     assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [T, Y, I]
     opciones = dialogo.opciones()
     assert opciones.tiktok_modo == ModoTikTok.PUBLICO
@@ -1153,7 +1154,8 @@ def test_sin_conexion_ni_nada_guardado_todo_sigue_usable(qtbot, video, ajustes,
     proveedor = ProveedorFalso(cuentas_conectadas=ErrorConsulta("sin red"))
     dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor)
     assert all(c.isEnabled() for c in dialogo.casillas.values())
-    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == list(ORDEN)
+    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [
+        p for p in ORDEN if p != Plataforma.LINKEDIN]
     assert dialogo.boton_publicar.isEnabled()
 
 

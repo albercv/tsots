@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 21:47+0100\n"
+"POT-Creation-Date: 2026-11-08 21:51+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1086,6 +1086,9 @@ msgstr "Not sent"
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr "Subtitle file not found: {ass}"
 
+msgid "No hay imágenes para LinkedIn"
+msgstr "There are no images for LinkedIn"
+
 msgid "No hay nada programado."
 msgstr "Nothing is scheduled."
 
@@ -1123,6 +1126,10 @@ msgstr "Video not found: {nombre}"
 #, python-brace-format
 msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
 msgstr "The record for this video ({id}) was not found. Drag in the original to process it again."
+
+#, python-brace-format
+msgid "No se encuentra la imagen: {nombre}"
+msgstr "Image not found: {nombre}"
 
 #, python-brace-format
 msgid ""
@@ -1386,6 +1393,9 @@ msgstr "Vertical position"
 
 msgid "Posición vertical:"
 msgstr "Vertical position:"
+
+msgid "Post con fotos"
+msgstr "Photo post"
 
 msgid "Post público"
 msgstr "Public post"
