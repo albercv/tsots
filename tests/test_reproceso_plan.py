@@ -458,6 +458,20 @@ def test_difusion_una_vez_por_video(tmp_path):
     assert plan.acciones and A.DIFUSION not in plan.acciones
 
 
+@pytest.mark.parametrize("artefactos", [
+    # La transcripción es de antes de recortar (la del caption, por ejemplo).
+    {BASE: _base(silencios=True, aparte=False), TRANSCRIPCION: _transcripcion("original")},
+    # Esta pasada recorta: la de la ficha es de la base vieja.
+    {TRANSCRIPCION: _transcripcion("original")},
+])
+def test_difusion_transcribe_la_linea_de_tiempo_de_la_base(tmp_path, artefactos):
+    """Cada fotograma va con el texto de su segundo en la base de esta pasada."""
+    plan = planificar(_ficha(tmp_path, artefactos),
+                      _panel(paso_silencios=True, difusion=True), Decisiones())
+
+    assert A.TRANSCRIBIR in plan.acciones and plan.acciones[-1] == A.DIFUSION
+
+
 def test_difusion_sin_final_da_error(tmp_path):
     plan = planificar(_ficha(tmp_path, {}, final=None), _panel(difusion=True),
                       Decisiones())

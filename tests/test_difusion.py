@@ -21,16 +21,17 @@ def _nitida(i=0):
     return img
 
 
-def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY):
+def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY, cliente=CLIENTE,
+            palabras=(Palabra("hola", 1.0, 1.5),)):
     final = tmp_path / "salida" / f"{nombre}_limpio.mp4"
     final.parent.mkdir(exist_ok=True)
     base = tmp_path / "base.mp4"
     base.write_bytes(b"video")
     return final, preparar(
         nombre=nombre, base=base, video_blog=base, final=final,
-        palabras=[Palabra("hola", 1.0, 1.5)], titulo="Claude Code ahorra tokens",
+        palabras=list(palabras), titulo="Claude Code ahorra tokens",
         idioma="es", contexto_marca="", modelo="m", dir_blog=tmp_path / "blog",
-        cliente=CLIENTE, detector=lambda f: np.zeros((0, 5)),
+        cliente=cliente, detector=lambda f: np.zeros((0, 5)),
         leer=leer or (lambda v, t: _nitida(int(t))), hoy=hoy, duracion=100.0,
     )
 
@@ -74,3 +75,24 @@ def test_carpeta_linkedin_previa_se_reemplaza(tmp_path):
     (viejo / "candidato_09.jpg").write_bytes(b"viejo")
     _llamar(tmp_path)
     assert not (viejo / "candidato_09.jpg").exists()
+
+
+def test_texto_de_linkedin_fallido_no_impide_el_blog(tmp_path):
+    def cliente_roto(m, msgs, esq):
+        raise PasoFallido("Ollama no responde")
+
+    final, res = _llamar(tmp_path, cliente=cliente_roto)
+    assert res.linkedin_md is None and str(res.fallo_linkedin) == "Ollama no responde"
+    assert not final.with_suffix(".linkedin.md").exists()
+    car = final.with_suffix(".linkedin")
+    assert (car / "01_portada.png").exists() and len(list(car.glob("0[234]_*"))) == 3
+    for f in ("video.mp4", "transcripcion.txt", "portada.png", "meta.json"):
+        assert (res.carpeta_blog / f).exists()
+
+
+def test_transcripcion_txt_en_lineas_cortas(tmp_path):
+    palabras = [Palabra("transcripción", i * 0.5, i * 0.5 + 0.4) for i in range(200)]
+    _, res = _llamar(tmp_path, palabras=palabras)
+    lineas = (res.carpeta_blog / "transcripcion.txt").read_text(encoding="utf-8").splitlines()
+    assert len(lineas) > 1 and max(map(len, lineas)) <= 300
+    assert " ".join(lineas).split() == ["transcripción"] * 200

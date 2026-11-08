@@ -18,6 +18,8 @@ E2D = "mcp__claude_ai_E2D_-_Blog__"
 HERRAMIENTAS = [f"{E2D}posts_create", f"{E2D}posts_request_upload", f"{E2D}posts_validate",
                 f"{E2D}posts_set_cover", f"{E2D}posts_list_media", "Read", "Write",
                 f"Bash({PYTHON} -m videopipeline.blog_subida:*)"]
+PROHIBIDAS = [f"{E2D}posts_update_frontmatter", f"{E2D}posts_delete",
+              f"{E2D}posts_update_body", f"{E2D}posts_rebuild"]
 RESULTADO = json.dumps({"slug": "mi-post", "locale": "es",
                         "url": "https://evolve2digital.com/es/blog/mi-post"})
 
@@ -52,6 +54,9 @@ def _llamadas(tmp_path):
 
 def test_carpeta_con_resultado_pasa_a_hechos(tmp_path):
     blog = _blog(tmp_path, "2026-11-08-video")
+    final = tmp_path / "x_limpio.mp4"  # el vídeo de la carpeta es un enlace duro al final
+    final.write_bytes(b"video")
+    os.link(final, blog / "pendientes" / "2026-11-08-video" / "video.mp4")
     r = _ejecutar(tmp_path, blog, f"echo '{RESULTADO}' > resultado.json\n")
     assert r.returncode == 0, r.stderr
     hecho = blog / "hechos" / "2026-11-08-video"
@@ -63,16 +68,19 @@ def test_carpeta_con_resultado_pasa_a_hechos(tmp_path):
     assert Path((hecho / "cwd.txt").read_text().strip()).resolve() == Path(carpeta).resolve()
     args = (hecho / "args.bin").read_text().split("\0")[:-1]
     prompt = INSTRUCCIONES.read_text().rstrip("\n").replace("@PYTHON@", PYTHON)
-    assert args[:7] == ["-p", prompt, "--add-dir", carpeta, "--allowedTools", ",".join(HERRAMIENTAS),
-                        "--settings"]
-    assert len(args) == 8
-    assert json.loads(args[7]) == {"hooks": {"PreToolUse": [{
+    assert args[:9] == ["-p", prompt, "--add-dir", carpeta, "--allowedTools", ",".join(HERRAMIENTAS),
+                        "--disallowedTools", ",".join(PROHIBIDAS), "--settings"]
+    assert len(args) == 10
+    assert json.loads(args[9]) == {"hooks": {"PreToolUse": [{
         "matcher": f"{E2D}posts_create",
         "hooks": [{"type": "command", "command": f"/bin/bash '{GUARDA}'"}]}]}}
+    # El borrador ya lleva el vídeo: la copia sobra, el final sigue.
+    assert not (hecho / "video.mp4").exists() and final.read_bytes() == b"video"
 
 
 def test_carpeta_sin_resultado_pasa_a_errores_con_motivo(tmp_path):
     blog = _blog(tmp_path, "2026-11-08-video")
+    (blog / "pendientes" / "2026-11-08-video" / "video.mp4").write_bytes(b"video")
     # resultado.json sin "url" no cuenta como hecho
     r = _ejecutar(tmp_path, blog, "for i in $(seq 1 50); do echo \"linea $i\"; done\n"
                                   "echo '{\"slug\": \"x\"}' > resultado.json\nexit 1\n")
@@ -80,6 +88,7 @@ def test_carpeta_sin_resultado_pasa_a_errores_con_motivo(tmp_path):
     error = blog / "errores" / "2026-11-08-video"
     assert (error / "motivo.txt").read_text().splitlines() == [f"linea {i}" for i in range(11, 51)]
     assert (error / "claude.log").exists()
+    assert (error / "video.mp4").exists()  # para reintentar
     assert not (blog / "hechos" / "2026-11-08-video").exists()
     assert not (blog / "pendientes" / "2026-11-08-video").exists()
 

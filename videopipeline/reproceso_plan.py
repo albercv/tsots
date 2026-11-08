@@ -19,8 +19,9 @@ guarda en cada uno:
   sin preguntar (tampoco R7) las salidas que hizo la app sobre una base que
   vale; las demás lo llevan cuando se rehacen por otra cosa.
 - CAPTION: `{"caption": ajustes_caption}`.
-- DIFUSION: `{"blog": carpeta, "linkedin": .linkedin.md}`, sin archivo: se
-  hace una vez por vídeo; basta con que esté, aunque se borren sus salidas.
+- DIFUSION: `{"blog": carpeta, "linkedin": .linkedin.md o None si falló su
+  texto}`, sin archivo: se hace una vez por vídeo; basta con que esté, aunque
+  se borren sus salidas.
 - SEGUIMIENTO: clave = `clave_seguimiento(línea de tiempo de la base)`; la
   imagen solo depende de los cortes, no del audio, y las x guardadas son las de
   una ventana de recorte concreta (`PROPORCION_VENTANA_CARA`).
@@ -510,10 +511,11 @@ def planificar(ficha: Ficha, config: PipelineConfig,
         elegidas.add(Accion.CAPTION)
         if transcripcion is None:
             elegidas.add(Accion.TRANSCRIBIR)
-    # Blog y LinkedIn: una vez por vídeo, aunque se borren sus salidas.
+    # Blog y LinkedIn: una vez por vídeo, aunque se borren sus salidas. Sus
+    # fotogramas salen de la base de esta pasada: el texto, de su misma línea.
     if config.difusion and DIFUSION not in ficha.artefactos:
         elegidas.add(Accion.DIFUSION)
-        if transcripcion is None:
+        if transcripcion is None or transcripcion.linea_tiempo != linea:
             elegidas.add(Accion.TRANSCRIBIR)
 
     # 7-8. Vertical y R10.

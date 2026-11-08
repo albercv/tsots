@@ -13,6 +13,9 @@ PYTHON="$RAIZ/.venv-clearvoice/bin/python"
 LIMITE="${TSOTS_BLOG_LIMITE:-1800}"  # segundos por carpeta; la variable es solo para los tests
 E2D=mcp__claude_ai_E2D_-_Blog__
 HERRAMIENTAS="${E2D}posts_create,${E2D}posts_request_upload,${E2D}posts_validate,${E2D}posts_set_cover,${E2D}posts_list_media,Read,Write,Bash($PYTHON -m videopipeline.blog_subida:*)"
+# Las prohibidas ganan a las permitidas y a cualquier modo de permisos: ni publicar
+# ni tocar un post que ya existe.
+PROHIBIDAS="${E2D}posts_update_frontmatter,${E2D}posts_delete,${E2D}posts_update_body,${E2D}posts_rebuild"
 # shortcut: una ruta con comillas o «\» rompe este JSON; escapar si llega a pasar.
 AJUSTES="$(printf '{"hooks": {"PreToolUse": [{"matcher": "%sposts_create", "hooks": [{"type": "command", "command": "%s"}]}]}}' \
     "$E2D" "/bin/bash '$AQUI/guarda_borrador.sh'")"
@@ -46,6 +49,8 @@ mover() {
     nombre="$(basename "$carpeta")"
     destino="$DIR/$1/$nombre"
     if [ ! -e "$destino" ] && mv "$carpeta" "$destino"; then
+        # El borrador ya lleva el vídeo: este (enlace duro o copia) sobra.
+        [ "$1" = hechos ] && rm -f "$destino/video.mp4"
         echo "$(ahora) $nombre: $2"
     elif mv "$carpeta" "$DIR/pendientes/.$nombre.no-movida"; then
         echo "$(ahora) $nombre: $2; no se pudo mover a $1/, apartada en pendientes/.$nombre.no-movida"
@@ -68,7 +73,8 @@ for carpeta in "$DIR"/pendientes/*/; do
     # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
     (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \
         "$CLAUDE" -p "$INSTRUCCIONES" --add-dir "$carpeta" \
-        --allowedTools "$HERRAMIENTAS" --settings "$AJUSTES") > "$carpeta/claude.log" 2>&1
+        --allowedTools "$HERRAMIENTAS" --disallowedTools "$PROHIBIDAS" \
+        --settings "$AJUSTES") > "$carpeta/claude.log" 2>&1
     rc=$?
     url="$(plutil -extract url raw -o - "$carpeta/resultado.json" 2>/dev/null)"
     if [ -n "$url" ]; then

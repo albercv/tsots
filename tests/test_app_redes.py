@@ -1662,6 +1662,18 @@ def test_texto_de_linkedin_largo_bloquea(qtbot, video, ajustes, llavero_falso):
     assert dialogo.boton_publicar.isEnabled()
 
 
+def test_texto_de_linkedin_vacio_deshabilita(qtbot, video, ajustes, llavero_falso):
+    _con_linkedin(video)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    dialogo.campo_linkedin.setPlainText("  \n ")
+    assert not dialogo.casillas[L].isEnabled() and not dialogo.casillas[L].isChecked()
+    assert dialogo.estados[L].text() == "Texto para LinkedIn vacío: escríbelo."
+    assert dialogo.boton_publicar.isEnabled()  # YouTube sigue marcada
+    # Con texto de nuevo, vuelve a estar marcada: el usuario la quería.
+    dialogo.campo_linkedin.setPlainText("Otro post")
+    assert dialogo.casillas[L].isEnabled() and dialogo.casillas[L].isChecked()
+
+
 def test_quitar_imagen_la_saca_de_la_publicacion(qtbot, video, ajustes, llavero_falso):
     fotos, _candidatos = _con_linkedin(video)
     dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(L,))

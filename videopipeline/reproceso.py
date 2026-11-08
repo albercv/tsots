@@ -15,9 +15,9 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import linkedin
-from .caption import texto_plano
+from .caption import leer_md, texto_plano
 from .config import SAMPLE_RATE_POR_MODELO
-from .difusion import preparar as preparar_difusion
+from .difusion import PLIST_BLOG, preparar as preparar_difusion
 from .ficha import (
     AUDIO, BASE, CAPTION, DIFUSION, HORIZONTAL, SEGUIMIENTO, TITULO,
     TRANSCRIPCION, VERTICAL, Artefacto, Ficha, Huella, _escribir_json, guardar,
@@ -529,13 +529,18 @@ class _Pasada:
                     _("la transcripción no dio texto"))
             idioma = c.idioma_subs if c.idioma_subs in ("es", "en") else "es"
             servidor = asegurar_servidor()
+            horizontal = ficha.hay_horizontal()
+            final = ficha.ruta_final(horizontal)
             titulo = ficha.artefactos.get(TITULO)  # aunque no se queme
+            seo = leer_md(final.with_suffix(".md"))
             corto = ((titulo.ajustes.get("texto") if titulo else None)
                      or generar_titulo(texto_plano(palabras), idioma,
                                        c.modelo_caption)
-                     or ficha.nombre)
-            horizontal = ficha.hay_horizontal()
-            final = ficha.ruta_final(horizontal)
+                     or (" ".join(seo.titulo.split()[:5]) if seo else None))
+            if not corto:  # sin DIFUSION: se reintenta al volver a procesar
+                raise PasoFallido(_(
+                    "No hay título para la portada: el modelo no lo dio y el "
+                    "vídeo no tiene caption. Se reintentará al volver a procesar."))
             resultado = preparar_difusion(
                 nombre=ficha.nombre, base=self.base,
                 video_blog=final if horizontal else self.base, final=final,
@@ -549,10 +554,25 @@ class _Pasada:
             return
         finally:
             _cerrar_servidor(servidor, self.on_progress)
+        md = resultado.linkedin_md
         ficha.artefactos[DIFUSION] = Artefacto("hecho", None, {
             "blog": str(resultado.carpeta_blog),
-            "linkedin": str(resultado.linkedin_md)})
+            "linkedin": str(md) if md else None})
         guardar(ficha)
+        if resultado.fallo_linkedin is not None:
+            error = resultado.fallo_linkedin
+            _avisar(self.on_progress,
+                    _("El texto de LinkedIn falló: {error}. El blog sigue "
+                      "adelante; para publicar en LinkedIn, escribe el post en "
+                      "{ruta}.{sugerencia}").format(
+                        error=error, ruta=linkedin.rutas(final)[0],
+                        sugerencia=_sugerencia(error)))
+        if not PLIST_BLOG.exists():
+            _avisar(self.on_progress,
+                    _("La carpeta del blog está en {carpeta}, pero el agente del "
+                      "blog no está instalado y nadie la convertirá en borrador: "
+                      "ejecuta instalar.command.").format(
+                        carpeta=resultado.carpeta_blog))
 
     # --- R10 ----------------------------------------------------------------
 

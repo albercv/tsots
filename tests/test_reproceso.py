@@ -9,6 +9,7 @@ import pytest
 
 from videopipeline import ficha as modulo_ficha
 from videopipeline import linkedin, pipeline, reproceso
+from videopipeline.caption import Caption, escribir_md
 from videopipeline.config import PipelineConfig
 from videopipeline.difusion import Resultado
 from videopipeline.ficha import (
@@ -891,9 +892,10 @@ def test_titulo_sin_texto_en_la_ficha_no_se_quema(entorno_titulo, tmp_path):
 @pytest.fixture()
 def difusion(tmp_path, monkeypatch):
     """`preparar` y el título falsos: apuntan lo que reciben y `preparar`
-    escribe el .linkedin.md junto al final."""
+    escribe el .linkedin.md junto al final. `corto` es lo que da el modelo
+    del título. El agente del blog está instalado."""
     blog = tmp_path / "blog" / "pendientes" / "charla"
-    recibido = {"preparar": [], "titulo": [], "blog": blog}
+    recibido = {"preparar": [], "titulo": [], "blog": blog, "corto": "Charla corta"}
 
     def falso_preparar(**kwargs):
         recibido["preparar"].append(kwargs)
@@ -902,8 +904,11 @@ def difusion(tmp_path, monkeypatch):
 
     def falso_titulo(transcripcion, idioma, modelo, cliente=None):
         recibido["titulo"].append(transcripcion)
-        return None
+        return recibido["corto"]
 
+    plist = tmp_path / "com.tsots.blog.plist"
+    plist.write_text("<plist/>")
+    monkeypatch.setattr(reproceso, "PLIST_BLOG", plist)
     monkeypatch.setattr(reproceso, "preparar_difusion", falso_preparar)
     monkeypatch.setattr(reproceso, "generar_titulo", falso_titulo)
     return recibido
@@ -922,8 +927,8 @@ def test_difusion_guarda_artefacto(falsos, difusion, tmp_path):
     assert recibido["video_blog"].resolve() == final
     assert recibido["base"].resolve() == final  # sin subtítulos es la base (R3)
     assert [p.texto for p in recibido["palabras"]] == ["hola"]
-    # Sin título en la ficha se pide uno y, si no llega, va el nombre.
-    assert difusion["titulo"] == ["hola"] and recibido["titulo"] == "charla"
+    # Sin título en la ficha se pide uno.
+    assert difusion["titulo"] == ["hola"] and recibido["titulo"] == "Charla corta"
     assert (recibido["nombre"], recibido["idioma"]) == ("charla", "es")
     assert recibido["contexto_marca"] == "Soy Alberto"
     assert recibido["modelo"] == "qwen3.5:9b"
@@ -944,6 +949,67 @@ def test_difusion_usa_el_titulo_guardado_aunque_no_se_queme(
 
     assert difusion["preparar"][0]["titulo"] == "Audio limpio ya"
     assert difusion["titulo"] == []
+
+
+def test_difusion_sin_titulo_usa_el_titulo_seo(falsos, difusion, tmp_path):
+    difusion["corto"] = None
+    ficha = _pasada(_ficha(tmp_path), [A.CORTAR, A.ESCRIBIR_FINAL], paso_silencios=True)
+    escribir_md(Caption("Cómo ahorrar tokens con Claude Code", "C", ["#ia"], []),
+                ficha.final.ruta.with_suffix(".md"))
+
+    _pasada(ficha, [A.TRANSCRIBIR, A.DIFUSION], paso_silencios=True, difusion=True)
+
+    assert difusion["preparar"][0]["titulo"] == "Cómo ahorrar tokens con Claude"
+
+
+def test_difusion_sin_titulo_ni_caption_falla_y_se_reintenta(falsos, difusion,
+                                                              tmp_path):
+    difusion["corto"] = None
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+                    paso_silencios=True, difusion=True)
+
+    [aviso] = _avisos(eventos)
+    assert aviso.startswith("Blog y LinkedIn fallaron: No hay título para la portada")
+    assert difusion["preparar"] == []
+    assert DIFUSION not in ficha.artefactos
+    plan = planificar(ficha, _panel(paso_silencios=True, difusion=True), Decisiones())
+    assert A.DIFUSION in plan.acciones
+
+
+def test_difusion_sin_texto_de_linkedin_guarda_el_blog_y_avisa(
+        falsos, difusion, tmp_path, monkeypatch):
+    def preparar_sin_linkedin(**kwargs):
+        difusion["preparar"].append(kwargs)
+        return Resultado(None, difusion["blog"], PasoFallido("Ollama no responde"))
+
+    monkeypatch.setattr(reproceso, "preparar_difusion", preparar_sin_linkedin)
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+                    paso_silencios=True, difusion=True)
+
+    [aviso] = _avisos(eventos)
+    assert aviso.startswith("El texto de LinkedIn falló: Ollama no responde.")
+    assert str(linkedin.rutas(ficha.final.ruta)[0]) in aviso
+    # Se registra igual: reintentar crearía otro borrador del blog.
+    assert ficha.artefactos[DIFUSION].ajustes == {
+        "blog": str(difusion["blog"]), "linkedin": None}
+    assert planificar(ficha, _panel(difusion=True), Decisiones()).vacio
+
+
+def test_difusion_sin_agente_del_blog_avisa(falsos, difusion, tmp_path,
+                                            monkeypatch):
+    monkeypatch.setattr(reproceso, "PLIST_BLOG", tmp_path / "no-existe.plist")
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+                    paso_silencios=True, difusion=True)
+
+    [aviso] = _avisos(eventos)
+    assert str(difusion["blog"]) in aviso and "instalar.command" in aviso
+    assert DIFUSION in ficha.artefactos
 
 
 def test_difusion_falla_sin_tumbar_el_video(falsos, difusion, tmp_path,

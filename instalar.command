@@ -141,6 +141,7 @@ if mkdir -p "$DIR_BLOG/pendientes" "$DIR_BLOG/hechos" "$DIR_BLOG/errores" "$HOME
         echo "    $(t "launchctl no pudo cargar el agente; el resto de la app funciona igual." "launchctl could not load the agent; the rest of the app works the same.")"
     fi
 else
+    rm -f "$PLIST_BLOG"  # un sed a medias deja un plist roto
     echo "    $(t "No se pudo preparar el agente del blog; el resto de la app funciona igual." "Could not set up the blog agent; the rest of the app works the same.")"
 fi
 

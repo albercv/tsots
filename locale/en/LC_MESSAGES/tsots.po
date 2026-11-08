@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 22:06+0100\n"
+"POT-Creation-Date: 2026-11-08 23:04+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -562,6 +562,10 @@ msgstr "The service rejected the post."
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr "The service finished without giving the result for {plataforma}."
 
+#, python-brace-format
+msgid "El texto de LinkedIn falló: {error}. El blog sigue adelante; para publicar en LinkedIn, escribe el post en {ruta}.{sugerencia}"
+msgstr "The LinkedIn text failed: {error}. The blog goes ahead; to publish on LinkedIn, write the post in {ruta}.{sugerencia}"
+
 msgid "El texto de LinkedIn generado es demasiado corto"
 msgstr "The generated LinkedIn text is too short"
 
@@ -878,6 +882,10 @@ msgstr "The API key is invalid or expired (401). Check it in Networks…"
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr "The app re-encodes the video with h264_videotoolbox and retries automatically. If it still fails, re-encode by hand: ffmpeg -i input.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy output.mp4"
 
+#, python-brace-format
+msgid "La carpeta del blog está en {carpeta}, pero el agente del blog no está instalado y nadie la convertirá en borrador: ejecuta instalar.command."
+msgstr "The blog folder is in {carpeta}, but the blog agent is not installed and nothing will turn it into a draft: run instalar.command."
+
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr "The key has spaces, quotes or other invalid characters."
 
@@ -1124,6 +1132,9 @@ msgstr "There are no Facebook Pages connected in {servicio}."
 
 msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
 msgstr "There is no server at http://localhost:11434 and `ollama serve` could not be started in time (port busy, Ollama app hung, or a model download in progress)."
+
+msgid "No hay título para la portada: el modelo no lo dio y el vídeo no tiene caption. Se reintentará al volver a procesar."
+msgstr "No title for the cover: the model gave none and the video has no caption. It will be retried when you process it again."
 
 msgid "No queda espacio en disco"
 msgstr "No space left on disk"
@@ -1892,6 +1903,9 @@ msgstr "Finished, but the result could not be shown ({tipo}). Check the log."
 #, python-brace-format
 msgid "Texto para LinkedIn de más de {maximo} caracteres: acórtalo"
 msgstr "Text for LinkedIn over {maximo} characters: shorten it"
+
+msgid "Texto para LinkedIn vacío: escríbelo."
+msgstr "Text for LinkedIn is empty: write it."
 
 msgid "Texto para LinkedIn:"
 msgstr "Text for LinkedIn:"

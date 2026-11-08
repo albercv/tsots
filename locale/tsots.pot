@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 22:06+0100\n"
+"POT-Creation-Date: 2026-11-08 23:04+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -548,6 +548,10 @@ msgstr ""
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr ""
 
+#, python-brace-format
+msgid "El texto de LinkedIn falló: {error}. El blog sigue adelante; para publicar en LinkedIn, escribe el post en {ruta}.{sugerencia}"
+msgstr ""
+
 msgid "El texto de LinkedIn generado es demasiado corto"
 msgstr ""
 
@@ -849,6 +853,10 @@ msgstr ""
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr ""
 
+#, python-brace-format
+msgid "La carpeta del blog está en {carpeta}, pero el agente del blog no está instalado y nadie la convertirá en borrador: ejecuta instalar.command."
+msgstr ""
+
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr ""
 
@@ -1089,6 +1097,9 @@ msgid "No hay páginas de Facebook conectadas en {servicio}."
 msgstr ""
 
 msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
+msgstr ""
+
+msgid "No hay título para la portada: el modelo no lo dio y el vídeo no tiene caption. Se reintentará al volver a procesar."
 msgstr ""
 
 msgid "No queda espacio en disco"
@@ -1835,6 +1846,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Texto para LinkedIn de más de {maximo} caracteres: acórtalo"
+msgstr ""
+
+msgid "Texto para LinkedIn vacío: escríbelo."
 msgstr ""
 
 msgid "Texto para LinkedIn:"

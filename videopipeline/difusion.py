@@ -25,13 +25,16 @@ from .steps import PasoFallido
 from .subtitles import Palabra
 
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
+# Lo instala instalar.command; sin él nadie recoge las carpetas de DIR_BLOG.
+PLIST_BLOG = Path.home() / "Library" / "LaunchAgents" / "com.tsots.blog.plist"
 NUM_IMAGENES = 3  # fotogramas que acompañan a la portada en LinkedIn
 
 
 @dataclass(frozen=True)
 class Resultado:
-    linkedin_md: Path
+    linkedin_md: Path | None  # None si falló el texto: el blog sigue adelante
     carpeta_blog: Path
+    fallo_linkedin: Exception | None = None
 
 
 def _elegir_portada(candidatos: list[Candidato]) -> Candidato:
@@ -82,14 +85,19 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
         raise PasoFallido(_("No se ha encontrado ningún fotograma válido para la portada"))
     portada = _elegir_portada(candidatos)
     transcripcion = texto_plano(palabras)
-    texto = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
+    texto, fallo = None, None
+    try:
+        texto = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
+    except Exception as error:  # noqa: BLE001 — sin texto de LinkedIn el blog sigue
+        fallo = error
 
     # LinkedIn: portada con logo + fotogramas repartidos en el tiempo
     extras = _repartidos([c for c in candidatos if c is not portada], NUM_IMAGENES)
     _componer(portada, titulo, TAM_LINKEDIN, car / "01_portada.png", con_logo=True)
     for i, c in enumerate(extras, start=2):
         shutil.copy2(c.archivo, car / f"{i:02d}_{c.archivo.name}")
-    linkedin.escribir(texto, final)
+    if texto is not None:
+        linkedin.escribir(texto, final)
 
     # Blog: carpeta oculta que se renombra al final
     destino = _carpeta_libre(dir_blog, f"{hoy:%Y-%m-%d}-{nombre}")
@@ -98,7 +106,10 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
     tmp.mkdir(parents=True)
     try:
         _enlazar_o_copiar(video_blog, tmp / "video.mp4")
-        (tmp / "transcripcion.txt").write_text(transcripcion, encoding="utf-8")
+        trozos = transcripcion.split()  # en líneas cortas: `Read` corta las muy largas
+        (tmp / "transcripcion.txt").write_text(
+            "\n".join(" ".join(trozos[i:i + 15]) for i in range(0, len(trozos), 15)),
+            encoding="utf-8")
         _componer(portada, titulo, TAM_BLOG, tmp / "portada.png")
         shutil.copytree(car / "candidatos", tmp / "candidatos")
         caption = leer_md(final.with_suffix(".md"))
@@ -117,4 +128,4 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
     except BaseException:
         shutil.rmtree(tmp, ignore_errors=True)
         raise
-    return Resultado(md, destino)
+    return Resultado(md if texto is not None else None, destino, fallo)

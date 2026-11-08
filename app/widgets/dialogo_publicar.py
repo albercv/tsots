@@ -675,7 +675,10 @@ class DialogoPublicar(QDialog):
                                     "LinkedIn» y procésalo."), COLOR_SECUNDARIO
             if not self.tira_linkedin.fotos():
                 return False, "", _("Sin fotos: añade al menos una."), COLOR_AVISO
-            if len(self.campo_linkedin.toPlainText().strip()) > MAX_TEXTO[plataforma]:
+            texto_linkedin = self.campo_linkedin.toPlainText().strip()
+            if not texto_linkedin:
+                return False, "", _("Texto para LinkedIn vacío: escríbelo."), COLOR_AVISO
+            if len(texto_linkedin) > MAX_TEXTO[plataforma]:
                 bloqueo = _("Texto para LinkedIn de más de {maximo} caracteres: "
                             "acórtalo").format(maximo=MAX_TEXTO[plataforma])
         if plataforma == Plataforma.FACEBOOK and self.ajustes.pagina_facebook is None:
