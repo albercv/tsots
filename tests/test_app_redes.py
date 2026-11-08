@@ -1615,8 +1615,17 @@ def test_linkedin_sin_acompanantes_deshabilitado(qtbot, video, ajustes, llavero_
     with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
         dialogo.boton_publicar.click()
     assert [c[1] for c in proveedor.llamadas] == [Y]
-    # Deshabilitada no se recuerda como elegida.
-    assert ajustes.plataformas_redes == [Y]
+    # Deshabilitada se desmarca, pero no se olvida (como X con un vídeo largo).
+    assert ajustes.plataformas_redes == [Y, L]
+
+
+def test_linkedin_md_ilegible_el_dialogo_abre(qtbot, video, ajustes, llavero_falso):
+    _con_linkedin(video)
+    linkedin.rutas(video)[0].write_bytes(b"\xff\xfe no es UTF-8 \x80")
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    assert not dialogo.casillas[L].isEnabled() and not dialogo.casillas[L].isChecked()
+    assert "no tiene post de LinkedIn" in dialogo.estados[L].text()
+    assert dialogo.campo_linkedin.isHidden() and dialogo.boton_publicar.isEnabled()
 
 
 def test_linkedin_publicacion_lleva_texto_y_fotos(qtbot, video, ajustes, llavero_falso,
@@ -1686,7 +1695,7 @@ def test_quitar_todas_deshabilita_linkedin(qtbot, video, ajustes, llavero_falso,
     with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
         dialogo.boton_publicar.click()
     assert [c[1] for c in proveedor.llamadas] == [Y]
-    assert ajustes.plataformas_redes == [Y]
+    assert ajustes.plataformas_redes == [Y, L]
 
 
 def test_anadir_candidato(qtbot, video, ajustes, llavero_falso):

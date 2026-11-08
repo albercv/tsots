@@ -162,7 +162,7 @@ def leer(final: Path) -> tuple[str, list[Path]] | None:
     md, carpeta = rutas(final)
     try:
         texto = md.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):  # ilegible: como si no hubiera post
         return None
     # glob no entra en subcarpetas, así que `candidatos/` queda fuera
     imagenes = sorted(p for p in carpeta.glob("*") if p.is_file()

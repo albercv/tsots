@@ -946,11 +946,8 @@ class DialogoPublicar(QDialog):
 
     def _recordar_eleccion(self, opciones: Opciones) -> None:
         # Lo que el usuario quiere marcado, también lo que hoy no se puede
-        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar. LinkedIn
-        # no: sin post o sin fotos no se queda como elegida.
-        self.ajustes.plataformas_redes = [
-            p for p in ORDEN if p in self._deseadas
-            and (p != Plataforma.LINKEDIN or self._estado_plataforma(p)[0])]
+        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
+        self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
         self.ajustes.tiktok_modo = opciones.tiktok_modo
         self.ajustes.instagram_modo = opciones.instagram_modo
         self.ajustes.facebook_modo = opciones.facebook_modo

@@ -65,3 +65,10 @@ def test_escribir_y_leer_imagenes_ordenadas_sin_candidatos(tmp_path):
 
 def test_leer_sin_md_es_none(tmp_path):
     assert leer(tmp_path / "x_limpio.mp4") is None
+
+
+def test_leer_md_que_no_es_utf8_es_none(tmp_path):
+    final = tmp_path / "x_limpio.mp4"
+    md, _carpeta = rutas(final)
+    md.write_bytes(b"\xff\xfe no es UTF-8 \x80")
+    assert leer(final) is None

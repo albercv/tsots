@@ -221,3 +221,5 @@ def test_linkedin_no_se_ofrece_ni_se_envia(qtbot, carpeta, ajustes, llavero_fals
     with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=10000):
         dialogo.boton_publicar.click()
     assert {c[1] for c in proveedor.llamadas} == {T}
+    # Y no la quita de las elegidas: es del vídeo largo.
+    assert ajustes.plataformas_redes == [T, linkedin_]
