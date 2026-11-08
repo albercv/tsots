@@ -91,3 +91,27 @@ def test_cli_error_a_stderr_sin_token(tmp_path, monkeypatch, capsys):
     assert blog_subida.main([URL, "--fichero", f"{a}=foto"]) == 1
     err = capsys.readouterr().err
     assert "fallo del blog" in err and "SECRETO123" not in err
+
+
+def _cliente_409(peticiones, error="exists"):
+    def manejar(peticion: httpx.Request) -> httpx.Response:
+        peticiones.append((peticion, peticion.read()))
+        if peticion.headers.get("x-media-name") == "portada":
+            return httpx.Response(409, json={"error": error, "message": "ya existe"})
+        return httpx.Response(200, json={"ok": True})
+    return httpx.Client(transport=httpx.MockTransport(manejar))
+
+
+def test_409_exists_se_da_por_subido_y_se_confirma(tmp_path):
+    a, b = _ficheros(tmp_path)
+    peticiones = []
+    blog_subida.subir(URL, [(a, "portada"), (b, "video")], http=_cliente_409(peticiones))
+    assert len(peticiones) == 3
+    assert [f["name"] for f in json.loads(peticiones[-1][1])["files"]] == ["portada", "video"]
+
+
+def test_409_con_otro_error_falla(tmp_path):
+    a, b = _ficheros(tmp_path)
+    with pytest.raises(RuntimeError, match="otro"):
+        blog_subida.subir(URL, [(a, "portada"), (b, "video")],
+                          http=_cliente_409([], error="otro"))

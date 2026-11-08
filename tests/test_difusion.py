@@ -21,8 +21,12 @@ def _nitida(i=0):
     return img
 
 
+def _sin_ffmpeg(origen, destino):
+    raise PasoFallido("sin ffmpeg en los tests")
+
+
 def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY, cliente=CLIENTE,
-            palabras=(Palabra("hola", 1.0, 1.5),)):
+            palabras=(Palabra("hola", 1.0, 1.5),), codificar=_sin_ffmpeg):
     final = tmp_path / "salida" / f"{nombre}_limpio.mp4"
     final.parent.mkdir(exist_ok=True)
     base = tmp_path / "base.mp4"
@@ -32,7 +36,7 @@ def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY, cliente=CLIENTE,
         palabras=list(palabras), titulo="Claude Code ahorra tokens",
         idioma="es", contexto_marca="", modelo="m", dir_blog=tmp_path / "blog",
         cliente=cliente, detector=lambda f: np.zeros((0, 5)),
-        leer=leer or (lambda v, t: _nitida(int(t))), hoy=hoy, duracion=100.0,
+        leer=leer or (lambda v, t: _nitida(int(t))), hoy=hoy, duracion=100.0, codificar=codificar,
     )
 
 
@@ -96,3 +100,21 @@ def test_transcripcion_txt_en_lineas_cortas(tmp_path):
     lineas = (res.carpeta_blog / "transcripcion.txt").read_text(encoding="utf-8").splitlines()
     assert len(lineas) > 1 and max(map(len, lineas)) <= 300
     assert " ".join(lineas).split() == ["transcripción"] * 200
+
+
+def test_video_del_blog_es_la_codificacion_web(tmp_path):
+    def codificar(origen, destino):
+        destino.write_bytes(b"web-720")
+    _, res = _llamar(tmp_path, codificar=codificar)
+    assert (res.carpeta_blog / "video.mp4").read_bytes() == b"web-720"
+
+
+def test_si_falla_la_codificacion_se_enlaza_el_video_original(tmp_path):
+    _, res = _llamar(tmp_path)  # _sin_ffmpeg lanza PasoFallido
+    assert (res.carpeta_blog / "video.mp4").read_bytes() == b"video"
+
+
+def test_comando_de_codificacion_web(tmp_path):
+    from videopipeline.steps import cmd_codificar_web
+    cmd = cmd_codificar_web("ffmpeg", tmp_path / "a.mp4", tmp_path / "b.mp4")
+    assert "scale=720:-2" in cmd and "libx264" in cmd and "26" in cmd

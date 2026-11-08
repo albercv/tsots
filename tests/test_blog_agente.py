@@ -211,6 +211,11 @@ def test_instrucciones_nombran_herramientas_y_orden_de_subida():
         assert marca in texto
 
 
+def test_instrucciones_reintentan_la_misma_orden_una_vez():
+    texto = " ".join(INSTRUCCIONES.read_text().split())
+    assert "repite **la misma orden** una vez" in texto and "ya estaban subidos" in texto
+
+
 def test_plist_plantilla_es_valido():
     plist = plistlib.loads((BLOG / "com.tsots.blog.plist.plantilla").read_bytes())
     script, dir_blog = plist["ProgramArguments"]

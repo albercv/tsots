@@ -42,6 +42,13 @@ def _error(r: httpx.Response) -> RuntimeError:
     return RuntimeError(f"El blog rechazó la subida: {motivo}")
 
 
+def _existe(r: httpx.Response) -> bool:
+    try:
+        return r.json()["error"] == "exists"
+    except (ValueError, KeyError, TypeError):
+        return False
+
+
 def subir(upload_url: str, ficheros: list[tuple[Path, str]], *, portada: str | None = None,
           alts: dict[str, str] | None = None, http: httpx.Client | None = None) -> None:
     """Sube los ficheros y confirma. `RuntimeError` si el blog responde con error."""
@@ -67,7 +74,10 @@ def subir(upload_url: str, ficheros: list[tuple[Path, str]], *, portada: str | N
                                  timeout=tiempos(ruta.stat().st_size),
                                  headers={**auth, "content-type": tipo, "x-media-name": nombre})
             log.info("subida %s: HTTP %s", nombre, r.status_code)
-            if not r.is_success:
+            if r.status_code == 409 and _existe(r):
+                # Un intento anterior fallido dejó el fichero en cola: sigue en el commit.
+                print(f"{nombre}: ya estaba subido")
+            elif not r.is_success:
                 raise _error(r)
         cuerpo: dict = {"files": [{"name": n, "alt": alts.get(n, ""), "caption": ""}
                                   for n in nombres]}

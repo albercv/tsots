@@ -96,7 +96,8 @@ Herramientas del blog que puedes usar (ninguna otra):
 
    - Es una sola orden: sin `cd`, sin `&&`, sin `;` y sin tuberías.
    - Si sale bien, termina con «listo: N ficheros confirmados». Si falla,
-     repítela una vez; si vuelve a fallar, ve al paso 8.
+     repite **la misma orden** una vez (es seguro repetirla: los ficheros que
+     ya estaban subidos se saltan); si vuelve a fallar, ve al paso 8.
    - El `uploadUrl` lleva un token secreto: no lo escribas en tu respuesta ni
      en ningún fichero.
 

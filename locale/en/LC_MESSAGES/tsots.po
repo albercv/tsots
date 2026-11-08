@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 23:04+0100\n"
+"POT-Creation-Date: 2026-11-08 23:56+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -307,6 +307,9 @@ msgstr "City:"
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
 msgstr "ClearVoice did not produce the clean audio: {salida}"
+
+msgid "Codificación web del vídeo del blog"
+msgstr "Web encoding of the blog video"
 
 msgid "Cola"
 msgstr "Queue"
@@ -1210,6 +1213,10 @@ msgstr "The remuxed video was not produced: {salida}"
 #, python-brace-format
 msgid "No se generó el vídeo vertical: {salida}"
 msgstr "The vertical video was not created: {salida}"
+
+#, python-brace-format
+msgid "No se generó el vídeo web: {salida}"
+msgstr "The web video was not produced: {salida}"
 
 msgid "No se ha encontrado ningún fotograma válido para la portada"
 msgstr "No valid frame was found for the cover"

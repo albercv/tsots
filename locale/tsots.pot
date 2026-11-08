@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 23:04+0100\n"
+"POT-Creation-Date: 2026-11-08 23:56+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -301,6 +301,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
+msgstr ""
+
+msgid "Codificación web del vídeo del blog"
 msgstr ""
 
 msgid "Cola"
@@ -1171,6 +1174,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se generó el vídeo vertical: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo web: {salida}"
 msgstr ""
 
 msgid "No se ha encontrado ningún fotograma válido para la portada"

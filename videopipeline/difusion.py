@@ -21,7 +21,7 @@ from .fotogramas import Candidato, extraer_candidatos
 from .i18n import _
 from .ollama import chat_json
 from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada
-from .steps import PasoFallido
+from .steps import PasoFallido, codificar_web
 from .subtitles import Palabra
 
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
@@ -74,7 +74,7 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
              palabras: list[Palabra], titulo: str, idioma: str, contexto_marca: str,
              modelo: str, dir_blog: Path = DIR_BLOG, cliente=chat_json,
              detector=None, leer=None, hoy: date | None = None,
-             duracion: float | None = None) -> Resultado:
+             duracion: float | None = None, codificar=codificar_web) -> Resultado:
     hoy = hoy or date.today()
     md, car = linkedin.rutas(final)
     shutil.rmtree(car, ignore_errors=True)  # que no sobrevivan candidatos de otra pasada
@@ -105,7 +105,11 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir(parents=True)
     try:
-        _enlazar_o_copiar(video_blog, tmp / "video.mp4")
+        try:  # 190 MB hacían fallar la subida (502): se sube una versión de 720 px
+            codificar(video_blog, tmp / "video.mp4")
+        except Exception:  # noqa: BLE001 — sin codificación se sube el original
+            (tmp / "video.mp4").unlink(missing_ok=True)
+            _enlazar_o_copiar(video_blog, tmp / "video.mp4")
         trozos = transcripcion.split()  # en líneas cortas: `Read` corta las muy largas
         (tmp / "transcripcion.txt").write_text(
             "\n".join(" ".join(trozos[i:i + 15]) for i in range(0, len(trozos), 15)),
