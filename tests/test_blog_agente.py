@@ -245,13 +245,13 @@ def test_instrucciones_reintentan_la_misma_orden_una_vez():
 
 
 def test_la_app_lanza_este_script(monkeypatch):
-    from videopipeline import difusion, steps
+    from tests.conftest import AGENTE_REAL
+    from videopipeline import difusion
 
     # Solo se restaura la ruta real; el resto de redes de seguridad siguen puestas.
-    monkeypatch.setattr(difusion, "AGENTE",
-                        steps.BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh")
+    monkeypatch.setattr(difusion, "AGENTE", AGENTE_REAL)
 
-    assert difusion.AGENTE == SCRIPT
+    assert AGENTE_REAL == SCRIPT == difusion.AGENTE
     assert not (BLOG / "com.tsots.blog.plist.plantilla").exists()  # ya no hay launchd
     assert os.access(SCRIPT, os.X_OK)  # la app lo ejecuta directamente
     assert os.access(GUARDA, os.X_OK)

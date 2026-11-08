@@ -6,6 +6,10 @@ from pathlib import Path
 
 import pytest
 
+from videopipeline import difusion as _difusion
+
+AGENTE_REAL = _difusion.AGENTE  # el valor de producción, antes de la red de seguridad
+
 
 @pytest.fixture(scope="session")
 def video_sintetico(tmp_path_factory) -> Path:
