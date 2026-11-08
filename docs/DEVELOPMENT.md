@@ -141,7 +141,7 @@ videopipeline/       pipeline (steps, subtitles, caption, opening title,
 videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
-lanzador/blog/       launchd agent that drafts blog posts (see Blog agent)
+lanzador/blog/       agent the app starts to draft blog posts (see Blog agent)
 locale/              gettext catalogs (see Translations)
 tests/               pytest + pytest-qt
 ```
@@ -948,14 +948,25 @@ thread, for the account lookups (when the Publish dialog opens and on
 `lanzador/blog/` turns each hand-off folder that the "Blog y LinkedIn" step
 writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
 
-- `instalar.command` fills `com.tsots.blog.plist.plantilla`, copies it to
-  `~/Library/LaunchAgents/com.tsots.blog.plist` and loads it. launchd runs
-  `procesar_pendientes.sh ~/TSOTS/blog` when `pendientes/` changes and every
-  hour as a retry; its output goes to `~/TSOTS/blog/agente.log`.
-- The script takes a lock (`~/TSOTS/blog/.bloqueo/`). A lock left by a
-  killed run is taken over once it is older than 180 min (each folder
-  touches it, and launchd never runs two copies of the job). Both cases are
-  logged in `agente.log`.
+- The app starts it. `videopipeline.difusion.lanzar_agente()` runs
+  `procesar_pendientes.sh ~/TSOTS/blog` detached (`start_new_session`,
+  stdin from `/dev/null`, output appended to `~/TSOTS/blog/agente.log`) and
+  does not wait for it. `reproceso` calls it right after the step records
+  the folder, and the main window calls it once at startup
+  (`QTimer.singleShot(0, …)`) for folders left from an earlier session. It
+  does nothing when the script is missing or `pendientes/` has no visible
+  folder, and never raises (an `OSError` is logged as a warning). So
+  folders are only picked up while the app runs.
+- No launchd: on the first real run (2026-11-08) launchd could not run the
+  script from a project inside `~/Documents` ("Operation not permitted",
+  macOS privacy). A process the app starts gets the app's access.
+- In tests the `sin_agente_del_blog` fixture (`tests/conftest.py`) points
+  `difusion.AGENTE` at a missing file, so no test starts the real agent or
+  touches `~/TSOTS/blog`.
+- The script takes a lock (`~/TSOTS/blog/.bloqueo/`): a second start while
+  one runs logs "bloqueo activo" and exits. A lock left by a killed run is
+  taken over once it is older than 180 min (each folder touches it). Both
+  cases are logged in `agente.log`.
 - It skips hidden folders (`.<name>.tmp` is still being written) and runs
   `claude -p` from each folder with `instrucciones.md` (`@PYTHON@` becomes
   the install's `.venv-clearvoice/bin/python`), with a 30 min limit
@@ -986,15 +997,13 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   was already created, a retry creates another one.
 - A folder that cannot be moved (its name already exists in `hechos/` or
   `errores/`) is renamed to `pendientes/.<name>.no-movida`, so it is not run
-  again every hour.
+  again on every start.
 - `claude` is looked up in PATH, `~/.local/bin` and `/opt/homebrew/bin`;
   without it every folder goes to `errores/`.
 - Run it by hand: `lanzador/blog/procesar_pendientes.sh ~/TSOTS/blog`.
-- `desinstalar.command` unloads the agent and deletes its plist; it keeps
-  `~/TSOTS/blog`.
-- Not verified yet: launchd running the script from a project inside
-  `~/Documents`. macOS privacy may deny it; `agente.log` would then show
-  "Operation not permitted".
+- `desinstalar.command` still unloads and deletes
+  `~/Library/LaunchAgents/com.tsots.blog.plist` when an older install left
+  it; it keeps `~/TSOTS/blog`.
 
 ## App bundle (Dock icon)
 

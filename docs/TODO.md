@@ -84,9 +84,10 @@ Pending work, most urgent first. Remove an item when it is merged into
       - A failed blog/LinkedIn step (Ollama down, no frame with a face, no
         title) is not recorded, so it is retried on every later reprocess
         of that video while the box is ticked.
-      - The launchd agent may be blocked by macOS privacy when the app
-        lives in `~/Documents`: verify on the first real run
-        (`~/TSOTS/blog/agente.log` would show "Operation not permitted").
+      - Blog folders are only processed while the app is running: the app
+        starts the agent when a video finishes and when it opens. A folder
+        written while the agent is busy with another (its lock is held)
+        waits for the next start.
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
       `videopipeline/steps.py` encodes with `libx264` on the CPU. Try

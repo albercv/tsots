@@ -28,7 +28,7 @@ Los dos con imágenes sacadas del propio vídeo y con aspecto corporativo de E2D
 - **Estilo de la portada: el «estilo 3» de sus portadas actuales.** Es tipo miniatura de YouTube: la cara del usuario a un lado y un título enorme en mayúsculas al otro. Referencia: la portada de `automatizaciones-para-empresas-con-ia-dos-casos-reales`. **Se genera en local.**
 - **El blog sigue el diseño acordado en `docs/TODO.md`** («Blog post from the video…»):
   - tsots deja una carpeta en `pendientes/`;
-  - un agente launchd lanza `claude -p` sobre ella;
+  - un agente lanza `claude -p` sobre ella (lo arranca la app, ver «Blog, fuera de la app»);
   - Claude crea el post como **borrador** con el MCP.
 
 ## Identidad E2D (sacada de evolve2digital.com el 2026-11-08)
@@ -99,7 +99,8 @@ Nueva opción en el panel (casilla «Blog y LinkedIn»). Igual que el caption, *
 
 Según el TODO:
 
-- **Disparo:** un agente launchd vigila `pendientes/` y, por cada carpeta, lanza `claude -p` con un fichero de instrucciones del repo. Ese fichero recoge el formato y tono E2D de arriba y los pasos.
+- **Disparo:** la app arranca el agente, suelto y sin esperarlo, al terminar un vídeo y al abrirse; por cada carpeta de `pendientes/`, el agente lanza `claude -p` con un fichero de instrucciones del repo. Ese fichero recoge el formato y tono E2D de arriba y los pasos. Las carpetas solo se recogen con la app abierta.
+- **2026-11-08, primera prueba real:** launchd no pudo ejecutar el script desde `~/Documents` («Operation not permitted», privacidad de macOS); lanzado desde un proceso con los permisos de la app, sí. El usuario decidió que lo lance la app: sin launchd y sin tocar ajustes de macOS.
 - **Lo que hace Claude:**
   1. elige 2-3 de los fotogramas candidatos y los coloca en las secciones que encajan;
   2. escribe el artículo;
@@ -206,8 +207,8 @@ La subida la hace un script del repo (Python o `curl`) que Claude llama con el t
   - cuántas líneas tiene el título y cómo se ajusta;
   - opacidad del degradado.
   - Hay que afinarlo con un fotograma real y enseñárselo al usuario antes de cerrar.
-- **Ubicación del agente launchd y del fichero de instrucciones** (por ejemplo `lanzador/blog/`).
-- **Cómo se instala el agente** con `instalar.command` y se quita con `desinstalar.command`.
+- **Ubicación del agente y del fichero de instrucciones** (por ejemplo `lanzador/blog/`).
+- **Cómo se arranca el agente:** lo arranca la app (decidido el 2026-11-08); `desinstalar.command` solo quita el plist de launchd de instalaciones antiguas.
 - **Pruebas:**
   - lógica pura con tests: elección de candidatos, composición de la portada sobre una imagen sintética, campos de `upload_photos`;
   - la parte de red y de Claude, con una prueba real descrita en el plan.

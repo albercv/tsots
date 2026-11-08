@@ -308,11 +308,14 @@ characters with 3 to 5 hashtags. Next to the video it leaves:
   `candidatos/` (all the frames, to swap them in **Publish…**).
 
 For the blog it writes a folder to `~/TSOTS/blog/pendientes/` with the
-video, the transcript, the 16:9 cover, the frames and their data.
-`instalar.command` installs an agent (launchd, `com.tsots.blog`) that
-watches that folder and, for each one, runs `claude` to write the article
-in the evolve2digital.com style and upload the cover, frames and video.
-The article is always created as a **draft**: the agent cannot publish
+video, the transcript, the 16:9 cover, the frames and their data. The app
+hands the pending folders to the blog agent when it finishes a video and
+when it opens (folders left from an earlier session), so they are only
+picked up while the app is running; there is nothing to install or allow
+in the macOS settings. For each folder the agent runs `claude` in the
+background to write the article in the evolve2digital.com style and upload
+the cover, frames and video. It needs `claude` logged in with the
+**claude.ai E2D - Blog** connector. The article is always created as a **draft**: the agent cannot publish
 or delete posts. Review and publish it yourself on the blog. Each folder
 then moves to:
 
@@ -323,10 +326,8 @@ then moves to:
   draft was already created, check it first, because a retry creates
   another one.
 
-The agent's log is `~/TSOTS/blog/agente.log`. If the agent is not
-installed, the video row warns you: run `instalar.command` again. A
-failure in this step never stops the video: it is saved anyway, with a
-warning.
+The agent's log is `~/TSOTS/blog/agente.log`. A failure in this step
+never stops the video: it is saved anyway, with a warning.
 
 ## Publish to social networks
 
@@ -460,7 +461,8 @@ scheduled. To change the time, cancel and schedule again.
 - "**Missing dependencies**" on launch: run `instalar.command` again.
 - No blog draft: look in `~/TSOTS/blog/errores/<folder>/motivo.txt` and in
   `~/TSOTS/blog/agente.log`. Check that `claude` is logged in and has the
-  **claude.ai E2D - Blog** connector.
+  **claude.ai E2D - Blog** connector. A folder still in `pendientes/` is
+  sent to the agent again the next time you open the app.
 - The **caption** is not generated: check that the Ollama app is open
   (menu bar icon) and press ↻ next to the model selector. To add models:
   `ollama pull name` in Terminal, then ↻.

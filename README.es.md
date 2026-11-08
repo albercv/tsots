@@ -308,11 +308,14 @@ caracteres con 3 a 5 hashtags. Junto al vídeo deja:
   `candidatos/` (todos los fotogramas, para cambiarlos en **Publicar…**).
 
 Para el blog escribe una carpeta en `~/TSOTS/blog/pendientes/` con el
-vídeo, la transcripción, la portada 16:9, los fotogramas y sus datos.
-`instalar.command` instala un agente (launchd, `com.tsots.blog`) que vigila
-esa carpeta y, por cada una, lanza `claude` para escribir el artículo con
-el estilo de evolve2digital.com y subir la portada, los fotogramas y el
-vídeo. El artículo se crea siempre como **borrador**: el agente no puede
+vídeo, la transcripción, la portada 16:9, los fotogramas y sus datos. La
+app pasa las carpetas pendientes al agente del blog al terminar un vídeo y
+al abrirse (las que quedaron de otra sesión), así que solo se recogen con
+la app abierta; no hay nada que instalar ni que permitir en los ajustes de
+macOS. Por cada carpeta, el agente lanza `claude` en segundo plano para
+escribir el artículo con el estilo de evolve2digital.com y subir la
+portada, los fotogramas y el vídeo. Necesita `claude` con la sesión
+iniciada y el conector **claude.ai E2D - Blog**. El artículo se crea siempre como **borrador**: el agente no puede
 publicar ni borrar posts. Revísalo y publícalo tú en el blog. Después,
 cada carpeta pasa a:
 
@@ -322,10 +325,8 @@ cada carpeta pasa a:
   reintentarlo, vuelve a moverla a `pendientes/`; si `motivo.txt` dice que
   el borrador ya está creado, revísalo antes, porque reintentar crea otro.
 
-El registro del agente es `~/TSOTS/blog/agente.log`. Si el agente no está
-instalado, la fila del vídeo te avisa: vuelve a ejecutar
-`instalar.command`. Un fallo de este paso nunca hace fallar el vídeo: se
-guarda igual, con un aviso.
+El registro del agente es `~/TSOTS/blog/agente.log`. Un fallo de este paso
+nunca hace fallar el vídeo: se guarda igual, con un aviso.
 
 ## Publicar en redes
 
@@ -460,7 +461,8 @@ programado. Para cambiar la fecha, cancela y vuelve a programar.
 - No aparece el borrador del blog: mira
   `~/TSOTS/blog/errores/<carpeta>/motivo.txt` y `~/TSOTS/blog/agente.log`.
   Comprueba que `claude` tenga la sesión iniciada y el conector
-  **claude.ai E2D - Blog**.
+  **claude.ai E2D - Blog**. Una carpeta que sigue en `pendientes/` vuelve
+  al agente la próxima vez que abras la app.
 - El **caption** no se genera: comprueba que la app de Ollama esté abierta
   (icono en la barra de menú) y pulsa ↻ junto al selector de modelo. Para
   añadir modelos: `ollama pull nombre` en Terminal y luego ↻.
