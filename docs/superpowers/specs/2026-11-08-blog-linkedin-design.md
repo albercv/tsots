@@ -179,10 +179,20 @@ La subida la hace un script del repo (Python o `curl`) que Claude llama con el t
 ## Riesgos que hay que comprobar primero
 
 1. **Subir media al blog desde un script.** Resuelto el 2026-11-08: se puede (ver «Subida de media al blog»). Queda probarlo de verdad sobre un borrador de prueba.
-2. **Autenticación del MCP en la CLI.**
+2. **Comprobado el 2026-11-08 (Task 1 del plan):**
+   - **Post real de LinkedIn publicado desde el vídeo `claudeTokensWaste`.**
+     - Petición: `POST /api/upload_photos` con `user`, `platform[]=linkedin`, `visibility=PUBLIC`, el texto **solo en `title`** y 4 `photos[]` (portada PNG 4:5 y 3 JPG verticales).
+     - Respuesta síncrona: HTTP 200 con `results.linkedin.{success, url, post_id}`, el mismo formato que la subida de vídeo.
+   - **La CLI ya ve el conector del blog de claude.ai** («claude.ai E2D - Blog», conectado). Sus herramientas son `mcp__claude_ai_E2D_-_Blog__posts_*`; no hace falta autenticar `e2d`.
+   - **Los vídeos reales son verticales** (1080×1920, cara muy cercana). La portada no puede escalar «a cubrir» sin cortar la cara. El controlador decidió (R4 en el registro del plan):
+     - limitar la escala para que la cara ocupe como mucho el 45 % del alto en 16:9 y el 60 % en 4:5;
+     - en 16:9, pegar la foto al borde derecho con el resto en fondo oscuro;
+     - en 4:5, centrar la cara y poner el título abajo.
+   - **El detector de ojos de OpenCV no detecta los ojos cerrados** (lo marcó como abiertos en un fotograma con los ojos cerrados). Queda sin filtro automático; se cambia la imagen a mano.
+3. **Autenticación del MCP en la CLI.**
    - En `claude` el servidor `e2d` aparece pendiente de autenticar; el usuario tiene que hacer `/mcp` una vez.
    - Plan B: una tarea programada de la app de escritorio de Claude, que ya tiene el conector del blog (comprobado el 2026-11-08: ve `posts_create`, `posts_request_upload`…).
-3. **Campos de LinkedIn en `upload_photos`.**
+4. **Campos de LinkedIn en `upload_photos`** (resuelto en el punto 2: basta con `title`).
    - La documentación no deja claro qué campo es el cuerpo visible: `title`/`linkedin_title` o `linkedin_description`.
    - Tampoco documenta el máximo de fotos ni el límite de texto.
    - Hay que probarlo con un post real programado y luego cancelarlo.
