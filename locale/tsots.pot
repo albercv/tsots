@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-06 11:56+0100\n"
+"POT-Creation-Date: 2026-11-08 21:47+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -27,6 +27,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el blog y LinkedIn solo se pueden pedir sobre un vídeo ya procesado"
 msgstr ""
 
 #, python-brace-format
@@ -196,6 +200,13 @@ msgid "Añadir subtítulos"
 msgstr ""
 
 msgid "Barras negras"
+msgstr ""
+
+msgid "Blog y LinkedIn"
+msgstr ""
+
+#, python-brace-format
+msgid "Blog y LinkedIn fallaron: {error}. Vídeo guardado igual.{sugerencia}"
 msgstr ""
 
 msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
@@ -529,6 +540,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
+msgstr ""
+
+msgid "El texto de LinkedIn generado es demasiado corto"
 msgstr ""
 
 #, python-brace-format
@@ -1115,6 +1129,9 @@ msgstr ""
 msgid "No se generó el vídeo vertical: {salida}"
 msgstr ""
 
+msgid "No se ha encontrado ningún fotograma válido para la portada"
+msgstr ""
+
 msgid "No se llegó a enviar."
 msgstr ""
 
@@ -1341,7 +1358,13 @@ msgstr ""
 msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
 msgstr ""
 
+msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
+msgstr ""
+
 msgid "Preparación del audio"
+msgstr ""
+
+msgid "Preparando blog y LinkedIn"
 msgstr ""
 
 msgid "Preview no disponible"
@@ -1967,6 +1990,9 @@ msgid "la descarga no produjo ningún fichero"
 msgstr ""
 
 msgid "la limpieza de audio"
+msgstr ""
+
+msgid "la transcripción no dio texto"
 msgstr ""
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."

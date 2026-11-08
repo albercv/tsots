@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-06 08:47+0100\n"
+"POT-Creation-Date: 2026-11-08 21:47+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -25,6 +25,10 @@ msgstr " at “{paso}”"
 #, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
 msgstr "\"{nombre}\" has no processed video yet to make shorts from."
+
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el blog y LinkedIn solo se pueden pedir sobre un vídeo ya procesado"
+msgstr "\"{nombre}\" has no processed video yet: the blog and LinkedIn can only be requested for an already processed video"
 
 #, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado: el caption solo se puede pedir sobre un vídeo ya procesado"
@@ -202,6 +206,13 @@ msgstr "Add subtitles"
 
 msgid "Barras negras"
 msgstr "Black bars"
+
+msgid "Blog y LinkedIn"
+msgstr "Blog and LinkedIn"
+
+#, python-brace-format
+msgid "Blog y LinkedIn fallaron: {error}. Vídeo guardado igual.{sugerencia}"
+msgstr "Blog and LinkedIn failed: {error}. Video saved anyway.{sugerencia}"
 
 msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
 msgstr "Deletes the data saved for redoing steps; does not touch the videos"
@@ -544,6 +555,9 @@ msgstr "The service rejected the post."
 #, python-brace-format
 msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr "The service finished without giving the result for {plataforma}."
+
+msgid "El texto de LinkedIn generado es demasiado corto"
+msgstr "The generated LinkedIn text is too short"
 
 #, python-brace-format
 msgid "El título no se pudo quemar: {error}. Vídeo guardado sin título."
@@ -1153,6 +1167,9 @@ msgstr "The remuxed video was not produced: {salida}"
 msgid "No se generó el vídeo vertical: {salida}"
 msgstr "The vertical video was not created: {salida}"
 
+msgid "No se ha encontrado ningún fotograma válido para la portada"
+msgstr "No valid frame was found for the cover"
+
 msgid "No se llegó a enviar."
 msgstr "It was never sent."
 
@@ -1379,8 +1396,14 @@ msgstr "Asks the service which accounts you have connected and your Facebook Pag
 msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
 msgstr "Asks the service which TikTok places have this name, so you can pick one"
 
+msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
+msgstr "Prepares a draft for the evolve2digital blog and a LinkedIn post with a cover and images from the video. Done once per video."
+
 msgid "Preparación del audio"
 msgstr "Audio preparation"
+
+msgid "Preparando blog y LinkedIn"
+msgstr "Preparing blog and LinkedIn"
 
 msgid "Preview no disponible"
 msgstr "Preview not available"
@@ -2027,6 +2050,9 @@ msgstr "the download produced no file"
 
 msgid "la limpieza de audio"
 msgstr "audio cleaning"
+
+msgid "la transcripción no dio texto"
+msgstr "the transcription produced no text"
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."
 msgstr "macOS denied access to the video or output folder (Desktop, Documents and external disks require permission)."
