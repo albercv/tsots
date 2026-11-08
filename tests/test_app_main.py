@@ -759,6 +759,16 @@ def test_opciones_subs_vuelven_a_previsualizacion(qtbot, tmp_path, monkeypatch):
     assert ventana.pestanas.currentWidget() is ventana.vista_previa
 
 
+def test_al_arrancar_lanza_el_agente_del_blog_sin_bloquear(qtbot, tmp_path, monkeypatch):
+    """Las carpetas del blog que quedaron de otra sesión van al agente, ya con
+    la ventana en marcha."""
+    llamadas = []
+    monkeypatch.setattr("app.main.lanzar_agente", lambda: llamadas.append(True))
+    _ventana(qtbot, tmp_path, monkeypatch)
+    assert llamadas == []  # no en el constructor
+    qtbot.waitUntil(lambda: llamadas == [True], timeout=1000)
+
+
 def test_audio_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     assert ventana.panel.seccion_abierta() == "audio"

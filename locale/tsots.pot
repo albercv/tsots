@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 23:56+0100\n"
+"POT-Creation-Date: 2026-11-09 00:03+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -854,10 +854,6 @@ msgid "La API key no es válida o ha caducado (401). Revísala en Redes…"
 msgstr ""
 
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
-msgstr ""
-
-#, python-brace-format
-msgid "La carpeta del blog está en {carpeta}, pero el agente del blog no está instalado y nadie la convertirá en borrador: ejecuta instalar.command."
 msgstr ""
 
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."

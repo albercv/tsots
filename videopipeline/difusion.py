@@ -1,14 +1,16 @@
 """Prepara lo que se difunde de un vídeo: sidecars de LinkedIn y carpeta del blog.
 
 Junta fotogramas (`fotogramas`), portadas (`portada`) y texto (`linkedin`). La
-carpeta del blog se escribe oculta y se renombra al final para que launchd no
-vea nunca una carpeta a medias.
+carpeta del blog se escribe oculta y se renombra al final para que el agente del
+blog no vea nunca una carpeta a medias. `lanzar_agente` lo arranca.
 """
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -21,12 +23,13 @@ from .fotogramas import Candidato, extraer_candidatos
 from .i18n import _
 from .ollama import chat_json
 from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada
-from .steps import PasoFallido, codificar_web
+from .steps import BASE_DIR, PasoFallido, codificar_web
 from .subtitles import Palabra
 
+log = logging.getLogger(__name__)
+
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
-# Lo instala instalar.command; sin él nadie recoge las carpetas de DIR_BLOG.
-PLIST_BLOG = Path.home() / "Library" / "LaunchAgents" / "com.tsots.blog.plist"
+AGENTE = BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh"
 NUM_IMAGENES = 3  # fotogramas que acompañan a la portada en LinkedIn
 
 
@@ -133,3 +136,26 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
         shutil.rmtree(tmp, ignore_errors=True)
         raise
     return Resultado(md if texto is not None else None, destino, fallo)
+
+
+def lanzar_agente(dir_blog: Path = DIR_BLOG) -> bool:
+    """Arranca el agente del blog suelto, sin esperarlo, si hay carpetas en
+    `pendientes/`. Lo lanza la app y no launchd: launchd no puede ejecutar el
+    script desde ~/Documents (privacidad de macOS). Si ya hay uno en marcha, su
+    bloqueo hace que el nuevo salga sin hacer nada. Nunca lanza excepciones."""
+    try:
+        # Como el `*/` del script: las ocultas aún se escriben o están apartadas.
+        if not AGENTE.is_file() or not any(
+                p.is_dir() and not p.name.startswith(".")
+                for p in (dir_blog / "pendientes").iterdir()):
+            return False
+        with open(dir_blog / "agente.log", "ab") as registro:
+            subprocess.Popen([str(AGENTE), str(dir_blog)], stdin=subprocess.DEVNULL,
+                             stdout=registro, stderr=registro,
+                             start_new_session=True, close_fds=True)
+    except FileNotFoundError:  # aún no hay pendientes/
+        return False
+    except OSError as error:
+        log.warning("No se pudo lanzar el agente del blog (%s): %s", AGENTE, error)
+        return False
+    return True

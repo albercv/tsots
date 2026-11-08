@@ -1,4 +1,6 @@
 import json
+import logging
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -6,7 +8,8 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from videopipeline.difusion import preparar
+from videopipeline import difusion
+from videopipeline.difusion import lanzar_agente, preparar
 from videopipeline.steps import PasoFallido
 from videopipeline.subtitles import Palabra
 
@@ -118,3 +121,78 @@ def test_comando_de_codificacion_web(tmp_path):
     from videopipeline.steps import cmd_codificar_web
     cmd = cmd_codificar_web("ffmpeg", tmp_path / "a.mp4", tmp_path / "b.mp4")
     assert "scale=720:-2" in cmd and "libx264" in cmd and "26" in cmd
+
+
+# --- Lanzar el agente del blog -------------------------------------------------
+
+@pytest.fixture()
+def agente(tmp_path, monkeypatch):
+    """Script del agente de mentira y `Popen` que solo apunta: nunca se lanza nada."""
+    script = tmp_path / "procesar_pendientes.sh"
+    script.write_text("#!/bin/bash\n")
+    lanzados = []
+    monkeypatch.setattr(difusion, "AGENTE", script)
+    monkeypatch.setattr(difusion.subprocess, "Popen",
+                        lambda *a, **k: lanzados.append((a, k)))
+    return script, lanzados
+
+
+def test_lanzar_agente_con_carpeta_pendiente_lo_suelta_sin_esperar(tmp_path, agente):
+    script, lanzados = agente
+    blog = tmp_path / "blog"
+    (blog / "pendientes" / ".a-medias.tmp").mkdir(parents=True)
+    (blog / "pendientes" / "2026-11-08-x").mkdir()
+    (blog / "agente.log").write_text("anterior\n")
+
+    assert lanzar_agente(blog) is True
+
+    [(args, kwargs)] = lanzados
+    assert args == ([str(script), str(blog)],)
+    registro = kwargs.pop("stdout")
+    assert kwargs.pop("stderr") is registro
+    assert Path(registro.name) == blog / "agente.log" and "a" in registro.mode
+    assert kwargs == {"stdin": subprocess.DEVNULL, "start_new_session": True,
+                      "close_fds": True}
+    assert (blog / "agente.log").read_text() == "anterior\n"  # se añade, no se pisa
+
+
+@pytest.mark.parametrize("ocultas, ficheros", [
+    (None, []),  # sin pendientes/
+    ([], []),
+    ([".x.tmp", ".y.no-movida"], []),  # a medio escribir o apartadas
+    ([], ["suelto.txt"]),
+])
+def test_lanzar_agente_sin_carpetas_pendientes_no_lanza(tmp_path, agente, ocultas, ficheros):
+    _, lanzados = agente
+    blog = tmp_path / "blog"
+    if ocultas is not None:
+        (blog / "pendientes").mkdir(parents=True)
+    for nombre in ocultas or []:
+        (blog / "pendientes" / nombre).mkdir()
+    for nombre in ficheros:
+        (blog / "pendientes" / nombre).write_text("x")
+
+    assert lanzar_agente(blog) is False
+    assert lanzados == [] and not (blog / "agente.log").exists()
+
+
+def test_lanzar_agente_sin_script_no_lanza(tmp_path, agente, monkeypatch):
+    _, lanzados = agente
+    monkeypatch.setattr(difusion, "AGENTE", tmp_path / "no-existe.sh")
+    (tmp_path / "blog" / "pendientes" / "2026-11-08-x").mkdir(parents=True)
+
+    assert lanzar_agente(tmp_path / "blog") is False
+    assert lanzados == []
+
+
+def test_lanzar_agente_que_no_arranca_avisa_en_el_log_sin_fallar(
+        tmp_path, agente, monkeypatch, caplog):
+    def no_arranca(*a, **k):
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(difusion.subprocess, "Popen", no_arranca)
+    (tmp_path / "blog" / "pendientes" / "2026-11-08-x").mkdir(parents=True)
+
+    with caplog.at_level(logging.WARNING, logger="videopipeline.difusion"):
+        assert lanzar_agente(tmp_path / "blog") is False
+    assert "Operation not permitted" in caplog.text

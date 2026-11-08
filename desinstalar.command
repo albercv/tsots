@@ -5,7 +5,8 @@
 # (TheSilenceOfTheShorts.app/Contents/MacOS), los logs, los intermedios de
 # audio_procesado/, las fichas de fichas/ (lo que la app recuerda de cada vídeo:
 # audio limpio, base, transcripción, y la versión anterior de un resultado antiguo
-# que la app sobrescribió), la entrada del Dock y el agente del blog (launchd).
+# que la app sobrescribió), la entrada del Dock y el agente launchd del blog de
+# instalaciones antiguas (ahora lo lanza la app).
 # Conserva: el código, el checkpoint descargado (checkpoints/), tus vídeos
 # actuales, con sus .md y .srt, y ~/TSOTS/blog.
 # No toca Homebrew ni Ollama.
@@ -37,7 +38,7 @@ if len(filtradas) != len(apps):
     print("Entrada del Dock eliminada.")
 EOF
 
-# Agente del blog (si existe). ~/TSOTS/blog se conserva.
+# Agente launchd del blog de instalaciones antiguas (si existe). ~/TSOTS/blog se conserva.
 PLIST_BLOG="$HOME/Library/LaunchAgents/com.tsots.blog.plist"
 if [ -f "$PLIST_BLOG" ]; then
     launchctl bootout "gui/$(id -u)/com.tsots.blog" 2>/dev/null || true

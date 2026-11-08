@@ -1,7 +1,7 @@
 #!/bin/bash
 # Agente del blog: convierte cada carpeta de <dir_blog>/pendientes/ en un
 # BORRADOR de evolve2digital.com con `claude -p` e instrucciones.md.
-# Lo lanza launchd (com.tsots.blog) cuando cambia pendientes/ y cada hora.
+# Lo lanza la app (difusion.lanzar_agente) al terminar un vídeo y al abrirse.
 #   hechos/   la carpeta con resultado.json (slug, locale y URL del borrador)
 #   errores/  la carpeta con motivo.txt (final de claude.log)
 set -u
@@ -23,8 +23,9 @@ AJUSTES="$(printf '{"hooks": {"PreToolUse": [{"matcher": "%sposts_create", "hook
 ahora() { date '+%F %T'; }
 
 mkdir -p "$DIR/pendientes" "$DIR/hechos" "$DIR/errores"
-# launchd nunca lanza dos a la vez: un bloqueo sin tocar en 180 min es de una
-# ejecución muerta (SIGKILL, apagón); cada carpeta lo renueva y dura 30 min como mucho.
+# Con otro en marcha, este sale sin hacer nada. Un bloqueo sin tocar en 180 min es
+# de una ejecución muerta (SIGKILL, apagón); cada carpeta lo renueva y dura 30 min
+# como mucho.
 if ! mkdir "$DIR/.bloqueo" 2>/dev/null; then
     if [ -z "$(find "$DIR/.bloqueo" -maxdepth 0 -mmin +180)" ]; then
         echo "$(ahora) bloqueo activo ($DIR/.bloqueo): otra ejecución sigue en marcha"

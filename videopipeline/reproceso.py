@@ -17,7 +17,7 @@ from pathlib import Path
 from . import linkedin
 from .caption import leer_md, texto_plano
 from .config import SAMPLE_RATE_POR_MODELO
-from .difusion import PLIST_BLOG, preparar as preparar_difusion
+from .difusion import lanzar_agente, preparar as preparar_difusion
 from .ficha import (
     AUDIO, BASE, CAPTION, DIFUSION, HORIZONTAL, SEGUIMIENTO, TITULO,
     TRANSCRIPCION, VERTICAL, Artefacto, Ficha, Huella, _escribir_json, guardar,
@@ -559,6 +559,7 @@ class _Pasada:
             "blog": str(resultado.carpeta_blog),
             "linkedin": str(md) if md else None})
         guardar(ficha)
+        lanzar_agente()  # convierte la carpeta nueva en borrador, sin esperarlo
         if resultado.fallo_linkedin is not None:
             error = resultado.fallo_linkedin
             _avisar(self.on_progress,
@@ -567,12 +568,6 @@ class _Pasada:
                       "{ruta}.{sugerencia}").format(
                         error=error, ruta=linkedin.rutas(final)[0],
                         sugerencia=_sugerencia(error)))
-        if not PLIST_BLOG.exists():
-            _avisar(self.on_progress,
-                    _("La carpeta del blog está en {carpeta}, pero el agente del "
-                      "blog no está instalado y nadie la convertirá en borrador: "
-                      "ejecuta instalar.command.").format(
-                        carpeta=resultado.carpeta_blog))
 
     # --- R10 ----------------------------------------------------------------
 

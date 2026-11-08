@@ -1,7 +1,6 @@
 """Agente del blog (`lanzador/blog/`): el script con un `claude` falso, nunca el real."""
 import json
 import os
-import plistlib
 import subprocess
 import time
 from pathlib import Path
@@ -216,13 +215,11 @@ def test_instrucciones_reintentan_la_misma_orden_una_vez():
     assert "repite **la misma orden** una vez" in texto and "ya estaban subidos" in texto
 
 
-def test_plist_plantilla_es_valido():
-    plist = plistlib.loads((BLOG / "com.tsots.blog.plist.plantilla").read_bytes())
-    script, dir_blog = plist["ProgramArguments"]
-    assert script.endswith("procesar_pendientes.sh")
-    assert plist["Label"] == "com.tsots.blog"
-    assert plist["WatchPaths"] == [f"{dir_blog}/pendientes"]
-    assert plist["StartInterval"] == 3600
-    assert plist["StandardOutPath"] == plist["StandardErrorPath"] == f"{dir_blog}/agente.log"
-    assert os.access(SCRIPT, os.X_OK)  # launchd lo ejecuta directamente
+def test_la_app_lanza_este_script(monkeypatch):
+    monkeypatch.undo()  # quita la red de seguridad de conftest: aquí se mira la ruta real
+    from videopipeline import difusion
+
+    assert difusion.AGENTE == SCRIPT
+    assert not (BLOG / "com.tsots.blog.plist.plantilla").exists()  # ya no hay launchd
+    assert os.access(SCRIPT, os.X_OK)  # la app lo ejecuta directamente
     assert os.access(GUARDA, os.X_OK)

@@ -225,3 +225,12 @@ def sin_medir_duraciones(monkeypatch):
     """Los vídeos de mentira no se miden con ffprobe: al reconocer un vídeo,
     su duración «no se pudo medir» (0.0), salvo que el test diga otra."""
     monkeypatch.setattr("videopipeline.ficha.duracion_video", lambda ruta: 0.0)
+
+
+@pytest.fixture(autouse=True)
+def sin_agente_del_blog(monkeypatch):
+    """Red de seguridad: ningún test lanza el agente del blog real (`claude -p`
+    sobre ~/TSOTS/blog). Sin script, `lanzar_agente` vuelve sin tocar nada; los
+    tests que lo prueban ponen el suyo."""
+    monkeypatch.setattr("videopipeline.difusion.AGENTE",
+                        Path("/sin-agente-del-blog-en-los-tests"))
