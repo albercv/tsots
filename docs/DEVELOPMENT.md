@@ -966,7 +966,9 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   claude.ai connector "claude.ai E2D - Blog" (`mcp__claude_ai_E2D_-_Blog__*`),
   `Read`, `Write` and `Bash(<python> -m videopipeline.blog_subida:*)`. No
   delete or frontmatter tool, so the agent cannot publish or remove an
-  existing post.
+  existing post. `posts_update_frontmatter`, `posts_delete`,
+  `posts_update_body` and `posts_rebuild` also go in `--disallowedTools`:
+  deny rules win over allow rules and any permission mode.
 - `posts_create` defaults to `published: true`, so the run gets a
   PreToolUse hook (`claude --settings`) running `guarda_borrador.sh`. It
   blocks the call (exit 2) unless `tool_input.published` is the boolean
@@ -976,11 +978,12 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   `videopipeline.blog_subida`, validates, sets the cover and writes
   `resultado.json` (`slug`, `locale`, `url`). Right after creating the
   draft it writes `borrador.json` (`slug`, `locale`).
-- With a `url` in `resultado.json` the folder moves to `hechos/`; otherwise
-  to `errores/`, with `motivo.txt` (timeout, the draft's slug if
-  `borrador.json` exists, last 40 lines of `claude.log`). To retry, move it
-  back to `pendientes/`; if a draft was already created, a retry creates
-  another one.
+- With a `url` in `resultado.json` the folder moves to `hechos/` and its
+  `video.mp4` is deleted (the draft holds the video; the file is a hard link
+  to the output or a full copy). Otherwise it moves to `errores/`, with
+  `motivo.txt` (timeout, the draft's slug if `borrador.json` exists, last 40
+  lines of `claude.log`). To retry, move it back to `pendientes/`; if a draft
+  was already created, a retry creates another one.
 - A folder that cannot be moved (its name already exists in `hechos/` or
   `errores/`) is renamed to `pendientes/.<name>.no-movida`, so it is not run
   again every hour.

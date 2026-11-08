@@ -6,14 +6,19 @@
 
 App de escritorio para Mac que deja un vídeo hablado listo para publicar:
 limpia el ruido de la voz, recorta los silencios, quema subtítulos estilo
-Reels y genera título, caption y hashtags con un modelo de IA local. Todo
-en tu Mac, sin subir nada a ningún servicio.
+Reels y genera título, caption y hashtags con un modelo de IA local.
+También puede preparar el borrador de un artículo de blog y un post de
+LinkedIn a partir del vídeo. Todo en tu Mac, sin subir nada a ningún
+servicio salvo que lo publiques o marques **Blog y LinkedIn** (ver
+[Blog y LinkedIn](#blog-y-linkedin)).
 
 | Entrada | Salida |
 |---|---|
 | `charla.mov` (cualquier vídeo con voz) | `charla_limpio.mp4` (voz limpia, sin silencios, subtítulos opcionales) |
 | | `charla_limpio.srt` (subtítulos, si los activas) |
 | | `charla_limpio.md` (título SEO, caption y hashtags, si lo activas) |
+| | `charla_limpio.linkedin.md` y `charla_limpio.linkedin/` (post de LinkedIn y sus fotos, si activas **Blog y LinkedIn**) |
+| | `~/TSOTS/blog/pendientes/<fecha>-charla/` (carpeta para el borrador del blog, con la misma opción) |
 
 ## Requisitos
 
@@ -25,6 +30,10 @@ en tu Mac, sin subir nada a ningún servicio.
   que uses subtítulos. Después funciona sin conexión.
 - Memoria: 16 GB es suficiente para todo salvo modelos de lenguaje grandes;
   la app te avisa de cuáles caben en tu Mac.
+- Solo para el borrador del blog (**Blog y LinkedIn**): el comando `claude`
+  de [Claude Code](https://claude.com/claude-code), con la sesión iniciada
+  en una cuenta que tenga el conector **claude.ai E2D - Blog**. El post de
+  LinkedIn solo necesita Ollama.
 
 El instalador se ocupa de Homebrew, Python, ffmpeg, auto-editor y Ollama.
 No hace falta saber programar.
@@ -109,6 +118,12 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
      tooltip dice por qué.
+   - **Blog y LinkedIn** (casilla en la sección Caption SEO): al terminar,
+     prepara un post de LinkedIn con fotos y una carpeta para el borrador
+     de un artículo del blog (ver [Blog y LinkedIn](#blog-y-linkedin)). Se
+     hace **una vez por vídeo**. Para publicar el post de LinkedIn desde
+     **Publicar…**, marca también el caption: Publicar… lo necesita para
+     abrirse.
    - **Formato vertical**: guarda además `nombre_limpio_vertical.mp4`
      (9:16, 1080x1920) para Reels y TikTok; si no marcas audio ni
      silencios, solo sale `nombre_vertical.mp4`. Encuadres: recorte central
@@ -194,6 +209,10 @@ ocupan sus datos.
   mantiene.
 - **Solo caption** se puede pedir sobre un vídeo ya procesado: usa la
   transcripción que haya y no toca la imagen.
+- **Blog y LinkedIn** se hace una vez por vídeo: marcarlo en un vídeo ya
+  procesado lo lanza, pero volver a procesar el vídeo no crea otro
+  borrador ni otro post, aunque los hayas borrado. Si falló, se vuelve a
+  intentar la próxima vez que proceses el vídeo con la casilla marcada.
 - **Publicar…** funciona con cualquier vídeo que tenga resultado y caption.
   Si falta el `.md` junto al vídeo, la app lo vuelve a escribir desde la
   ficha.
@@ -276,12 +295,44 @@ encontró su `.md` junto al vídeo.
 - Las copias duplicadas que ya tengas (`x_limpio_limpio.mp4`…) no se
   borran: bórralas tú.
 
+## Blog y LinkedIn
+
+Con **Blog y LinkedIn** marcado, al terminar el vídeo la app elige seis
+fotogramas nítidos repartidos por el vídeo (mejor si se te ve la cara
+entera) de la versión sin subtítulos, compone una portada con el título
+corto y pide al modelo local (Ollama) un post de LinkedIn de 1300 a 2500
+caracteres con 3 a 5 hashtags. Junto al vídeo deja:
+
+- `nombre_limpio.linkedin.md`: el texto del post de LinkedIn.
+- `nombre_limpio.linkedin/`: la portada 4:5, hasta tres fotogramas y
+  `candidatos/` (todos los fotogramas, para cambiarlos en **Publicar…**).
+
+Para el blog escribe una carpeta en `~/TSOTS/blog/pendientes/` con el
+vídeo, la transcripción, la portada 16:9, los fotogramas y sus datos.
+`instalar.command` instala un agente (launchd, `com.tsots.blog`) que vigila
+esa carpeta y, por cada una, lanza `claude` para escribir el artículo con
+el estilo de evolve2digital.com y subir la portada, los fotogramas y el
+vídeo. El artículo se crea siempre como **borrador**: el agente no puede
+publicar ni borrar posts. Revísalo y publícalo tú en el blog. Después,
+cada carpeta pasa a:
+
+- `~/TSOTS/blog/hechos/`: terminada, con `resultado.json` y el enlace del
+  borrador. Su copia del vídeo se borra (el borrador ya lo tiene).
+- `~/TSOTS/blog/errores/`: ha fallado, con el motivo en `motivo.txt`. Para
+  reintentarlo, vuelve a moverla a `pendientes/`; si `motivo.txt` dice que
+  el borrador ya está creado, revísalo antes, porque reintentar crea otro.
+
+El registro del agente es `~/TSOTS/blog/agente.log`. Si el agente no está
+instalado, la fila del vídeo te avisa: vuelve a ejecutar
+`instalar.command`. Un fallo de este paso nunca hace fallar el vídeo: se
+guarda igual, con un aviso.
+
 ## Publicar en redes
 
 Desde un vídeo terminado con caption, **Publicar…** lo envía a **TikTok →
-YouTube → Instagram → X → Facebook**, en ese orden. Nunca se publica nada
-solo: revisas título, caption, hashtags y el texto para X, marcas las
-plataformas, pulsas **Publicar** y confirmas. Si una plataforma falla, las demás siguen; cada fila muestra su
+YouTube → Instagram → X → Facebook → LinkedIn**, en ese orden. Nunca se
+publica nada solo: revisas título, caption, hashtags y los textos para X y
+LinkedIn, marcas las plataformas, pulsas **Publicar** y confirmas. Si una plataforma falla, las demás siguen; cada fila muestra su
 progreso y, al terminar, el enlace o el error.
 
 TikTok y YouTube solo dejan publicar en público a apps auditadas, así que
@@ -291,9 +342,11 @@ gratuito de 10 subidas al mes). Necesitas:
 
 1. Una cuenta en Upload-Post.
 2. En Upload-Post, un **perfil** con tus redes conectadas (TikTok,
-   YouTube, Instagram, X, Facebook: las que uses). La cuenta de Instagram
-   debe ser **profesional** (empresa o creador). En Facebook solo se puede
-   publicar en una **página**, no en un perfil personal.
+   YouTube, Instagram, X, Facebook, LinkedIn: las que uses). La cuenta de
+   Instagram debe ser **profesional** (empresa o creador). En Facebook solo
+   se puede publicar en una **página**, no en un perfil personal. En
+   LinkedIn se publica en tu **perfil personal**, no en una página de
+   empresa.
 3. La **API key** de Upload-Post.
 
 No está claro si X y Facebook entran en el plan gratuito de Upload-Post:
@@ -338,6 +391,15 @@ Qué hace cada modo:
 | Facebook | **Reel** (por defecto) | Un reel publicado en tu página. |
 | Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |
+| LinkedIn | **Post con fotos** | Un post en tu perfil personal con el texto y las fotos. |
+
+**LinkedIn.** Solo sale habilitado si el vídeo tiene su post de LinkedIn
+(**Blog y LinkedIn**). Publica **fotos y texto, no el vídeo** (LinkedIn no
+deja mezclarlos en un post), sin enlace al blog. Puedes editar el texto
+(hasta **3000 caracteres**; si está vacío, LinkedIn se deshabilita) y
+cambiar las fotos: **Quitar** una, **Añadir…** otro fotograma (u **Otra
+imagen…** del disco) o arrastrar una imagen a la tira. Lo que editas se
+publica, pero no se guarda en el `.linkedin.md`.
 
 **Ubicación.** Las publicaciones salen etiquetadas en **Madrid** salvo que
 elijas otra cosa en Redes… (fila **Ubicación** de «Al publicar», botón
@@ -381,7 +443,7 @@ al programar y lo devuelve si cancelas antes de la hora.
 **Programadas…** (barra inferior, junto a Redes…) abre un calendario del
 mes con todo lo pendiente en Upload-Post, también lo que programes desde
 su web. Cada día muestra la hora, las siglas de las redes (TT, YT, IG, X,
-FB) y el título. Al pulsar una etiqueta ves cada red con su botón
+FB, LI) y el título. Al pulsar una etiqueta ves cada red con su botón
 **Cancelar** (y **Cancelar todas**). Cancelar pide confirmación; si el
 vídeo se programó desde TSOTS, Publicar deja de avisar de que ya está
 programado. Para cambiar la fecha, cancela y vuelve a programar.
@@ -395,6 +457,10 @@ programado. Para cambiar la fecha, cancela y vuelve a programar.
   subtítulos o el caption fallaron y el vídeo se guardó sin ellos). Pasa
   el ratón por encima para leerlo.
 - "**Faltan dependencias**" al abrir: vuelve a ejecutar `instalar.command`.
+- No aparece el borrador del blog: mira
+  `~/TSOTS/blog/errores/<carpeta>/motivo.txt` y `~/TSOTS/blog/agente.log`.
+  Comprueba que `claude` tenga la sesión iniciada y el conector
+  **claude.ai E2D - Blog**.
 - El **caption** no se genera: comprueba que la app de Ollama esté abierta
   (icono en la barra de menú) y pulsa ↻ junto al selector de modelo. Para
   añadir modelos: `ollama pull nombre` en Terminal y luego ↻.
@@ -409,7 +475,9 @@ voz, Apache-2.0), [auto-editor](https://auto-editor.com) (silencios),
 [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
 (transcripción con la GPU del Mac; faster-whisper en macOS 13),
 ffmpeg (vídeo), [Ollama](https://ollama.com) (modelo de lenguaje local),
-[Upload-Post](https://www.upload-post.com) (publicar, opcional), PySide6 (interfaz). Documentación técnica en `docs/DEVELOPMENT.md` (en inglés).
+[Upload-Post](https://www.upload-post.com) (publicar, opcional),
+[Claude Code](https://claude.com/claude-code) (borradores del blog,
+opcional), PySide6 (interfaz). Documentación técnica en `docs/DEVELOPMENT.md` (en inglés).
 
 Licencia: Apache-2.0 (ver `LICENSE`). Incluye código de ClearerVoice-Studio,
 © Alibaba, bajo la misma licencia.

@@ -69,6 +69,25 @@ Pending work, most urgent first. Remove an item when it is merged into
       - An edited original can adopt a stray `x_limpio_vertical.mp4`
         without a warning.
 
+- [ ] **Blog and LinkedIn: accepted gaps of the first version.**
+      - The CLI path (`limpiarVideo.py`, `runner` calling `pipeline.run`
+        without a record) never runs the blog/LinkedIn step: it only runs
+        through `reproceso` (the GUI).
+      - The «Blog y LinkedIn» checkbox has a tooltip but no info-icon help
+        card (`AYUDAS` in `app/widgets/panel_opciones.py`).
+      - **Publish…** needs a caption to open, so publishing only to
+        LinkedIn from a video without a caption is not possible.
+      - No automatic closed-eyes filter for the frames: OpenCV's eye
+        cascade was not reliable and there is no detector without new
+        dependencies. A cover or photo with closed eyes is swapped by hand
+        in **Publish…** (LinkedIn) or in the blog draft.
+      - A failed blog/LinkedIn step (Ollama down, no frame with a face, no
+        title) is not recorded, so it is retried on every later reprocess
+        of that video while the box is ticked.
+      - The launchd agent may be blocked by macOS privacy when the app
+        lives in `~/Documents`: verify on the first real run
+        (`~/TSOTS/blog/agente.log` would show "Operation not permitted").
+
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
       `videopipeline/steps.py` encodes with `libx264` on the CPU. Try
       `h264_videotoolbox` (already used for re-encoding) with `-q:v` around
