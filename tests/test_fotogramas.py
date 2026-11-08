@@ -50,7 +50,7 @@ def test_prefiere_fotograma_con_cara_a_mas_nitido(tmp_path):
         return con_cara if t == 51.0 else _nitida()
 
     def detector(f):
-        if f is con_cara:
+        if np.array_equal(f, cv2.cvtColor(con_cara, cv2.COLOR_BGR2RGB)):
             return np.array([[80, 20, 130, 85, 0.95]])
         return np.zeros((0, 5))
 
@@ -79,3 +79,18 @@ def test_borrosos_se_descartan_salvo_que_lo_sean_todos(tmp_path):
 def test_texto_en_junta_palabras_del_entorno():
     palabras = [Palabra("hola", 1.0, 1.5), Palabra("mundo", 9.5, 10.0), Palabra("lejos", 30.0, 30.5)]
     assert texto_en(palabras, 5.0) == "hola mundo"
+
+
+def test_el_detector_recibe_rgb(tmp_path):
+    bgr = np.zeros((90, 160, 3), np.uint8)
+    bgr[..., 0] = 255  # azul en BGR
+    bgr[::2] = 255
+    vistos = []
+
+    def detector(f):
+        vistos.append(f)
+        return np.zeros((0, 5))
+
+    extraer_candidatos(Path("v.mp4"), [], tmp_path, n=1, detector=detector,
+                       leer=lambda v, t: bgr, duracion=100.0)
+    assert vistos and all(np.array_equal(f, bgr[..., ::-1]) for f in vistos)

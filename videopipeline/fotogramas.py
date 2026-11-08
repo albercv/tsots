@@ -105,7 +105,8 @@ def extraer_candidatos(
             if frame is None:
                 continue
             alto, ancho = frame.shape[:2]
-            cara = cara_completa(np.asarray(detector(frame)).reshape(-1, 5), ancho, alto)
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # S3FD espera RGB
+            cara = cara_completa(np.asarray(detector(rgb)).reshape(-1, 5), ancho, alto)
             vistos.append((t, frame, cara, nitidez(frame)))
         if vistos:
             elegidos.append(max(vistos, key=lambda v: (v[2] is not None, v[3])))
