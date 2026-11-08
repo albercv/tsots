@@ -952,26 +952,38 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   `~/Library/LaunchAgents/com.tsots.blog.plist` and loads it. launchd runs
   `procesar_pendientes.sh ~/TSOTS/blog` when `pendientes/` changes and every
   hour as a retry; its output goes to `~/TSOTS/blog/agente.log`.
-- The script takes a lock (`~/TSOTS/blog/.bloqueo/`; delete it by hand if the
-  script was killed), skips hidden folders (`.<name>.tmp` is still being
-  written) and runs `claude -p` from each folder with `instrucciones.md`
-  (`@PYTHON@` becomes the install's `.venv-clearvoice/bin/python`). Claude's
-  output goes to `claude.log` in the folder.
+- The script takes a lock (`~/TSOTS/blog/.bloqueo/`). A lock left by a
+  killed run is taken over once it is older than 180 min (each folder
+  touches it, and launchd never runs two copies of the job). Both cases are
+  logged in `agente.log`.
+- It skips hidden folders (`.<name>.tmp` is still being written) and runs
+  `claude -p` from each folder with `instrucciones.md` (`@PYTHON@` becomes
+  the install's `.venv-clearvoice/bin/python`), with a 30 min limit
+  (`perl -e 'alarm …'`, since macOS has no `timeout`). Claude's output goes
+  to `claude.log` in the folder.
 - Allowed tools, nothing else: `posts_create`, `posts_request_upload`,
   `posts_validate`, `posts_set_cover` and `posts_list_media` from the
   claude.ai connector "claude.ai E2D - Blog" (`mcp__claude_ai_E2D_-_Blog__*`),
   `Read`, `Write` and `Bash(<python> -m videopipeline.blog_subida:*)`. No
   delete or frontmatter tool, so the agent cannot publish or remove an
-  existing post. `posts_create` defaults to `published: true`: only the
-  instructions keep the new post a draft.
+  existing post.
+- `posts_create` defaults to `published: true`, so the run gets a
+  PreToolUse hook (`claude --settings`) running `guarda_borrador.sh`. It
+  blocks the call (exit 2) unless `tool_input.published` is the boolean
+  `false`.
 - Claude writes the article (E2D tone and MDX components), creates it with
   `published: false`, uploads the cover, the video and 2-3 frames with
   `videopipeline.blog_subida`, validates, sets the cover and writes
-  `resultado.json` (`slug`, `locale`, `url`).
+  `resultado.json` (`slug`, `locale`, `url`). Right after creating the
+  draft it writes `borrador.json` (`slug`, `locale`).
 - With a `url` in `resultado.json` the folder moves to `hechos/`; otherwise
-  to `errores/`, with `motivo.txt` (last 40 lines of `claude.log`). To retry,
-  move it back to `pendientes/`; check first whether a half-done draft was
-  left, because a retry creates a new one.
+  to `errores/`, with `motivo.txt` (timeout, the draft's slug if
+  `borrador.json` exists, last 40 lines of `claude.log`). To retry, move it
+  back to `pendientes/`; if a draft was already created, a retry creates
+  another one.
+- A folder that cannot be moved (its name already exists in `hechos/` or
+  `errores/`) is renamed to `pendientes/.<name>.no-movida`, so it is not run
+  again every hour.
 - `claude` is looked up in PATH, `~/.local/bin` and `/opt/homebrew/bin`;
   without it every folder goes to `errores/`.
 - Run it by hand: `lanzador/blog/procesar_pendientes.sh ~/TSOTS/blog`.

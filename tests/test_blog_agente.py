@@ -3,6 +3,7 @@ import json
 import os
 import plistlib
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ RAIZ = Path(__file__).resolve().parent.parent
 BLOG = RAIZ / "lanzador" / "blog"
 SCRIPT = BLOG / "procesar_pendientes.sh"
 INSTRUCCIONES = BLOG / "instrucciones.md"
+GUARDA = BLOG / "guarda_borrador.sh"
 PYTHON = str(RAIZ / ".venv-clearvoice" / "bin" / "python")
 E2D = "mcp__claude_ai_E2D_-_Blog__"
 HERRAMIENTAS = [f"{E2D}posts_create", f"{E2D}posts_request_upload", f"{E2D}posts_validate",
@@ -28,7 +30,7 @@ def _blog(tmp_path, *nombres):
     return blog
 
 
-def _ejecutar(tmp_path, blog, claude=None):
+def _ejecutar(tmp_path, blog, claude=None, **extra):
     """Lanza el script con HOME y PATH temporales. `claude`: cuerpo bash del claude falso."""
     bin_ = tmp_path / "bin"
     bin_.mkdir(exist_ok=True)
@@ -38,7 +40,7 @@ def _ejecutar(tmp_path, blog, claude=None):
                          'echo x >> "$LLAMADAS"\n' + claude)
         falso.chmod(0o755)
     env = {"PATH": f"{bin_}:/usr/bin:/bin", "HOME": str(tmp_path / "home"),
-           "LLAMADAS": str(tmp_path / "llamadas")}
+           "LLAMADAS": str(tmp_path / "llamadas"), **extra}
     return subprocess.run(["/bin/bash", str(SCRIPT), str(blog)], env=env,
                           capture_output=True, text=True, timeout=60)
 
@@ -61,7 +63,12 @@ def test_carpeta_con_resultado_pasa_a_hechos(tmp_path):
     assert Path((hecho / "cwd.txt").read_text().strip()).resolve() == Path(carpeta).resolve()
     args = (hecho / "args.bin").read_text().split("\0")[:-1]
     prompt = INSTRUCCIONES.read_text().rstrip("\n").replace("@PYTHON@", PYTHON)
-    assert args == ["-p", prompt, "--add-dir", carpeta, "--allowedTools", ",".join(HERRAMIENTAS)]
+    assert args[:7] == ["-p", prompt, "--add-dir", carpeta, "--allowedTools", ",".join(HERRAMIENTAS),
+                        "--settings"]
+    assert len(args) == 8
+    assert json.loads(args[7]) == {"hooks": {"PreToolUse": [{
+        "matcher": f"{E2D}posts_create",
+        "hooks": [{"type": "command", "command": f"/bin/bash '{GUARDA}'"}]}]}}
 
 
 def test_carpeta_sin_resultado_pasa_a_errores_con_motivo(tmp_path):
@@ -95,6 +102,75 @@ def test_segunda_ejecucion_con_bloqueo_no_hace_nada(tmp_path):
     assert _llamadas(tmp_path) == 0
     assert (blog / "pendientes" / "2026-11-08-video").is_dir()
     assert (blog / ".bloqueo").is_dir()  # el bloqueo es de la otra ejecución
+    assert "bloqueo activo" in r.stdout
+
+
+def test_bloqueo_de_mas_de_180_min_se_quita_y_se_procesa(tmp_path):
+    blog = _blog(tmp_path, "2026-11-08-video")
+    (blog / ".bloqueo").mkdir()
+    viejo = time.time() - 181 * 60
+    os.utime(blog / ".bloqueo", (viejo, viejo))
+    r = _ejecutar(tmp_path, blog, f"echo '{RESULTADO}' > resultado.json\n")
+    assert r.returncode == 0, r.stderr
+    assert "bloqueo de hace más de 180 min" in r.stdout
+    assert _llamadas(tmp_path) == 1
+    assert (blog / "hechos" / "2026-11-08-video").is_dir()
+    assert not (blog / ".bloqueo").exists()
+
+
+def test_carpeta_que_no_se_puede_mover_se_aparta(tmp_path):
+    blog = _blog(tmp_path, "2026-11-08-video")
+    (blog / "hechos" / "2026-11-08-video").mkdir(parents=True)
+    (blog / "hechos" / "2026-11-08-video" / "otro.txt").write_text("de antes")
+    claude = f"echo '{RESULTADO}' > resultado.json\n"
+    r = _ejecutar(tmp_path, blog, claude)
+    assert r.returncode == 0, r.stderr
+    apartada = blog / "pendientes" / ".2026-11-08-video.no-movida"
+    assert (apartada / "resultado.json").exists()
+    assert not (blog / "pendientes" / "2026-11-08-video").exists()
+    assert ".2026-11-08-video.no-movida" in r.stdout
+    assert (blog / "hechos" / "2026-11-08-video" / "otro.txt").read_text() == "de antes"
+    _ejecutar(tmp_path, blog, claude)
+    assert _llamadas(tmp_path) == 1  # no se vuelve a procesar (sería otro borrador)
+
+
+def test_claude_que_no_termina_va_a_errores(tmp_path):
+    blog = _blog(tmp_path, "2026-11-08-video")
+    inicio = time.monotonic()
+    r = _ejecutar(tmp_path, blog, "exec sleep 30\n", TSOTS_BLOG_LIMITE="1")
+    assert r.returncode == 0, r.stderr
+    assert time.monotonic() - inicio < 15
+    assert "Tiempo agotado" in (blog / "errores" / "2026-11-08-video" / "motivo.txt").read_text()
+
+
+def test_motivo_menciona_el_borrador_ya_creado(tmp_path):
+    blog = _blog(tmp_path, "2026-11-08-video")
+    r = _ejecutar(tmp_path, blog, """echo '{"slug": "mi-post", "locale": "es"}' > borrador.json
+echo 'ERROR: paso 5, la subida falló'
+exit 1
+""")
+    assert r.returncode == 0, r.stderr
+    motivo = (blog / "errores" / "2026-11-08-video" / "motivo.txt").read_text()
+    assert "mi-post" in motivo and "ERROR: paso 5, la subida falló" in motivo
+
+
+@pytest.mark.parametrize("entrada, codigo", [
+    ({"published": False}, 0),
+    ({}, 2),
+    ({"published": True}, 2),
+    ({"published": "false"}, 2),
+    ({"published": 0}, 2),
+    (None, 2),  # entrada que no es JSON
+])
+def test_guarda_solo_deja_crear_borradores(entrada, codigo):
+    datos = "basura" if entrada is None else json.dumps({
+        "tool_name": f"{E2D}posts_create",
+        "tool_input": {"title": "Un título", **entrada}})
+    r = subprocess.run(["/bin/bash", str(GUARDA)], input=datos, capture_output=True, text=True,
+                       env={"PATH": "/usr/bin:/bin"}, timeout=30)
+    assert r.returncode == codigo
+    if codigo:
+        assert "published: false" in r.stderr and len(r.stderr.strip().splitlines()) == 1
 
 
 @pytest.mark.skipif(Path("/opt/homebrew/bin/claude").exists(),
@@ -121,7 +197,8 @@ def test_instrucciones_nombran_herramientas_y_orden_de_subida():
         assert f"`{h}`" in texto
     assert "@PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada" in texto
     for marca in ("<Lead>", "<PullQuote", "<Callout", "[video:video]", "[image:fotograma_1]",
-                  "[contact]", "resultado.json", 'cover: "portada"'):
+                  "[contact]", "resultado.json", "borrador.json", 'cover: "portada"',
+                  "https://evolve2digital.com/<locale>/blog/<slug>"):
         assert marca in texto
 
 
@@ -134,3 +211,4 @@ def test_plist_plantilla_es_valido():
     assert plist["StartInterval"] == 3600
     assert plist["StandardOutPath"] == plist["StandardErrorPath"] == f"{dir_blog}/agente.log"
     assert os.access(SCRIPT, os.X_OK)  # launchd lo ejecuta directamente
+    assert os.access(GUARDA, os.X_OK)

@@ -70,7 +70,18 @@ Herramientas del blog que puedes usar (ninguna otra):
    - `tags`: 3-6 etiquetas cortas, en minúsculas, sacadas de
      `meta.palabras_clave`.
 
-   Guarda el `slug` y la URL que devuelve.
+   Si una comprobación previa bloquea la llamada, corrige lo que diga y
+   repítela.
+
+   Nada más crearlo, y antes de subir nada, escribe con `Write`
+   `borrador.json` en la carpeta actual:
+
+   ```json
+   {"slug": "<slug>", "locale": "<locale>"}
+   ```
+
+   La URL del borrador es la que devuelva `posts_create`; si no devuelve
+   ninguna, es `https://evolve2digital.com/<locale>/blog/<slug>`.
 
 5. **Sube la media:**
    - Llama a `mcp__claude_ai_E2D_-_Blog__posts_request_upload` con ese `slug`
@@ -102,10 +113,13 @@ Herramientas del blog que puedes usar (ninguna otra):
    {"slug": "<slug>", "locale": "<locale>", "url": "<URL del borrador>"}
    ```
 
+   La URL es la del paso 4.
+
    Termina con una línea: `Borrador creado: <URL del borrador>`.
 
 8. **Si algo falla**, en cualquier paso:
    - no escribas `resultado.json` y no sigas con los pasos;
+   - deja `borrador.json` si ya lo habías escrito;
    - termina con una última línea `ERROR: <paso y motivo concreto>`; si el
      borrador ya estaba creado, incluye su `slug`.
 
@@ -118,4 +132,4 @@ Herramientas del blog que puedes usar (ninguna otra):
 - No toques otros posts: solo el que creas en el paso 4.
 - No ejecutes con `Bash` otra orden que la del paso 5.
 - No cambies ni borres los ficheros de la carpeta; solo creas
-  `resultado.json`.
+  `borrador.json` y `resultado.json`.
