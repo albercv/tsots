@@ -108,7 +108,8 @@ fi
 
 # --------------------------------------------------------------------- la app
 paso "$(t "Construyendo" "Building") TheSilenceOfTheShorts.app"
-chmod +x lanzador/construir_app.sh TheSilenceOfTheShorts.command desinstalar.command
+chmod +x lanzador/construir_app.sh TheSilenceOfTheShorts.command desinstalar.command \
+    lanzador/blog/procesar_pendientes.sh
 lanzador/construir_app.sh >/dev/null
 ok "$(t "app lista en" "app ready at") $PROYECTO/TheSilenceOfTheShorts.app"
 
@@ -122,6 +123,25 @@ if [ -z "${SIN_DOCK:-}" ]; then
         killall Dock
         ok "$(t "añadido" "added")"
     fi
+fi
+
+# El agente del blog no es imprescindible: si falla, avisa y la instalación sigue.
+paso "$(t "Agente del blog (launchd)" "Blog agent (launchd)")"
+DIR_BLOG="$HOME/TSOTS/blog"
+PLIST_BLOG="$HOME/Library/LaunchAgents/com.tsots.blog.plist"
+# shortcut: una ruta con «|», «&» o «<» rompe el sed o el XML; escapar si llega a pasar.
+if mkdir -p "$DIR_BLOG/pendientes" "$DIR_BLOG/hechos" "$DIR_BLOG/errores" "$HOME/Library/LaunchAgents" \
+    && sed -e "s|@PROYECTO@|$PROYECTO|g" -e "s|@DIR_BLOG@|$DIR_BLOG|g" \
+        lanzador/blog/com.tsots.blog.plist.plantilla > "$PLIST_BLOG"; then
+    # Si ya estaba cargado, se descarga para que launchd lea el plist nuevo.
+    launchctl bootout "gui/$(id -u)/com.tsots.blog" 2>/dev/null && sleep 1 || true
+    if launchctl bootstrap "gui/$(id -u)" "$PLIST_BLOG"; then
+        ok "$(t "vigila" "watching") $DIR_BLOG/pendientes"
+    else
+        echo "    $(t "launchctl no pudo cargar el agente; el resto de la app funciona igual." "launchctl could not load the agent; the rest of the app works the same.")"
+    fi
+else
+    echo "    $(t "No se pudo preparar el agente del blog; el resto de la app funciona igual." "Could not set up the blog agent; the rest of the app works the same.")"
 fi
 
 paso "$(t "Comprobación final" "Final check")"

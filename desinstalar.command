@@ -5,8 +5,9 @@
 # (TheSilenceOfTheShorts.app/Contents/MacOS), los logs, los intermedios de
 # audio_procesado/, las fichas de fichas/ (lo que la app recuerda de cada vídeo:
 # audio limpio, base, transcripción, y la versión anterior de un resultado antiguo
-# que la app sobrescribió) y la entrada del Dock. Conserva: el código, el
-# checkpoint descargado (checkpoints/) y tus vídeos actuales, con sus .md y .srt.
+# que la app sobrescribió), la entrada del Dock y el agente del blog (launchd).
+# Conserva: el código, el checkpoint descargado (checkpoints/), tus vídeos
+# actuales, con sus .md y .srt, y ~/TSOTS/blog.
 # No toca Homebrew ni Ollama.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -35,6 +36,14 @@ if len(filtradas) != len(apps):
     subprocess.run(["killall", "Dock"])
     print("Entrada del Dock eliminada.")
 EOF
+
+# Agente del blog (si existe). ~/TSOTS/blog se conserva.
+PLIST_BLOG="$HOME/Library/LaunchAgents/com.tsots.blog.plist"
+if [ -f "$PLIST_BLOG" ]; then
+    launchctl bootout "gui/$(id -u)/com.tsots.blog" 2>/dev/null || true
+    rm -f "$PLIST_BLOG"
+    echo "Agente del blog eliminado (~/TSOTS/blog se conserva)."
+fi
 
 echo
 echo "Para quitar también los ajustes guardados (marca, modelo, carpeta de salida):"

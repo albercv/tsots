@@ -141,6 +141,7 @@ videopipeline/       pipeline (steps, subtitles, caption, opening title,
 videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
+lanzador/blog/       launchd agent that drafts blog posts (see Blog agent)
 locale/              gettext catalogs (see Translations)
 tests/               pytest + pytest-qt
 ```
@@ -941,6 +942,44 @@ thread, for the account lookups (when the Publish dialog opens and on
   `location` capability it answers 400 `tiktok_reconnect_required`. A
   location field the service rejects is ignored: it publishes anyway and
   says so in `warnings` (kept in the publication log).
+
+## Blog agent
+
+`lanzador/blog/` turns each hand-off folder that the "Blog y LinkedIn" step
+writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
+
+- `instalar.command` fills `com.tsots.blog.plist.plantilla`, copies it to
+  `~/Library/LaunchAgents/com.tsots.blog.plist` and loads it. launchd runs
+  `procesar_pendientes.sh ~/TSOTS/blog` when `pendientes/` changes and every
+  hour as a retry; its output goes to `~/TSOTS/blog/agente.log`.
+- The script takes a lock (`~/TSOTS/blog/.bloqueo/`; delete it by hand if the
+  script was killed), skips hidden folders (`.<name>.tmp` is still being
+  written) and runs `claude -p` from each folder with `instrucciones.md`
+  (`@PYTHON@` becomes the install's `.venv-clearvoice/bin/python`). Claude's
+  output goes to `claude.log` in the folder.
+- Allowed tools, nothing else: `posts_create`, `posts_request_upload`,
+  `posts_validate`, `posts_set_cover` and `posts_list_media` from the
+  claude.ai connector "claude.ai E2D - Blog" (`mcp__claude_ai_E2D_-_Blog__*`),
+  `Read`, `Write` and `Bash(<python> -m videopipeline.blog_subida:*)`. No
+  delete or frontmatter tool, so the agent cannot publish or remove an
+  existing post. `posts_create` defaults to `published: true`: only the
+  instructions keep the new post a draft.
+- Claude writes the article (E2D tone and MDX components), creates it with
+  `published: false`, uploads the cover, the video and 2-3 frames with
+  `videopipeline.blog_subida`, validates, sets the cover and writes
+  `resultado.json` (`slug`, `locale`, `url`).
+- With a `url` in `resultado.json` the folder moves to `hechos/`; otherwise
+  to `errores/`, with `motivo.txt` (last 40 lines of `claude.log`). To retry,
+  move it back to `pendientes/`; check first whether a half-done draft was
+  left, because a retry creates a new one.
+- `claude` is looked up in PATH, `~/.local/bin` and `/opt/homebrew/bin`;
+  without it every folder goes to `errores/`.
+- Run it by hand: `lanzador/blog/procesar_pendientes.sh ~/TSOTS/blog`.
+- `desinstalar.command` unloads the agent and deletes its plist; it keeps
+  `~/TSOTS/blog`.
+- Not verified yet: launchd running the script from a project inside
+  `~/Documents`. macOS privacy may deny it; `agente.log` would then show
+  "Operation not permitted".
 
 ## App bundle (Dock icon)
 

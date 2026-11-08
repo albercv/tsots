@@ -21,26 +21,6 @@ Pending work, most urgent first. Remove an item when it is merged into
       today a cut is detected when the face jumps more than 25% of the
       width, so cuts between similar shots pan for ~1.5 s.
 
-- [ ] **Blog post from the video, published as a draft on evolve2digital.**
-      Agreed design:
-      1. Register the e2d MCP in Claude Code and check that `claude -p` sees
-         the posts tools:
-         `claude mcp add --transport http --scope user e2d https://evolve2digital.com/mcp`,
-         then `/mcp` inside `claude` to authenticate.
-      2. TSOTS option "Prepare for blog": when a video finishes, write
-         `~/TSOTS/blog/pendientes/<date>-<name>/` with `video.mp4`,
-         `transcripcion.txt` and `meta.json` (language, brand context,
-         provisional title).
-      3. launchd agent watching `pendientes/` runs a script that calls
-         `claude -p` per folder, with an instructions file (e2d tone and
-         structure, upload steps). Flow: `posts_create` with
-         `published: false`, `posts_request_upload`, POST the video and a
-         cover frame to `/api/admin/media/upload`, `posts_validate`,
-         `posts_set_cover`. Move the folder to `hechos/` with
-         `resultado.json` (draft URL) or to `errores/` with the reason.
-      Fallback if CLI auth fails: a scheduled task in the Claude desktop app,
-      which already has the e2d connector (not verified).
-
 - [ ] **Header alignment.** The header (`app/widgets/cabecera.py`) sits too
       far to the left. Review spacing and alignment with the rest of the
       window, ideally with the user looking at the real app.
