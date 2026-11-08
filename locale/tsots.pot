@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 21:51+0100\n"
+"POT-Creation-Date: 2026-11-08 22:06+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -196,7 +196,13 @@ msgstr ""
 msgid "Aviso"
 msgstr ""
 
+msgid "Añade otro fotograma del vídeo u otra imagen. También puedes arrastrar imágenes aquí."
+msgstr ""
+
 msgid "Añadir subtítulos"
+msgstr ""
+
+msgid "Añadir…"
 msgstr ""
 
 msgid "Barras negras"
@@ -569,6 +575,9 @@ msgstr ""
 msgid "El vídeo ya era vertical: se reescala con barras."
 msgstr ""
 
+msgid "Elegir imágenes"
+msgstr ""
+
 msgid "Elegir vídeos"
 msgstr ""
 
@@ -669,6 +678,9 @@ msgstr ""
 msgid "Esperando confirmación…"
 msgstr ""
 
+msgid "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo."
+msgstr ""
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
@@ -752,6 +764,9 @@ msgstr ""
 msgid "Formato vertical"
 msgstr ""
 
+msgid "Fotos para LinkedIn:"
+msgstr ""
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
@@ -809,6 +824,10 @@ msgstr ""
 msgid "Impacto"
 msgstr ""
 
+#, python-brace-format
+msgid "Imágenes ({extensiones})"
+msgstr ""
+
 msgid "Jue"
 msgstr ""
 
@@ -842,6 +861,10 @@ msgid "La detección de caras falló (código {codigo})"
 msgstr ""
 
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
+msgstr ""
+
+#, python-brace-format
+msgid "La publicación se envió pero no llegó la respuesta del servicio ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -879,6 +902,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
+msgstr ""
+
+msgid "Las fotos son demasiado grandes para el servicio (413)."
 msgstr ""
 
 msgid "Leyendo la API key del Llavero…"
@@ -1197,6 +1223,10 @@ msgid "No se pudo lanzar el proceso"
 msgstr ""
 
 #, python-brace-format
+msgid "No se pudo leer el archivo ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
 msgstr ""
 
@@ -1316,6 +1346,9 @@ msgid "Olvidar este vídeo"
 msgstr ""
 
 msgid "Ordenando las salidas"
+msgstr ""
+
+msgid "Otra imagen…"
 msgstr ""
 
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
@@ -1724,6 +1757,9 @@ msgstr ""
 msgid "Sin conexión para descargar un modelo"
 msgstr ""
 
+msgid "Sin fotos: añade al menos una."
+msgstr ""
+
 msgid "Sin memoria suficiente"
 msgstr ""
 
@@ -1795,6 +1831,13 @@ msgstr ""
 
 #, python-brace-format
 msgid "Terminó, pero no se pudo mostrar el resultado ({tipo}). Mira el registro."
+msgstr ""
+
+#, python-brace-format
+msgid "Texto para LinkedIn de más de {maximo} caracteres: acórtalo"
+msgstr ""
+
+msgid "Texto para LinkedIn:"
 msgstr ""
 
 #, python-brace-format

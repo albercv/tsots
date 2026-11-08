@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from videopipeline import linkedin
 from videopipeline.caption import Caption
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
@@ -51,6 +52,7 @@ from videopipeline.redes.modelo import (
 )
 from videopipeline.redes.publicador import Estado
 from videopipeline.redes.textos import (
+    MAX_TEXTO,
     MAX_TEXTO_X,
     MAX_TITULO_YOUTUBE,
     longitud_x,
@@ -63,6 +65,7 @@ from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
 from .selector_ubicacion import DialogoUbicacion, describir_ubicacion, ubicacion_guardada
+from .tira_imagenes import TiraImagenes
 
 # Duración del vídeo (ffprobe). Se llama fuera del hilo de la interfaz; los
 # tests la sustituyen.
@@ -297,6 +300,23 @@ class DialogoPublicar(QDialog):
         fila_x.addWidget(self.campo_x, 1)
         fila_x.addWidget(self.contador_x, 0, Qt.AlignmentFlag.AlignTop)
         formulario.addRow(_("Texto para X:"), fila_x)
+        # LinkedIn: el post y sus fotos, junto al vídeo. Lo editado se publica,
+        # pero no se guarda en el .md.
+        self._linkedin = linkedin.leer(self.video)
+        texto_linkedin, fotos_linkedin = self._linkedin or ("", [])
+        self.campo_linkedin = QPlainTextEdit(texto_linkedin.strip())
+        self.campo_linkedin.setFixedHeight(120)
+        self.contador_linkedin = QLabel()
+        fila_linkedin = QHBoxLayout()
+        fila_linkedin.addWidget(self.campo_linkedin, 1)
+        fila_linkedin.addWidget(self.contador_linkedin, 0, Qt.AlignmentFlag.AlignTop)
+        formulario.addRow(_("Texto para LinkedIn:"), fila_linkedin)
+        self.tira_linkedin = TiraImagenes(fotos_linkedin,
+                                          linkedin.rutas(self.video)[1] / "candidatos")
+        formulario.addRow(_("Fotos para LinkedIn:"), self.tira_linkedin)
+        if self._linkedin is None:
+            formulario.setRowVisible(fila_linkedin, False)
+            formulario.setRowVisible(self.tira_linkedin, False)
         raiz.addWidget(grupo_textos)
         self.grupo_textos = grupo_textos
 
@@ -319,7 +339,7 @@ class DialogoPublicar(QDialog):
             self.combo_facebook.addItem(_(ETIQUETAS_FACEBOOK[modo]), modo.value)
         self.combo_facebook.setCurrentIndex(
             self.combo_facebook.findData(ajustes.facebook_modo.value))
-        modo_por_plataforma = {
+        self.modos = {
             Plataforma.TIKTOK: self.combo_tiktok,
             Plataforma.YOUTUBE: QLabel(_("Short público")),
             Plataforma.INSTAGRAM: self.combo_instagram,
@@ -338,7 +358,7 @@ class DialogoPublicar(QDialog):
             self.casillas[plataforma] = casilla
             self.estados[plataforma] = estado
             rejilla.addWidget(casilla, fila, 0)
-            rejilla.addWidget(modo_por_plataforma[plataforma], fila, 1)
+            rejilla.addWidget(self.modos[plataforma], fila, 1)
             rejilla.addWidget(estado, fila, 2)
         raiz.addWidget(grupo_plataformas)
 
@@ -429,6 +449,8 @@ class DialogoPublicar(QDialog):
         self.campo_titulo.textChanged.connect(self._al_cambiar_textos)
         self.campo_hashtags.textChanged.connect(self._al_cambiar_textos)
         self.campo_x.textChanged.connect(self._al_editar_x)
+        self.campo_linkedin.textChanged.connect(self._refrescar)
+        self.tira_linkedin.cambiada.connect(self._refrescar)
         self.radio_programar.toggled.connect(self._refrescar)
         self.campo_fecha.dateTimeChanged.connect(self._refrescar)
         self._rellenar_x()
@@ -506,6 +528,8 @@ class DialogoPublicar(QDialog):
             hashtags=tuple(self.campo_hashtags.text().split()),
             palabras_clave=self._palabras_clave,
             texto_x=self.campo_x.toPlainText().strip(),
+            fotos=self.tira_linkedin.fotos(),
+            texto_linkedin=self.campo_linkedin.toPlainText().strip(),
         )
 
     # --- ubicación ---
@@ -645,6 +669,15 @@ class DialogoPublicar(QDialog):
             if longitud_x(self.campo_x.toPlainText().strip()) > MAX_TEXTO_X:
                 bloqueo = _("Texto para X de más de {maximo} caracteres: acórtalo (o marca "
                             "Premium en Redes…)").format(maximo=MAX_TEXTO_X)
+        if plataforma == Plataforma.LINKEDIN:
+            if self._linkedin is None:
+                return False, "", _("Este vídeo no tiene post de LinkedIn: activa «Blog y "
+                                    "LinkedIn» y procésalo."), COLOR_SECUNDARIO
+            if not self.tira_linkedin.fotos():
+                return False, "", _("Sin fotos: añade al menos una."), COLOR_AVISO
+            if len(self.campo_linkedin.toPlainText().strip()) > MAX_TEXTO[plataforma]:
+                bloqueo = _("Texto para LinkedIn de más de {maximo} caracteres: "
+                            "acórtalo").format(maximo=MAX_TEXTO[plataforma])
         if plataforma == Plataforma.FACEBOOK and self.ajustes.pagina_facebook is None:
             bloqueo = _("Falta la página de Facebook: elígela en Redes…")
         texto, color = (consulta_cuentas.describir(plataforma, cuenta, servicio)
@@ -737,6 +770,11 @@ class DialogoPublicar(QDialog):
         self.contador_x.setStyleSheet(
             f"color: {COLOR_AVISO};" if largo_x > MAX_TEXTO_X and not self.ajustes.x_premium
             else "")
+        largo_linkedin = len(self.campo_linkedin.toPlainText().strip())
+        maximo_linkedin = MAX_TEXTO[Plataforma.LINKEDIN]
+        self.contador_linkedin.setText(f"{largo_linkedin}/{maximo_linkedin}")
+        self.contador_linkedin.setStyleSheet(
+            f"color: {COLOR_AVISO};" if largo_linkedin > maximo_linkedin else "")
         bloqueos = self._refrescar_plataformas()
         listo, _motivo = self._listo()
         programar = self.radio_programar.isChecked()
@@ -908,8 +946,11 @@ class DialogoPublicar(QDialog):
 
     def _recordar_eleccion(self, opciones: Opciones) -> None:
         # Lo que el usuario quiere marcado, también lo que hoy no se puede
-        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
-        self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
+        # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar. LinkedIn
+        # no: sin post o sin fotos no se queda como elegida.
+        self.ajustes.plataformas_redes = [
+            p for p in ORDEN if p in self._deseadas
+            and (p != Plataforma.LINKEDIN or self._estado_plataforma(p)[0])]
         self.ajustes.tiktok_modo = opciones.tiktok_modo
         self.ajustes.instagram_modo = opciones.instagram_modo
         self.ajustes.facebook_modo = opciones.facebook_modo
@@ -972,6 +1013,9 @@ class DialogoPublicar(QDialog):
                      self.tamano if self.tamano is not None else "?")
         if Plataforma.FACEBOOK in plataformas:
             log.info("Página de Facebook: %s", "sí" if self.ajustes.pagina_facebook else "no")
+        if Plataforma.LINKEDIN in plataformas:
+            log.info("LinkedIn: texto de %d caracteres · fotos: %s",
+                     len(publicacion.texto_linkedin), ", ".join(map(str, publicacion.fotos)))
         ubicacion = opciones.ubicacion
         log.info("Ubicación%s: %s · TikTok: %s · Instagram: %s · X: %s",
                  " (solo este vídeo)" if self._ubicacion_propia is not None else "",
@@ -1032,11 +1076,14 @@ class DialogoPublicar(QDialog):
             return _(ETIQUETAS_FACEBOOK[opciones.facebook_modo])
         if plataforma == Plataforma.X:
             return _("Post público")
+        if plataforma == Plataforma.LINKEDIN:
+            return _("Post con fotos")
         return _("Short público")
 
     def _bloquear(self, bloqueado: bool) -> None:
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
-                       self.campo_x, self.combo_tiktok, self.combo_instagram,
+                       self.campo_x, self.campo_linkedin, self.tira_linkedin,
+                       self.combo_tiktok, self.combo_instagram,
                        self.combo_facebook, self.boton_redes, self.boton_cerrar,
                        self.boton_ubicacion, self.radio_ahora, self.radio_programar,
                        *self.casillas.values()):

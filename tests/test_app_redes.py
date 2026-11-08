@@ -4,8 +4,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from PySide6.QtCore import QSettings
-from PySide6.QtWidgets import QLineEdit, QMessageBox
+from PIL import Image
+from PySide6.QtCore import QMimeData, QPoint, QPointF, QSettings, Qt, QUrl
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import QApplication, QLineEdit, QMessageBox, QPushButton
 
 from app import credenciales, segundo_plano
 from app.settings import Ajustes
@@ -13,6 +15,7 @@ from app.widgets import dialogo_publicar
 from app.widgets.dialogo_publicar import DialogoPublicar
 from app.widgets.dialogo_redes import DialogoRedes
 from tests.redes_falsos import ProveedorFalso, todas_conectadas
+from videopipeline import linkedin
 from videopipeline.caption import Caption
 from videopipeline.redes import publicador, registro
 from videopipeline.redes.modelo import (
@@ -1152,6 +1155,7 @@ def test_sin_conexion_se_usa_lo_ultimo_que_se_supo(qtbot, video, ajustes, llaver
 def test_sin_conexion_ni_nada_guardado_todo_sigue_usable(qtbot, video, ajustes,
                                                          llavero_falso):
     proveedor = ProveedorFalso(cuentas_conectadas=ErrorConsulta("sin red"))
+    _con_linkedin(video)  # sin su post, LinkedIn sale deshabilitada
     dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, proveedor)
     assert all(c.isEnabled() for c in dialogo.casillas.values())
     assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [
@@ -1546,3 +1550,181 @@ def test_publicar_por_defecto_madrid_llega_a_instagram_y_x(qtbot, video, ajustes
     _publicar_y_esperar(qtbot, dialogo, monkeypatch)
     enviadas = _enviadas(proveedor)
     assert enviadas[I] == enviadas[X] == UBICACION_POR_DEFECTO
+
+
+# --- LinkedIn en el diálogo Publicar ---
+
+L = Plataforma.LINKEDIN
+TEXTO_LINKEDIN = "Gancho del post.\n\nCuerpo del post.\n\n#IA #Pymes"
+
+
+def _imagen(ruta: Path) -> Path:
+    Image.new("RGB", (16, 9), "#05b4ba").save(ruta)
+    return ruta
+
+
+def _con_linkedin(video: Path, n: int = 4) -> tuple[list[Path], list[Path]]:
+    """Lo que deja `difusion.preparar`: el texto, la portada y `n - 1`
+    fotogramas copiados de `candidatos/` como `NN_<candidato>`. Devuelve
+    (fotos del post, candidatos)."""
+    md, carpeta = linkedin.rutas(video)
+    (carpeta / "candidatos").mkdir(parents=True)
+    candidatos = [_imagen(carpeta / "candidatos" / f"candidato_{i:02d}.jpg")
+                  for i in range(1, 7)]
+    fotos = [_imagen(carpeta / "01_portada.png")] + [
+        _imagen(carpeta / f"{i:02d}_{c.name}") for i, c in enumerate(candidatos[1:n], start=2)]
+    md.write_text(TEXTO_LINKEDIN + "\n", encoding="utf-8")
+    return fotos, candidatos
+
+
+def _botones_quitar(tira) -> list[QPushButton]:
+    return [b for b in tira.findChildren(QPushButton)
+            if b.text() == "Quitar" and b.isVisibleTo(tira)]
+
+
+def _menu_anadir(tira) -> dict:
+    menu = tira.boton_anadir.menu()
+    menu.aboutToShow.emit()
+    return {a.text(): a for a in menu.actions() if a.text()}
+
+
+def _soltar(tira, *rutas: Path) -> bool:
+    """Arrastra `rutas` sobre la tira; devuelve si aceptó el arrastre."""
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(r)) for r in rutas])
+    entrar = QDragEnterEvent(QPoint(5, 5), Qt.DropAction.CopyAction, mime,
+                             Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier)
+    QApplication.sendEvent(tira, entrar)
+    if entrar.isAccepted():
+        QApplication.sendEvent(tira, QDropEvent(
+            QPointF(5, 5), Qt.DropAction.CopyAction, mime, Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier))
+    return entrar.isAccepted()
+
+
+def test_linkedin_sin_acompanantes_deshabilitado(qtbot, video, ajustes, llavero_falso,
+                                                 monkeypatch):
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    assert not dialogo.casillas[L].isEnabled() and not dialogo.casillas[L].isChecked()
+    assert dialogo.estados[L].text() == (
+        "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo.")
+    assert dialogo.campo_linkedin.isHidden() and dialogo.tira_linkedin.isHidden()
+    pub = dialogo.publicacion()
+    assert pub.fotos == () and pub.texto_linkedin == ""
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert [c[1] for c in proveedor.llamadas] == [Y]
+    # Deshabilitada no se recuerda como elegida.
+    assert ajustes.plataformas_redes == [Y]
+
+
+def test_linkedin_publicacion_lleva_texto_y_fotos(qtbot, video, ajustes, llavero_falso,
+                                                  monkeypatch):
+    fotos, _candidatos = _con_linkedin(video)
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    assert dialogo.casillas[L].isEnabled() and dialogo.casillas[L].isChecked()
+    assert not dialogo.campo_linkedin.isHidden() and not dialogo.tira_linkedin.isHidden()
+    assert dialogo.campo_linkedin.toPlainText() == TEXTO_LINKEDIN
+    assert dialogo.contador_linkedin.text() == f"{len(TEXTO_LINKEDIN)}/3000"
+    pub = dialogo.publicacion()
+    assert pub.fotos == tuple(fotos) and pub.texto_linkedin == TEXTO_LINKEDIN
+    # Lo editado se publica, pero no se guarda en el .md.
+    dialogo.campo_linkedin.setPlainText("Otro post")
+    preguntas = _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert "LinkedIn: Post con fotos" in preguntas[0]
+    enviada = next(c[2] for c in proveedor.llamadas if c[1] == L)
+    assert enviada.texto_linkedin == "Otro post" and enviada.fotos == tuple(fotos)
+    assert linkedin.leer(video) == (TEXTO_LINKEDIN + "\n", fotos)
+    assert ajustes.plataformas_redes == [Y, L]
+    assert "LinkedIn [publico: Post con fotos]" in _log(dialogo)
+
+
+def test_texto_de_linkedin_largo_bloquea(qtbot, video, ajustes, llavero_falso):
+    _con_linkedin(video)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    dialogo.campo_linkedin.setPlainText("a" * 3001)
+    assert dialogo.contador_linkedin.text() == "3001/3000"
+    assert "color" in dialogo.contador_linkedin.styleSheet()
+    assert not dialogo.boton_publicar.isEnabled() and "3000" in dialogo.estados[L].text()
+    dialogo.casillas[L].setChecked(False)
+    assert dialogo.boton_publicar.isEnabled()
+
+
+def test_quitar_imagen_la_saca_de_la_publicacion(qtbot, video, ajustes, llavero_falso):
+    fotos, _candidatos = _con_linkedin(video)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(L,))
+    tira = dialogo.tira_linkedin
+    cambios = []
+    tira.cambiada.connect(lambda: cambios.append(tira.fotos()))
+    assert len(_botones_quitar(tira)) == 4
+    _botones_quitar(tira)[1].click()
+    assert dialogo.publicacion().fotos == (fotos[0], fotos[2], fotos[3])
+    assert cambios == [(fotos[0], fotos[2], fotos[3])]
+    assert len(_botones_quitar(tira)) == 3
+    assert fotos[1].is_file()  # del disco no se borra nada
+    assert dialogo.casillas[L].isChecked()
+
+
+def test_quitar_todas_deshabilita_linkedin(qtbot, video, ajustes, llavero_falso, monkeypatch):
+    fotos, candidatos = _con_linkedin(video, n=2)
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
+    tira = dialogo.tira_linkedin
+    for _foto in fotos:
+        _botones_quitar(tira)[0].click()
+    assert tira.fotos() == () and dialogo.publicacion().fotos == ()
+    assert not dialogo.casillas[L].isEnabled() and not dialogo.casillas[L].isChecked()
+    assert "foto" in dialogo.estados[L].text()
+    assert dialogo.boton_publicar.isEnabled()  # YouTube sigue marcada
+    # Con una foto de nuevo, vuelve a estar marcada: el usuario la quería.
+    _menu_anadir(tira)[candidatos[0].name].trigger()
+    assert dialogo.casillas[L].isEnabled() and dialogo.casillas[L].isChecked()
+    _botones_quitar(tira)[0].click()
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert [c[1] for c in proveedor.llamadas] == [Y]
+    assert ajustes.plataformas_redes == [Y]
+
+
+def test_anadir_candidato(qtbot, video, ajustes, llavero_falso):
+    fotos, candidatos = _con_linkedin(video)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(L,))
+    tira = dialogo.tira_linkedin
+    # Solo los que no están ya: las fotos del post son copias `NN_<candidato>`.
+    acciones = _menu_anadir(tira)
+    assert list(acciones) == ["candidato_01.jpg", "candidato_05.jpg", "candidato_06.jpg",
+                              "Otra imagen…"]
+    acciones["candidato_05.jpg"].trigger()
+    assert dialogo.publicacion().fotos == (*fotos, candidatos[4])
+    assert "candidato_05.jpg" not in _menu_anadir(tira)
+    assert len(_botones_quitar(tira)) == 5
+    # Quitada la copia de un candidato, se puede volver a añadir.
+    _botones_quitar(tira)[1].click()
+    assert "candidato_02.jpg" in _menu_anadir(tira)
+
+
+def test_arrastrar_imagen_propia(qtbot, video, ajustes, llavero_falso, tmp_path, monkeypatch):
+    fotos, _candidatos = _con_linkedin(video)
+    propia = _imagen(tmp_path / "mi foto.jpeg")
+    notas = tmp_path / "notas.txt"
+    notas.write_text("no es una imagen")
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(L,))
+    tira = dialogo.tira_linkedin
+    cambios = []
+    tira.cambiada.connect(lambda: cambios.append(1))
+    assert tira.acceptDrops()
+    assert not _soltar(tira, notas)
+    assert _soltar(tira, notas, propia)
+    assert dialogo.publicacion().fotos == (*fotos, propia) and cambios == [1]
+    assert not (linkedin.rutas(video)[1] / propia.name).exists()  # no se copia
+    _soltar(tira, propia)  # la misma otra vez: no se repite
+    assert tira.fotos() == (*fotos, propia) and cambios == [1]
+    # Sin arrastrar: «Añadir…» → «Otra imagen…».
+    otra = _imagen(tmp_path / "otra.png")
+    monkeypatch.setattr("app.widgets.tira_imagenes.QFileDialog.getOpenFileNames",
+                        lambda *a, **k: ([str(otra)], ""))
+    _menu_anadir(tira)["Otra imagen…"].trigger()
+    assert tira.fotos() == (*fotos, propia, otra)

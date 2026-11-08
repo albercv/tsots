@@ -1330,3 +1330,29 @@ def test_cuentas_reconoce_linkedin():
     cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()
     assert cuentas[Plataforma.LINKEDIN].visible == "Yo en LinkedIn"
     assert cuentas[Plataforma.TIKTOK] is None
+
+
+# Tras enviar, LinkedIn no habla de «vídeo»: lo que sube son fotos.
+
+def test_linkedin_sin_respuesta_tras_enviar_habla_de_la_publicacion(tmp_path):
+    def responder(request, servidor):
+        raise httpx.ReadTimeout("sin respuesta", request=request)
+
+    r = _proveedor(Servidor(responder)).publicar(
+        Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert r.pendiente and "La publicación se envió" in r.error and "vídeo" not in r.error
+
+
+def test_linkedin_foto_ilegible_habla_del_archivo(tmp_path):
+    pub = _pub_linkedin(tmp_path)
+    pub.fotos[1].chmod(0)
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, pub, Opciones())
+    assert not r.ok and r.error == "No se pudo leer el archivo (PermissionError)."
+    assert servidor.peticiones == []
+
+
+def test_linkedin_413_habla_de_las_fotos(tmp_path):
+    servidor = Servidor(lambda req, s: httpx.Response(413, text="Too Large"))
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert "413" in r.error and "fotos" in r.error and "vídeo" not in r.error

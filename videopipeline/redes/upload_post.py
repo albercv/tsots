@@ -392,15 +392,18 @@ class ProveedorUploadPost:
         except httpx.HTTPError as e:
             log.warning("%s: sin respuesta tras enviar el vídeo (%.1f s): %s",
                         plataforma.nombre, time.monotonic() - inicio, self._traza(e))
-            resultado = self._por_confirmar(plataforma, _(
-                "El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).").format(
+            resultado = self._por_confirmar(plataforma, (
+                _("La publicación se envió pero no llegó la respuesta del servicio ({tipo}).")
+                if linkedin else
+                _("El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).")).format(
                 tipo=type(e).__name__))
             self._registrar_resultado(resultado)
             return resultado
         except OSError as e:
             log.warning("%s: no se pudo leer el vídeo: %s", plataforma.nombre, self._traza(e))
-            return self._error(plataforma, _("No se pudo leer el vídeo ({tipo}).").format(
-                tipo=type(e).__name__))
+            return self._error(plataforma, (
+                _("No se pudo leer el archivo ({tipo}).") if linkedin
+                else _("No se pudo leer el vídeo ({tipo}).")).format(tipo=type(e).__name__))
         self._registrar_respuesta(plataforma, "subida", respuesta, time.monotonic() - inicio)
         resultado = self._interpretar_subida(plataforma, respuesta, opciones.programada)
         self._registrar_resultado(resultado)
@@ -909,7 +912,9 @@ class ProveedorUploadPost:
         elif codigo == 403:
             base = _("Sin permiso o fuera del plan contratado (403).")
         elif codigo == 413:
-            base = _("El vídeo es demasiado grande para el servicio (413).")
+            base = (_("Las fotos son demasiado grandes para el servicio (413).")
+                    if plataforma == Plataforma.LINKEDIN
+                    else _("El vídeo es demasiado grande para el servicio (413)."))
         elif codigo == 429:
             base = _("Límite de subidas del plan alcanzado (429).")
         elif codigo == 503:

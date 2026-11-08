@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-08 21:51+0100\n"
+"POT-Creation-Date: 2026-11-08 22:06+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -201,8 +201,14 @@ msgstr "Automatic: the place called “{nombre}”"
 msgid "Aviso"
 msgstr "Notice"
 
+msgid "Añade otro fotograma del vídeo u otra imagen. También puedes arrastrar imágenes aquí."
+msgstr "Add another frame from the video or another image. You can also drag images here."
+
 msgid "Añadir subtítulos"
 msgstr "Add subtitles"
+
+msgid "Añadir…"
+msgstr "Add…"
 
 msgid "Barras negras"
 msgstr "Black bars"
@@ -583,6 +589,9 @@ msgstr "The video was sent but the service response never arrived ({tipo})."
 msgid "El vídeo ya era vertical: se reescala con barras."
 msgstr "The video was already vertical: it is rescaled with bars."
 
+msgid "Elegir imágenes"
+msgstr "Choose images"
+
 msgid "Elegir vídeos"
 msgstr "Choose videos"
 
@@ -685,6 +694,9 @@ msgstr "Waiting for the service to finish: {lista}…"
 msgid "Esperando confirmación…"
 msgstr "Waiting for confirmation…"
 
+msgid "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo."
+msgstr "This video has no LinkedIn post: turn on “Blog and LinkedIn” and process it."
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
@@ -776,6 +788,9 @@ msgstr "Blurred background (16:9)"
 msgid "Formato vertical"
 msgstr "Vertical format"
 
+msgid "Fotos para LinkedIn:"
+msgstr "Photos for LinkedIn:"
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr "Writes name_limpio.md with a local model (Ollama) from the transcript."
 
@@ -838,6 +853,10 @@ msgstr ""
 msgid "Impacto"
 msgstr "Impact"
 
+#, python-brace-format
+msgid "Imágenes ({extensiones})"
+msgstr "Images ({extensiones})"
+
 msgid "Jue"
 msgstr "Thu"
 
@@ -872,6 +891,10 @@ msgstr "Face detection failed (code {codigo})"
 
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
 msgstr "The scheduled time has already passed: it was not sent. Pick another one."
+
+#, python-brace-format
+msgid "La publicación se envió pero no llegó la respuesta del servicio ({tipo})."
+msgstr "The post was sent but the service response never arrived ({tipo})."
 
 #, python-brace-format
 msgid "La respuesta de {juez} no es válida"
@@ -909,6 +932,9 @@ msgstr "The earlier version of the video that was saved there (\"{archivo}\") is
 #, python-brace-format
 msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
 msgstr "The version of \"{nombre}\" without subtitles is gone. Process it again to make shorts."
+
+msgid "Las fotos son demasiado grandes para el servicio (413)."
+msgstr "The photos are too large for the service (413)."
 
 msgid "Leyendo la API key del Llavero…"
 msgstr "Reading the API key from the Keychain…"
@@ -1235,6 +1261,10 @@ msgid "No se pudo lanzar el proceso"
 msgstr "Could not launch the process"
 
 #, python-brace-format
+msgid "No se pudo leer el archivo ({tipo})."
+msgstr "Could not read the file ({tipo})."
+
+#, python-brace-format
 msgid "No se pudo leer el lugar de TikTok del Llavero (código {codigo})."
 msgstr "Could not read the TikTok place from the Keychain (code {codigo})."
 
@@ -1355,6 +1385,9 @@ msgstr "Forget this video"
 
 msgid "Ordenando las salidas"
 msgstr "Tidying up the outputs"
+
+msgid "Otra imagen…"
+msgstr "Another image…"
 
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr "To change the language the app will restart. Any process in progress will be cancelled. Restart now?"
@@ -1780,6 +1813,9 @@ msgstr "Not checked. Press “Check connection” to see which accounts you have
 msgid "Sin conexión para descargar un modelo"
 msgstr "No connection to download a model"
 
+msgid "Sin fotos: añade al menos una."
+msgstr "No photos: add at least one."
+
 msgid "Sin memoria suficiente"
 msgstr "Not enough memory"
 
@@ -1852,6 +1888,13 @@ msgstr "Task:"
 #, python-brace-format
 msgid "Terminó, pero no se pudo mostrar el resultado ({tipo}). Mira el registro."
 msgstr "Finished, but the result could not be shown ({tipo}). Check the log."
+
+#, python-brace-format
+msgid "Texto para LinkedIn de más de {maximo} caracteres: acórtalo"
+msgstr "Text for LinkedIn over {maximo} characters: shorten it"
+
+msgid "Texto para LinkedIn:"
+msgstr "Text for LinkedIn:"
 
 #, python-brace-format
 msgid "Texto para X de más de {maximo} caracteres: acórtalo (o marca Premium en Redes…)"

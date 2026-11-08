@@ -71,6 +71,11 @@ class DialogoPublicarShorts(DialogoPublicar):
                        self.radio_ahora, self.radio_programar, self.campo_fecha,
                        self.aviso_fecha, self.boton_ubicacion):
             widget.hide()
+        # LinkedIn no: su post y sus fotos son del vídeo largo, no de los shorts.
+        self._linkedin = None
+        for widget in (self.casillas[Plataforma.LINKEDIN], self.modos[Plataforma.LINKEDIN],
+                       self.estados[Plataforma.LINKEDIN]):
+            widget.hide()
         self.layout().insertWidget(1, self._crear_lista())
         self._refrescar()
 
