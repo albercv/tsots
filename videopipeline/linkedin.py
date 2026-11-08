@@ -7,6 +7,7 @@ para poder testearse sin servidor.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Callable
 
@@ -60,6 +61,11 @@ _SYSTEM_ES = (
     "por una flecha (→), una conclusión concreta y aplicable, y una pregunta "
     "final al lector.\n"
     "- hashtags: entre 3 y 5, relevantes al tema, que irán al final del post.\n"
+    "Cierra con una pregunta al lector, como en el ejemplo. Prohibido el CTA "
+    "de Instagram/TikTok («enlace en bio», «sígueme para más»). No nombres "
+    "productos, modelos, versiones, empresas ni cifras que no aparezcan "
+    "literalmente en la transcripción: si la transcripción no lo nombra, no lo "
+    "nombres.\n"
     "No inventes datos que no estén en la transcripción. Responde solo JSON "
     'con el esquema {"texto": str, "hashtags": [str]}.\n\n'
     "Ejemplo de estilo (no copies su contenido ni sus datos, solo el tono, la "
@@ -78,6 +84,11 @@ _SYSTEM_EN = (
     "(→), a concrete actionable takeaway, and a closing question to the "
     "reader.\n"
     "- hashtags: 3 to 5, relevant to the topic, to be placed at the end.\n"
+    "Close with a question to the reader, as in the example. Instagram/TikTok "
+    "style CTAs (\"link in bio\", \"follow me for more\") are forbidden. Do not "
+    "name products, models, versions, companies or figures that do not appear "
+    "literally in the transcript: if the transcript doesn't name it, don't name "
+    "it.\n"
     "Do not invent data that isn't in the transcript. Respond only with JSON "
     'with the schema {"texto": str, "hashtags": [str]}.\n\n'
     "Style example below. It is in Spanish: only its tone, structure and length "
@@ -121,6 +132,22 @@ def _cortar_por_parrafo(texto: str) -> str:
     return texto[:corte if corte > 0 else MAX_CARACTERES].rstrip()
 
 
+_SOLO_HASHTAGS = re.compile(r"(?:#\w+\s*)+")
+_HASHTAGS_FINALES = re.compile(r"(?:[ \t]+#\w+)+\s*$")
+_FRASE_BIO = re.compile(r"[^.!?\n]*(?:enlace en bio|link in bio)[^.!?\n]*[.!?]?", re.I)
+
+
+def _limpiar(texto: str) -> str:
+    """Quita el CTA de «bio» y los hashtags que el modelo dejó al final."""
+    texto = re.sub(r"[ \t]{2,}", " ", _FRASE_BIO.sub("", texto)).strip()
+    lineas = texto.split("\n")
+    while lineas and (not lineas[-1].strip() or _SOLO_HASHTAGS.fullmatch(lineas[-1].strip())):
+        lineas.pop()
+    if lineas:
+        lineas[-1] = _HASHTAGS_FINALES.sub("", lineas[-1]).rstrip()
+    return "\n".join(lineas).strip()
+
+
 def generar(transcripcion: str, contexto_marca: str, modelo: str,
             cliente: Callable[[str, list[dict], dict], dict] = chat_json,
             idioma: str = "es") -> str:
@@ -143,7 +170,7 @@ def generar(transcripcion: str, contexto_marca: str, modelo: str,
     for h in map(_normalizar_hashtag, map(str, hashtags)):
         if h and h not in elegidos and h not in HASHTAGS_GENERICOS:
             elegidos.append(h)
-    texto = _cortar_por_parrafo(texto)
+    texto = _cortar_por_parrafo(_limpiar(texto))
     return "\n\n".join([texto, " ".join(elegidos[:MAX_HASHTAGS])]) if elegidos else texto
 
 

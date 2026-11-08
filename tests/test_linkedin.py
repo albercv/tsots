@@ -72,3 +72,30 @@ def test_leer_md_que_no_es_utf8_es_none(tmp_path):
     md, _carpeta = rutas(final)
     md.write_bytes(b"\xff\xfe no es UTF-8 \x80")
     assert leer(final) is None
+
+
+def test_hashtags_del_modelo_no_se_duplican():
+    cuerpo = "Gancho.\n\n" + "x" * 1400
+    for final in ("\n\n#IA #Pymes", " #IA #Pymes", "\n#IA"):
+        texto = generar("t", "", "m", cliente=lambda *a: {"texto": cuerpo + final, "hashtags": ["#ia", "#pymes"]})
+        assert texto.endswith("x\n\n#ia #pymes") and texto.count("#") == 2
+
+
+def test_hashtag_en_mitad_de_frase_se_conserva():
+    cuerpo = "Usa #Claude a diario.\n\n" + "x" * 1400
+    texto = generar("t", "", "m", cliente=lambda *a: {"texto": cuerpo, "hashtags": ["#ia"]})
+    assert "Usa #Claude a diario." in texto
+
+
+def test_prompt_prohibe_cta_de_red_social_e_inventos():
+    es = construir_mensajes("hola", "", "es")[0]["content"]
+    en = construir_mensajes("hola", "", "en")[0]["content"]
+    assert "enlace en bio" in es and "si la transcripción no lo nombra, no lo nombres" in es
+    assert "link in bio" in en and "if the transcript doesn't name it, don't name it" in en
+
+
+def test_frase_con_enlace_en_bio_se_elimina():
+    cuerpo = "Gancho.\n\n" + "x" * 1400
+    for frase in ("Escríbeme (enlace en bio).", "Reach out, link in BIO!"):
+        texto = generar("t", "", "m", cliente=lambda *a: {"texto": f"{cuerpo}\n\nSígueme para más. {frase}\n\n¿Y tú?", "hashtags": []})
+        assert "bio" not in texto.lower() and "¿Y tú?" in texto
