@@ -8,8 +8,8 @@ from videopipeline import ficha as modulo_ficha
 from videopipeline import reproceso_plan
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION,
-    VERTICAL, Artefacto, Ficha, Huella,
+    AUDIO, BASE, CAPTION, DIFUSION, HORIZONTAL, SEGUIMIENTO, TITULO,
+    TRANSCRIPCION, VERTICAL, Artefacto, Ficha, Huella,
 )
 from videopipeline.reproceso_plan import (
     Accion, Consulta, Decisiones, ajustes_audio, ajustes_caption,
@@ -30,7 +30,7 @@ def dir_fichas(tmp_path, monkeypatch):
 def _panel(**valores) -> PipelineConfig:
     """Lo que pide el panel: ningún paso marcado salvo los que se pasan."""
     marcas = dict(paso_audio=False, paso_silencios=False, subtitulos=False,
-                  caption_seo=False, paso_vertical=False)
+                  caption_seo=False, paso_vertical=False, difusion=False)
     marcas.update(valores)
     return PipelineConfig(video=Path("/no/importa.mov"), **marcas)
 
@@ -430,6 +430,39 @@ def test_caption_sin_final_da_error(tmp_path):
                       Decisiones())
 
     assert "aún no tiene vídeo procesado" in plan.error
+    assert plan.acciones == []
+
+
+def test_difusion_pide_transcribir_si_falta(tmp_path):
+    plan = planificar(_ficha(tmp_path, {}), _panel(difusion=True), Decisiones())
+
+    assert plan.acciones == [A.TRANSCRIBIR, A.DIFUSION]
+
+
+def test_difusion_va_la_ultima(tmp_path):
+    ficha = _ficha(tmp_path, {TRANSCRIPCION: _transcripcion("original")})
+
+    plan = planificar(ficha, _panel(caption_seo=True, difusion=True), Decisiones())
+
+    assert plan.acciones == [A.CAPTION, A.DIFUSION]
+
+
+def test_difusion_una_vez_por_video(tmp_path):
+    ficha = _ficha(tmp_path, {TRANSCRIPCION: _transcripcion("original"),
+                              HORIZONTAL: _horizontal(),
+                              DIFUSION: Artefacto("hecho", None, {})})
+
+    plan = planificar(ficha, _panel(subtitulos=True, diseno="caja", difusion=True),
+                      Decisiones(rehacer=frozenset({"subtitulos"})))
+
+    assert plan.acciones and A.DIFUSION not in plan.acciones
+
+
+def test_difusion_sin_final_da_error(tmp_path):
+    plan = planificar(_ficha(tmp_path, {}, final=None), _panel(difusion=True),
+                      Decisiones())
+
+    assert "el blog y LinkedIn" in plan.error
     assert plan.acciones == []
 
 

@@ -8,11 +8,12 @@ from pathlib import Path
 import pytest
 
 from videopipeline import ficha as modulo_ficha
-from videopipeline import pipeline, reproceso
+from videopipeline import linkedin, pipeline, reproceso
 from videopipeline.config import PipelineConfig
+from videopipeline.difusion import Resultado
 from videopipeline.ficha import (
-    BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION, VERTICAL,
-    Ficha, cargar, guardar, reconocer,
+    BASE, CAPTION, DIFUSION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION,
+    VERTICAL, Artefacto, Ficha, cargar, guardar, reconocer,
 )
 from videopipeline.reproceso import ejecutar
 from videopipeline.reproceso_plan import (
@@ -56,7 +57,7 @@ def _ficha(tmp_path) -> Ficha:
 def _panel(**valores) -> PipelineConfig:
     """Lo que pide el panel: ningún paso marcado salvo los que se pasan."""
     marcas = dict(paso_audio=False, paso_silencios=False, subtitulos=False,
-                  caption_seo=False, paso_vertical=False)
+                  caption_seo=False, paso_vertical=False, difusion=False)
     marcas.update(valores)
     return PipelineConfig(video=Path("/no/importa.mov"), **marcas)
 
@@ -883,3 +884,115 @@ def test_titulo_sin_texto_en_la_ficha_no_se_quema(entorno_titulo, tmp_path):
 
     assert len(_avisos(eventos)) == 1
     assert set(ficha.artefactos[HORIZONTAL].ajustes) == {"subtitulos"}
+
+
+# --- Blog y LinkedIn ----------------------------------------------------------
+
+@pytest.fixture()
+def difusion(tmp_path, monkeypatch):
+    """`preparar` y el título falsos: apuntan lo que reciben y `preparar`
+    escribe el .linkedin.md junto al final."""
+    blog = tmp_path / "blog" / "pendientes" / "charla"
+    recibido = {"preparar": [], "titulo": [], "blog": blog}
+
+    def falso_preparar(**kwargs):
+        recibido["preparar"].append(kwargs)
+        linkedin.escribir("Gancho.", kwargs["final"])
+        return Resultado(linkedin.rutas(kwargs["final"])[0], blog)
+
+    def falso_titulo(transcripcion, idioma, modelo, cliente=None):
+        recibido["titulo"].append(transcripcion)
+        return None
+
+    monkeypatch.setattr(reproceso, "preparar_difusion", falso_preparar)
+    monkeypatch.setattr(reproceso, "generar_titulo", falso_titulo)
+    return recibido
+
+
+SILENCIOS_Y_DIFUSION = [A.CORTAR, A.TRANSCRIBIR, A.ESCRIBIR_FINAL, A.DIFUSION]
+
+
+def test_difusion_guarda_artefacto(falsos, difusion, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, paso_silencios=True,
+                    difusion=True, contexto_marca="Soy Alberto")
+
+    [recibido] = difusion["preparar"]
+    final = ficha.final.ruta
+    assert recibido["final"].resolve() == final
+    assert recibido["video_blog"].resolve() == final
+    assert recibido["base"].resolve() == final  # sin subtítulos es la base (R3)
+    assert [p.texto for p in recibido["palabras"]] == ["hola"]
+    # Sin título en la ficha se pide uno y, si no llega, va el nombre.
+    assert difusion["titulo"] == ["hola"] and recibido["titulo"] == "charla"
+    assert (recibido["nombre"], recibido["idioma"]) == ("charla", "es")
+    assert recibido["contexto_marca"] == "Soy Alberto"
+    assert recibido["modelo"] == "qwen3.5:9b"
+    assert ficha.artefactos[DIFUSION] == Artefacto("hecho", None, {
+        "blog": str(difusion["blog"]),
+        "linkedin": str(linkedin.rutas(recibido["final"])[0])})
+    assert falsos[-2:] == ["ollama:asegurar", "ollama:cerrar"]
+    assert planificar(ficha, _panel(difusion=True), Decisiones()).vacio
+    assert _sin_restos(ficha)
+
+
+def test_difusion_usa_el_titulo_guardado_aunque_no_se_queme(
+        falsos, difusion, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
+                    titulo=True)
+
+    _pasada(ficha, [A.ESCRIBIR_FINAL, A.DIFUSION], difusion=True)
+
+    assert difusion["preparar"][0]["titulo"] == "Audio limpio ya"
+    assert difusion["titulo"] == []
+
+
+def test_difusion_falla_sin_tumbar_el_video(falsos, difusion, tmp_path,
+                                            monkeypatch):
+    monkeypatch.setattr(reproceso, "preparar_difusion", _revienta)
+    ficha = _ficha(tmp_path)
+    plan = planificar(ficha, _panel(paso_silencios=True, difusion=True),
+                      Decisiones())
+    eventos: list[dict] = []
+
+    salida = ejecutar(ficha, plan, eventos.append)
+
+    avisos = _avisos(eventos)
+    assert len(avisos) == 1
+    assert avisos[0].startswith("Blog y LinkedIn fallaron: ffmpeg explotó.")
+    ficha = cargar(ficha.id)
+    assert salida == ficha.final.ruta and salida.read_bytes() == b"MP4FINAL"
+    assert DIFUSION not in ficha.artefactos
+    assert falsos[-1] == "ollama:cerrar"
+    assert _sin_restos(ficha)
+
+
+def test_transcripcion_fallida_para_la_difusion_avisa(falsos, difusion,
+                                                      tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, "transcribir", _revienta)
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+                    paso_silencios=True, difusion=True)
+
+    avisos = _avisos(eventos)
+    assert len(avisos) == 1
+    assert avisos[0].startswith("Blog y LinkedIn fallaron: ffmpeg explotó.")
+    assert difusion["preparar"] == []
+    assert DIFUSION not in ficha.artefactos
+    assert ficha.final.ruta.read_bytes() == b"MP4FINAL"
+
+
+def test_r10_mueve_acompanantes_de_linkedin(falsos, difusion, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), [A.TRANSCRIBIR, A.VERTICAL, A.DIFUSION],
+                    paso_vertical=True, difusion=True)
+    md, fotos = linkedin.rutas(ficha.final.ruta)
+    (fotos / "01_portada.png").write_bytes(b"PNG")
+
+    ficha = _pasada(ficha, [A.CORTAR, A.ESCRIBIR_FINAL, A.VERTICAL,
+                            A.RETIRAR_VERTICAL_UNICO], paso_silencios=True)
+
+    nuevo_md, nuevas_fotos = linkedin.rutas(ficha.final.ruta)
+    assert nuevo_md.read_text(encoding="utf-8") == "Gancho."
+    assert (nuevas_fotos / "01_portada.png").read_bytes() == b"PNG"
+    assert not md.exists() and not fotos.exists()
+    assert _sin_restos(ficha)

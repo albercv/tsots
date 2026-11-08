@@ -19,6 +19,8 @@ guarda en cada uno:
   sin preguntar (tampoco R7) las salidas que hizo la app sobre una base que
   vale; las demás lo llevan cuando se rehacen por otra cosa.
 - CAPTION: `{"caption": ajustes_caption}`.
+- DIFUSION: `{"blog": carpeta, "linkedin": .linkedin.md}`, sin archivo: se
+  hace una vez por vídeo; basta con que esté, aunque se borren sus salidas.
 - SEGUIMIENTO: clave = `clave_seguimiento(línea de tiempo de la base)`; la
   imagen solo depende de los cortes, no del audio, y las x guardadas son las de
   una ventana de recorte concreta (`PROPORCION_VENTANA_CARA`).
@@ -40,7 +42,7 @@ from enum import Enum
 
 from .config import PipelineConfig
 from .ficha import (
-    AUDIO, BASE, CAPTION, HORIZONTAL, PASOS, SEGUIMIENTO, TITULO,
+    AUDIO, BASE, CAPTION, DIFUSION, HORIZONTAL, PASOS, SEGUIMIENTO, TITULO,
     TRANSCRIPCION, VERTICAL, Artefacto, Ficha, Huella,
 )
 from .i18n import N_, _
@@ -122,6 +124,7 @@ class Accion(str, Enum):
     VERTICAL = "vertical"
     RENOMBRAR_VERTICAL = "renombrar_vertical"           # R10 sin recodificar
     RETIRAR_VERTICAL_UNICO = "retirar_vertical_unico"   # R10 tras regenerar
+    DIFUSION = "difusion"                               # → DIFUSION; no es un paso del panel
 
 
 @dataclass(frozen=True)
@@ -145,7 +148,7 @@ class Plan:
     # casillas de audio, silencios y subtítulos dicen cómo queda el vídeo.
     config: PipelineConfig
     avisos: list[str]  # bloqueos aplicados (legado)
-    error: str = ""  # no se puede ejecutar (falta el original, caption sin vídeo)
+    error: str = ""  # no se puede ejecutar (falta el original, caption o blog sin vídeo)
     marcar_desactualizado: bool = False
 
     @property
@@ -507,6 +510,11 @@ def planificar(ficha: Ficha, config: PipelineConfig,
         elegidas.add(Accion.CAPTION)
         if transcripcion is None:
             elegidas.add(Accion.TRANSCRIBIR)
+    # Blog y LinkedIn: una vez por vídeo, aunque se borren sus salidas.
+    if config.difusion and DIFUSION not in ficha.artefactos:
+        elegidas.add(Accion.DIFUSION)
+        if transcripcion is None:
+            elegidas.add(Accion.TRANSCRIBIR)
 
     # 7-8. Vertical y R10.
     if genera:
@@ -525,11 +533,16 @@ def planificar(ficha: Ficha, config: PipelineConfig,
                  else _('No encuentro el original de "{nombre}": arrástralo '
                         'para rehacer el vídeo')).format(
             nombre=ficha.nombre, ruta=fuente.ruta if fuente else "")
-    elif (Accion.CAPTION in elegidas and ficha.final is None
-          and not elegidas & {Accion.QUEMAR, Accion.ESCRIBIR_FINAL, Accion.VERTICAL}):
-        error = _('"{nombre}" aún no tiene vídeo procesado: el caption solo se '
-                  'puede pedir sobre un vídeo ya procesado').format(
-            nombre=ficha.nombre)
+    elif ficha.final is None and not elegidas & {
+            Accion.QUEMAR, Accion.ESCRIBIR_FINAL, Accion.VERTICAL}:
+        if Accion.CAPTION in elegidas:
+            error = _('"{nombre}" aún no tiene vídeo procesado: el caption solo '
+                      'se puede pedir sobre un vídeo ya procesado').format(
+                nombre=ficha.nombre)
+        elif Accion.DIFUSION in elegidas:
+            error = _('"{nombre}" aún no tiene vídeo procesado: el blog y '
+                      'LinkedIn solo se pueden pedir sobre un vídeo ya '
+                      'procesado').format(nombre=ficha.nombre)
 
     # 9. Orden: el de la enumeración.
     acciones = [] if error else [accion for accion in Accion if accion in elegidas]

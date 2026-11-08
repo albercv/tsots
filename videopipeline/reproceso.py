@@ -14,16 +14,20 @@ import shutil
 from dataclasses import asdict
 from pathlib import Path
 
+from . import linkedin
+from .caption import texto_plano
 from .config import SAMPLE_RATE_POR_MODELO
+from .difusion import preparar as preparar_difusion
 from .ficha import (
-    AUDIO, BASE, CAPTION, HORIZONTAL, SEGUIMIENTO, TITULO, TRANSCRIPCION,
-    VERTICAL, Artefacto, Ficha, Huella, _escribir_json, guardar,
+    AUDIO, BASE, CAPTION, DIFUSION, HORIZONTAL, SEGUIMIENTO, TITULO,
+    TRANSCRIPCION, VERTICAL, Artefacto, Ficha, Huella, _escribir_json, guardar,
     limpiar_temporales,
 )
 from .i18n import _
 from .pipeline import (
-    Progreso, _avisar, _emitir, _fase_caption, _fase_titulo, _fase_vertical,
-    _quemar_subs, _transcribir_subs,
+    Progreso, _avisar, _cerrar_servidor, _emitir, _fase_caption, _fase_titulo,
+    _fase_vertical, _quemar_subs, _sugerencia, _transcribir_subs,
+    asegurar_servidor,
 )
 from .reproceso_plan import (
     Accion, Plan, ajustes_audio, ajustes_caption, ajustes_silencios,
@@ -36,6 +40,7 @@ from .steps import (
     limpiar_audio, rellenar_huecos_audio, remux, resolucion_video,
 )
 from .subtitles import Palabra, agrupar, generar_srt
+from .titulo import generar_titulo
 from .vertical import es_ya_vertical
 
 FLAC = "audio_limpio.flac"
@@ -97,6 +102,7 @@ class _Pasada:
         self.degradar_subs = bool(cambia_base) or Accion.QUEMAR not in plan.acciones
         self.palabras: list[Palabra] | None = None
         self.transcrito = False
+        self.fallo_transcripcion: Exception | None = None  # lo absorbió otro paso
         self.publicados: set[Path] = set()  # lo que ha escrito esta pasada
         seguimiento = ficha.artefactos.get(SEGUIMIENTO)
         # Solo las x de la ventana y la línea de tiempo actuales: nunca las viejas.
@@ -173,10 +179,11 @@ class _Pasada:
         self.publicados.add(destino.resolve())
 
     def _mover_acompanantes(self, viejo: Path, nuevo: Path) -> None:
-        """R10: el .md y el .srt van junto al nuevo final. El viejo solo se
-        borra si esta pasada ya ha escrito el nuevo. Uno que no es de esta
-        pasada se rehace desde la ficha, que es la fuente de verdad, y el viejo
-        se queda."""
+        """R10: el .md, el .srt y los de LinkedIn van junto al nuevo final. El
+        viejo solo se borra si esta pasada ya ha escrito el nuevo. Uno que no
+        es de esta pasada se rehace desde la ficha, que es la fuente de verdad,
+        y el viejo se queda; los de LinkedIn no están en ella: se quedan los
+        dos."""
         for sufijo in (".md", ".srt"):
             origen, destino = viejo.with_suffix(sufijo), nuevo.with_suffix(sufijo)
             if destino.resolve() in self.publicados:
@@ -184,6 +191,9 @@ class _Pasada:
             elif destino.exists():
                 self._acompanante_de_la_ficha(destino)
             elif origen.is_file():
+                shutil.move(origen, destino)
+        for origen, destino in zip(linkedin.rutas(viejo), linkedin.rutas(nuevo)):
+            if origen.exists() and not destino.exists():
                 shutil.move(origen, destino)
 
     def _acompanante_de_la_ficha(self, destino: Path) -> None:
@@ -286,11 +296,13 @@ class _Pasada:
                 wav_continuo=(self.tmp / "subs.wav"
                               if self.base == self.fuente else None),
             )[0]
-        except Exception as error:  # noqa: BLE001 — el caption o el título se degradan
-            # Sin caption ni título que lo absorban (los shorts), el error sube.
-            absorben = {Accion.CAPTION, Accion.TITULO} & set(self.acciones)
+        except Exception as error:  # noqa: BLE001 — caption, título o blog se degradan
+            # Sin caption, título ni blog que lo absorban (los shorts), el error sube.
+            absorben = ({Accion.CAPTION, Accion.TITULO, Accion.DIFUSION}
+                        & set(self.acciones))
             if para_subs or not absorben:
                 raise
+            self.fallo_transcripcion = error
             if Accion.TITULO in self.acciones:
                 _avisar(self.on_progress,
                         _("No se pudo transcribir para el título: {error}. "
@@ -501,6 +513,45 @@ class _Pasada:
         ficha.artefactos[VERTICAL] = Artefacto(clave(self.linea, ajustes), None,
                                                ajustes)
         ficha.desactualizado.discard("vertical")
+        guardar(ficha)
+
+    # --- Blog y LinkedIn ----------------------------------------------------
+
+    def difusion(self, paso: int) -> None:
+        """Una vez por vídeo y la última: nunca hace fallar el vídeo."""
+        ficha, c = self.ficha, self.c
+        self._paso(paso, _("Preparando blog y LinkedIn"))
+        servidor = None
+        try:
+            palabras = self._palabras()
+            if not palabras:
+                raise self.fallo_transcripcion or PasoFallido(
+                    _("la transcripción no dio texto"))
+            idioma = c.idioma_subs if c.idioma_subs in ("es", "en") else "es"
+            servidor = asegurar_servidor()
+            titulo = ficha.artefactos.get(TITULO)  # aunque no se queme
+            corto = ((titulo.ajustes.get("texto") if titulo else None)
+                     or generar_titulo(texto_plano(palabras), idioma,
+                                       c.modelo_caption)
+                     or ficha.nombre)
+            horizontal = ficha.hay_horizontal()
+            final = ficha.ruta_final(horizontal)
+            resultado = preparar_difusion(
+                nombre=ficha.nombre, base=self.base,
+                video_blog=final if horizontal else self.base, final=final,
+                palabras=palabras, titulo=corto, idioma=idioma,
+                contexto_marca=c.contexto_marca, modelo=c.modelo_caption)
+        except Exception as error:  # noqa: BLE001 — degradación deliberada
+            _avisar(self.on_progress,
+                    _("Blog y LinkedIn fallaron: {error}. Vídeo guardado igual."
+                      "{sugerencia}").format(error=error,
+                                             sugerencia=_sugerencia(error)))
+            return
+        finally:
+            _cerrar_servidor(servidor, self.on_progress)
+        ficha.artefactos[DIFUSION] = Artefacto("hecho", None, {
+            "blog": str(resultado.carpeta_blog),
+            "linkedin": str(resultado.linkedin_md)})
         guardar(ficha)
 
     # --- R10 ----------------------------------------------------------------
