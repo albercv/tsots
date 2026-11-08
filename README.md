@@ -322,7 +322,8 @@ then moves to:
 - `~/TSOTS/blog/hechos/`: done, with `resultado.json` holding the draft's
   link. Its copy of the video is deleted (the draft already has it).
 - `~/TSOTS/blog/errores/`: failed, with the reason in `motivo.txt`. To try
-  again, move the folder back to `pendientes/`; if `motivo.txt` says the
+  again, move the folder back to `pendientes/` (it is retried on the next
+  processed video or the next time the app opens); if `motivo.txt` says the
   draft was already created, check it first, because a retry creates
   another one.
 

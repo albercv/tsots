@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 00:03+0100\n"
+"POT-Creation-Date: 2026-11-09 00:20+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -884,6 +884,9 @@ msgstr "The API key is invalid or expired (401). Check it in Networks…"
 
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr "The app re-encodes the video with h264_videotoolbox and retries automatically. If it still fails, re-encode by hand: ffmpeg -i input.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy output.mp4"
+
+msgid "La carpeta del blog está lista, pero no se pudo arrancar el agente del blog: comprueba que existe y es ejecutable lanzador/blog/procesar_pendientes.sh. Se reintentará al abrir la app."
+msgstr "The blog folder is ready, but the blog agent could not be started: check that lanzador/blog/procesar_pendientes.sh exists and is executable. It will be retried when the app opens."
 
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr "The key has spaces, quotes or other invalid characters."

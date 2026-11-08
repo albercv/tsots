@@ -322,7 +322,8 @@ cada carpeta pasa a:
 - `~/TSOTS/blog/hechos/`: terminada, con `resultado.json` y el enlace del
   borrador. Su copia del vídeo se borra (el borrador ya lo tiene).
 - `~/TSOTS/blog/errores/`: ha fallado, con el motivo en `motivo.txt`. Para
-  reintentarlo, vuelve a moverla a `pendientes/`; si `motivo.txt` dice que
+  reintentarlo, vuelve a moverla a `pendientes/` (se reintenta con el siguiente vídeo
+  procesado o la próxima vez que abras la app); si `motivo.txt` dice que
   el borrador ya está creado, revísalo antes, porque reintentar crea otro.
 
 El registro del agente es `~/TSOTS/blog/agente.log`. Un fallo de este paso

@@ -559,7 +559,12 @@ class _Pasada:
             "blog": str(resultado.carpeta_blog),
             "linkedin": str(md) if md else None})
         guardar(ficha)
-        lanzar_agente()  # convierte la carpeta nueva en borrador, sin esperarlo
+        if not lanzar_agente():  # convierte la carpeta nueva en borrador, sin esperarlo
+            _avisar(self.on_progress,
+                    _("La carpeta del blog está lista, pero no se pudo arrancar "
+                      "el agente del blog: comprueba que existe y es ejecutable "
+                      "lanzador/blog/procesar_pendientes.sh. Se reintentará al "
+                      "abrir la app."))
         if resultado.fallo_linkedin is not None:
             error = resultado.fallo_linkedin
             _avisar(self.on_progress,

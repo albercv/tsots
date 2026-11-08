@@ -245,8 +245,11 @@ def test_instrucciones_reintentan_la_misma_orden_una_vez():
 
 
 def test_la_app_lanza_este_script(monkeypatch):
-    monkeypatch.undo()  # quita la red de seguridad de conftest: aquí se mira la ruta real
-    from videopipeline import difusion
+    from videopipeline import difusion, steps
+
+    # Solo se restaura la ruta real; el resto de redes de seguridad siguen puestas.
+    monkeypatch.setattr(difusion, "AGENTE",
+                        steps.BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh")
 
     assert difusion.AGENTE == SCRIPT
     assert not (BLOG / "com.tsots.blog.plist.plantilla").exists()  # ya no hay launchd

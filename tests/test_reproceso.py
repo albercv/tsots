@@ -909,7 +909,7 @@ def difusion(tmp_path, monkeypatch):
 
     def falso_agente():
         recibido["agente"] += 1
-        return True
+        return recibido.get("agente_ok", True)
 
     monkeypatch.setattr(reproceso, "lanzar_agente", falso_agente)
     monkeypatch.setattr(reproceso, "preparar_difusion", falso_preparar)
@@ -942,6 +942,27 @@ def test_difusion_guarda_artefacto(falsos, difusion, tmp_path):
     assert difusion["agente"] == 1  # la carpeta nueva va al agente del blog
     assert planificar(ficha, _panel(difusion=True), Decisiones()).vacio
     assert _sin_restos(ficha)
+
+
+def test_difusion_avisa_si_el_agente_no_arranca(falsos, difusion, tmp_path):
+    difusion["agente_ok"] = False
+    eventos: list[dict] = []
+
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+                    paso_silencios=True, difusion=True)
+
+    [aviso] = _avisos(eventos)
+    assert "procesar_pendientes.sh" in aviso and "al abrir la app" in aviso
+    assert ficha.artefactos[DIFUSION].clave == "hecho"
+
+
+def test_difusion_sin_aviso_si_el_agente_arranca(falsos, difusion, tmp_path):
+    eventos: list[dict] = []
+
+    _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
+            paso_silencios=True, difusion=True)
+
+    assert _avisos(eventos) == []
 
 
 def test_difusion_usa_el_titulo_guardado_aunque_no_se_queme(
