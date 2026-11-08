@@ -142,6 +142,35 @@ def test_carpeta_que_no_se_puede_mover_se_aparta(tmp_path):
     assert _llamadas(tmp_path) == 1  # no se vuelve a procesar (sería otro borrador)
 
 
+def test_carpeta_que_llega_durante_la_ejecucion_entra_en_la_misma(tmp_path):
+    """Otro vídeo termina mientras se procesa el primero: su arranque sale por el
+    bloqueo, así que esta ejecución tiene que recoger su carpeta."""
+    blog = _blog(tmp_path, "2026-11-08-uno")
+    r = _ejecutar(tmp_path, blog, f"echo '{RESULTADO}' > resultado.json\n"
+                                  '[ "$(wc -l < "$LLAMADAS")" -eq 1 ] && mkdir ../2026-11-08-dos\n')
+    assert r.returncode == 0, r.stderr
+    assert _llamadas(tmp_path) == 2
+    assert (blog / "hechos" / "2026-11-08-uno").is_dir()
+    assert (blog / "hechos" / "2026-11-08-dos").is_dir()
+    assert not any((blog / "pendientes").iterdir())
+
+
+def test_carpeta_que_sigue_en_pendientes_no_se_repite_en_la_misma_ejecucion(tmp_path):
+    """Sin poder mover ni apartar la carpeta, se queda con su nombre: repasar
+    pendientes/ no debe volver a procesarla (sería otro borrador)."""
+    blog = _blog(tmp_path, "2026-11-08-video")
+    pendientes = blog / "pendientes"
+    pendientes.chmod(0o555)  # nada sale de pendientes/
+    try:
+        r = _ejecutar(tmp_path, blog, f"echo '{RESULTADO}' > resultado.json\n")
+    finally:
+        pendientes.chmod(0o755)
+    assert r.returncode == 0, r.stderr
+    assert _llamadas(tmp_path) == 1
+    assert (pendientes / "2026-11-08-video").is_dir()
+    assert "se volverá a procesar" in r.stdout
+
+
 def test_claude_que_no_termina_va_a_errores(tmp_path):
     blog = _blog(tmp_path, "2026-11-08-video")
     inicio = time.monotonic()

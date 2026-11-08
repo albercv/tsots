@@ -60,34 +60,46 @@ mover() {
     fi
 }
 
-# `*` no casa los nombres con punto: las .<nombre>.tmp aún se están escribiendo.
-for carpeta in "$DIR"/pendientes/*/; do
-    [ -d "$carpeta" ] || continue
-    carpeta="${carpeta%/}"
-    touch "$DIR/.bloqueo"
-    if [ -z "$CLAUDE" ]; then
-        echo "No se encuentra claude (ni en PATH, ni en ~/.local/bin, ni en /opt/homebrew/bin)" \
-            > "$carpeta/motivo.txt"
-        mover errores "error, sin claude"
-        continue
-    fi
-    # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
-    (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \
-        "$CLAUDE" -p "$INSTRUCCIONES" --add-dir "$carpeta" \
-        --allowedTools "$HERRAMIENTAS" --disallowedTools "$PROHIBIDAS" \
-        --settings "$AJUSTES") > "$carpeta/claude.log" 2>&1
-    rc=$?
-    url="$(plutil -extract url raw -o - "$carpeta/resultado.json" 2>/dev/null)"
-    if [ -n "$url" ]; then
-        mover hechos "borrador $url"
-        continue
-    fi
-    slug="$(plutil -extract slug raw -o - "$carpeta/borrador.json" 2>/dev/null)"
-    {
-        [ "$rc" -eq 142 ] && echo "Tiempo agotado: claude no terminó en $((LIMITE / 60)) min ($LIMITE s)."
-        [ -n "$slug" ] && echo "El borrador ya está creado en el blog (slug $slug):" \
-            "revísalo antes de reintentar, porque reintentar crea otro."
-        tail -n 40 "$carpeta/claude.log"
-    } > "$carpeta/motivo.txt"
-    mover errores "error, ver errores/$(basename "$carpeta")/motivo.txt"
+# Se repasa pendientes/ hasta no encontrar nada nuevo: la carpeta de un vídeo que
+# termina mientras tanto (su arranque salió por el bloqueo) entra en esta ejecución.
+# Cada nombre se procesa una vez como mucho, así que una carpeta que no se pudo
+# mover nunca se repite (sería otro borrador). «/» no cabe en un nombre.
+vistas=/
+nuevas=1
+while [ "$nuevas" = 1 ]; do
+    nuevas=0
+    # `*` no casa los nombres con punto: las .<nombre>.tmp aún se están escribiendo.
+    for carpeta in "$DIR"/pendientes/*/; do
+        [ -d "$carpeta" ] || continue
+        carpeta="${carpeta%/}"
+        case "$vistas" in *"/${carpeta##*/}/"*) continue ;; esac
+        vistas="$vistas${carpeta##*/}/"
+        nuevas=1
+        touch "$DIR/.bloqueo"
+        if [ -z "$CLAUDE" ]; then
+            echo "No se encuentra claude (ni en PATH, ni en ~/.local/bin, ni en /opt/homebrew/bin)" \
+                > "$carpeta/motivo.txt"
+            mover errores "error, sin claude"
+            continue
+        fi
+        # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
+        (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \
+            "$CLAUDE" -p "$INSTRUCCIONES" --add-dir "$carpeta" \
+            --allowedTools "$HERRAMIENTAS" --disallowedTools "$PROHIBIDAS" \
+            --settings "$AJUSTES") > "$carpeta/claude.log" 2>&1
+        rc=$?
+        url="$(plutil -extract url raw -o - "$carpeta/resultado.json" 2>/dev/null)"
+        if [ -n "$url" ]; then
+            mover hechos "borrador $url"
+            continue
+        fi
+        slug="$(plutil -extract slug raw -o - "$carpeta/borrador.json" 2>/dev/null)"
+        {
+            [ "$rc" -eq 142 ] && echo "Tiempo agotado: claude no terminó en $((LIMITE / 60)) min ($LIMITE s)."
+            [ -n "$slug" ] && echo "El borrador ya está creado en el blog (slug $slug):" \
+                "revísalo antes de reintentar, porque reintentar crea otro."
+            tail -n 40 "$carpeta/claude.log"
+        } > "$carpeta/motivo.txt"
+        mover errores "error, ver errores/$(basename "$carpeta")/motivo.txt"
+    done
 done

@@ -85,9 +85,9 @@ Pending work, most urgent first. Remove an item when it is merged into
         title) is not recorded, so it is retried on every later reprocess
         of that video while the box is ticked.
       - Blog folders are only processed while the app is running: the app
-        starts the agent when a video finishes and when it opens. A folder
-        written while the agent is busy with another (its lock is held)
-        waits for the next start.
+        starts the agent when a video finishes and when it opens. Only a
+        folder written in the instant between the agent's last scan and its
+        exit waits for the next start.
 
 - [ ] **Burn subtitles on the GPU.** `cmd_quemar_subtitulos` in
       `videopipeline/steps.py` encodes with `libx264` on the CPU. Try

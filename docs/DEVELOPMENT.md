@@ -967,6 +967,10 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   one runs logs "bloqueo activo" and exits. A lock left by a killed run is
   taken over once it is older than 180 min (each folder touches it). Both
   cases are logged in `agente.log`.
+- After the folders it found, it scans `pendientes/` again until a scan
+  finds nothing new, so a folder written meanwhile (whose own start hit the
+  lock) is handled in the same run. Each name is handled at most once per
+  run, so a folder that could not be moved never loops.
 - It skips hidden folders (`.<name>.tmp` is still being written) and runs
   `claude -p` from each folder with `instrucciones.md` (`@PYTHON@` becomes
   the install's `.venv-clearvoice/bin/python`), with a 30 min limit
