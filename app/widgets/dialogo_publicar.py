@@ -64,6 +64,7 @@ from .. import credenciales, segundo_plano
 from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
+from .selector_perfil import SelectorPerfil
 from .selector_ubicacion import DialogoUbicacion, describir_ubicacion, ubicacion_guardada
 from .tira_imagenes import TiraImagenes
 
@@ -214,13 +215,19 @@ class DialogoPublicar(QDialog):
     def __init__(self, video: Path, caption: Caption, ajustes: Ajustes,
                  llavero=credenciales, fabrica: Fabrica | None = None,
                  medir: Callable[[Path], float] | None = None,
-                 ahora: Callable[[], datetime] | None = None, zona: tzinfo | None = None,
+                 ahora: Callable[[], datetime] | None = None, zona: tzinfo | None = None, perfil: str = "",
                  parent=None):
         super().__init__(parent)
         self.video = Path(video)
         self._zona = zona or zona_local()
         self._ahora = ahora or (lambda: datetime.now(self._zona))
         self.ajustes = ajustes
+        # El perfil con el que se procesó el vídeo, si aún existe; si no, el activo.
+        if perfil != ajustes.perfil_redes and perfil in ajustes.perfiles_de(
+                ajustes.proveedor_redes):
+            ajustes.perfil_redes = perfil
+        self._perfil_leido = ajustes.perfil_redes  # del que se leyeron plataformas y modos
+        self.perfil_usado = ""  # el de la publicación enviada
         self.llavero = llavero
         self.fabrica = fabrica or (lambda nombre, clave, datos: proveedores.crear(
             nombre, clave, datos))
@@ -431,7 +438,11 @@ class DialogoPublicar(QDialog):
         self.etiqueta_servicio.setWordWrap(True)
         self.boton_redes = QPushButton(_("Redes…"))
         self.boton_redes.clicked.connect(self.configurar_redes)
+        self.selector_perfil = SelectorPerfil()
+        self.selector_perfil.perfil_elegido.connect(self._al_elegir_perfil)
         fila_servicio.addWidget(self.etiqueta_servicio, 1)
+        fila_servicio.addWidget(QLabel(_("Perfil:")))
+        fila_servicio.addWidget(self.selector_perfil)
         fila_servicio.addWidget(self.boton_redes)
         raiz.addLayout(fila_servicio)
 
@@ -726,6 +737,9 @@ class DialogoPublicar(QDialog):
     def refrescar_servicio(self) -> None:
         """Vuelve a leer ajustes y Llavero (tras cerrar el diálogo Redes…) y
         vuelve a consultar las cuentas conectadas."""
+        self.selector_perfil.recargar(self.ajustes)
+        if self.ajustes.perfil_redes != self._perfil_leido:
+            self._leer_datos_del_perfil()
         nombre = self.ajustes.proveedor_redes
         self._hay_clave = self.llavero.hay_clave(nombre)
         guardadas = self.ajustes.cuentas_guardadas()
@@ -739,15 +753,30 @@ class DialogoPublicar(QDialog):
         self._consultar_cuentas()
         self._refrescar()
 
+    def _al_elegir_perfil(self, perfil: str) -> None:
+        self.ajustes.perfil_redes = perfil
+        self.refrescar_servicio()
+
+    def _leer_datos_del_perfil(self) -> None:
+        """Plataformas deseadas y modos del perfil activo. La ubicación «solo
+        este vídeo» se quita: su lugar de TikTok era de otra cuenta."""
+        self._perfil_leido = self.ajustes.perfil_redes
+        self._ubicacion_propia = None
+        self._deseadas = set(self.ajustes.plataformas_redes)
+        for plataforma, casilla in self.casillas.items():
+            casilla.setChecked(plataforma in self._deseadas)
+        for combo, modo in ((self.combo_tiktok, self.ajustes.tiktok_modo),
+                            (self.combo_instagram, self.ajustes.instagram_modo),
+                            (self.combo_facebook, self.ajustes.facebook_modo)):
+            combo.setCurrentIndex(combo.findData(modo.value))
+
     def _refrescar_etiqueta_servicio(self) -> None:
         nombre = self.ajustes.proveedor_redes
         listo, motivo = self._listo()
         if listo:
-            perfil = self.ajustes.perfil_redes
             texto = _("Vía {servicio}").format(servicio=proveedores.nombre_visible(nombre))
-            if perfil:
-                texto += " · " + _("perfil «{perfil}»").format(perfil=perfil)
-            if proveedores.usa_perfil(nombre) and proveedores.parece_email(perfil):
+            if proveedores.usa_perfil(nombre) and proveedores.parece_email(
+                    self.ajustes.perfil_redes):
                 texto += " · " + _("⚠ el perfil parece un email: revísalo en Redes…")
                 self.etiqueta_servicio.setStyleSheet(f"color: {COLOR_AVISO};")
             else:
@@ -950,6 +979,7 @@ class DialogoPublicar(QDialog):
     def _recordar_eleccion(self, opciones: Opciones) -> None:
         # Lo que el usuario quiere marcado, también lo que hoy no se puede
         # (p. ej. X con un vídeo largo): la próxima vez vuelve a estar.
+        self.perfil_usado = self.ajustes.perfil_redes
         self.ajustes.plataformas_redes = [p for p in ORDEN if p in self._deseadas]
         self.ajustes.tiktok_modo = opciones.tiktok_modo
         self.ajustes.instagram_modo = opciones.instagram_modo
@@ -1084,7 +1114,8 @@ class DialogoPublicar(QDialog):
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
                        self.campo_x, self.campo_linkedin, self.tira_linkedin,
                        self.combo_tiktok, self.combo_instagram,
-                       self.combo_facebook, self.boton_redes, self.boton_cerrar,
+                       self.combo_facebook, self.boton_redes, self.selector_perfil,
+                       self.boton_cerrar,
                        self.boton_ubicacion, self.radio_ahora, self.radio_programar,
                        *self.casillas.values()):
             widget.setEnabled(not bloqueado)

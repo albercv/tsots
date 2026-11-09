@@ -222,6 +222,13 @@ def test_dialogo_marca_devuelve_texto(qtbot):
     assert d.texto() == "Soy Alberto"
 
 
+def test_dialogo_marca_nombra_el_perfil(qtbot):
+    from app.widgets.dialogo_marca import DialogoMarca
+
+    assert DialogoMarca("x", perfil="six").windowTitle() == "Contexto de marca · perfil «six»"
+    assert DialogoMarca("x").windowTitle() == "Contexto de marca"
+
+
 def test_panel_caption_defecto_off_y_en_valores(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)

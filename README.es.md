@@ -366,6 +366,17 @@ y la API key. La clave va directa al **Llavero de macOS** (servicio
 quitarla: **Olvidar clave** en el mismo diálogo, o borra la entrada en
 Acceso a Llaveros.
 
+**Varios perfiles.** Una sola API key puede servir a varios perfiles de
+Upload-Post (por ejemplo, uno por marca). El selector **Perfil:** de la
+cabecera cambia de uno a otro, y Redes…, Publicar… y Programadas… tienen el
+suyo. En Redes…, **Buscar perfiles** pregunta a Upload-Post qué perfiles
+tiene tu cuenta y **Quitar perfil** borra uno de TSOTS (sus ajustes aquí;
+en Upload-Post no cambia nada). Cada perfil guarda su ubicación, página de
+Facebook, redes marcadas, modos, X Premium, categoría de YouTube, cuentas
+guardadas y contexto de marca. Publicar… propone el perfil con que se
+procesó el vídeo y deja cambiarlo; el caption no se regenera. Se recuerda
+el último perfil usado.
+
 **Comprobar conexión** (en Redes…) pregunta a Upload-Post qué cuentas
 tienes conectadas y en qué páginas de Facebook puedes publicar: elige ahí
 la página (si solo hay una, se elige sola). Al abrir Publicar… se vuelve a

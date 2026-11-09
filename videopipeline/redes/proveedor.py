@@ -60,6 +60,11 @@ class Proveedor(Protocol):
         (y ninguna otra excepción) si no se puede consultar."""
         ...
 
+    def perfiles(self) -> list[str]:
+        """Nombres de los perfiles de la cuenta, a partir de la API key (no
+        necesita perfil). Lanza `ErrorConsulta`."""
+        ...
+
     def paginas_facebook(self) -> list[Pagina]:
         """Páginas de Facebook a las que puede publicar. Lanza `ErrorConsulta`."""
         ...

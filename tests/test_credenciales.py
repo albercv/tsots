@@ -1,6 +1,7 @@
 """Llavero: `subprocess.run` siempre falso; nunca se ejecuta `security`."""
 from __future__ import annotations
 
+import hashlib
 import subprocess
 
 import pytest
@@ -155,3 +156,10 @@ def test_lugar_de_tiktok_ilegible_es_como_si_no_hubiera(llavero_falso):
     clave = next(iter(llavero_falso.elementos))
     llavero_falso.elementos[clave] = "no-es-base64-ni-json"
     assert credenciales.leer_lugar_tiktok("prov", "yo", "MADRID") is None
+
+
+def test_huella_del_perfil_es_la_de_siempre():
+    """Los lugares de TikTok ya guardados en el Llavero se siguen encontrando."""
+    assert credenciales.huella_perfil(" yo ") == hashlib.sha256(b"yo").hexdigest()[:16]
+    assert credenciales._cuenta_lugar("yo", "MADRID") == (
+        "tiktok-lugar-MADRID-" + credenciales.huella_perfil("yo"))

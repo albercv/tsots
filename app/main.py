@@ -33,8 +33,8 @@ from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.difusion import lanzar_agente
 from videopipeline.ficha import (
-    CAPTION, Ficha, cargar, limpiar_temporales, mover_salidas, ocupa, olvidar,
-    reconocer,
+    CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
+    olvidar, reconocer,
 )
 from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
@@ -128,6 +128,8 @@ class VentanaPrincipal(QMainWindow):
         # opciones debajo.
         self.cabecera = Cabecera(RUTA_ICONO)
         raiz.addWidget(self.cabecera)
+        self.cabecera.selector_perfil.perfil_elegido.connect(self._al_elegir_perfil)
+        self._recargar_perfil()
         fila_superior = QHBoxLayout()
 
         columna_izquierda = QVBoxLayout()
@@ -593,7 +595,8 @@ class VentanaPrincipal(QMainWindow):
             self.ajustes.modelo_caption = modelo
 
     def _editar_marca(self) -> None:
-        dialogo = DialogoMarca(self.ajustes.contexto_marca, self)
+        dialogo = DialogoMarca(self.ajustes.contexto_marca, self,
+                              perfil=self.ajustes.perfil_redes)
         if dialogo.exec():
             self.ajustes.contexto_marca = dialogo.texto()
 
@@ -606,6 +609,9 @@ class VentanaPrincipal(QMainWindow):
 
     def _publicar(self) -> None:
         caption, video = self.panel_caption.caption, self.panel_caption.video
+        indices = self.vista_cola.selectedIndexes()
+        trabajo = self.modelo_cola.trabajo(indices[0].row()) if indices else None
+        ficha = self._ficha_de(trabajo) if trabajo else None
         if caption is None or video is None:
             QMessageBox.warning(
                 self, _("Publicar en redes"),
@@ -616,14 +622,17 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar en redes"),
                 _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
             return
-        dialogo = DialogoPublicar(video, caption, self.ajustes, parent=self)
+        dialogo = DialogoPublicar(video, caption, self.ajustes,
+                                  perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+        self._anotar_perfil(trabajo.ficha_id if trabajo else None, dialogo.perfil_usado)
         # El hilo de la subida no depende del diálogo (ver dialogo_publicar);
         # aun así, solo se libera cuando no publica.
         if not dialogo.publicando:
             dialogo.deleteLater()
+        self._recargar_perfil()
 
     def _publicar_shorts(self) -> None:
         """Botón «Publicar shorts…»: los shorts del vídeo elegido, en lote."""
@@ -636,12 +645,16 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar shorts"),
                 _("El vídeo elegido no tiene shorts en su carpeta."))
             return
-        dialogo = DialogoPublicarShorts(cortos, self.ajustes, parent=self)
+        ficha = self._ficha_de(trabajo) if trabajo else None
+        dialogo = DialogoPublicarShorts(cortos, self.ajustes,
+                                        perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+        self._anotar_perfil(trabajo.ficha_id, dialogo.perfil_usado)
         if not dialogo.publicando:  # como en `_publicar`
             dialogo.deleteLater()
+        self._recargar_perfil()
 
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
@@ -651,11 +664,21 @@ class VentanaPrincipal(QMainWindow):
         dialogo = DialogoProgramadas(self.ajustes, parent=self)
         dialogo.exec()  # no se cierra mientras cancela
         dialogo.deleteLater()
+        self._recargar_perfil()
 
-    def _configurar_redes(self, al_guardar=None, padre=None) -> None:
+    def _configurar_redes(self, al_cerrar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)
-        if dialogo.exec() and al_guardar is not None:
-            al_guardar()
+        dialogo.exec()
+        # «Quitar perfil» actúa al momento, aunque se cancele: se avisa siempre.
+        self._recargar_perfil()
+        if al_cerrar is not None:
+            al_cerrar()
+
+    def _recargar_perfil(self) -> None:
+        self.cabecera.selector_perfil.recargar(self.ajustes)
+
+    def _al_elegir_perfil(self, perfil: str) -> None:
+        self.ajustes.perfil_redes = perfil
 
     # --- procesado ---
 
@@ -710,6 +733,7 @@ class VentanaPrincipal(QMainWindow):
             }
             if shorts_al_procesar:
                 datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
+            self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -720,6 +744,16 @@ class VentanaPrincipal(QMainWindow):
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _anotar_perfil(self, ficha_id: str | None, perfil: str) -> None:
+        """Apunta en la ficha el perfil activo. Se recarga del disco para no
+        pisar lo que el runner haya escrito."""
+        if not ficha_id or not perfil:
+            return
+        ficha = cargar(ficha_id)
+        if ficha is not None and ficha.perfil != perfil:
+            ficha.perfil = perfil
+            guardar(ficha)
 
     def _guardar_panel(self) -> dict:
         """Guarda las opciones del panel y devuelve las del pipeline."""
@@ -792,6 +826,7 @@ class VentanaPrincipal(QMainWindow):
         # La fila puede venir de un intento anterior: sin esto conservaría su
         # error, aviso y diagnóstico (solo `volver_a_espera` los limpia).
         self.modelo_cola.actualizar(fila, error="", aviso="", diagnostico=None)
+        self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
         self.ejecutor.iniciar([(fila, json.dumps(datos, ensure_ascii=False))])
 
     def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:

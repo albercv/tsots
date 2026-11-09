@@ -12,6 +12,11 @@ Pending work, most urgent first. Remove an item when it is merged into
       local record keeps "scheduled for…" (Upload-Post
       `status?job_id=` or the upload history).
 
+- [ ] **Verify `GET /api/uploadposts/users` against the real service.** The
+      response shape of the profiles list is unverified; if it fails, the
+      profile is typed by hand.
+- [ ] **TikTok places of a removed profile stay orphaned in the Keychain.**
+
 - [ ] **Choose horizontal or vertical when publishing.** With both outputs,
       **Publish…** always uses the horizontal one.
 - [ ] **Show the horizontal output in the queue before the vertical one

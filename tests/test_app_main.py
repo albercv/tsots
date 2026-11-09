@@ -275,12 +275,14 @@ def test_terminar_trabajo_seleccionado_refresca_caption(qtbot, tmp_path, monkeyp
 
 def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "six"
     ventana.ajustes.contexto_marca = "antes"
     visto = {}
 
     class DialogoFalso:
-        def __init__(self, texto_inicial="", parent=None):
+        def __init__(self, texto_inicial="", parent=None, perfil=""):
             visto["inicial"] = texto_inicial
+            visto["perfil"] = perfil
 
         def exec(self):
             return 1  # QDialog.DialogCode.Accepted
@@ -291,7 +293,36 @@ def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("app.main.DialogoMarca", DialogoFalso)
     ventana.panel.editar_marca.emit()
     assert visto["inicial"] == "antes"
+    assert visto["perfil"] == "six"
     assert ventana.ajustes.contexto_marca == "después"
+
+
+def test_selector_de_la_cabecera_fija_el_perfil_y_se_recarga_al_cerrar_redes(
+        qtbot, tmp_path, monkeypatch):
+    from tests.test_app_perfiles import _elegir
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    selector = ventana.cabecera.selector_perfil
+    assert selector.itemText(0) == "Sin perfil: añádelo en Redes…"
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.ajustes.anadir_perfil("upload_post", "six")
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    ventana.boton_redes.click()  # Cancelar también recarga
+    assert selector.currentText() == "personal"
+    _elegir(selector, "six")
+    assert ventana.ajustes.perfil_redes == "six"
+
+
+def test_un_perfil_de_nombre_largo_no_ensancha_la_ventana(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "x" * 200
+    ventana._recargar_perfil()
+    ventana.show()
+    assert ventana.minimumSizeHint().width() <= 700
 
 
 def test_procesar_incluye_marca_y_modelo_caption(qtbot, tmp_path, monkeypatch):
@@ -532,6 +563,7 @@ class _DialogoFalso:
     """Sustituye a DialogoPublicar / DialogoRedes y registra con qué se abrió."""
 
     abiertos: list = []
+    perfil_usado = ""
 
     def __init__(self, *args, parent=None, **kwargs):
         type(self).abiertos.append(args)
@@ -580,6 +612,56 @@ def test_publicar_abre_dialogo_con_video_y_caption(qtbot, tmp_path, monkeypatch)
     assert video == salida
     assert caption.titulo == "Título X"
     assert ajustes is ventana.ajustes
+
+
+def test_publicar_propone_el_perfil_de_la_ficha_y_anota_el_usado(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ficha.perfil = "six"
+    guardar(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    propuestos = []
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+        perfil_usado = "personal"
+
+        def __init__(self, *args, perfil="", **kwargs):
+            super().__init__(*args, **kwargs)
+            propuestos.append(perfil)
+            self.ajustes = args[2]
+
+        def exec(self):
+            self.ajustes.perfil_redes = "personal"
+            return 0
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    assert propuestos == ["six"]
+    assert cargar(ficha.id).perfil == "personal"
+    assert ventana.cabecera.selector_perfil.currentText() == "personal"
+
+
+def test_publicar_shorts_propone_el_perfil_de_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.ajustes.anadir_perfil("upload_post", "six")
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    (carpeta / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "01 - Uno.mp4", "titulo": "Uno", "inicio": 0, "fin": 70}]}))
+    ficha.perfil = "six"
+    guardar(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    _eligiendo_la_fila(ventana)
+    activos = []
+    monkeypatch.setattr(
+        "app.widgets.dialogo_publicar_shorts.DialogoPublicarShorts.exec",
+        lambda self: activos.append(self.ajustes.perfil_redes))
+    ventana.panel.boton_publicar_shorts.click()
+    assert activos == ["six"]
 
 
 def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
@@ -1743,3 +1825,35 @@ def test_salida_shorts_actualiza_la_fila(qtbot, tmp_path, monkeypatch):
     assert trabajo.estado == EstadoTrabajo.HECHO
     assert trabajo.salida == ficha.final.ruta
     assert "+ 3 shorts" in ventana.modelo_cola.data(ventana.modelo_cola.index(0))
+
+
+def test_procesar_anota_el_perfil_activo_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "sixpodcast"
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert cargar(ventana.modelo_cola.trabajo(0).ficha_id).perfil == "sixpodcast"
+
+
+def test_crear_shorts_anota_el_perfil_activo_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    assert cargar(ficha.id).perfil == "personal"
+
+
+def test_cerrar_redes_sin_guardar_tambien_avisa(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    avisos = []
+    ventana._configurar_redes(lambda: avisos.append(1))
+    assert avisos == [1]
