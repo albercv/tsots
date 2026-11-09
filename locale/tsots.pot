@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-06 11:56+0100\n"
+"POT-Creation-Date: 2026-11-09 00:20+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -27,6 +27,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "\"{nombre}\" aún no tiene vídeo procesado del que sacar shorts."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" aún no tiene vídeo procesado: el blog y LinkedIn solo se pueden pedir sobre un vídeo ya procesado"
 msgstr ""
 
 #, python-brace-format
@@ -192,10 +196,23 @@ msgstr ""
 msgid "Aviso"
 msgstr ""
 
+msgid "Añade otro fotograma del vídeo u otra imagen. También puedes arrastrar imágenes aquí."
+msgstr ""
+
 msgid "Añadir subtítulos"
 msgstr ""
 
+msgid "Añadir…"
+msgstr ""
+
 msgid "Barras negras"
+msgstr ""
+
+msgid "Blog y LinkedIn"
+msgstr ""
+
+#, python-brace-format
+msgid "Blog y LinkedIn fallaron: {error}. Vídeo guardado igual.{sugerencia}"
 msgstr ""
 
 msgid "Borra los datos guardados para rehacer pasos; no toca los vídeos"
@@ -284,6 +301,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
+msgstr ""
+
+msgid "Codificación web del vídeo del blog"
 msgstr ""
 
 msgid "Cola"
@@ -532,6 +552,13 @@ msgid "El servicio terminó sin dar el resultado de {plataforma}."
 msgstr ""
 
 #, python-brace-format
+msgid "El texto de LinkedIn falló: {error}. El blog sigue adelante; para publicar en LinkedIn, escribe el post en {ruta}.{sugerencia}"
+msgstr ""
+
+msgid "El texto de LinkedIn generado es demasiado corto"
+msgstr ""
+
+#, python-brace-format
 msgid "El título no se pudo quemar: {error}. Vídeo guardado sin título."
 msgstr ""
 
@@ -553,6 +580,9 @@ msgid "El vídeo se envió pero no llegó la respuesta del servicio ({tipo})."
 msgstr ""
 
 msgid "El vídeo ya era vertical: se reescala con barras."
+msgstr ""
+
+msgid "Elegir imágenes"
 msgstr ""
 
 msgid "Elegir vídeos"
@@ -655,6 +685,9 @@ msgstr ""
 msgid "Esperando confirmación…"
 msgstr ""
 
+msgid "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo."
+msgstr ""
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
@@ -738,6 +771,9 @@ msgstr ""
 msgid "Formato vertical"
 msgstr ""
 
+msgid "Fotos para LinkedIn:"
+msgstr ""
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
@@ -795,6 +831,10 @@ msgstr ""
 msgid "Impacto"
 msgstr ""
 
+#, python-brace-format
+msgid "Imágenes ({extensiones})"
+msgstr ""
+
 msgid "Jue"
 msgstr ""
 
@@ -816,6 +856,9 @@ msgstr ""
 msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticamente. Si sigue fallando, reencoda a mano: ffmpeg -i entrada.mp4 -c:v h264_videotoolbox -b:v 14M -c:a copy salida.mp4"
 msgstr ""
 
+msgid "La carpeta del blog está lista, pero no se pudo arrancar el agente del blog: comprueba que existe y es ejecutable lanzador/blog/procesar_pendientes.sh. Se reintentará al abrir la app."
+msgstr ""
+
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
 msgstr ""
 
@@ -828,6 +871,10 @@ msgid "La detección de caras falló (código {codigo})"
 msgstr ""
 
 msgid "La hora programada ya ha pasado: no se ha enviado. Elige otra."
+msgstr ""
+
+#, python-brace-format
+msgid "La publicación se envió pero no llegó la respuesta del servicio ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -865,6 +912,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "La versión sin subtítulos de \"{nombre}\" ya no está. Vuelve a procesarlo para sacar shorts."
+msgstr ""
+
+msgid "Las fotos son demasiado grandes para el servicio (413)."
 msgstr ""
 
 msgid "Leyendo la API key del Llavero…"
@@ -1038,6 +1088,9 @@ msgstr ""
 msgid "No existe el archivo de subtítulos: {ass}"
 msgstr ""
 
+msgid "No hay imágenes para LinkedIn"
+msgstr ""
+
 msgid "No hay nada programado."
 msgstr ""
 
@@ -1046,6 +1099,9 @@ msgid "No hay páginas de Facebook conectadas en {servicio}."
 msgstr ""
 
 msgid "No hay servidor en http://localhost:11434 y no se pudo arrancar `ollama serve` a tiempo (puerto ocupado, app de Ollama colgada, o descarga del modelo en curso)."
+msgstr ""
+
+msgid "No hay título para la portada: el modelo no lo dio y el vídeo no tiene caption. Se reintentará al volver a procesar."
 msgstr ""
 
 msgid "No queda espacio en disco"
@@ -1072,6 +1128,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
+msgid "No se encuentra la imagen: {nombre}"
 msgstr ""
 
 #, python-brace-format
@@ -1113,6 +1173,13 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se generó el vídeo vertical: {salida}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se generó el vídeo web: {salida}"
+msgstr ""
+
+msgid "No se ha encontrado ningún fotograma válido para la portada"
 msgstr ""
 
 msgid "No se llegó a enviar."
@@ -1170,6 +1237,10 @@ msgid "No se pudo guardar la clave en el Llavero."
 msgstr ""
 
 msgid "No se pudo lanzar el proceso"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudo leer el archivo ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -1294,6 +1365,9 @@ msgstr ""
 msgid "Ordenando las salidas"
 msgstr ""
 
+msgid "Otra imagen…"
+msgstr ""
+
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
@@ -1332,6 +1406,9 @@ msgstr ""
 msgid "Posición vertical:"
 msgstr ""
 
+msgid "Post con fotos"
+msgstr ""
+
 msgid "Post público"
 msgstr ""
 
@@ -1341,7 +1418,13 @@ msgstr ""
 msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
 msgstr ""
 
+msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
+msgstr ""
+
 msgid "Preparación del audio"
+msgstr ""
+
+msgid "Preparando blog y LinkedIn"
 msgstr ""
 
 msgid "Preview no disponible"
@@ -1691,6 +1774,9 @@ msgstr ""
 msgid "Sin conexión para descargar un modelo"
 msgstr ""
 
+msgid "Sin fotos: añade al menos una."
+msgstr ""
+
 msgid "Sin memoria suficiente"
 msgstr ""
 
@@ -1762,6 +1848,16 @@ msgstr ""
 
 #, python-brace-format
 msgid "Terminó, pero no se pudo mostrar el resultado ({tipo}). Mira el registro."
+msgstr ""
+
+#, python-brace-format
+msgid "Texto para LinkedIn de más de {maximo} caracteres: acórtalo"
+msgstr ""
+
+msgid "Texto para LinkedIn vacío: escríbelo."
+msgstr ""
+
+msgid "Texto para LinkedIn:"
 msgstr ""
 
 #, python-brace-format
@@ -1967,6 +2063,9 @@ msgid "la descarga no produjo ningún fichero"
 msgstr ""
 
 msgid "la limpieza de audio"
+msgstr ""
+
+msgid "la transcripción no dio texto"
 msgstr ""
 
 msgid "macOS ha denegado el acceso a la carpeta del vídeo o de salida (Escritorio, Documentos y discos externos requieren permiso)."

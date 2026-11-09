@@ -174,6 +174,15 @@ def test_titulo_defecto_y_json():
     assert PipelineConfig.from_json(c.to_json()) == c
 
 
+def test_difusion_defecto_y_json():
+    assert _config_minima().difusion is False
+    datos = json.loads(_config_minima().to_json())
+    datos.pop("difusion")  # JSON de una versión anterior
+    assert PipelineConfig.from_json(json.dumps(datos)).difusion is False
+    c = _config_minima(difusion=True)
+    assert PipelineConfig.from_json(c.to_json()) == c
+
+
 def test_caption_modelo_vacio_invalido():
     with pytest.raises(ValueError, match="modelo_caption"):
         _config_minima(caption_seo=True, modelo_caption="").validar()

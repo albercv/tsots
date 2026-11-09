@@ -1,6 +1,7 @@
 """Proveedor Upload-Post contra un transporte HTTP falso: nunca sale a la red."""
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from email.parser import BytesParser
 from email.policy import HTTP
@@ -25,7 +26,7 @@ from videopipeline.redes.modelo import (
     Ubicacion,
 )
 from videopipeline.redes.proveedor import ErrorConsulta
-from videopipeline.redes.textos import longitud_x
+from videopipeline.redes.textos import MAX_TEXTO, longitud_x
 
 CLAVE = "clave-secreta-123"
 
@@ -330,7 +331,7 @@ def test_error_401_en_youtube_no_impide_instagram(video):
         _proveedor(servidor), _pub(video), Opciones(), list(Plataforma), registrar=False)
     assert [p for p in resultados] == [Plataforma.TIKTOK, Plataforma.YOUTUBE,
                                        Plataforma.INSTAGRAM, Plataforma.X,
-                                       Plataforma.FACEBOOK]
+                                       Plataforma.FACEBOOK, Plataforma.LINKEDIN]
     assert resultados[Plataforma.TIKTOK].ok
     assert not resultados[Plataforma.YOUTUBE].ok
     assert "401" in resultados[Plataforma.YOUTUBE].error
@@ -1170,9 +1171,9 @@ def test_lista_de_programadas():
         {"job_id": "j1", "scheduled_date": "2026-11-03T17:00:00+00:00",
          "platforms": ["tiktok"], "title": "Uno", "fields": {"post_mode": "MEDIA_UPLOAD"}},
         {"job_id": "j2", "scheduled_date": "2026-11-05T09:30:00Z",
-         "platforms": ["youtube", "linkedin", "twitter"], "title": "Dos"},
+         "platforms": ["youtube", "threads", "twitter"], "title": "Dos"},
         {"job_id": "j3", "scheduled_date": "mañana", "platforms": ["tiktok"]},
-        {"job_id": "j4", "scheduled_date": "2026-11-06T09:30:00Z", "platforms": ["linkedin"]},
+        {"job_id": "j4", "scheduled_date": "2026-11-06T09:30:00Z", "platforms": ["threads"]},
         {"scheduled_date": "2026-11-06T09:30:00Z", "platforms": ["tiktok"]},
         "basura",
     ], "total": 6})
@@ -1249,3 +1250,109 @@ def test_cancelar_sin_referencia_no_envia_nada():
     servidor = Servidor(lambda req, s: pytest.fail("no debe enviar"))
     with pytest.raises(ErrorConsulta):
         _proveedor(servidor).cancelar("")
+
+
+# --- LinkedIn: fotos y texto largo en lugar del vídeo ---
+
+def _foto(ruta: Path, datos: bytes = b"\x89PNG") -> Path:
+    ruta.write_bytes(datos)
+    return ruta
+
+
+def _pub_linkedin(tmp_path, n=3, texto="Gancho.\n\nCuerpo") -> Publicacion:
+    fotos = tuple(_foto(tmp_path / f"{i}.{'png' if i == 0 else 'jpg'}") for i in range(n))
+    return replace(_pub(tmp_path / "no_existe.mp4"), fotos=fotos, texto_linkedin=texto)
+
+
+def test_linkedin_sube_fotos_a_upload_photos(tmp_path):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert r.ok and r.url == "https://linkedin.example/v/1"
+    peticion = servidor.peticiones[0]
+    assert str(peticion.url) == "https://api.upload-post.com/api/upload_photos"
+    assert peticion.headers["authorization"] == f"Apikey {CLAVE}"
+    campos = servidor.formularios[0]
+    assert campos["user"] == ["mi_perfil"]
+    assert campos["platform[]"] == ["linkedin"] and campos["title"] == ["Gancho.\n\nCuerpo"]
+    assert campos["visibility"] == ["PUBLIC"] and "target_linkedin_page_id" not in campos
+    assert campos["async_upload"] == ["true"] and campos["external_id"][0].startswith("tsots-linkedin-")
+    assert peticion.content.count(b'name="photos[]"') == 3
+    assert b'name="video"' not in peticion.content
+    assert b"Content-Type: image/png" in peticion.content
+    assert b"Content-Type: image/jpeg" in peticion.content
+
+
+def test_linkedin_sin_fotos_no_envia(tmp_path):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub(tmp_path / "v.mp4"), Opciones())
+    assert not r.ok and r.error == "No hay imágenes para LinkedIn" and servidor.peticiones == []
+
+
+def test_linkedin_foto_ausente_no_envia(tmp_path):
+    servidor = Servidor(_ok_sync)
+    pub = replace(_pub_linkedin(tmp_path), fotos=(tmp_path / "0.png", tmp_path / "falta.jpg"))
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, pub, Opciones())
+    assert not r.ok and "falta.jpg" in r.error and servidor.peticiones == []
+
+
+def test_linkedin_recorta_el_texto_a_3000(tmp_path):
+    servidor = Servidor(_ok_sync)
+    pub = _pub_linkedin(tmp_path, texto="a" * 3500)
+    _proveedor(servidor).publicar(Plataforma.LINKEDIN, pub, Opciones())
+    assert len(servidor.formularios[0]["title"][0]) == MAX_TEXTO[Plataforma.LINKEDIN] == 3000
+
+
+def test_linkedin_programado_lleva_fecha(tmp_path):
+    servidor = Servidor(_programado)
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path),
+                                      Opciones(programada=CUANDO))
+    campos = servidor.formularios[0]
+    assert campos["scheduled_date"] == ["2026-11-03T18:00:00"]
+    assert campos["timezone"] == ["Europe/Madrid"] and "async_upload" not in campos
+    assert r.ok and r.programada == CUANDO and r.referencia == "job-1"
+
+
+def test_linkedin_respuesta_real_de_publicacion(tmp_path):
+    cuerpo = {"success": True, "results": {"linkedin": {
+        "success": True, "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:1/",
+        "post_id": "urn:li:ugcPost:1", "image_urns": ["urn:li:image:1"],
+        "status": "completed"}},
+        "usage": {"count": 1, "limit": 10}, "request_id": "r1", "job_id": "j1",
+        "status": "completed"}
+    servidor = Servidor(lambda request, servidor: httpx.Response(200, json=cuerpo))
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert r.ok and not r.pendiente
+    assert r.url == "https://www.linkedin.com/feed/update/urn:li:ugcPost:1/"
+
+
+def test_cuentas_reconoce_linkedin():
+    sa = _cuentas_json(linkedin={"display_name": "Yo en LinkedIn", "reauth_required": False})
+    cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()
+    assert cuentas[Plataforma.LINKEDIN].visible == "Yo en LinkedIn"
+    assert cuentas[Plataforma.TIKTOK] is None
+
+
+# Tras enviar, LinkedIn no habla de «vídeo»: lo que sube son fotos.
+
+def test_linkedin_sin_respuesta_tras_enviar_habla_de_la_publicacion(tmp_path):
+    def responder(request, servidor):
+        raise httpx.ReadTimeout("sin respuesta", request=request)
+
+    r = _proveedor(Servidor(responder)).publicar(
+        Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert r.pendiente and "La publicación se envió" in r.error and "vídeo" not in r.error
+
+
+def test_linkedin_foto_ilegible_habla_del_archivo(tmp_path):
+    pub = _pub_linkedin(tmp_path)
+    pub.fotos[1].chmod(0)
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, pub, Opciones())
+    assert not r.ok and r.error == "No se pudo leer el archivo (PermissionError)."
+    assert servidor.peticiones == []
+
+
+def test_linkedin_413_habla_de_las_fotos(tmp_path):
+    servidor = Servidor(lambda req, s: httpx.Response(413, text="Too Large"))
+    r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
+    assert "413" in r.error and "fotos" in r.error and "vídeo" not in r.error

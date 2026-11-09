@@ -27,6 +27,7 @@ MAX_TEXTO = {
     # Facebook admite mucho más en un post; en vídeos y reels se usa el
     # mismo límite prudente que en Instagram.
     Plataforma.FACEBOOK: 2200,
+    Plataforma.LINKEDIN: 3000,
 }
 MAX_HASHTAGS = {Plataforma.INSTAGRAM: 30}
 # YouTube cuenta las comas y las comillas de las etiquetas con espacios.

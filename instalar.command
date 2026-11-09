@@ -108,7 +108,8 @@ fi
 
 # --------------------------------------------------------------------- la app
 paso "$(t "Construyendo" "Building") TheSilenceOfTheShorts.app"
-chmod +x lanzador/construir_app.sh TheSilenceOfTheShorts.command desinstalar.command
+chmod +x lanzador/construir_app.sh TheSilenceOfTheShorts.command desinstalar.command \
+    lanzador/blog/procesar_pendientes.sh lanzador/blog/guarda_borrador.sh
 lanzador/construir_app.sh >/dev/null
 ok "$(t "app lista en" "app ready at") $PROYECTO/TheSilenceOfTheShorts.app"
 
