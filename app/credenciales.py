@@ -96,11 +96,14 @@ def borrar(proveedor: str) -> bool:
     return True
 
 
-def _cuenta_lugar(perfil: str, ciudad: str) -> str:
+def huella_perfil(perfil: str) -> str:
     # El perfil puede llevar espacios o barras: va resumido, para que la
     # orden de `security -i` no necesite comillas y no se lea en claro.
-    huella = hashlib.sha256(perfil.strip().encode("utf-8")).hexdigest()[:16]
-    return f"tiktok-lugar-{ciudad}-{huella}"
+    return hashlib.sha256(perfil.strip().encode("utf-8")).hexdigest()[:16]
+
+
+def _cuenta_lugar(perfil: str, ciudad: str) -> str:
+    return f"tiktok-lugar-{ciudad}-{huella_perfil(perfil)}"
 
 
 def guardar_lugar_tiktok(proveedor: str, perfil: str, ciudad: str, lugar: Lugar | None) -> None:

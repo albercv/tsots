@@ -164,8 +164,8 @@ def test_eleccion_guardada_sin_x_ni_facebook_sigue_valiendo(ajustes):
 
 def test_pagina_de_facebook_por_proveedor_y_borrable(ajustes):
     ajustes.pagina_facebook = Pagina("111", "Mía")
-    assert ajustes.pagina_facebook_de(PROVEEDOR_POR_DEFECTO) == Pagina("111", "Mía")
-    assert ajustes.pagina_facebook_de("otro") is None
+    assert ajustes.de_perfil(PROVEEDOR_POR_DEFECTO, "").pagina_facebook == Pagina("111", "Mía")
+    assert ajustes.de_perfil("otro", "").pagina_facebook is None
     ajustes.pagina_facebook = None
     assert ajustes.pagina_facebook is None
     assert ajustes.ajustes_proveedor()["pagina_facebook"] == ""
@@ -182,7 +182,7 @@ def test_cuentas_guardadas_ida_y_vuelta_y_ligadas_al_perfil(ajustes):
     ajustes.perfil_redes = "otro"  # otro perfil, otras cuentas
     assert ajustes.cuentas_guardadas() is None
     ajustes.perfil_redes = "yo"
-    ajustes._q.setValue(f"redes/cuentas/{PROVEEDOR_POR_DEFECTO}", "{no es json")
+    ajustes._q.setValue(ajustes._clave("cuentas"), "{no es json")
     assert ajustes.cuentas_guardadas() is None
 
 

@@ -310,7 +310,8 @@ class DialogoRedes(QDialog):
         self.campo_pagina_manual.clear()
         self.campo_pagina_manual.hide()
         self.aviso_pagina.hide()
-        pagina = self.ajustes.pagina_facebook_de(self.proveedor)
+        pagina = self.ajustes.de_perfil(
+            self.proveedor, self.ajustes.perfil_de(self.proveedor)).pagina_facebook
         self._poner_paginas([pagina] if pagina else [], pagina.id if pagina else "")
         guardadas = (self.ajustes.cuentas_guardadas()
                      if self.proveedor == self.ajustes.proveedor_redes else None)
@@ -525,7 +526,7 @@ class DialogoRedes(QDialog):
         self.ajustes.youtube_categoria = str(self.combo_categoria.currentData())
         self.ajustes.x_premium = self.casilla_x_premium.isChecked()
         self.ajustes.facebook_modo = ModoFacebook(self.combo_facebook.currentData())
-        self.ajustes.guardar_pagina_facebook(self.proveedor, self.pagina_elegida())
+        self.ajustes.pagina_facebook = self.pagina_elegida()
         if self._comprobadas is not None and self._comprobadas[0] == self.ajustes.perfil_redes:
             self.ajustes.guardar_cuentas(self._comprobadas[1])
         super().accept()
