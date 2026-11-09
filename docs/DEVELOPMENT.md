@@ -606,7 +606,8 @@ modes, location), `app/widgets/selector_ubicacion.py` (the location
 selector, opened in its own window from both dialogs; inline it pushed
 Networks… past a 14" laptop screen),
 `app/widgets/selector_perfil.py` (the profile selector shared by the
-header, Networks…, Publish… and Scheduled…),
+header, Publish… and Scheduled…; Networks… has its own editable combo
+without autocompletion, since it also creates profiles),
 `app/cuentas.py` (account and TikTok place lookups shared by both dialogs,
 always in the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button
