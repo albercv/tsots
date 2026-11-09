@@ -313,8 +313,11 @@ hands the pending folders to the blog agent when it finishes a video and
 when it opens (folders left from an earlier session), so they are only
 picked up while the app is running; there is nothing to install or allow
 in the macOS settings. For each folder the agent runs `claude` in the
-background to write the article in the evolve2digital.com style and upload
-the cover, frames and video. It needs `claude` logged in with the
+background to write the article in the evolve2digital.com style, following
+an SEO guide (`lanzador/blog/guia_seo.md`: one search keyword, a title of
+60 characters at most, a direct-answer lead, an FAQ when the video covers
+it, image alt texts and links to related published posts), and to upload
+the cover, frames and video. It never adds facts that are not in the video. It needs `claude` logged in with the
 **claude.ai E2D - Blog** connector. The article is always created as a **draft**: the agent cannot publish
 or delete posts. Review and publish it yourself on the blog. Each folder
 then moves to:
