@@ -65,7 +65,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Alto mínimo de la zona de secciones: la cabecera abierta y un par de filas.
 ALTO_MINIMO_SECCIONES = 90
 # Tamaño inicial; se recorta al área útil de la pantalla.
-TAMANO_INICIAL = (960, 720)
+TAMANO_INICIAL = (1200, 920)
 RUTA_LANZADOR = (
     BASE_DIR / "TheSilenceOfTheShorts.app" / "Contents" / "MacOS" / "TheSilenceOfTheShorts"
 )
@@ -162,7 +162,8 @@ class VentanaPrincipal(QMainWindow):
         columna_izquierda.addWidget(self.boton_reprocesar)
         columna_izquierda.addWidget(self.boton_olvidar)
 
-        fila_superior.addLayout(columna_izquierda, 2)
+        # La cola solo lista nombres: el ancho es para las opciones.
+        fila_superior.addLayout(columna_izquierda, 1)
 
         # Columna derecha: arriba las secciones de opciones (plegables) en un
         # QScrollArea, que es lo único que se desplaza si no caben; abajo, fija
@@ -195,7 +196,7 @@ class VentanaPrincipal(QMainWindow):
         columna_derecha.setContentsMargins(0, 0, 0, 0)
         columna_derecha.addWidget(self.scroll_derecha, 1)
         columna_derecha.addWidget(self.pestanas)
-        fila_superior.addLayout(columna_derecha, 1)
+        fila_superior.addLayout(columna_derecha, 2)
         raiz.addLayout(fila_superior, 1)
 
         fila_inferior = QHBoxLayout()

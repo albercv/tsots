@@ -1857,3 +1857,32 @@ def test_cerrar_redes_sin_guardar_tambien_avisa(qtbot, tmp_path, monkeypatch):
     avisos = []
     ventana._configurar_redes(lambda: avisos.append(1))
     assert avisos == [1]
+
+
+def test_a_tamano_inicial_las_opciones_caben_sin_scroll_y_la_cola_es_estrecha(
+        qtbot, tmp_path, monkeypatch):
+    """Al tamaño inicial la sección más alta (Subtítulos) cabe entera sobre
+    las pestañas, sin scroll, y la zona de soltar y la cola dejan el ancho a
+    las opciones: no necesitan tanto."""
+    from app.main import TAMANO_INICIAL
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.resize(*TAMANO_INICIAL)
+    ventana.show()
+    qtbot.waitExposed(ventana)
+    ventana.panel.abrir_seccion("subtitulos")
+    qtbot.wait(20)
+    assert ventana.scroll_derecha.verticalScrollBar().maximum() == 0
+    assert ventana.zona_drop.width() < ventana.scroll_derecha.width()
+    assert ventana.zona_drop.height() <= 90
+
+
+def test_la_geometria_de_la_disposicion_anterior_no_se_restaura(tmp_path):
+    """El tamaño guardado con la disposición anterior (cola ancha, opciones
+    con scroll) no vale para la nueva: se empieza con el tamaño inicial."""
+    ajustes = Ajustes(QSettings(str(tmp_path / "g.ini"), QSettings.Format.IniFormat))
+    ajustes._q.setValue("ventana/geometria", b"vieja")
+    assert ajustes.cargar_geometria() is None
+    ajustes.guardar_geometria(b"nueva")
+    assert ajustes.cargar_geometria() == b"nueva"
+    assert ajustes._q.value("ventana/geometria") == b"vieja"
