@@ -33,8 +33,8 @@ from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.difusion import lanzar_agente
 from videopipeline.ficha import (
-    CAPTION, Ficha, cargar, limpiar_temporales, mover_salidas, ocupa, olvidar,
-    reconocer,
+    CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
+    olvidar, reconocer,
 )
 from videopipeline.i18n import _
 from videopipeline.ollama import listar_modelos, memoria_para_modelos
@@ -710,6 +710,7 @@ class VentanaPrincipal(QMainWindow):
             }
             if shorts_al_procesar:
                 datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
+            self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -720,6 +721,16 @@ class VentanaPrincipal(QMainWindow):
         self._procesando = True
         self._refrescar_boton()
         self.ejecutor.iniciar(trabajos)
+
+    def _anotar_perfil(self, ficha_id: str | None, perfil: str) -> None:
+        """Apunta en la ficha el perfil activo. Se recarga del disco para no
+        pisar lo que el runner haya escrito."""
+        if not ficha_id or not perfil:
+            return
+        ficha = cargar(ficha_id)
+        if ficha is not None and ficha.perfil != perfil:
+            ficha.perfil = perfil
+            guardar(ficha)
 
     def _guardar_panel(self) -> dict:
         """Guarda las opciones del panel y devuelve las del pipeline."""
@@ -792,6 +803,7 @@ class VentanaPrincipal(QMainWindow):
         # La fila puede venir de un intento anterior: sin esto conservaría su
         # error, aviso y diagnóstico (solo `volver_a_espera` los limpia).
         self.modelo_cola.actualizar(fila, error="", aviso="", diagnostico=None)
+        self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
         self.ejecutor.iniciar([(fila, json.dumps(datos, ensure_ascii=False))])
 
     def _reconocer_fila(self, fila: int, avisos: list[str]) -> bool:

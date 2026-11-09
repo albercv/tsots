@@ -1743,3 +1743,23 @@ def test_salida_shorts_actualiza_la_fila(qtbot, tmp_path, monkeypatch):
     assert trabajo.estado == EstadoTrabajo.HECHO
     assert trabajo.salida == ficha.final.ruta
     assert "+ 3 shorts" in ventana.modelo_cola.data(ventana.modelo_cola.index(0))
+
+
+def test_procesar_anota_el_perfil_activo_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "sixpodcast"
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    _lanzando(ventana, monkeypatch)
+    ventana.procesar()
+    assert cargar(ventana.modelo_cola.trabajo(0).ficha_id).perfil == "sixpodcast"
+
+
+def test_crear_shorts_anota_el_perfil_activo_en_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    _lanzando(ventana, monkeypatch)
+    ventana.panel.boton_crear_shorts.click()
+    assert cargar(ficha.id).perfil == "personal"
