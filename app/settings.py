@@ -415,9 +415,12 @@ class Ajustes:
         self._q.endGroup()
         return valores
 
+    # Clave nueva con la disposición de cola estrecha y opciones anchas: el
+    # tamaño guardado con la anterior dejaba las opciones con scroll. La
+    # vieja se queda para las versiones anteriores.
     def guardar_geometria(self, geometria: bytes) -> None:
-        self._q.setValue("ventana/geometria", geometria)
+        self._q.setValue("ventana/geometria_v2", geometria)
 
     def cargar_geometria(self) -> bytes | None:
-        valor = self._q.value("ventana/geometria")
+        valor = self._q.value("ventana/geometria_v2")
         return valor if valor else None

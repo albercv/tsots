@@ -18,7 +18,7 @@ class ZonaDrop(QLabel):
         self.setText(_("Arrastra vídeos aquí\n(o haz clic para abrir)"))
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setAcceptDrops(True)
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(80)
         self.setStyleSheet(
             "QLabel { border: 2px dashed #888; border-radius: 8px; "
             "padding: 16px; color: #666; }"
