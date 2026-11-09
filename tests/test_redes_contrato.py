@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ast
 import re
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -87,6 +88,12 @@ def test_por_defecto_esta_registrado():
     assert registro_proveedores.PROVEEDOR_POR_DEFECTO in PROVEEDORES
 
 
+def _pub_con_fotos(video: Path) -> Publicacion:
+    foto = video.with_name("foto.png")
+    foto.write_bytes(b"PNG")
+    return replace(_pub(video), fotos=(foto,), texto_linkedin="Post")
+
+
 def test_video_ausente_no_envia_nada(nombre, tmp_path):
     peticiones: list = []
     p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
@@ -106,7 +113,7 @@ def test_fallos_del_servicio_no_lanzan_ni_filtran_la_clave(nombre, tmp_path, res
     p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(responder, peticiones))
     for plataforma in ORDEN:
-        r = p.publicar(plataforma, _pub(video), Opciones())
+        r = p.publicar(plataforma, _pub_con_fotos(video), Opciones())
         assert isinstance(r, Resultado) and r.plataforma == plataforma
         assert not r.ok
         assert r.error or r.pendiente
@@ -213,7 +220,8 @@ def test_el_modulo_del_proveedor_contiene_lo_especifico():
 
 
 def test_plataformas_neutras():
-    assert {p.value for p in Plataforma} == {"tiktok", "youtube", "instagram", "x", "facebook"}
+    assert {p.value for p in Plataforma} == {"tiktok", "youtube", "instagram", "x", "facebook",
+                                         "linkedin"}
 
 
 def test_ayuda_del_perfil_es_texto(nombre):

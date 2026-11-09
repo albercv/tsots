@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
 from videopipeline import i18n, shorts
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
+from videopipeline.difusion import lanzar_agente
 from videopipeline.ficha import (
     CAPTION, Ficha, cargar, limpiar_temporales, mover_salidas, ocupa, olvidar,
     reconocer,
@@ -272,6 +273,8 @@ class VentanaPrincipal(QMainWindow):
         if geometria:
             self.restoreGeometry(geometria)
         self._ajustar_a_pantalla()
+        # Carpetas del blog que quedaron de otra sesión, ya con la ventana en marcha.
+        QTimer.singleShot(0, lanzar_agente)
 
     def _fijar_alto_pestanas(self) -> None:
         """Alto fijo para la zona de pestañas: el de la previsualización a

@@ -29,6 +29,7 @@ AUDIO, BASE, TRANSCRIPCION, HORIZONTAL, CAPTION, SEGUIMIENTO, VERTICAL = (
     "audio", "base", "transcripcion", "horizontal", "caption", "seguimiento",
     "vertical")
 TITULO = "titulo"  # texto del título de inicio; sin archivo, vale si está
+DIFUSION = "difusion"  # blog y LinkedIn preparados; sin archivo, una vez por vídeo
 
 # Los pasos del panel, en el orden en que se muestran.
 PASOS = ("audio", "silencios", "subtitulos", "caption", "vertical")

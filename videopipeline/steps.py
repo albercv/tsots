@@ -268,6 +268,26 @@ def normalizar_video(entrada: Path, salida: Path) -> None:
         )
 
 
+def cmd_codificar_web(ffmpeg: str, entrada: Path, salida: Path) -> list[str]:
+    """Versión ligera para el blog: 720 px de ancho, altura par, proporción intacta."""
+    return [
+        ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+        "-i", str(entrada),
+        "-vf", "scale=720:-2",
+        "-c:v", "libx264", "-crf", "26", "-preset", "veryfast",
+        "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "96k",
+        str(salida),
+    ]
+
+
+def codificar_web(entrada: Path, salida: Path) -> None:
+    _ejecutar(cmd_codificar_web(_binario("ffmpeg"), entrada, salida),
+              _("Codificación web del vídeo del blog"))
+    if not salida.is_file() or salida.stat().st_size == 0:
+        raise PasoFallido(_("No se generó el vídeo web: {salida}").format(salida=salida))
+
+
 # Firma del bug de auto-editor que se resuelve reencodando la entrada.
 _ERROR_PAQUETE_AUTO_EDITOR = "Could not write packet"
 

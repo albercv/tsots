@@ -231,6 +231,19 @@ def test_panel_caption_defecto_off_y_en_valores(qtbot):
     PipelineConfig(video=Path("/v.mp4"), **panel.valores()).validar()
 
 
+def test_casilla_difusion_se_guarda_y_restaura(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.valores()["difusion"] is False
+    panel.check_difusion.setChecked(True)
+    assert panel.valores()["difusion"] is True
+    PipelineConfig(video=Path("/v.mp4"), **panel.valores()).validar()
+    panel.cargar({"difusion": "false"})
+    assert not panel.check_difusion.isChecked()
+    panel.cargar({"difusion": "true"})
+    assert panel.check_difusion.isChecked()
+
+
 def test_panel_caption_cargar_desde_qsettings(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)

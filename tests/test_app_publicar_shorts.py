@@ -15,7 +15,7 @@ from app.settings import Ajustes
 from app.widgets import dialogo_publicar
 from app.widgets.dialogo_publicar_shorts import DialogoPublicarShorts
 from tests.redes_falsos import ProveedorFalso
-from videopipeline import shorts
+from videopipeline import linkedin, shorts
 from videopipeline.caption import Caption, escribir_md
 from videopipeline.redes import registro
 from videopipeline.redes.modelo import Plataforma, Resultado
@@ -202,3 +202,24 @@ def test_avisa_de_un_short_ya_publicado(qtbot, carpeta, ajustes, llavero_falso, 
     monkeypatch.setattr(dialogo, "fabrica", lambda *a: (_ for _ in ()).throw(RuntimeError()))
     dialogo.boton_publicar.click()
     assert "Ya publicado o programado antes" in preguntas[0] and "Titulo 2" in preguntas[0]
+
+
+def test_linkedin_no_se_ofrece_ni_se_envia(qtbot, carpeta, ajustes, llavero_falso,
+                                           monkeypatch):
+    linkedin_ = Plataforma.LINKEDIN
+    ajustes.plataformas_redes = [T, linkedin_]
+    # Ni aunque el primer short tuviera un post de LinkedIn al lado.
+    md, fotos = linkedin.rutas(carpeta / "01 - Uno.mp4")
+    fotos.mkdir()
+    (fotos / "01_portada.png").write_bytes(b"PNG")
+    md.write_text("Post", encoding="utf-8")
+    dialogo, proveedor = _dialogo(qtbot, carpeta, ajustes)
+    assert dialogo.casillas[linkedin_].isHidden() and dialogo.estados[linkedin_].isHidden()
+    assert not dialogo.casillas[linkedin_].isChecked()
+    assert dialogo.plataformas() == [T]
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=10000):
+        dialogo.boton_publicar.click()
+    assert {c[1] for c in proveedor.llamadas} == {T}
+    # Y no la quita de las elegidas: es del vídeo largo.
+    assert ajustes.plataformas_redes == [T, linkedin_]

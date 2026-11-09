@@ -24,6 +24,14 @@ API (docs y openapi.json consultados el 2026-09-23):
   solo deja publicar en páginas), `facebook_title`, `facebook_description`,
   `facebook_media_type` (REELS | VIDEO | STORIES) y `video_state`
   (PUBLISHED | DRAFT). Supuesto: el borrador es un reel en DRAFT.
+- LinkedIn (`platform[]=linkedin`, docs y publicación real del 2026-11-08):
+  `POST /api/upload_photos`, multipart, mismos `user` y cabecera; una parte
+  `photos[]` por imagen (PNG o JPEG, en lugar de `video`), `title` (el texto
+  completo del post, ≤ 3000) y `visibility=PUBLIC`. Sin `target_linkedin_page_id`
+  publica en el perfil personal; `linkedin_description` y `linkedin_title` no
+  se usan. Respuesta síncrona como la de los vídeos: `{"success", "results":
+  {"linkedin": {success, url, post_id, image_urns, status}}, "usage",
+  "request_id", "job_id", "status"}`. `async_upload` y la programación, igual.
 - Cuentas conectadas: `GET /api/uploadposts/users/{perfil}` → perfil con
   `social_accounts`: por plataforma, `null`/`""` si no está conectada o un
   objeto con `display_name`, `handle`, `username`, `reauth_required` y
@@ -73,7 +81,7 @@ import re
 import time
 import traceback
 import uuid
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -100,7 +108,7 @@ from .modelo import (
     id_x_valido,
 )
 from .proveedor import ErrorConsulta
-from .textos import MAX_TEXTO_X, etiquetas_youtube, longitud_x, texto_para, titulo_para
+from .textos import MAX_TEXTO, MAX_TEXTO_X, etiquetas_youtube, longitud_x, texto_para, titulo_para
 
 NOMBRE = "Upload-Post"
 USA_PERFIL = True
@@ -111,6 +119,7 @@ AYUDA_PERFIL = N_(
 
 URL_API = "https://api.upload-post.com/api"
 URL_SUBIDA = f"{URL_API}/upload"
+URL_FOTOS = f"{URL_API}/upload_photos"
 URL_ESTADO = f"{URL_API}/uploadposts/status"
 URL_USUARIOS = f"{URL_API}/uploadposts/users"
 URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
@@ -145,6 +154,7 @@ _PLATAFORMAS = {
     Plataforma.INSTAGRAM: "instagram",
     Plataforma.X: "x",
     Plataforma.FACEBOOK: "facebook",
+    Plataforma.LINKEDIN: "linkedin",
 }
 # Nombres con que el servicio puede devolver cada plataforma.
 _NOMBRES_RESPUESTA = {plataforma: (nombre,) for plataforma, nombre in _PLATAFORMAS.items()}
@@ -254,6 +264,10 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         datos["video_state"] = (
             "DRAFT" if opciones.facebook_modo == ModoFacebook.BORRADOR else "PUBLISHED")
         datos["facebook_is_ai_generated"] = "false"
+    elif plataforma == Plataforma.LINKEDIN:
+        # El cuerpo del post va en `title`; sin `target_linkedin_page_id`: perfil personal.
+        datos["title"] = publicacion.texto_linkedin.strip()[:MAX_TEXTO[Plataforma.LINKEDIN]]
+        datos["visibility"] = "PUBLIC"
     return datos
 
 
@@ -318,7 +332,10 @@ class ProveedorUploadPost:
 
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:
-        video = Path(publicacion.video)
+        linkedin = plataforma == Plataforma.LINKEDIN
+        # LinkedIn sube las fotos en lugar del vídeo.
+        archivos = [Path(f) for f in publicacion.fotos] if linkedin else [Path(publicacion.video)]
+        video = archivos[0] if archivos else Path(publicacion.video)
         if not self._clave:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
         if not self._perfil:
@@ -326,34 +343,42 @@ class ProveedorUploadPost:
         if plataforma == Plataforma.FACEBOOK and not self._pagina_facebook:
             return self._error(plataforma, _(
                 "Falta la página de Facebook. Elígela en Redes…"))
-        if not video.is_file():
-            return self._error(plataforma, _("No se encuentra el vídeo: {nombre}").format(
-                nombre=video.name))
+        if linkedin and not archivos:
+            return self._error(plataforma, _("No hay imágenes para LinkedIn"))
+        for archivo in archivos:
+            if not archivo.is_file():
+                texto = (_("No se encuentra la imagen: {nombre}") if linkedin
+                         else _("No se encuentra el vídeo: {nombre}"))
+                return self._error(plataforma, texto.format(nombre=archivo.name))
         datos = campos(plataforma, publicacion, opciones, self._perfil, self._pagina_facebook)
         try:
             estado_video = video.stat()
-            tamano = estado_video.st_size
+            tamano = sum(a.stat().st_size for a in archivos)
         except OSError:
             estado_video, tamano = None, 0
         datos["external_id"] = identificador_externo(
             plataforma, video, tamano, estado_video.st_mtime if estado_video else 0.0)
         limites = tiempos(tamano)
         # El perfil (`user`) no va al registro.
-        log.info("%s: POST %s (un único intento) · external_id %s · vídeo %s (%d bytes) · "
+        url = URL_FOTOS if linkedin else URL_SUBIDA
+        log.info("%s: POST %s (un único intento) · external_id %s · archivo %s (%d bytes) · "
                  "campos %s · esperas máx.: "
                  "conexión %.0f s, escritura %.0f s, lectura %.0f s",
-                 plataforma.nombre, URL_SUBIDA, datos["external_id"], video, tamano,
+                 plataforma.nombre, url, datos["external_id"], video, tamano,
                  {k: ("(privado)" if k == "tiktok_location_id" else v)
                   for k, v in datos.items() if k not in ("user", "external_id")},
                  limites.connect, limites.write, limites.read)
 
         def enviar(http: httpx.Client) -> httpx.Response:
-            with video.open("rb") as fichero:
-                return http.post(
-                    URL_SUBIDA, headers=self._cabeceras(), data=datos,
-                    files={"video": (video.name, fichero, "video/mp4")},
-                    timeout=limites,
-                )
+            with ExitStack() as pila:
+                if linkedin:
+                    files = [("photos[]", (a.name, pila.enter_context(a.open("rb")), _mime_foto(a)))
+                             for a in archivos]
+                else:
+                    files = {"video": (video.name, pila.enter_context(video.open("rb")),
+                                       "video/mp4")}
+                return http.post(url, headers=self._cabeceras(), data=datos, files=files,
+                                 timeout=limites)
 
         inicio = time.monotonic()
         try:
@@ -367,15 +392,18 @@ class ProveedorUploadPost:
         except httpx.HTTPError as e:
             log.warning("%s: sin respuesta tras enviar el vídeo (%.1f s): %s",
                         plataforma.nombre, time.monotonic() - inicio, self._traza(e))
-            resultado = self._por_confirmar(plataforma, _(
-                "El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).").format(
+            resultado = self._por_confirmar(plataforma, (
+                _("La publicación se envió pero no llegó la respuesta del servicio ({tipo}).")
+                if linkedin else
+                _("El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).")).format(
                 tipo=type(e).__name__))
             self._registrar_resultado(resultado)
             return resultado
         except OSError as e:
             log.warning("%s: no se pudo leer el vídeo: %s", plataforma.nombre, self._traza(e))
-            return self._error(plataforma, _("No se pudo leer el vídeo ({tipo}).").format(
-                tipo=type(e).__name__))
+            return self._error(plataforma, (
+                _("No se pudo leer el archivo ({tipo}).") if linkedin
+                else _("No se pudo leer el vídeo ({tipo}).")).format(tipo=type(e).__name__))
         self._registrar_respuesta(plataforma, "subida", respuesta, time.monotonic() - inicio)
         resultado = self._interpretar_subida(plataforma, respuesta, opciones.programada)
         self._registrar_resultado(resultado)
@@ -884,7 +912,9 @@ class ProveedorUploadPost:
         elif codigo == 403:
             base = _("Sin permiso o fuera del plan contratado (403).")
         elif codigo == 413:
-            base = _("El vídeo es demasiado grande para el servicio (413).")
+            base = (_("Las fotos son demasiado grandes para el servicio (413).")
+                    if plataforma == Plataforma.LINKEDIN
+                    else _("El vídeo es demasiado grande para el servicio (413)."))
         elif codigo == 429:
             base = _("Límite de subidas del plan alcanzado (429).")
         elif codigo == 503:
@@ -906,6 +936,10 @@ class ProveedorUploadPost:
 
     def _error(self, plataforma: Plataforma, texto: str) -> Resultado:
         return Resultado(plataforma, ok=False, error=self._limpiar(texto))
+
+
+def _mime_foto(ruta: Path) -> str:
+    return "image/png" if ruta.suffix.lower() == ".png" else "image/jpeg"
 
 
 def _verdadero(valor: Any) -> bool:

@@ -17,6 +17,7 @@ class Plataforma(str, Enum):
     INSTAGRAM = "instagram"
     X = "x"
     FACEBOOK = "facebook"
+    LINKEDIN = "linkedin"
 
     @property
     def nombre(self) -> str:
@@ -26,7 +27,7 @@ class Plataforma(str, Enum):
 # Orden fijo de publicación.
 ORDEN: tuple[Plataforma, ...] = (
     Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM,
-    Plataforma.X, Plataforma.FACEBOOK,
+    Plataforma.X, Plataforma.FACEBOOK, Plataforma.LINKEDIN,
 )
 
 # Marcas: no se traducen.
@@ -36,6 +37,7 @@ NOMBRES = {
     Plataforma.INSTAGRAM: "Instagram",
     Plataforma.X: "X",
     Plataforma.FACEBOOK: "Facebook",
+    Plataforma.LINKEDIN: "LinkedIn",
 }
 
 
@@ -224,6 +226,10 @@ class Publicacion:
     # Texto propio del post de X, revisado por el usuario. Vacío: se usa el
     # de por defecto (título + hashtags, ver `textos.texto_x_por_defecto`).
     texto_x: str = ""
+    # LinkedIn publica fotos (portada + fotogramas) y un texto largo, no el
+    # vídeo: `texto_linkedin` es el post completo, revisado por el usuario.
+    fotos: tuple[Path, ...] = ()
+    texto_linkedin: str = ""
 
 
 @dataclass(frozen=True)

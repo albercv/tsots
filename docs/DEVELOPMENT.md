@@ -141,6 +141,7 @@ videopipeline/       pipeline (steps, subtitles, caption, opening title,
 videopipeline/redes/ publishing to TikTok, YouTube, Instagram, X, Facebook
 clearvoice/          ClearVoice library (upstream, Apache-2.0)
 lanzador/            native launcher + build script for the .app bundle
+lanzador/blog/       agent the app starts to draft blog posts (see Blog agent)
 locale/              gettext catalogs (see Translations)
 tests/               pytest + pytest-qt
 ```
@@ -941,6 +942,72 @@ thread, for the account lookups (when the Publish dialog opens and on
   `location` capability it answers 400 `tiktok_reconnect_required`. A
   location field the service rejects is ignored: it publishes anyway and
   says so in `warnings` (kept in the publication log).
+
+## Blog agent
+
+`lanzador/blog/` turns each hand-off folder that the "Blog y LinkedIn" step
+writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
+
+- The app starts it. `videopipeline.difusion.lanzar_agente()` runs
+  `procesar_pendientes.sh ~/TSOTS/blog` detached (`start_new_session`,
+  stdin from `/dev/null`, output appended to `~/TSOTS/blog/agente.log`) and
+  does not wait for it. `reproceso` calls it right after the step records
+  the folder, and the main window calls it once at startup
+  (`QTimer.singleShot(0, …)`) for folders left from an earlier session. It
+  does nothing when the script is missing or `pendientes/` has no visible
+  folder, and never raises (an `OSError` is logged as a warning). So
+  folders are only picked up while the app runs.
+- No launchd: on the first real run (2026-11-08) launchd could not run the
+  script from a project inside `~/Documents` ("Operation not permitted",
+  macOS privacy). A process the app starts gets the app's access.
+- In tests the `sin_agente_del_blog` fixture (`tests/conftest.py`) points
+  `difusion.AGENTE` at a missing file, so no test starts the real agent or
+  touches `~/TSOTS/blog`.
+- The script takes a lock (`~/TSOTS/blog/.bloqueo/`): a second start while
+  one runs logs "bloqueo activo" and exits. A lock left by a killed run is
+  taken over once it is older than 180 min (each folder touches it). Both
+  cases are logged in `agente.log`.
+- After the folders it found, it scans `pendientes/` again until a scan
+  finds nothing new, so a folder written meanwhile (whose own start hit the
+  lock) is handled in the same run. Each name is handled at most once per
+  run, so a folder that could not be moved never loops.
+- It skips hidden folders (`.<name>.tmp` is still being written) and runs
+  `claude -p` from each folder with `instrucciones.md` (`@PYTHON@` becomes
+  the install's `.venv-clearvoice/bin/python`), with a 30 min limit
+  (`perl -e 'alarm …'`, since macOS has no `timeout`). Claude's output goes
+  to `claude.log` in the folder.
+- Allowed tools, nothing else: `posts_create`, `posts_request_upload`,
+  `posts_validate`, `posts_set_cover` and `posts_list_media` from the
+  claude.ai connector "claude.ai E2D - Blog" (`mcp__claude_ai_E2D_-_Blog__*`),
+  `Read`, `Write` and `Bash(<python> -m videopipeline.blog_subida:*)`. No
+  delete or frontmatter tool, so the agent cannot publish or remove an
+  existing post. `posts_update_frontmatter`, `posts_delete`,
+  `posts_update_body` and `posts_rebuild` also go in `--disallowedTools`:
+  deny rules win over allow rules and any permission mode.
+- `posts_create` defaults to `published: true`, so the run gets a
+  PreToolUse hook (`claude --settings`) running `guarda_borrador.sh`. It
+  blocks the call (exit 2) unless `tool_input.published` is the boolean
+  `false`.
+- Claude writes the article (E2D tone and MDX components), creates it with
+  `published: false`, uploads the cover, the video and 2-3 frames with
+  `videopipeline.blog_subida`, validates, sets the cover and writes
+  `resultado.json` (`slug`, `locale`, `url`). Right after creating the
+  draft it writes `borrador.json` (`slug`, `locale`).
+- With a `url` in `resultado.json` the folder moves to `hechos/` and its
+  `video.mp4` is deleted (the draft holds the video; the file is a hard link
+  to the output or a full copy). Otherwise it moves to `errores/`, with
+  `motivo.txt` (timeout, the draft's slug if `borrador.json` exists, last 40
+  lines of `claude.log`). To retry, move it back to `pendientes/`; if a draft
+  was already created, a retry creates another one.
+- A folder that cannot be moved (its name already exists in `hechos/` or
+  `errores/`) is renamed to `pendientes/.<name>.no-movida`, so it is not run
+  again on every start.
+- `claude` is looked up in PATH, `~/.local/bin` and `/opt/homebrew/bin`;
+  without it every folder goes to `errores/`.
+- Run it by hand: `lanzador/blog/procesar_pendientes.sh ~/TSOTS/blog`.
+- `desinstalar.command` still unloads and deletes
+  `~/Library/LaunchAgents/com.tsots.blog.plist` when an older install left
+  it; it keeps `~/TSOTS/blog`.
 
 ## App bundle (Dock icon)
 

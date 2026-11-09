@@ -7,13 +7,18 @@
 A Mac desktop app that gets a talking-head video ready to publish: it
 cleans the noise out of the voice, cuts the silences, burns Reels-style
 subtitles and writes an SEO title, caption and hashtags with a local AI
-model. Everything runs on your Mac; nothing is uploaded anywhere.
+model. It can also prepare a blog article draft and a LinkedIn post from
+the video. Everything runs on your Mac; nothing is uploaded anywhere unless
+you publish it or tick **Blog and LinkedIn** (see
+[Blog and LinkedIn](#blog-and-linkedin)).
 
 | Input | Output |
 |---|---|
 | `talk.mov` (any video with speech) | `talk_limpio.mp4` (clean voice, no silences, optional subtitles) |
 | | `talk_limpio.srt` (subtitles, if enabled) |
 | | `talk_limpio.md` (SEO title, caption and hashtags, if enabled) |
+| | `talk_limpio.linkedin.md` and `talk_limpio.linkedin/` (LinkedIn post and its photos, if **Blog and LinkedIn** is on) |
+| | `~/TSOTS/blog/pendientes/<date>-talk/` (hand-off folder for the blog draft, same option) |
 
 ## Requirements
 
@@ -25,6 +30,10 @@ model. Everything runs on your Mac; nothing is uploaded anywhere.
   subtitles. After that it works offline.
 - Memory: 16 GB is enough for everything except large language models;
   the app tells you which ones fit on your Mac.
+- Only for the blog draft (**Blog and LinkedIn**): the
+  [Claude Code](https://claude.com/claude-code) `claude` command, logged in
+  with an account that has the **claude.ai E2D - Blog** connector. The
+  LinkedIn post only needs Ollama.
 
 The installer takes care of Homebrew, Python, ffmpeg, auto-editor and
 Ollama. No programming knowledge needed.
@@ -106,6 +115,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the
      tooltip says why. The caption is written in the subtitle language.
+   - **Blog and LinkedIn** (checkbox in the SEO caption section): at the
+     end, prepares a LinkedIn post with photos and a folder for a blog
+     article draft (see [Blog and LinkedIn](#blog-and-linkedin)). It is
+     done **once per video**. To publish the LinkedIn post from
+     **Publish…**, tick the SEO caption too: Publish… needs it to open.
    - **Vertical format**: also saves `name_limpio_vertical.mp4` (9:16,
      1080x1920) for Reels and TikTok; without audio or silences selected,
      only `name_vertical.mp4` is written. Framings: centre crop (default),
@@ -192,6 +206,10 @@ takes up.
   caption is kept.
 - **Caption only** can be requested on an already processed video: it uses
   whatever transcript exists and does not touch the picture.
+- **Blog and LinkedIn** is done once per video: ticking it on an already
+  processed video runs it, but processing the video again does not create
+  another draft or post, even if you deleted them. If it failed, it is
+  tried again the next time you process the video with the box ticked.
 - **Publish…** works with any video that has a result and a caption. If the
   `.md` next to the video is missing, the app writes it again from the
   record.
@@ -277,12 +295,47 @@ when it found its `.md` next to the video.
 - The duplicate copies you already have (`x_limpio_limpio.mp4`…) are not
   deleted: delete them yourself.
 
+## Blog and LinkedIn
+
+With **Blog and LinkedIn** ticked, after the video the app picks six sharp
+frames spread over the video (preferring ones with your whole face) from
+the version without subtitles, composes a cover with the short title, and
+asks the local model (Ollama) for a LinkedIn post of 1,300 to 2,500
+characters with 3 to 5 hashtags. Next to the video it leaves:
+
+- `name_limpio.linkedin.md`: the text of the LinkedIn post.
+- `name_limpio.linkedin/`: the 4:5 cover, up to three frames and
+  `candidatos/` (all the frames, to swap them in **Publish…**).
+
+For the blog it writes a folder to `~/TSOTS/blog/pendientes/` with the
+video, the transcript, the 16:9 cover, the frames and their data. The app
+hands the pending folders to the blog agent when it finishes a video and
+when it opens (folders left from an earlier session), so they are only
+picked up while the app is running; there is nothing to install or allow
+in the macOS settings. For each folder the agent runs `claude` in the
+background to write the article in the evolve2digital.com style and upload
+the cover, frames and video. It needs `claude` logged in with the
+**claude.ai E2D - Blog** connector. The article is always created as a **draft**: the agent cannot publish
+or delete posts. Review and publish it yourself on the blog. Each folder
+then moves to:
+
+- `~/TSOTS/blog/hechos/`: done, with `resultado.json` holding the draft's
+  link. Its copy of the video is deleted (the draft already has it).
+- `~/TSOTS/blog/errores/`: failed, with the reason in `motivo.txt`. To try
+  again, move the folder back to `pendientes/` (it is retried on the next
+  processed video or the next time the app opens); if `motivo.txt` says the
+  draft was already created, check it first, because a retry creates
+  another one.
+
+The agent's log is `~/TSOTS/blog/agente.log`. A failure in this step
+never stops the video: it is saved anyway, with a warning.
+
 ## Publish to social networks
 
 From a finished video with a caption, **Publish…** sends it to **TikTok →
-YouTube → Instagram → X → Facebook**, in that order. Nothing is published
-automatically: you review the title, caption, hashtags and the text for
-X, tick the platforms, press **Publish** and confirm. A failure on one platform does not stop the
+YouTube → Instagram → X → Facebook → LinkedIn**, in that order. Nothing is published
+automatically: you review the title, caption, hashtags and the texts for
+X and LinkedIn, tick the platforms, press **Publish** and confirm. A failure on one platform does not stop the
 others; each row shows its progress and, at the end, a link or the error.
 
 TikTok and YouTube only let audited apps post publicly, so TSOTS publishes
@@ -292,9 +345,10 @@ uploads a month). Requirements:
 
 1. An Upload-Post account.
 2. In Upload-Post, a **profile** with your networks connected (TikTok,
-   YouTube, Instagram, X, Facebook: the ones you use). Instagram must be a
-   **professional** account (Business or Creator). On Facebook you can
-   only post to a **Page**, not to a personal profile.
+   YouTube, Instagram, X, Facebook, LinkedIn: the ones you use). Instagram
+   must be a **professional** account (Business or Creator). On Facebook
+   you can only post to a **Page**, not to a personal profile. LinkedIn
+   posts go to your **personal profile**, not to a company page.
 3. Your Upload-Post **API key**.
 
 It is not clear whether X and Facebook are part of Upload-Post's free
@@ -339,6 +393,15 @@ What each mode does:
 | Facebook | **Reel** (default) | A reel published on your Page. |
 | Facebook | **Regular video** | A video published on your Page. |
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
+| LinkedIn | **Photo post** | A post on your personal profile with the text and the photos. |
+
+**LinkedIn.** It only appears enabled when the video has its LinkedIn post
+(**Blog and LinkedIn**). It publishes **photos and text, not the video**
+(LinkedIn does not mix them in one post), with no link to the blog. You
+can edit the text (up to **3,000 characters**; an empty one disables
+LinkedIn) and change the photos: **Remove** one, **Add…** another frame
+(or **Another image…** from disk), or drag an image onto the strip.
+What you edit is published but not saved to `.linkedin.md`.
 
 **Location.** Posts are tagged with **Madrid** unless you choose otherwise
 in Networks… (**Location** row under "When publishing", **Change…**
@@ -383,7 +446,7 @@ refunds it if you cancel before the time.
 **Scheduled…** (bottom bar, next to Networks…) opens a month calendar with
 everything pending in Upload-Post, including what you schedule on its
 website. Each day shows the time, the networks' initials (TT, YT, IG, X,
-FB) and the title. Click a label to see each network with its **Cancel**
+FB, LI) and the title. Click a label to see each network with its **Cancel**
 button (and **Cancel all**). Cancelling asks for confirmation; if the video
 was scheduled from TSOTS, Publish stops warning that it is already
 scheduled. To change the time, cancel and schedule again.
@@ -397,6 +460,10 @@ scheduled. To change the time, cancel and schedule again.
   or the caption failed and the video was saved without them). Hover to
   read it.
 - "**Missing dependencies**" on launch: run `instalar.command` again.
+- No blog draft: look in `~/TSOTS/blog/errores/<folder>/motivo.txt` and in
+  `~/TSOTS/blog/agente.log`. Check that `claude` is logged in and has the
+  **claude.ai E2D - Blog** connector. A folder still in `pendientes/` is
+  sent to the agent again the next time you open the app.
 - The **caption** is not generated: check that the Ollama app is open
   (menu bar icon) and press ↻ next to the model selector. To add models:
   `ollama pull name` in Terminal, then ↻.
@@ -411,6 +478,7 @@ cleaning, Apache-2.0), [auto-editor](https://auto-editor.com) (silences),
 [mlx-whisper](https://github.com/ml-explore/mlx-examples/tree/main/whisper)
 (transcription on the Apple GPU; faster-whisper on macOS 13), ffmpeg (video), [Ollama](https://ollama.com) (local
 language model), [Upload-Post](https://www.upload-post.com) (publishing,
+optional), [Claude Code](https://claude.com/claude-code) (blog drafts,
 optional), PySide6 (interface). Technical docs in
 `docs/DEVELOPMENT.md`; translations live in `locale/` (add a language by
 adding a `.po` file — see the development docs).
