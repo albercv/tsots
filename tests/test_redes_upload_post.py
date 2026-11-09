@@ -847,6 +847,41 @@ def test_cuentas_formas_de_respuesta(envoltorio):
     assert cuentas[Plataforma.FACEBOOK].premium is None
 
 
+def test_perfiles_de_la_cuenta():
+    cuerpo = {"success": True, "profiles": [
+        {"username": "personal", "social_accounts": {}}, {"profile": "sixpodcast"},
+        {"name": " tercero "}, {"username": "", "name": "cuarto"},
+        {"social_accounts": {}}, "basura", {"username": "personal"}]}
+    servidor = Servidor(_responder_json(cuerpo))
+    assert _proveedor(servidor, perfil="").perfiles() == [
+        "personal", "sixpodcast", "tercero", "cuarto"]
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert str(peticion.url) == "https://api.upload-post.com/api/uploadposts/users"
+    assert peticion.headers["authorization"] == f"Apikey {CLAVE}"
+
+
+@pytest.mark.parametrize("codigo, cuerpo, texto", [
+    (200, {"success": True}, "inesperada"),
+    (200, {"profiles": "x"}, "inesperada"),
+    (401, {"message": "Invalid API key"}, "API key"),
+    (500, {"message": f"boom {CLAVE}"}, "500"),
+])
+def test_perfiles_errores_legibles_y_sin_clave(codigo, cuerpo, texto):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, codigo))).perfiles()
+    assert texto in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+def test_perfiles_sin_red():
+    def sin_red(request, servidor):
+        raise httpx.ConnectError(f"sin red {CLAVE}", request=request)
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(sin_red)).perfiles()
+    assert CLAVE not in str(error.value)
+
+
 def test_cuentas_x_sin_capacidad_clara_no_decide_premium():
     sa = _cuentas_json(x={"handle": "yo", "capabilities": ["post", "video"]})
     cuentas = _proveedor(Servidor(_responder_json({"social_accounts": sa}))).cuentas()

@@ -4,12 +4,14 @@ from __future__ import annotations
 import pytest
 from PySide6.QtCore import QSettings
 
+from app import credenciales, cuentas
 from app.credenciales import huella_perfil
 from app.settings import Ajustes
+from tests.redes_falsos import ProveedorFalso
 from videopipeline.redes.modelo import (
     Ciudad, Cuenta, ModoFacebook, ModoInstagram, ModoTikTok, Pagina, Plataforma,
 )
-from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO as P
+from videopipeline.redes.proveedor import PROVEEDOR_POR_DEFECTO as P, ErrorConsulta
 
 T, Y, I, X = Plataforma.TIKTOK, Plataforma.YOUTUBE, Plataforma.INSTAGRAM, Plataforma.X
 
@@ -162,3 +164,24 @@ def test_lista_de_perfiles_estropeada_es_vacia(ajustes):
     assert ajustes.perfiles_de(P) == []
     ajustes._q.setValue(f"redes/perfiles/{P}", '["ok", 5, "  "]')
     assert ajustes.perfiles_de(P) == ["ok"]
+
+
+def test_listar_perfiles_nunca_lanza(llavero_falso):
+    pedidos = []
+
+    def fabrica(perfiles):
+        def crear(nombre, clave, datos):
+            pedidos.append((clave, datos))
+            return ProveedorFalso(perfiles_cuenta=perfiles)
+        return crear
+
+    assert cuentas.listar_perfiles(credenciales, fabrica(["a"]), P) == (
+        None, "Falta la API key del servicio: guárdala en Redes…")
+    assert cuentas.listar_perfiles(credenciales, fabrica(["a", "b"]), P, clave="k") == (
+        ["a", "b"], "")
+    assert pedidos[-1] == ("k", {"perfil": "", "pagina_facebook": ""})
+    assert cuentas.listar_perfiles(credenciales, fabrica(ErrorConsulta("401 mala")), P,
+                                   clave="k") == (None, "401 mala")
+    perfiles, motivo = cuentas.listar_perfiles(
+        credenciales, fabrica(RuntimeError("clave-secreta")), P, clave="clave-secreta")
+    assert perfiles is None and "RuntimeError" in motivo and "clave-secreta" not in motivo

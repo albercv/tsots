@@ -132,7 +132,7 @@ def test_consultas_fallidas_lanzan_error_consulta_sin_la_clave(nombre, responder
     peticiones: list = []
     p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(responder, peticiones))
-    for consulta in (p.cuentas, p.paginas_facebook, lambda: p.lugares_tiktok("Madrid"),
+    for consulta in (p.cuentas, p.perfiles, p.paginas_facebook, lambda: p.lugares_tiktok("Madrid"),
                      p.programadas, lambda: p.cancelar("ref-1")):
         with pytest.raises(ErrorConsulta) as error:
             consulta()

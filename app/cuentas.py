@@ -80,6 +80,23 @@ def buscar_lugares(llavero, fabrica: Fabrica, nombre: str, datos: dict, texto: s
             tipo=type(e).__name__)
 
 
+def listar_perfiles(llavero, fabrica: Fabrica, nombre: str, *,
+                    clave: str | None = None) -> tuple[list[str] | None, str]:
+    """Perfiles de la cuenta del servicio: `(perfiles, "")` o `(None, motivo)`.
+    Para fuera del hilo de la interfaz: nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre,
+                                {"perfil": "", "pagina_facebook": ""}, clave)
+    if servicio is None:
+        return None, error
+    try:
+        return servicio.perfiles(), ""
+    except proveedores.ErrorConsulta as e:
+        return None, str(e)
+    except Exception as e:
+        return None, _("Error inesperado al buscar los perfiles ({tipo}).").format(
+            tipo=type(e).__name__)
+
+
 def programadas(llavero, fabrica: Fabrica, nombre: str,
                 datos: dict) -> tuple[list[Programada] | None, str]:
     """Lo programado en el servicio: `(lista, "")` o `(None, motivo)`. Para
