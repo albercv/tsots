@@ -76,8 +76,9 @@ class DialogoPublicarShorts(DialogoPublicar):
         for widget in (self.casillas[Plataforma.LINKEDIN], self.modos[Plataforma.LINKEDIN],
                        self.estados[Plataforma.LINKEDIN]):
             widget.hide()
-        self.layout().insertWidget(1, self._crear_lista())
+        self.contenido.layout().insertWidget(1, self._crear_lista())
         self._refrescar()
+        self.ajustar_a_la_pantalla()
 
     # --- la lista ---
 

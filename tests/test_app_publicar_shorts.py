@@ -235,3 +235,23 @@ def test_shorts_abre_con_el_perfil_del_video_largo(qtbot, carpeta, ajustes):
     qtbot.addWidget(dialogo)
     assert ajustes.perfil_redes == "six"
     assert dialogo.selector_perfil.currentText() == "six"
+
+
+def test_el_dialogo_de_shorts_cabe_en_la_pantalla_y_publicar_se_ve(qtbot, carpeta, ajustes,
+                                                                    monkeypatch):
+    """La lista de shorts va dentro de la zona con scroll: el diálogo no pasa
+    del alto útil y los botones quedan fijos abajo."""
+    from PySide6.QtCore import QPoint, QRect
+
+    class PantallaBaja:
+        def availableGeometry(self):
+            return QRect(0, 0, 1440, 400)
+
+    monkeypatch.setattr(DialogoPublicarShorts, "screen", lambda self: PantallaBaja())
+    dialogo, _ = _dialogo(qtbot, carpeta, ajustes)
+    assert dialogo.contenido.sizeHint().height() > 400
+    dialogo.show()
+    qtbot.waitExposed(dialogo)
+    assert dialogo.height() <= 400
+    abajo = dialogo.boton_publicar.mapTo(dialogo, QPoint(0, dialogo.boton_publicar.height()))
+    assert abajo.y() <= dialogo.height()
