@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMessageBox
 
 from app import credenciales, cuentas
@@ -364,3 +365,26 @@ def test_quitar_perfil_pide_confirmacion_y_borra_sus_datos(qtbot, ajustes, llave
     assert ajustes.de_perfil(P, "six").x_premium is False
     assert dialogo.campo_perfil.text() == "personal"
     assert dialogo.combo_tiktok.currentData() == ModoTikTok.PUBLICO.value
+
+
+def test_escribir_un_perfil_nuevo_y_guardar_sin_perder_el_foco(qtbot, ajustes,
+                                                               llavero_falso):
+    """En macOS Guardar no quita el foco al campo: no sale `editingFinished`."""
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    dialogo.campo_perfil.setText("")
+    QTest.keyClicks(dialogo.campo_perfil, "sixpodcast")
+    assert dialogo.pagina_elegida() is None
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.BORRADOR.value
+    dialogo.combo_instagram.setCurrentIndex(
+        dialogo.combo_instagram.findData(ModoInstagram.NORMAL.value))
+    dialogo.accept()
+    assert ajustes.perfil_redes == "sixpodcast"
+    nuevo = ajustes.de_perfil(P, "sixpodcast")
+    assert nuevo.pagina_facebook is None
+    assert nuevo.instagram_modo == ModoInstagram.NORMAL  # lo editado después se guarda
+    personal = ajustes.de_perfil(P, "personal")
+    assert personal.pagina_facebook == Pagina("111", "Personal")
+    assert personal.tiktok_modo == ModoTikTok.PUBLICO
+    assert personal.instagram_modo == ModoInstagram.PRUEBA

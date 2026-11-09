@@ -143,6 +143,9 @@ class DialogoRedes(QDialog):
         self.campo_perfil.textChanged.connect(self._refrescar_perfil)
         self.campo_perfil.textChanged.connect(self._refrescar_quitar)
         self.combo_perfil.activated.connect(self._al_cambiar_perfil)
+        # textEdited: el perfil escrito se carga al teclear, sin depender del foco
+        # (en macOS Guardar no lo quita del campo y `editingFinished` no salta).
+        self.campo_perfil.textEdited.connect(self._al_cambiar_perfil)
         self.campo_perfil.editingFinished.connect(self._al_cambiar_perfil)
 
         self.campo_clave = QLineEdit()
