@@ -145,6 +145,7 @@ def test_envia_cada_short_con_su_fecha_y_apunta_su_registro(
     assert "Programados 2 de 2" in dialogo.etiqueta_estado.text()
     assert "Programado" in dialogo.filas[0].estado.text()
     assert not dialogo.publicando and dialogo.casillas[T].isEnabled() is True
+    assert dialogo.perfil_usado == "mi_perfil"
 
 
 def test_x_se_bloquea_por_short_largo_sin_premium(qtbot, carpeta, ajustes, llavero_falso,
@@ -223,3 +224,14 @@ def test_linkedin_no_se_ofrece_ni_se_envia(qtbot, carpeta, ajustes, llavero_fals
     assert {c[1] for c in proveedor.llamadas} == {T}
     # Y no la quita de las elegidas: es del vídeo largo.
     assert ajustes.plataformas_redes == [T, linkedin_]
+
+
+def test_shorts_abre_con_el_perfil_del_video_largo(qtbot, carpeta, ajustes):
+    ajustes.anadir_perfil(PROVEEDOR_POR_DEFECTO, "six")
+    dialogo = DialogoPublicarShorts(
+        shorts.listar(carpeta), ajustes, fabrica=lambda n, c, d: ProveedorFalso(),
+        medir=lambda mp4: DURACIONES[Path(mp4).name], ahora=lambda: AHORA, zona=MADRID,
+        perfil="six")
+    qtbot.addWidget(dialogo)
+    assert ajustes.perfil_redes == "six"
+    assert dialogo.selector_perfil.currentText() == "six"

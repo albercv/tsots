@@ -501,7 +501,7 @@ def test_boton_deshabilitado_sin_clave_perfil_o_plataformas(qtbot, video, ajuste
     ajustes.perfil_redes = "yo"
     dialogo.refrescar_servicio()
     assert dialogo.boton_publicar.isEnabled()
-    assert "yo" in dialogo.etiqueta_servicio.text()
+    assert dialogo.selector_perfil.currentText() == "yo"
     for casilla in dialogo.casillas.values():
         casilla.setChecked(False)
     assert not dialogo.boton_publicar.isEnabled()

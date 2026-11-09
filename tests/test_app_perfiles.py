@@ -1,6 +1,8 @@
 """Varios perfiles de publicación: ajustes, selector y diálogos (sin red ni Llavero real)."""
 from __future__ import annotations
 
+import threading
+
 import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtTest import QTest
@@ -9,10 +11,13 @@ from PySide6.QtWidgets import QMessageBox
 from app import credenciales, cuentas
 from app.credenciales import huella_perfil
 from app.settings import Ajustes
+from app.widgets.dialogo_publicar import DialogoPublicar
 from app.widgets.dialogo_redes import DialogoRedes
 from app.widgets.selector_perfil import SelectorPerfil
 from tests.redes_falsos import ProveedorFalso
-from tests.test_app_redes import CLAVE, _esperar_consultas, _redes
+from tests.test_app_redes import (  # noqa: F401  (los fixtures autouse cuentan aquí)
+    CLAVE, _caption, _esperar_consultas, _redes, duracion_falsa, sin_hilos_colgando, video,
+)
 from videopipeline.redes.modelo import (
     Ciudad, Cuenta, ModoFacebook, ModoInstagram, ModoTikTok, Pagina, Plataforma,
 )
@@ -388,3 +393,78 @@ def test_escribir_un_perfil_nuevo_y_guardar_sin_perder_el_foco(qtbot, ajustes,
     assert personal.pagina_facebook == Pagina("111", "Personal")
     assert personal.tiktok_modo == ModoTikTok.PUBLICO
     assert personal.instagram_modo == ModoInstagram.PRUEBA
+
+
+def _publicar(qtbot, video, ajustes, fabrica=None, **kwargs):
+    dialogo = DialogoPublicar(video, _caption(), ajustes,
+                              fabrica=fabrica or (lambda n, c, d: ProveedorFalso()), **kwargs)
+    qtbot.addWidget(dialogo)
+    return dialogo
+
+
+def test_publicar_abre_con_el_perfil_de_la_ficha(qtbot, video, ajustes, llavero_falso):
+    _dos_perfiles(ajustes)
+    credenciales.guardar(P, CLAVE)
+    dialogo = _publicar(qtbot, video, ajustes, perfil="six")
+    assert ajustes.perfil_redes == "six"
+    assert dialogo.selector_perfil.currentText() == "six"
+    assert dialogo.etiqueta_servicio.text().startswith("Vía")
+    assert "six" not in dialogo.etiqueta_servicio.text()  # el perfil ya lo dice el selector
+
+
+def test_publicar_con_un_perfil_que_ya_no_existe_deja_el_activo(qtbot, video, ajustes,
+                                                                llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = _publicar(qtbot, video, ajustes, perfil="borrado")
+    assert ajustes.perfil_redes == "personal"
+    assert dialogo.selector_perfil.currentText() == "personal"
+
+
+def test_cambiar_de_perfil_al_publicar_recarga_sus_datos(qtbot, video, ajustes,
+                                                         llavero_falso):
+    _dos_perfiles(ajustes)  # sin clave: no consulta, se ven las cuentas guardadas
+    dialogo = _publicar(qtbot, video, ajustes)
+    assert dialogo.etiqueta_ubicacion.text().startswith("Madrid")
+    assert dialogo._cuentas[T].nombre == "Personal TT"
+    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [T]
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.PUBLICO.value
+    _elegir(dialogo.selector_perfil, "six")
+    assert ajustes.perfil_redes == "six"
+    assert dialogo.etiqueta_ubicacion.text().startswith("Sevilla")
+    assert dialogo._cuentas[T].nombre == "Six TT"
+    assert [p for p, c in dialogo.casillas.items() if c.isChecked()] == [Y]
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.BORRADOR.value
+    assert dialogo.campo_caption.toPlainText() == "Cuerpo del caption"  # no se regenera
+
+
+def test_el_selector_se_bloquea_mientras_publica(qtbot, video, ajustes, llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = _publicar(qtbot, video, ajustes)
+    dialogo._bloquear(True)
+    assert not dialogo.selector_perfil.isEnabled()
+    dialogo._bloquear(False)
+    assert dialogo.selector_perfil.isEnabled()
+
+
+def test_respuesta_tardia_de_otro_perfil_no_se_guarda(qtbot, video, ajustes, llavero_falso):
+    _dos_perfiles(ajustes)
+    credenciales.guardar(P, CLAVE)
+    soltar = threading.Event()
+
+    class Lento(ProveedorFalso):
+        def cuentas(self):
+            soltar.wait(5)
+            return super().cuentas()
+
+    def fabrica(nombre, clave, datos):
+        if datos["perfil"] == "personal":
+            return Lento()
+        return ProveedorFalso(cuentas_conectadas=ErrorConsulta("caído"))
+
+    dialogo = _publicar(qtbot, video, ajustes, fabrica)
+    _elegir(dialogo.selector_perfil, "six")
+    soltar.set()
+    _esperar_consultas(qtbot)
+    assert ajustes.de_perfil(P, "six").cuentas_guardadas().cuentas[T].nombre == "Six TT"
+    assert ajustes.de_perfil(P, "personal").cuentas_guardadas().cuentas[T].nombre == (
+        "Personal TT")

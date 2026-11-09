@@ -614,6 +614,56 @@ def test_publicar_abre_dialogo_con_video_y_caption(qtbot, tmp_path, monkeypatch)
     assert ajustes is ventana.ajustes
 
 
+def test_publicar_propone_el_perfil_de_la_ficha_y_anota_el_usado(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    ficha.perfil = "six"
+    guardar(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    propuestos = []
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+        perfil_usado = "personal"
+
+        def __init__(self, *args, perfil="", **kwargs):
+            super().__init__(*args, **kwargs)
+            propuestos.append(perfil)
+            self.ajustes = args[2]
+
+        def exec(self):
+            self.ajustes.perfil_redes = "personal"
+            return 0
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    assert propuestos == ["six"]
+    assert cargar(ficha.id).perfil == "personal"
+    assert ventana.cabecera.selector_perfil.currentText() == "personal"
+
+
+def test_publicar_shorts_propone_el_perfil_de_la_ficha(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.ajustes.anadir_perfil("upload_post", "six")
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    (carpeta / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "01 - Uno.mp4", "titulo": "Uno", "inicio": 0, "fin": 70}]}))
+    ficha.perfil = "six"
+    guardar(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    _eligiendo_la_fila(ventana)
+    activos = []
+    monkeypatch.setattr(
+        "app.widgets.dialogo_publicar_shorts.DialogoPublicarShorts.exec",
+        lambda self: activos.append(self.ajustes.perfil_redes))
+    ventana.panel.boton_publicar_shorts.click()
+    assert activos == ["six"]
+
+
 def test_publicar_sin_video_en_disco_avisa(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     salida = _hecho_con_caption(ventana, tmp_path)

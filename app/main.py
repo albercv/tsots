@@ -609,6 +609,9 @@ class VentanaPrincipal(QMainWindow):
 
     def _publicar(self) -> None:
         caption, video = self.panel_caption.caption, self.panel_caption.video
+        indices = self.vista_cola.selectedIndexes()
+        trabajo = self.modelo_cola.trabajo(indices[0].row()) if indices else None
+        ficha = self._ficha_de(trabajo) if trabajo else None
         if caption is None or video is None:
             QMessageBox.warning(
                 self, _("Publicar en redes"),
@@ -619,10 +622,12 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar en redes"),
                 _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
             return
-        dialogo = DialogoPublicar(video, caption, self.ajustes, parent=self)
+        dialogo = DialogoPublicar(video, caption, self.ajustes,
+                                  perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+        self._anotar_perfil(trabajo.ficha_id if trabajo else None, dialogo.perfil_usado)
         # El hilo de la subida no depende del diálogo (ver dialogo_publicar);
         # aun así, solo se libera cuando no publica.
         if not dialogo.publicando:
@@ -640,10 +645,13 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar shorts"),
                 _("El vídeo elegido no tiene shorts en su carpeta."))
             return
-        dialogo = DialogoPublicarShorts(cortos, self.ajustes, parent=self)
+        ficha = self._ficha_de(trabajo) if trabajo else None
+        dialogo = DialogoPublicarShorts(cortos, self.ajustes,
+                                        perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
+        self._anotar_perfil(trabajo.ficha_id, dialogo.perfil_usado)
         if not dialogo.publicando:  # como en `_publicar`
             dialogo.deleteLater()
         self._recargar_perfil()
