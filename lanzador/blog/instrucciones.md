@@ -21,12 +21,19 @@ Herramientas del blog que puedes usar (ninguna otra):
 - `mcp__claude_ai_E2D_-_Blog__posts_validate`
 - `mcp__claude_ai_E2D_-_Blog__posts_set_cover`
 - `mcp__claude_ai_E2D_-_Blog__posts_list_media`
+- `mcp__claude_ai_E2D_-_Blog__posts_search` (solo lectura)
+- `WebFetch`, solo para comprobar que una URL de evolve2digital.com carga
+
+Al final de estas instrucciones está la **Guía SEO y de redacción**: síguela
+al escribir el artículo.
 
 ## Pasos
 
 1. **Lee** `meta.json` y `transcripcion.txt` con `Read`.
 
 2. **Escribe el artículo** en MDX:
+   - Antes de escribir, elige la palabra clave principal y las secundarias, y
+     busca los enlaces internos (guía, apartados 1 y 4).
    - En el idioma de `meta.idioma` (`es`, `en` o `it`).
    - Tono E2D: directo, escéptico y apoyado en datos, pensado para pymes.
      Puede ir en primera persona: el autor es quien habla en el vídeo.
@@ -41,6 +48,8 @@ Herramientas del blog que puedes usar (ninguna otra):
      - al menos un `<Callout type="info">…</Callout>` o
        `<Callout type="warning">…</Callout>` con un consejo o una advertencia
        práctica;
+     - las preguntas frecuentes de la guía (apartado 3), si el vídeo da para
+       ellas;
      - si en el vídeo se citan fuentes (estudios, informes, webs), una línea
        final «Fuente: …» con ellas («Source:» en inglés, «Fonte:» en
        italiano); si no se cita ninguna, no la pongas;
@@ -49,8 +58,9 @@ Herramientas del blog que puedes usar (ninguna otra):
      inventes** cifras, nombres, fuentes, citas ni ejemplos: si un dato no
      está, no lo pongas.
    - Título (`title`): parte de `meta.titulo_seo`, o de `meta.titulo_corto` si
-     es `null`; que diga claramente de qué va el artículo.
-   - Descripción (`description`): 1-2 frases, 120-160 caracteres.
+     es `null`, y ajústalo a la guía (apartado 2): `titulo_seo` está pensado
+     para redes, no para Google.
+   - Descripción (`description`): según la guía (apartado 2).
 
 3. **Imágenes del artículo:**
    - Elige 2 o 3 fotogramas de `meta.candidatos` cuyo `texto` encaje con una
@@ -58,7 +68,8 @@ Herramientas del blog que puedes usar (ninguna otra):
    - Ponlos como `[image:fotograma_1]`, `[image:fotograma_2]` y
      `[image:fotograma_3]`, cada uno en su propia línea, dentro de la sección
      que encaja y numerados en el orden en que aparecen.
-   - Apunta qué `archivo` corresponde a cada `fotograma_N`.
+   - Apunta qué `archivo` corresponde a cada `fotograma_N` y escribe su texto
+     alternativo, y el de la portada, según la guía (apartado 5).
    - No uses `[image:…]` con ningún otro nombre.
 
 4. **Crea el borrador** con `mcp__claude_ai_E2D_-_Blog__posts_create`:
@@ -68,7 +79,7 @@ Herramientas del blog que puedes usar (ninguna otra):
    - `published: false`, siempre y escrito de forma explícita: si no lo
      pasas, el blog lo publica;
    - `tags`: 3-6 etiquetas cortas, en minúsculas, sacadas de
-     `meta.palabras_clave`.
+     `meta.palabras_clave` y de la palabra clave principal.
 
    Si una comprobación previa bloquea la llamada, corrige lo que diga y
    repítela.
@@ -87,11 +98,12 @@ Herramientas del blog que puedes usar (ninguna otra):
    - Llama a `mcp__claude_ai_E2D_-_Blog__posts_request_upload` con ese `slug`
      y `locale`. Devuelve un `uploadUrl`.
    - Ejecuta con `Bash` esta orden, sustituyendo `<uploadUrl>` (entre las
-     comillas simples) y poniendo un `--fichero` por cada fotograma elegido en
-     el paso 3:
+     comillas simples), poniendo un `--fichero` por cada fotograma elegido en
+     el paso 3 y un `--alt` con su texto alternativo, entre comillas simples,
+     por la portada y por cada fotograma:
 
      ```
-     @PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada --fichero video.mp4=video --fichero candidatos/candidato_03.jpg=fotograma_1 --fichero candidatos/candidato_05.jpg=fotograma_2 --portada portada
+     @PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada --fichero video.mp4=video --fichero candidatos/candidato_03.jpg=fotograma_1 --fichero candidatos/candidato_05.jpg=fotograma_2 --portada portada --alt 'portada=<texto>' --alt 'fotograma_1=<texto>' --alt 'fotograma_2=<texto>'
      ```
 
    - Es una sola orden: sin `cd`, sin `&&`, sin `;` y sin tuberías.

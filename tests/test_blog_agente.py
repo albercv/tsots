@@ -11,11 +11,13 @@ RAIZ = Path(__file__).resolve().parent.parent
 BLOG = RAIZ / "lanzador" / "blog"
 SCRIPT = BLOG / "procesar_pendientes.sh"
 INSTRUCCIONES = BLOG / "instrucciones.md"
+GUIA = BLOG / "guia_seo.md"
 GUARDA = BLOG / "guarda_borrador.sh"
 PYTHON = str(RAIZ / ".venv-clearvoice" / "bin" / "python")
 E2D = "mcp__claude_ai_E2D_-_Blog__"
 HERRAMIENTAS = [f"{E2D}posts_create", f"{E2D}posts_request_upload", f"{E2D}posts_validate",
-                f"{E2D}posts_set_cover", f"{E2D}posts_list_media", "Read", "Write",
+                f"{E2D}posts_set_cover", f"{E2D}posts_list_media", f"{E2D}posts_search",
+                "Read", "Write", "WebFetch(domain:evolve2digital.com)",
                 f"Bash({PYTHON} -m videopipeline.blog_subida:*)"]
 PROHIBIDAS = [f"{E2D}posts_update_frontmatter", f"{E2D}posts_delete",
               f"{E2D}posts_update_body", f"{E2D}posts_rebuild"]
@@ -66,10 +68,13 @@ def test_carpeta_con_resultado_pasa_a_hechos(tmp_path):
     carpeta = str(blog / "pendientes" / "2026-11-08-video")
     assert Path((hecho / "cwd.txt").read_text().strip()).resolve() == Path(carpeta).resolve()
     args = (hecho / "args.bin").read_text().split("\0")[:-1]
-    prompt = INSTRUCCIONES.read_text().rstrip("\n").replace("@PYTHON@", PYTHON)
+    prompt = (INSTRUCCIONES.read_text().rstrip("\n") + "\n\n"
+              + GUIA.read_text().rstrip("\n")).replace("@PYTHON@", PYTHON)
     assert args[:9] == ["-p", prompt, "--add-dir", carpeta, "--allowedTools", ",".join(HERRAMIENTAS),
                         "--disallowedTools", ",".join(PROHIBIDAS), "--settings"]
-    assert len(args) == 10
+    assert len(args) == 12
+    # Sin ajustes de usuario: sus plugins y hooks no llegan al agente.
+    assert args[10:] == ["--setting-sources", "project,local"]
     assert json.loads(args[9]) == {"hooks": {"PreToolUse": [{
         "matcher": f"{E2D}posts_create",
         "hooks": [{"type": "command", "command": f"/bin/bash '{GUARDA}'"}]}]}}
@@ -230,12 +235,22 @@ def test_instrucciones_prohiben_publicar():
 
 def test_instrucciones_nombran_herramientas_y_orden_de_subida():
     texto = INSTRUCCIONES.read_text()
-    for h in HERRAMIENTAS[:5]:
+    for h in HERRAMIENTAS[:6]:
         assert f"`{h}`" in texto
+    assert "`WebFetch`" in texto and "**Guía SEO y de redacción**" in texto
+    assert "--portada portada --alt 'portada=<texto>' --alt 'fotograma_1=<texto>'" in texto
     assert "@PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada" in texto
     for marca in ("<Lead>", "<PullQuote", "<Callout", "[video:video]", "[image:fotograma_1]",
                   "[contact]", "resultado.json", "borrador.json", 'cover: "portada"',
                   "https://evolve2digital.com/<locale>/blog/<slug>"):
+        assert marca in texto
+
+
+def test_guia_seo_fija_palabra_clave_enlaces_y_alt():
+    texto = " ".join(GUIA.read_text().split())
+    for marca in ("gana «no inventes»", "nunca más de 60", "de 130 a 155 caracteres",
+                  "## Preguntas frecuentes", f"{E2D}posts_search", "comprueba su `url` con `WebFetch`",
+                  "125 caracteres como mucho", "Sin comillas simples"):
         assert marca in texto
 
 

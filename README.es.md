@@ -313,8 +313,12 @@ app pasa las carpetas pendientes al agente del blog al terminar un vídeo y
 al abrirse (las que quedaron de otra sesión), así que solo se recogen con
 la app abierta; no hay nada que instalar ni que permitir en los ajustes de
 macOS. Por cada carpeta, el agente lanza `claude` en segundo plano para
-escribir el artículo con el estilo de evolve2digital.com y subir la
-portada, los fotogramas y el vídeo. Necesita `claude` con la sesión
+escribir el artículo con el estilo de evolve2digital.com, siguiendo una
+guía SEO (`lanzador/blog/guia_seo.md`: una palabra clave de búsqueda, título
+de 60 caracteres como mucho, entradilla que responde directamente,
+preguntas frecuentes si el vídeo da para ellas, textos alternativos en las
+imágenes y enlaces a posts publicados relacionados), y subir la portada,
+los fotogramas y el vídeo. Nunca añade datos que no estén en el vídeo. Necesita `claude` con la sesión
 iniciada y el conector **claude.ai E2D - Blog**. El artículo se crea siempre como **borrador**: el agente no puede
 publicar ni borrar posts. Revísalo y publícalo tú en el blog. Después,
 cada carpeta pasa a:
