@@ -1795,3 +1795,15 @@ def test_crear_shorts_anota_el_perfil_activo_en_la_ficha(qtbot, tmp_path, monkey
     _lanzando(ventana, monkeypatch)
     ventana.panel.boton_crear_shorts.click()
     assert cargar(ficha.id).perfil == "personal"
+
+
+def test_cerrar_redes_sin_guardar_tambien_avisa(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    avisos = []
+    ventana._configurar_redes(lambda: avisos.append(1))
+    assert avisos == [1]

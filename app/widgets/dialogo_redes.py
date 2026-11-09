@@ -79,6 +79,7 @@ class DialogoRedes(QDialog):
         # guarda al pulsar Guardar.
         self._comprobadas: tuple[str, dict[Plataforma, Cuenta | None]] | None = None
         self._paginas: dict[str, Pagina] = {}
+        self._perfil_cargado: str | None = None
         self.setWindowTitle(_("Redes sociales"))
         self.setMinimumWidth(600)
         raiz = QVBoxLayout(self)
@@ -107,11 +108,26 @@ class DialogoRedes(QDialog):
             max(0, self.combo_proveedor.findData(ajustes.proveedor_redes)))
         formulario.addRow(_("Servicio:"), self.combo_proveedor)
 
-        self.campo_perfil = QLineEdit()
+        # Editable: un perfil que no está en la lista se escribe a mano.
+        self.combo_perfil = QComboBox()
+        self.combo_perfil.setEditable(True)
+        self.combo_perfil.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.campo_perfil = self.combo_perfil.lineEdit()
         self.campo_perfil.setPlaceholderText(_("Nombre del perfil en el servicio"))
-        self.campo_perfil.setToolTip(_(
+        self.combo_perfil.setToolTip(_(
             "El perfil del servicio donde conectaste tus redes."))
-        formulario.addRow(_("Perfil:"), self.campo_perfil)
+        formulario.addRow(_("Perfil:"), self.combo_perfil)
+        self.boton_buscar_perfiles = QPushButton(_("Buscar perfiles"))
+        self.boton_buscar_perfiles.setToolTip(_(
+            "Pregunta al servicio qué perfiles tiene tu cuenta"))
+        self.boton_buscar_perfiles.clicked.connect(self._buscar_perfiles)
+        self.boton_quitar_perfil = QPushButton(_("Quitar perfil"))
+        self.boton_quitar_perfil.clicked.connect(self._quitar_perfil)
+        fila_perfiles = QHBoxLayout()
+        fila_perfiles.addWidget(self.boton_buscar_perfiles)
+        fila_perfiles.addWidget(self.boton_quitar_perfil)
+        fila_perfiles.addStretch(1)
+        formulario.addRow("", fila_perfiles)
         # Qué es el perfil lo explica cada proveedor (texto propio del servicio).
         self.ayuda_perfil = QLabel()
         self.ayuda_perfil.setWordWrap(True)
@@ -125,6 +141,9 @@ class DialogoRedes(QDialog):
         self.aviso_perfil.hide()
         formulario.addRow("", self.aviso_perfil)
         self.campo_perfil.textChanged.connect(self._refrescar_perfil)
+        self.campo_perfil.textChanged.connect(self._refrescar_quitar)
+        self.combo_perfil.activated.connect(self._al_cambiar_perfil)
+        self.campo_perfil.editingFinished.connect(self._al_cambiar_perfil)
 
         self.campo_clave = QLineEdit()
         self.campo_clave.setEchoMode(QLineEdit.EchoMode.Password)
@@ -173,31 +192,19 @@ class DialogoRedes(QDialog):
         self.combo_tiktok = QComboBox()
         for modo in ModoTikTok:
             self.combo_tiktok.addItem(_(ETIQUETAS_TIKTOK[modo]), modo.value)
-        self.combo_tiktok.setCurrentIndex(
-            self.combo_tiktok.findData(ajustes.tiktok_modo.value))
         formulario_defecto.addRow("TikTok:", self.combo_tiktok)
         self.combo_categoria = QComboBox()
         for codigo, nombre in CATEGORIAS_YOUTUBE.items():
             self.combo_categoria.addItem(_(nombre), codigo)
-        indice = self.combo_categoria.findData(ajustes.youtube_categoria)
-        if indice < 0:  # categoría guardada que no está en la lista
-            self.combo_categoria.addItem(ajustes.youtube_categoria, ajustes.youtube_categoria)
-            indice = self.combo_categoria.count() - 1
-        self.combo_categoria.setCurrentIndex(indice)
         formulario_defecto.addRow(_("Categoría de YouTube:"), self.combo_categoria)
         self.combo_instagram = QComboBox()
         for modo in ModoInstagram:
             self.combo_instagram.addItem(_(ETIQUETAS_INSTAGRAM[modo]), modo.value)
-        self.combo_instagram.setCurrentIndex(
-            self.combo_instagram.findData(ajustes.instagram_modo.value))
         formulario_defecto.addRow("Instagram:", self.combo_instagram)
         self.combo_facebook = QComboBox()
         for modo in ModoFacebook:
             self.combo_facebook.addItem(_(ETIQUETAS_FACEBOOK[modo]), modo.value)
-        self.combo_facebook.setCurrentIndex(
-            self.combo_facebook.findData(ajustes.facebook_modo.value))
         self.casilla_x_premium = QCheckBox(_("Mi cuenta de X tiene Premium"))
-        self.casilla_x_premium.setChecked(ajustes.x_premium)
         self.casilla_x_premium.setToolTip(_(
             "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un "
             "solo post."))
@@ -296,25 +303,67 @@ class DialogoRedes(QDialog):
 
     def _al_cambiar_proveedor(self, *args) -> None:
         usa_perfil = proveedores.usa_perfil(self.proveedor)
-        self.campo_perfil.setEnabled(usa_perfil)
-        self.campo_perfil.setText(self.ajustes.perfil_de(self.proveedor))
+        self.combo_perfil.setEnabled(usa_perfil)
+        self.boton_buscar_perfiles.setEnabled(usa_perfil)
         ayuda = proveedores.ayuda_perfil(self.proveedor) if usa_perfil else ""
         self.ayuda_perfil.setText(ayuda)
         self.ayuda_perfil.setVisible(bool(ayuda))
-        self._refrescar_perfil()
         self.campo_clave.clear()
         self._refrescar_clave()
-        self._consulta_n += 1  # una consulta en marcha de otro servicio ya no vale
+        self._poner_perfiles()
+        self.campo_perfil.setText(self.ajustes.perfil_de(self.proveedor))
+        self._cargar_perfil()
+
+    def _datos(self) -> Ajustes:
+        """Vista de los ajustes del perfil escrito, sin cambiar el activo."""
+        return self.ajustes.de_perfil(self.proveedor, self.campo_perfil.text().strip())
+
+    def _poner_perfiles(self) -> None:
+        """Rellena la lista con los perfiles conocidos; lo escrito se queda."""
+        texto = self.campo_perfil.text()
+        self.combo_perfil.clear()  # al añadir, QComboBox elige el primero y pisa el texto
+        for perfil in self.ajustes.perfiles_de(self.proveedor):
+            self.combo_perfil.addItem(perfil)
+        self.campo_perfil.setText(texto)
+        self._refrescar_quitar()
+
+    def _refrescar_quitar(self, *args) -> None:
+        self.boton_quitar_perfil.setEnabled(
+            self.combo_perfil.isEnabled()
+            and self.campo_perfil.text().strip() in self.ajustes.perfiles_de(self.proveedor))
+
+    def _al_cambiar_perfil(self, *args) -> None:
+        if self.campo_perfil.text().strip() != self._perfil_cargado:
+            self._cargar_perfil()
+
+    def _cargar_perfil(self) -> None:
+        """Pone en el diálogo los datos del perfil escrito."""
+        self._perfil_cargado = self.campo_perfil.text().strip()
+        self._refrescar_perfil()
+        datos = self._datos()
+        self.combo_tiktok.setCurrentIndex(self.combo_tiktok.findData(datos.tiktok_modo.value))
+        self.combo_instagram.setCurrentIndex(
+            self.combo_instagram.findData(datos.instagram_modo.value))
+        self.combo_facebook.setCurrentIndex(
+            self.combo_facebook.findData(datos.facebook_modo.value))
+        while self.combo_categoria.count() > len(CATEGORIAS_YOUTUBE):  # la de otro perfil
+            self.combo_categoria.removeItem(self.combo_categoria.count() - 1)
+        indice = self.combo_categoria.findData(datos.youtube_categoria)
+        if indice < 0:  # categoría guardada que no está en la lista
+            self.combo_categoria.addItem(datos.youtube_categoria, datos.youtube_categoria)
+            indice = self.combo_categoria.count() - 1
+        self.combo_categoria.setCurrentIndex(indice)
+        self.casilla_x_premium.setChecked(datos.x_premium)
+        self.nota_x_premium.hide()
+        self._consulta_n += 1  # una consulta en marcha de otro perfil ya no vale
         self._comprobadas = None
         self.boton_comprobar.setEnabled(True)
         self.campo_pagina_manual.clear()
         self.campo_pagina_manual.hide()
         self.aviso_pagina.hide()
-        pagina = self.ajustes.de_perfil(
-            self.proveedor, self.ajustes.perfil_de(self.proveedor)).pagina_facebook
+        pagina = datos.pagina_facebook
         self._poner_paginas([pagina] if pagina else [], pagina.id if pagina else "")
-        guardadas = (self.ajustes.cuentas_guardadas()
-                     if self.proveedor == self.ajustes.proveedor_redes else None)
+        guardadas = datos.cuentas_guardadas()
         self._ubicacion = None
         self._cuenta_tiktok = guardadas.cuentas.get(Plataforma.TIKTOK) if guardadas else None
         self._refrescar_ubicacion()
@@ -330,6 +379,51 @@ class DialogoRedes(QDialog):
             self._poner_consulta(_(
                 "Sin comprobar. Pulsa «Comprobar conexión» para ver qué cuentas "
                 "tienes conectadas."))
+
+    def _buscar_perfiles(self) -> None:
+        nombre = self.proveedor
+        clave = self.campo_clave.text().strip() or None
+        llavero, fabrica = self.llavero, self.fabrica
+        self.boton_buscar_perfiles.setEnabled(False)
+        self._poner_consulta(_("Buscando perfiles…"))
+        segundo_plano.en_segundo_plano(
+            lambda: (nombre, consulta_cuentas.listar_perfiles(
+                llavero, fabrica, nombre, clave=clave)),
+            self._al_buscar_perfiles, "tsots-perfiles")
+
+    def _al_buscar_perfiles(self, resultado) -> None:
+        self.boton_buscar_perfiles.setEnabled(proveedores.usa_perfil(self.proveedor))
+        if isinstance(resultado, BaseException):  # `listar_perfiles` no lanza; por si acaso
+            self._poner_consulta(type(resultado).__name__, COLOR_ERROR)
+            return
+        nombre, (perfiles, motivo) = resultado
+        if nombre != self.proveedor:
+            return
+        if perfiles is None:
+            self._poner_consulta(motivo, COLOR_ERROR)
+            return
+        for perfil in perfiles:
+            self.ajustes.anadir_perfil(nombre, perfil)
+        self._poner_perfiles()
+        self._poner_consulta(
+            _("Perfiles en el servicio: {lista}.").format(lista=", ".join(perfiles))
+            if perfiles else _("El servicio no tiene perfiles."), COLOR_OK)
+
+    def _quitar_perfil(self) -> None:
+        perfil = self.campo_perfil.text().strip()
+        respuesta = QMessageBox.question(
+            self, _("Quitar perfil"),
+            _("¿Quitar el perfil «{perfil}» de TSOTS? Se borran sus ajustes de publicación "
+              "en la app; en {servicio} no cambia nada.").format(
+                perfil=perfil, servicio=proveedores.nombre_visible(self.proveedor)),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if respuesta != QMessageBox.StandardButton.Yes:
+            return
+        self.ajustes.quitar_perfil(self.proveedor, perfil)
+        self._poner_perfiles()
+        self.campo_perfil.setText(self.ajustes.perfil_de(self.proveedor))
+        self._cargar_perfil()
 
     # --- cuentas conectadas y página de Facebook ---
 
@@ -448,7 +542,7 @@ class DialogoRedes(QDialog):
     def _refrescar_ubicacion(self) -> None:
         # Para la fila basta la ciudad: el lugar de TikTok no se lee al abrir.
         ubicacion = (self._ubicacion if self._ubicacion is not None
-                     else Ubicacion(self.ajustes.ciudad))
+                     else Ubicacion(self._datos().ciudad))
         self.etiqueta_ubicacion.setText(describir_ubicacion(ubicacion))
         aviso = (aviso_permiso_tiktok(self._cuenta_tiktok, proveedores.nombre_visible(
             self.proveedor)) if Plataforma.TIKTOK in ubicacion.plataformas() else "")
@@ -458,7 +552,7 @@ class DialogoRedes(QDialog):
     def _cambiar_ubicacion(self) -> None:
         actual = self._ubicacion
         if actual is None:
-            actual = ubicacion_guardada(self.ajustes, self.llavero, self.proveedor,
+            actual = ubicacion_guardada(self._datos(), self.llavero, self.proveedor,
                                         self.campo_perfil.text().strip())
         dialogo = DialogoUbicacion(
             actual, self._preparar_busqueda, _("Ubicación de siempre"),
@@ -512,21 +606,23 @@ class DialogoRedes(QDialog):
             finally:
                 self.campo_clave.clear()
         # El lugar de TikTok es de la cuenta: va al Llavero, con el perfil escrito.
+        perfil = self.campo_perfil.text().strip()
+        datos = self.ajustes.de_perfil(self.proveedor, perfil)
         if self._ubicacion is not None:
             try:
-                guardar_ubicacion(self.ajustes, self.llavero, self.proveedor,
-                                  self.campo_perfil.text().strip(), self._ubicacion)
+                guardar_ubicacion(datos, self.llavero, self.proveedor, perfil,
+                                  self._ubicacion)
             except credenciales.ErrorLlavero as e:
                 QMessageBox.warning(self, _("Llavero"), str(e))
                 return
         self.ajustes.proveedor_redes = self.proveedor
-        self.ajustes.guardar_perfil(self.proveedor, self.campo_perfil.text())
-        self.ajustes.tiktok_modo = ModoTikTok(self.combo_tiktok.currentData())
-        self.ajustes.instagram_modo = ModoInstagram(self.combo_instagram.currentData())
-        self.ajustes.youtube_categoria = str(self.combo_categoria.currentData())
-        self.ajustes.x_premium = self.casilla_x_premium.isChecked()
-        self.ajustes.facebook_modo = ModoFacebook(self.combo_facebook.currentData())
-        self.ajustes.pagina_facebook = self.pagina_elegida()
-        if self._comprobadas is not None and self._comprobadas[0] == self.ajustes.perfil_redes:
-            self.ajustes.guardar_cuentas(self._comprobadas[1])
+        self.ajustes.guardar_perfil(self.proveedor, perfil)
+        datos.tiktok_modo = ModoTikTok(self.combo_tiktok.currentData())
+        datos.instagram_modo = ModoInstagram(self.combo_instagram.currentData())
+        datos.youtube_categoria = str(self.combo_categoria.currentData())
+        datos.x_premium = self.casilla_x_premium.isChecked()
+        datos.facebook_modo = ModoFacebook(self.combo_facebook.currentData())
+        datos.pagina_facebook = self.pagina_elegida()
+        if self._comprobadas is not None and self._comprobadas[0] == perfil:
+            datos.guardar_cuentas(self._comprobadas[1])
         super().accept()

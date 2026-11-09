@@ -658,12 +658,13 @@ class VentanaPrincipal(QMainWindow):
         dialogo.deleteLater()
         self._recargar_perfil()
 
-    def _configurar_redes(self, al_guardar=None, padre=None) -> None:
+    def _configurar_redes(self, al_cerrar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)
-        aceptado = dialogo.exec()
-        self._recargar_perfil()  # «Quitar perfil» actúa al momento, aunque se cancele
-        if aceptado and al_guardar is not None:
-            al_guardar()
+        dialogo.exec()
+        # «Quitar perfil» actúa al momento, aunque se cancele: se avisa siempre.
+        self._recargar_perfil()
+        if al_cerrar is not None:
+            al_cerrar()
 
     def _recargar_perfil(self) -> None:
         self.cabecera.selector_perfil.recargar(self.ajustes)

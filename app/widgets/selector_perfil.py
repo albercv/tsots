@@ -32,7 +32,9 @@ class SelectorPerfil(QComboBox):
         for perfil in perfiles:
             self.addItem(perfil, perfil)
         self._marcado = ajustes.perfil_redes
-        self.setCurrentIndex(max(0, self.findData(self._marcado)))
+        # Sin el activo en la lista no se marca ninguno: la cabecera no enseña
+        # un perfil que no es el activo.
+        self.setCurrentIndex(self.findData(self._marcado))
 
     def _al_activar(self, indice: int) -> None:
         perfil = self.itemData(indice)

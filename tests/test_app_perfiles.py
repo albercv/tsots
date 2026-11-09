@@ -3,12 +3,15 @@ from __future__ import annotations
 
 import pytest
 from PySide6.QtCore import QSettings
+from PySide6.QtWidgets import QMessageBox
 
 from app import credenciales, cuentas
 from app.credenciales import huella_perfil
 from app.settings import Ajustes
+from app.widgets.dialogo_redes import DialogoRedes
 from app.widgets.selector_perfil import SelectorPerfil
 from tests.redes_falsos import ProveedorFalso
+from tests.test_app_redes import CLAVE, _esperar_consultas, _redes
 from videopipeline.redes.modelo import (
     Ciudad, Cuenta, ModoFacebook, ModoInstagram, ModoTikTok, Pagina, Plataforma,
 )
@@ -224,3 +227,140 @@ def test_selector_sin_perfiles(qtbot, ajustes):
     assert not selector.model().item(0).isEnabled()
     selector.activated.emit(0)
     assert elegidos == []
+
+
+def test_selector_sin_perfil_activo_entre_los_de_la_lista_no_marca_ninguno(qtbot, ajustes):
+    ajustes.anadir_perfil(P, "personal")
+    ajustes.perfil_redes = ""
+    selector = SelectorPerfil()
+    qtbot.addWidget(selector)
+    selector.recargar(ajustes)
+    assert selector.count() == 1 and selector.currentIndex() == -1
+
+
+def _dos_perfiles(ajustes) -> None:
+    """«personal» (activo) y «six», con datos distintos."""
+    ajustes.perfil_redes = "personal"
+    ajustes.tiktok_modo = ModoTikTok.PUBLICO
+    ajustes.pagina_facebook = Pagina("111", "Personal")
+    ajustes.plataformas_redes = [T]
+    ajustes.guardar_cuentas({T: Cuenta(T, "Personal TT")})
+    ajustes.anadir_perfil(P, "six")
+    six = ajustes.de_perfil(P, "six")
+    six.ciudad = Ciudad.SEVILLA
+    six.x_premium = True
+    six.youtube_categoria = "28"
+    six.pagina_facebook = Pagina("222", "Six")
+    six.plataformas_redes = [Y]
+    six.guardar_cuentas({T: Cuenta(T, "Six TT")})
+
+
+def _responder_redes(monkeypatch, respuesta):
+    preguntas = []
+
+    def pregunta(*args, **kwargs):
+        preguntas.append(args[2])
+        return respuesta
+
+    monkeypatch.setattr("app.widgets.dialogo_redes.QMessageBox.question", pregunta)
+    return preguntas
+
+
+def test_redes_carga_los_datos_del_perfil_elegido_y_guarda_en_el(qtbot, ajustes,
+                                                                  llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    combo = dialogo.combo_perfil
+    assert [combo.itemText(i) for i in range(combo.count())] == ["personal", "six"]
+    assert dialogo.campo_perfil.text() == "personal"
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.PUBLICO.value
+    _elegir(combo, "six")
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.BORRADOR.value
+    assert dialogo.casilla_x_premium.isChecked()
+    assert dialogo.combo_categoria.currentData() == "28"
+    assert dialogo.pagina_elegida() == Pagina("222", "Six")
+    assert dialogo.etiqueta_ubicacion.text().startswith("Sevilla")
+    assert "Six TT" in dialogo.etiquetas_cuentas[T].text()
+    dialogo.combo_instagram.setCurrentIndex(
+        dialogo.combo_instagram.findData(ModoInstagram.NORMAL.value))
+    dialogo.accept()
+    assert ajustes.perfil_redes == "six"
+    assert ajustes.instagram_modo == ModoInstagram.NORMAL
+    personal = ajustes.de_perfil(P, "personal")
+    assert personal.tiktok_modo == ModoTikTok.PUBLICO
+    assert personal.instagram_modo == ModoInstagram.PRUEBA
+    assert personal.pagina_facebook == Pagina("111", "Personal")
+
+
+def test_cancelar_redes_no_cambia_el_perfil_activo(qtbot, ajustes, llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    _elegir(dialogo.combo_perfil, "six")
+    dialogo.reject()
+    assert ajustes.perfil_redes == "personal"
+
+
+def test_escribir_un_perfil_nuevo_empieza_con_los_valores_de_siempre(qtbot, ajustes,
+                                                                      llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    dialogo.campo_perfil.setText("nuevo")
+    dialogo.campo_perfil.editingFinished.emit()
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.BORRADOR.value
+    assert dialogo.pagina_elegida() is None
+    assert not dialogo.boton_quitar_perfil.isEnabled()
+    dialogo.accept()
+    assert ajustes.perfiles_de(P) == ["personal", "six", "nuevo"]
+    assert ajustes.tiktok_modo == ModoTikTok.BORRADOR
+
+
+def test_buscar_perfiles_anade_los_del_servicio(qtbot, ajustes, llavero_falso):
+    ajustes.perfil_redes = "personal"
+    capturado: dict = {}
+    dialogo = _redes(qtbot, ajustes, ProveedorFalso(perfiles_cuenta=["personal", "six"]),
+                     capturado)
+    dialogo.campo_clave.setText(CLAVE)
+    dialogo.boton_buscar_perfiles.click()
+    _esperar_consultas(qtbot)
+    assert capturado["clave"] == CLAVE and capturado["datos"]["perfil"] == ""
+    combo = dialogo.combo_perfil
+    assert [combo.itemText(i) for i in range(combo.count())] == ["personal", "six"]
+    assert ajustes.perfiles_de(P) == ["personal", "six"]
+    assert dialogo.campo_perfil.text() == "personal"  # lo escrito no cambia
+    assert "six" in dialogo.etiqueta_consulta.text()
+    assert dialogo.boton_buscar_perfiles.isEnabled()
+
+
+def test_si_la_lista_falla_el_perfil_se_escribe_a_mano(qtbot, ajustes, llavero_falso):
+    credenciales.guardar(P, CLAVE)
+    dialogo = _redes(qtbot, ajustes, ProveedorFalso(perfiles_cuenta=ErrorConsulta(
+        "Respuesta inesperada del servicio: no trae los perfiles.")))
+    dialogo.boton_buscar_perfiles.click()
+    _esperar_consultas(qtbot)
+    assert "no trae los perfiles" in dialogo.etiqueta_consulta.text()
+    assert CLAVE not in dialogo.etiqueta_consulta.text()
+    assert dialogo.boton_buscar_perfiles.isEnabled()
+    dialogo.campo_perfil.setText("a_mano")
+    dialogo.accept()
+    assert ajustes.perfil_redes == "a_mano" and ajustes.perfiles_de(P) == ["a_mano"]
+
+
+def test_quitar_perfil_pide_confirmacion_y_borra_sus_datos(qtbot, ajustes, llavero_falso,
+                                                           monkeypatch):
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    _elegir(dialogo.combo_perfil, "six")
+    assert dialogo.boton_quitar_perfil.isEnabled()
+    preguntas = _responder_redes(monkeypatch, QMessageBox.StandardButton.No)
+    dialogo.boton_quitar_perfil.click()
+    assert "six" in preguntas[0] and ajustes.perfiles_de(P) == ["personal", "six"]
+    _responder_redes(monkeypatch, QMessageBox.StandardButton.Yes)
+    dialogo.boton_quitar_perfil.click()
+    assert ajustes.perfiles_de(P) == ["personal"]
+    assert ajustes.de_perfil(P, "six").x_premium is False
+    assert dialogo.campo_perfil.text() == "personal"
+    assert dialogo.combo_tiktok.currentData() == ModoTikTok.PUBLICO.value
