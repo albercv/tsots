@@ -2,15 +2,18 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QMessageBox
 
-from app import credenciales, cuentas
+from app import credenciales, cuentas, segundo_plano
 from app.credenciales import huella_perfil
 from app.settings import Ajustes
+from app.widgets.dialogo_programadas import DialogoProgramadas
 from app.widgets.dialogo_publicar import DialogoPublicar
 from app.widgets.dialogo_redes import DialogoRedes
 from app.widgets.selector_perfil import SelectorPerfil
@@ -468,3 +471,26 @@ def test_respuesta_tardia_de_otro_perfil_no_se_guarda(qtbot, video, ajustes, lla
     assert ajustes.de_perfil(P, "six").cuentas_guardadas().cuentas[T].nombre == "Six TT"
     assert ajustes.de_perfil(P, "personal").cuentas_guardadas().cuentas[T].nombre == (
         "Personal TT")
+
+
+def test_programadas_de_otro_perfil(qtbot, ajustes, llavero_falso):
+    ajustes.perfil_redes = "personal"
+    ajustes.anadir_perfil(P, "six")
+    credenciales.guardar(P, "clave")
+    pedidos: list[str] = []
+
+    def fabrica(nombre, clave, datos):
+        pedidos.append(datos["perfil"])
+        return ProveedorFalso()
+
+    dialogo = DialogoProgramadas(ajustes, fabrica=fabrica, zona=ZoneInfo("Europe/Madrid"),
+                                 ahora=lambda: datetime(2026, 11, 1, tzinfo=timezone.utc))
+    qtbot.addWidget(dialogo)
+    qtbot.waitUntil(lambda: segundo_plano.vivas() == 0, timeout=5000)
+    assert dialogo.selector_perfil.currentText() == "personal" and pedidos == ["personal"]
+    _elegir(dialogo.selector_perfil, "six")
+    assert not dialogo.selector_perfil.isEnabled()  # consultando
+    qtbot.waitUntil(lambda: segundo_plano.vivas() == 0, timeout=5000)
+    assert pedidos == ["personal", "six"] and ajustes.perfil_redes == "six"
+    assert dialogo.selector_perfil.isEnabled()
+    assert "No hay nada programado" in dialogo.etiqueta_estado.text()
