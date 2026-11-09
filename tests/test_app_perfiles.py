@@ -7,6 +7,7 @@ from PySide6.QtCore import QSettings
 from app import credenciales, cuentas
 from app.credenciales import huella_perfil
 from app.settings import Ajustes
+from app.widgets.selector_perfil import SelectorPerfil
 from tests.redes_falsos import ProveedorFalso
 from videopipeline.redes.modelo import (
     Ciudad, Cuenta, ModoFacebook, ModoInstagram, ModoTikTok, Pagina, Plataforma,
@@ -185,3 +186,41 @@ def test_listar_perfiles_nunca_lanza(llavero_falso):
     perfiles, motivo = cuentas.listar_perfiles(
         credenciales, fabrica(RuntimeError("clave-secreta")), P, clave="clave-secreta")
     assert perfiles is None and "RuntimeError" in motivo and "clave-secreta" not in motivo
+
+
+def _elegir(combo, texto: str) -> None:
+    """Como el usuario: marca la entrada y emite `activated`."""
+    indice = combo.findText(texto)
+    assert indice >= 0, texto
+    combo.setCurrentIndex(indice)
+    combo.activated.emit(indice)
+
+
+def test_selector_lista_los_perfiles_y_avisa_solo_si_el_usuario_cambia(qtbot, ajustes):
+    ajustes.perfil_redes = "personal"
+    ajustes.anadir_perfil(P, "six")
+    selector = SelectorPerfil()
+    qtbot.addWidget(selector)
+    elegidos: list[str] = []
+    selector.perfil_elegido.connect(elegidos.append)
+    selector.recargar(ajustes)
+    assert [selector.itemText(i) for i in range(selector.count())] == ["personal", "six"]
+    assert selector.currentText() == "personal"
+    assert elegidos == []
+    _elegir(selector, "six")
+    assert elegidos == ["six"]
+    selector.activated.emit(selector.currentIndex())  # la misma otra vez
+    assert elegidos == ["six"]
+
+
+def test_selector_sin_perfiles(qtbot, ajustes):
+    selector = SelectorPerfil()
+    qtbot.addWidget(selector)
+    elegidos: list[str] = []
+    selector.perfil_elegido.connect(elegidos.append)
+    selector.recargar(ajustes)
+    assert selector.count() == 1
+    assert selector.itemText(0) == "Sin perfil: añádelo en Redes…"
+    assert not selector.model().item(0).isEnabled()
+    selector.activated.emit(0)
+    assert elegidos == []

@@ -275,12 +275,14 @@ def test_terminar_trabajo_seleccionado_refresca_caption(qtbot, tmp_path, monkeyp
 
 def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "six"
     ventana.ajustes.contexto_marca = "antes"
     visto = {}
 
     class DialogoFalso:
-        def __init__(self, texto_inicial="", parent=None):
+        def __init__(self, texto_inicial="", parent=None, perfil=""):
             visto["inicial"] = texto_inicial
+            visto["perfil"] = perfil
 
         def exec(self):
             return 1  # QDialog.DialogCode.Accepted
@@ -291,7 +293,36 @@ def test_editar_marca_persiste_en_ajustes(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("app.main.DialogoMarca", DialogoFalso)
     ventana.panel.editar_marca.emit()
     assert visto["inicial"] == "antes"
+    assert visto["perfil"] == "six"
     assert ventana.ajustes.contexto_marca == "después"
+
+
+def test_selector_de_la_cabecera_fija_el_perfil_y_se_recarga_al_cerrar_redes(
+        qtbot, tmp_path, monkeypatch):
+    from tests.test_app_perfiles import _elegir
+
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    selector = ventana.cabecera.selector_perfil
+    assert selector.itemText(0) == "Sin perfil: añádelo en Redes…"
+    ventana.ajustes.perfil_redes = "personal"
+    ventana.ajustes.anadir_perfil("upload_post", "six")
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+    monkeypatch.setattr("app.main.DialogoRedes", Falso)
+    ventana.boton_redes.click()  # Cancelar también recarga
+    assert selector.currentText() == "personal"
+    _elegir(selector, "six")
+    assert ventana.ajustes.perfil_redes == "six"
+
+
+def test_un_perfil_de_nombre_largo_no_ensancha_la_ventana(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.ajustes.perfil_redes = "x" * 200
+    ventana._recargar_perfil()
+    ventana.show()
+    assert ventana.minimumSizeHint().width() <= 700
 
 
 def test_procesar_incluye_marca_y_modelo_caption(qtbot, tmp_path, monkeypatch):
@@ -532,6 +563,7 @@ class _DialogoFalso:
     """Sustituye a DialogoPublicar / DialogoRedes y registra con qué se abrió."""
 
     abiertos: list = []
+    perfil_usado = ""
 
     def __init__(self, *args, parent=None, **kwargs):
         type(self).abiertos.append(args)

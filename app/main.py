@@ -128,6 +128,8 @@ class VentanaPrincipal(QMainWindow):
         # opciones debajo.
         self.cabecera = Cabecera(RUTA_ICONO)
         raiz.addWidget(self.cabecera)
+        self.cabecera.selector_perfil.perfil_elegido.connect(self._al_elegir_perfil)
+        self._recargar_perfil()
         fila_superior = QHBoxLayout()
 
         columna_izquierda = QVBoxLayout()
@@ -593,7 +595,8 @@ class VentanaPrincipal(QMainWindow):
             self.ajustes.modelo_caption = modelo
 
     def _editar_marca(self) -> None:
-        dialogo = DialogoMarca(self.ajustes.contexto_marca, self)
+        dialogo = DialogoMarca(self.ajustes.contexto_marca, self,
+                              perfil=self.ajustes.perfil_redes)
         if dialogo.exec():
             self.ajustes.contexto_marca = dialogo.texto()
 
@@ -624,6 +627,7 @@ class VentanaPrincipal(QMainWindow):
         # aun así, solo se libera cuando no publica.
         if not dialogo.publicando:
             dialogo.deleteLater()
+        self._recargar_perfil()
 
     def _publicar_shorts(self) -> None:
         """Botón «Publicar shorts…»: los shorts del vídeo elegido, en lote."""
@@ -642,6 +646,7 @@ class VentanaPrincipal(QMainWindow):
         dialogo.exec()
         if not dialogo.publicando:  # como en `_publicar`
             dialogo.deleteLater()
+        self._recargar_perfil()
 
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
@@ -651,11 +656,20 @@ class VentanaPrincipal(QMainWindow):
         dialogo = DialogoProgramadas(self.ajustes, parent=self)
         dialogo.exec()  # no se cierra mientras cancela
         dialogo.deleteLater()
+        self._recargar_perfil()
 
     def _configurar_redes(self, al_guardar=None, padre=None) -> None:
         dialogo = DialogoRedes(self.ajustes, parent=padre or self)
-        if dialogo.exec() and al_guardar is not None:
+        aceptado = dialogo.exec()
+        self._recargar_perfil()  # «Quitar perfil» actúa al momento, aunque se cancele
+        if aceptado and al_guardar is not None:
             al_guardar()
+
+    def _recargar_perfil(self) -> None:
+        self.cabecera.selector_perfil.recargar(self.ajustes)
+
+    def _al_elegir_perfil(self, perfil: str) -> None:
+        self.ajustes.perfil_redes = perfil
 
     # --- procesado ---
 

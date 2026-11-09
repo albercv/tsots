@@ -14,9 +14,12 @@ from videopipeline.i18n import _
 class DialogoMarca(QDialog):
     """Texto libre que se añade al prompt del caption SEO."""
 
-    def __init__(self, texto_inicial: str = "", parent=None):
+    def __init__(self, texto_inicial: str = "", parent=None,
+                 perfil: str = ""):
         super().__init__(parent)
-        self.setWindowTitle(_("Contexto de marca"))
+        self.setWindowTitle(
+            _("Contexto de marca · perfil «{perfil}»").format(perfil=perfil)
+            if perfil else _("Contexto de marca"))
         self.resize(520, 320)
         layout = QVBoxLayout(self)
         ayuda = QLabel(
