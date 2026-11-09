@@ -365,6 +365,17 @@ the API key. The key goes straight to the **macOS Keychain** (service
 remove it: **Forget key** in the same dialog, or delete the entry in
 Keychain Access.
 
+**Several profiles.** One API key can serve several Upload-Post profiles
+(for example one per brand). The **Profile:** selector in the window header
+switches between them, and Networks…, Publish… and Scheduled… have their
+own. In Networks…, **Find profiles** asks Upload-Post which profiles your
+account has, and **Remove profile** deletes one from TSOTS (its settings
+here; nothing changes in Upload-Post). Each profile keeps its own location,
+Facebook Page, ticked networks, modes, X Premium, YouTube category, saved
+accounts and brand context. Publish… suggests the profile the video was
+processed for and lets you change it; the caption is not regenerated.
+The last profile you used is remembered.
+
 **Check connection** (in Networks…) asks Upload-Post which accounts you
 have connected and which Facebook Pages you can post to: pick the Page
 there (if there is only one, it is picked for you). When Publish… opens

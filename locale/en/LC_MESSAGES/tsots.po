@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 00:20+0100\n"
+"POT-Creation-Date: 2026-11-09 14:55+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -229,6 +229,9 @@ msgstr "Draft (finish it in Facebook)"
 msgid "Borrador (lo terminas en la app)"
 msgstr "Draft (finish it in the app)"
 
+msgid "Buscando perfiles…"
+msgstr "Looking for profiles…"
+
 msgid "Buscando trozos para shorts"
 msgstr "Looking for clips for shorts"
 
@@ -237,6 +240,9 @@ msgstr "Searching…"
 
 msgid "Buscar en TikTok"
 msgstr "Search TikTok"
+
+msgid "Buscar perfiles"
+msgstr "Find profiles"
 
 msgid "Caja blanca"
 msgstr "White box"
@@ -358,6 +364,10 @@ msgstr "Brand context for the caption (who you are, tone, CTA)."
 
 msgid "Contexto de marca que se añade al prompt."
 msgstr "Brand context added to the prompt."
+
+#, python-brace-format
+msgid "Contexto de marca · perfil «{perfil}»"
+msgstr "Brand context · profile “{perfil}”"
 
 msgid "Convertir a vertical (9:16)"
 msgstr "Convert to vertical (9:16)"
@@ -558,6 +568,9 @@ msgstr "The service returned no result for {plataforma}: {motivo}"
 msgid "El servicio no pudo cancelarla."
 msgstr "The service could not cancel it."
 
+msgid "El servicio no tiene perfiles."
+msgstr "The service has no profiles."
+
 msgid "El servicio rechazó la publicación."
 msgstr "The service rejected the post."
 
@@ -650,6 +663,10 @@ msgstr "Unexpected error ({tipo}). Details in the log: {fichero}"
 #, python-brace-format
 msgid "Error inesperado al buscar el lugar ({tipo})."
 msgstr "Unexpected error while searching for the place ({tipo})."
+
+#, python-brace-format
+msgid "Error inesperado al buscar los perfiles ({tipo})."
+msgstr "Unexpected error while looking for the profiles ({tipo})."
 
 #, python-brace-format
 msgid "Error inesperado al cancelar ({tipo})."
@@ -1426,6 +1443,10 @@ msgstr "Pending: {n}."
 msgid "Perfil:"
 msgstr "Profile:"
 
+#, python-brace-format
+msgid "Perfiles en el servicio: {lista}."
+msgstr "Profiles in the service: {lista}."
+
 msgid "Personas y blogs"
 msgstr "People & Blogs"
 
@@ -1455,6 +1476,9 @@ msgstr "Asks the service which accounts you have connected and your Facebook Pag
 
 msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
 msgstr "Asks the service which TikTok places have this name, so you can pick one"
+
+msgid "Pregunta al servicio qué perfiles tiene tu cuenta"
+msgstr "Asks the service which profiles your account has"
 
 msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
 msgstr "Prepares a draft for the evolve2digital blog and a LinkedIn post with a cover and images from the video. Done once per video."
@@ -1577,6 +1601,9 @@ msgstr "Burning subtitles needs the `ass` filter, which only ffmpeg-full include
 msgid "Quitar"
 msgstr "Remove"
 
+msgid "Quitar perfil"
+msgstr "Remove profile"
+
 msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
 msgstr "Who you are, who you talk to, tone, usual call to action, hashtags you always want. Sent to the model with every video."
 
@@ -1676,6 +1703,9 @@ msgstr "Unexpected response from the service: it does not include the Facebook P
 
 msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
 msgstr "Unexpected response from the service: it does not include the TikTok places."
+
+msgid "Respuesta inesperada del servicio: no trae los perfiles."
+msgstr "Unexpected response from the service: it does not include the profiles."
 
 #, python-brace-format
 msgid "Respuesta inesperada del servicio: no trae resultado para {plataforma}."
@@ -1835,6 +1865,9 @@ msgstr "No photos: add at least one."
 
 msgid "Sin memoria suficiente"
 msgstr "Not enough memory"
+
+msgid "Sin perfil: añádelo en Redes…"
+msgstr "No profile: add one in Networks…"
 
 msgid "Sin permiso o fuera del plan contratado (403)."
 msgstr "No permission or outside your plan (403)."
@@ -2139,10 +2172,6 @@ msgstr "not available"
 msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
 msgstr "ollama pull <model>  (the exact name is in the technical detail)"
 
-#, python-brace-format
-msgid "perfil «{perfil}»"
-msgstr "profile “{perfil}”"
-
 msgid "procesando"
 msgstr "processing"
 
@@ -2249,6 +2278,10 @@ msgstr "Schedule them?"
 
 msgid "¿Publicar ahora?"
 msgstr "Publish now?"
+
+#, python-brace-format
+msgid "¿Quitar el perfil «{perfil}» de TSOTS? Se borran sus ajustes de publicación en la app; en {servicio} no cambia nada."
+msgstr "Remove the profile “{perfil}” from TSOTS? Its publishing settings in the app are deleted; nothing changes in {servicio}."
 
 #, python-brace-format
 msgid "Última comprobación: {fecha}"
