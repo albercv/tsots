@@ -43,7 +43,7 @@ def test_guardar_y_cargar_ida_y_vuelta(tmp_path):
         id="abc123def456", nombre="charla", carpeta_salida=tmp_path / "salida",
         original=Huella.de(original), final=Huella.de(final),
         vertical=Huella.de(vertical), legado=True, subs_quemados_sin_base=True,
-        desactualizado={"vertical"},
+        desactualizado={"vertical"}, perfil="sixpodcast",
         artefactos={
             BASE: Artefacto("k1", None, {"audio": {"modelo": "m"},
                                          "silencios": {"margen": 0.2}}, "lt1"),
@@ -102,6 +102,7 @@ FORMAS_ERRONEAS = [
     ("carpeta_salida", None),
     ("nombre", 5),
     ("id", None),
+    ("perfil", 5),
 ]
 
 
@@ -109,6 +110,13 @@ def _escribir_ficha_mala(datos) -> None:
     carpeta = modulo.DIR_FICHAS / "mala"
     carpeta.mkdir(parents=True, exist_ok=True)
     (carpeta / "ficha.json").write_text(json.dumps(datos), encoding="utf-8")
+
+
+def test_ficha_sin_perfil_carga_con_perfil_vacio(tmp_path):
+    datos = _ficha_json_valida(tmp_path)
+    del datos["perfil"]
+    _escribir_ficha_mala(datos)
+    assert cargar("mala").perfil == ""
 
 
 @pytest.mark.parametrize("clave, valor", FORMAS_ERRONEAS)

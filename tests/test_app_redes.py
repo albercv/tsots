@@ -164,8 +164,8 @@ def test_eleccion_guardada_sin_x_ni_facebook_sigue_valiendo(ajustes):
 
 def test_pagina_de_facebook_por_proveedor_y_borrable(ajustes):
     ajustes.pagina_facebook = Pagina("111", "Mía")
-    assert ajustes.pagina_facebook_de(PROVEEDOR_POR_DEFECTO) == Pagina("111", "Mía")
-    assert ajustes.pagina_facebook_de("otro") is None
+    assert ajustes.de_perfil(PROVEEDOR_POR_DEFECTO, "").pagina_facebook == Pagina("111", "Mía")
+    assert ajustes.de_perfil("otro", "").pagina_facebook is None
     ajustes.pagina_facebook = None
     assert ajustes.pagina_facebook is None
     assert ajustes.ajustes_proveedor()["pagina_facebook"] == ""
@@ -182,7 +182,7 @@ def test_cuentas_guardadas_ida_y_vuelta_y_ligadas_al_perfil(ajustes):
     ajustes.perfil_redes = "otro"  # otro perfil, otras cuentas
     assert ajustes.cuentas_guardadas() is None
     ajustes.perfil_redes = "yo"
-    ajustes._q.setValue(f"redes/cuentas/{PROVEEDOR_POR_DEFECTO}", "{no es json")
+    ajustes._q.setValue(ajustes._clave("cuentas"), "{no es json")
     assert ajustes.cuentas_guardadas() is None
 
 
@@ -208,6 +208,7 @@ def test_dialogo_redes_guarda_clave_en_llavero_y_perfil(qtbot, ajustes, llavero_
     assert "Sin clave" in dialogo.etiqueta_clave.text()
     assert not dialogo.boton_olvidar.isEnabled()
     dialogo.campo_perfil.setText("mi_perfil")
+    dialogo.campo_perfil.editingFinished.emit()  # al teclear, el perfil se carga antes de editar
     dialogo.campo_clave.setText(f" {CLAVE} ")
     dialogo.combo_tiktok.setCurrentIndex(dialogo.combo_tiktok.findData("publico"))
     dialogo.combo_instagram.setCurrentIndex(dialogo.combo_instagram.findData("normal"))
@@ -424,6 +425,7 @@ def test_dialogo_redes_explica_el_perfil_y_avisa_si_es_un_email(qtbot, ajustes,
     assert not dialogo.aviso_perfil.isHidden()
     assert "email" in dialogo.aviso_perfil.text()
     dialogo.campo_perfil.setText("mi_perfil")
+    dialogo.campo_perfil.editingFinished.emit()  # al teclear, el perfil se carga antes de editar
     assert dialogo.aviso_perfil.isHidden()
 
 
@@ -501,7 +503,7 @@ def test_boton_deshabilitado_sin_clave_perfil_o_plataformas(qtbot, video, ajuste
     ajustes.perfil_redes = "yo"
     dialogo.refrescar_servicio()
     assert dialogo.boton_publicar.isEnabled()
-    assert "yo" in dialogo.etiqueta_servicio.text()
+    assert dialogo.selector_perfil.currentText() == "yo"
     for casilla in dialogo.casillas.values():
         casilla.setChecked(False)
     assert not dialogo.boton_publicar.isEnabled()

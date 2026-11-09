@@ -46,6 +46,7 @@ from .. import cuentas as consulta_cuentas
 from ..cuentas import COLOR_AVISO, COLOR_ERROR, COLOR_OK, COLOR_SECUNDARIO
 from ..settings import Ajustes
 from .dialogo_publicar import zona_local
+from .selector_perfil import SelectorPerfil
 
 log = logging.getLogger(__name__)
 
@@ -227,6 +228,11 @@ class DialogoProgramadas(QDialog):
         raiz.addWidget(self.etiqueta_estado)
 
         pie = QHBoxLayout()
+        self.selector_perfil = SelectorPerfil()
+        self.selector_perfil.perfil_elegido.connect(self._al_elegir_perfil)
+        self.selector_perfil.recargar(self.ajustes)
+        pie.addWidget(QLabel(_("Perfil:")))
+        pie.addWidget(self.selector_perfil)
         self.etiqueta_zona = QLabel(_("Hora de tu Mac ({zona})").format(
             zona=getattr(self.zona, "key", None) or str(self.zona)))
         self.etiqueta_zona.setStyleSheet(f"color: {COLOR_SECUNDARIO};")
@@ -276,6 +282,7 @@ class DialogoProgramadas(QDialog):
     def _ocupar(self, ocupado: bool) -> None:
         self._ocupado = ocupado
         self.boton_actualizar.setEnabled(not ocupado)
+        self.selector_perfil.setEnabled(not ocupado)  # ninguna respuesta bajo otro perfil
 
     def actualizar(self) -> None:
         if self._ocupado:
@@ -287,6 +294,12 @@ class DialogoProgramadas(QDialog):
         segundo_plano.en_segundo_plano(
             lambda: consulta_cuentas.programadas(llavero, fabrica, nombre, datos),
             self._al_consultar, "tsots-programadas")
+
+    def _al_elegir_perfil(self, perfil: str) -> None:
+        self.ajustes.perfil_redes = perfil
+        self._programadas = []
+        self._pintar()
+        self.actualizar()
 
     def _al_consultar(self, resultado) -> None:
         self._ocupar(False)

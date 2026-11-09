@@ -75,3 +75,13 @@ def test_catalogo_ingles_traduce_los_shorts():
         assert i18n._("Crear shorts al procesar") == "Create shorts when processing"
     finally:
         i18n.instalar("es")
+
+
+def test_catalogo_ingles_traduce_los_perfiles():
+    i18n.instalar("en")
+    try:
+        assert i18n._("Buscar perfiles") == "Find profiles"
+        assert i18n._("Quitar perfil") == "Remove profile"
+        assert i18n._("Sin perfil: añádelo en Redes…") == "No profile: add one in Networks…"
+    finally:
+        i18n.instalar("es")

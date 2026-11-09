@@ -82,6 +82,7 @@ class Ficha:
     subs_quemados_sin_base: bool = False
     desactualizado: set[str] = field(default_factory=set)  # {"vertical"}
     artefactos: dict[str, Artefacto] = field(default_factory=dict)
+    perfil: str = ""  # perfil de publicación con el que se procesó
 
     @property
     def carpeta(self) -> Path:
@@ -200,6 +201,7 @@ def _a_dict(ficha: Ficha) -> dict:
         "subs_quemados_sin_base": ficha.subs_quemados_sin_base,
         "desactualizado": sorted(ficha.desactualizado),
         "artefactos": {k: asdict(a) for k, a in ficha.artefactos.items()},
+        "perfil": ficha.perfil,
     }
 
 
@@ -217,6 +219,7 @@ def _de_dict(datos: dict) -> Ficha:
         desactualizado={_tipo(d, str) for d in _tipo(datos["desactualizado"], list)},
         artefactos={_tipo(k, str): _artefacto_de_dict(a)
                     for k, a in _tipo(datos["artefactos"], dict).items()},
+        perfil=_tipo(datos.get("perfil", ""), str),
     )
 
 

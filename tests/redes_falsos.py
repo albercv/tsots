@@ -26,12 +26,14 @@ class ProveedorFalso:
     excepción a lanzar); `lugares`, lo que devuelve `lugares_tiktok()`;
     `pendientes`, lo que devuelve `programadas()` (o una excepción), y
     `al_cancelar`, una excepción que lanza `cancelar()`. Se anotan en
-    `consultas`, no en `llamadas`."""
+    `consultas`, no en `llamadas`. `perfiles_cuenta` es lo que devuelve
+    `perfiles()` (o una excepción)."""
 
     nombre = "Falso"
 
     def __init__(self, respuestas=None, estados=None, cuentas_conectadas=None,
-                 paginas=None, lugares=None, pendientes=None, al_cancelar=None):
+                 paginas=None, lugares=None, pendientes=None, al_cancelar=None,
+                 perfiles_cuenta=None):
         self.respuestas = dict(respuestas or {})
         self.estados = {p: list(v) for p, v in (estados or {}).items()}
         self.cuentas_conectadas = (todas_conectadas() if cuentas_conectadas is None
@@ -41,6 +43,7 @@ class ProveedorFalso:
         self.pendientes: list[Programada] | BaseException = (
             [] if pendientes is None else pendientes)
         self.al_cancelar = al_cancelar
+        self.perfiles_cuenta = ["mi_perfil"] if perfiles_cuenta is None else perfiles_cuenta
         self.llamadas: list[tuple] = []
         self.consultas: list[str] = []
 
@@ -49,6 +52,12 @@ class ProveedorFalso:
         if isinstance(self.cuentas_conectadas, BaseException):
             raise self.cuentas_conectadas
         return {p: self.cuentas_conectadas.get(p) for p in Plataforma}
+
+    def perfiles(self):
+        self.consultas.append("perfiles")
+        if isinstance(self.perfiles_cuenta, BaseException):
+            raise self.perfiles_cuenta
+        return list(self.perfiles_cuenta)
 
     def paginas_facebook(self):
         self.consultas.append("paginas")

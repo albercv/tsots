@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 00:20+0100\n"
+"POT-Creation-Date: 2026-11-09 15:11+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -224,6 +224,9 @@ msgstr ""
 msgid "Borrador (lo terminas en la app)"
 msgstr ""
 
+msgid "Buscando perfiles…"
+msgstr ""
+
 msgid "Buscando trozos para shorts"
 msgstr ""
 
@@ -231,6 +234,9 @@ msgid "Buscando…"
 msgstr ""
 
 msgid "Buscar en TikTok"
+msgstr ""
+
+msgid "Buscar perfiles"
 msgstr ""
 
 msgid "Caja blanca"
@@ -352,6 +358,10 @@ msgid "Contexto de marca para el caption (quién eres, tono, CTA)."
 msgstr ""
 
 msgid "Contexto de marca que se añade al prompt."
+msgstr ""
+
+#, python-brace-format
+msgid "Contexto de marca · perfil «{perfil}»"
 msgstr ""
 
 msgid "Convertir a vertical (9:16)"
@@ -544,6 +554,9 @@ msgstr ""
 msgid "El servicio no pudo cancelarla."
 msgstr ""
 
+msgid "El servicio no tiene perfiles."
+msgstr ""
+
 msgid "El servicio rechazó la publicación."
 msgstr ""
 
@@ -635,6 +648,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "Error inesperado al buscar el lugar ({tipo})."
+msgstr ""
+
+#, python-brace-format
+msgid "Error inesperado al buscar los perfiles ({tipo})."
 msgstr ""
 
 #, python-brace-format
@@ -1388,6 +1405,10 @@ msgstr ""
 msgid "Perfil:"
 msgstr ""
 
+#, python-brace-format
+msgid "Perfiles en el servicio: {lista}."
+msgstr ""
+
 msgid "Personas y blogs"
 msgstr ""
 
@@ -1416,6 +1437,9 @@ msgid "Pregunta al servicio qué cuentas tienes conectadas y tus páginas de Fac
 msgstr ""
 
 msgid "Pregunta al servicio qué lugares de TikTok se llaman así, para elegir uno"
+msgstr ""
+
+msgid "Pregunta al servicio qué perfiles tiene tu cuenta"
 msgstr ""
 
 msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
@@ -1539,6 +1563,9 @@ msgstr ""
 msgid "Quitar"
 msgstr ""
 
+msgid "Quitar perfil"
+msgstr ""
+
 msgid "Quién eres, a quién hablas, tono, llamada a la acción habitual, hashtags que quieres siempre. Se envía al modelo con cada vídeo."
 msgstr ""
 
@@ -1620,6 +1647,9 @@ msgstr ""
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
 msgstr ""
 
+msgid "Respuesta inesperada del servicio: no se reconocen los nombres de los perfiles."
+msgstr ""
+
 msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
 msgstr ""
 
@@ -1630,6 +1660,9 @@ msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr ""
 
 msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no trae los perfiles."
 msgstr ""
 
 #, python-brace-format
@@ -1778,6 +1811,9 @@ msgid "Sin fotos: añade al menos una."
 msgstr ""
 
 msgid "Sin memoria suficiente"
+msgstr ""
+
+msgid "Sin perfil: añádelo en Redes…"
 msgstr ""
 
 msgid "Sin permiso o fuera del plan contratado (403)."
@@ -2080,10 +2116,6 @@ msgstr ""
 msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
 msgstr ""
 
-#, python-brace-format
-msgid "perfil «{perfil}»"
-msgstr ""
-
 msgid "procesando"
 msgstr ""
 
@@ -2186,6 +2218,10 @@ msgid "¿Programarlos?"
 msgstr ""
 
 msgid "¿Publicar ahora?"
+msgstr ""
+
+#, python-brace-format
+msgid "¿Quitar el perfil «{perfil}» de TSOTS? Se borran sus ajustes de publicación en la app; en {servicio} no cambia nada."
 msgstr ""
 
 #, python-brace-format

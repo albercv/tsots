@@ -187,7 +187,8 @@ outputs. The folder holds:
   recognises. Written atomically: hidden temp file, then `replace`.
   `cargar` returns `None` for a missing file, and for a damaged one
   (type-checked, so a valid JSON that is not a record counts too) with a
-  log warning; it never breaks the queue.
+  log warning; it never breaks the queue. `perfil` is the publishing
+  profile the video was processed for (the Publish dialog preselects it).
 - the artifact files below, and `tmp/` for the pass in progress (emptied
   at the start, deleted at the end, whatever the outcome).
 - `original.<ext>`: only for an old output that has no known original and
@@ -592,8 +593,8 @@ Package `videopipeline/redes/`:
 | `modelo.py` | Neutral types: `Plataforma` + `ORDEN` (TikTok, YouTube, Instagram, X, Facebook), `Publicacion` (incl. `texto_x`, the reviewed X post), `Opciones` (TikTok draft/public, Instagram trial/regular, Facebook reel/video/draft, YouTube category, `x_premium`, `ubicacion`), `Ciudad` (catalog of cities with their public Instagram and X place ids), `Ubicacion` (a `Ciudad` and the TikTok `Lugar` chosen with the account; `plataformas()` says which networks get it), `Opciones.programada` (aware datetime to schedule, `None` = now), `Programada` (a pending post in the service: opaque reference, aware date, platforms, title, modes when known), `Lugar` (TikTok place from the lookup; its id is private and hidden from `repr`), `elegir_lugar` (exact-name match, accents and case ignored), `UBICACION_POR_DEFECTO` (Madrid), `Resultado` (ok, url, error, pendiente, referencia, `programada` when the service will publish it later), `Cuenta` (connected account: name, handle, reconnect needed, capabilities, Premium if known, TikTok location permission if known), `Pagina` (Facebook Page) | No |
 | `textos.py` | Platform limits: YouTube title ≤ 100, text ≤ 2200 (5000 for the YouTube description), ≤ 30 hashtags on Instagram, YouTube tags ≤ 500 chars. The caption is trimmed; hashtags never are. X: `longitud_x` counts like X and the default X text is title + hashtags within 280 (see below) | No |
 | `limites.py` | Video limits: X without Premium takes ≤ 140 s (2:20) and ≤ 512 MB; `motivo_no_admite_x` returns the reason shown in the dialog | No |
-| `proveedor.py` | `Proveedor` protocol (publish, status, accounts, Facebook Pages, TikTok places, `programadas()` and `cancelar()`), `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
-| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups, scheduling (`scheduled_date` in local time + IANA `timezone`, no `async_upload`; list and cancel scheduled jobs) | Yes, the only one |
+| `proveedor.py` | `Proveedor` protocol (publish, status, accounts, Facebook Pages, TikTok places, `perfiles()`, `programadas()` and `cancelar()`), `ErrorConsulta`, registry `PROVEEDORES` (id → module), `PROVEEDOR_POR_DEFECTO`, `crear()` | Only its id |
+| `upload_post.py` | URLs, `Apikey` header, form fields, response parsing, status polling, account, Facebook Page and TikTok place lookups, `perfiles()` (`GET /api/uploadposts/users`), scheduling (`scheduled_date` in local time + IANA `timezone`, no `async_upload`; list and cancel scheduled jobs) | Yes, the only one |
 | `publicador.py` | Fixed order, a failure never stops the rest, polls pending uploads (15 min max), writes the registry. Before TikTok, looks up the place by name when none was chosen (no exact match or a failed lookup: TikTok goes out without a location) | No |
 | `registro.py` | `name_limpio.publicado.json` next to the video: platform, date, url, provider id, mode; for a scheduled post also `programada` and `referencia`, and `olvidar()` drops it when cancelled. Never the key | No |
 
@@ -604,6 +605,9 @@ profile, API key, **Check connection**, X Premium, Facebook Page, default
 modes, location), `app/widgets/selector_ubicacion.py` (the location
 selector, opened in its own window from both dialogs; inline it pushed
 Networks… past a 14" laptop screen),
+`app/widgets/selector_perfil.py` (the profile selector shared by the
+header, Publish… and Scheduled…; Networks… has its own editable combo
+without autocompletion, since it also creates profiles),
 `app/cuentas.py` (account and TikTok place lookups shared by both dialogs,
 always in the background through `app/segundo_plano.py`),
 the **Publish…** button in `panel_caption.py` and the **Networks…** button
@@ -618,6 +622,17 @@ last successful account lookup (per provider, tied to the profile); never
 the key. The checked platforms are remembered; a list saved before X and
 Facebook existed keeps working (both stay unchecked), and a new user
 starts with TikTok, YouTube and Instagram.
+
+**Profiles.** The profile list is `redes/perfiles/<proveedor>` and the
+active one `redes/perfil/<proveedor>` (older versions keep reading that
+key, so it always holds the active profile). Each profile's settings live
+under `redes/perfil_datos/<proveedor>/<huella>/<clave>` (`huella_perfil`
+in `app/credenciales.py`); `Ajustes.de_perfil(proveedor, perfil)` returns
+a view over them. With no active profile the original flat `redes/*` keys
+are used. On first use the existing flat settings migrate into the first
+profile, which keeps them (the first profile inherits them); later
+profiles start empty. `Proveedor.perfiles()` lists the profiles in the
+service. `Ficha.perfil` records the profile a video was processed for.
 
 ### Scheduling
 

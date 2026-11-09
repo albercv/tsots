@@ -429,6 +429,28 @@ class ProveedorUploadPost:
         self._registrar_resultado(resultado)
         return resultado
 
+    def perfiles(self) -> list[str]:
+        cuerpo = self._consultar("perfiles", URL_USUARIOS, URL_USUARIOS, pide_perfil=False)
+        bruto = self._buscar(cuerpo, "profiles")
+        if not isinstance(bruto, list):
+            raise ErrorConsulta(_("Respuesta inesperada del servicio: no trae los perfiles."))
+        nombres: list[str] = []
+        for elemento in bruto:
+            if isinstance(elemento, str):  # una cadena suelta se toma como el nombre
+                nombre = elemento.strip()
+            elif isinstance(elemento, dict):
+                nombre = next((v.strip() for k in ("username", "profile", "name")
+                               if isinstance(v := elemento.get(k), str) and v.strip()), "")
+            else:
+                continue
+            if nombre and nombre not in nombres:
+                nombres.append(nombre)
+        if bruto and not nombres:  # hay lista pero ningún nombre: forma que no conocemos
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no se reconocen los nombres de los perfiles."))
+        log.info("Perfiles: %d", len(nombres))
+        return nombres
+
     def cuentas(self) -> dict[Plataforma, Cuenta | None]:
         cuerpo = self._consultar("cuentas", URL_USUARIOS + "/{perfil}",
                                  f"{URL_USUARIOS}/{quote(self._perfil, safe='')}")
@@ -565,12 +587,13 @@ class ProveedorUploadPost:
         return True
 
     def _consultar(self, que: str, plantilla: str, url: str,
-                   parametros: dict | None = None, registrar_cuerpo: bool = True) -> Any:
+                   parametros: dict | None = None, registrar_cuerpo: bool = True,
+                   pide_perfil: bool = True) -> Any:
         """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
         motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
         if not self._clave:
             raise ErrorConsulta(_("Falta la API key. Guárdala en Redes…"))
-        if not self._perfil:
+        if pide_perfil and not self._perfil:
             raise ErrorConsulta(_("Falta el perfil. Escríbelo en Redes…"))
         log.info("Consulta de %s: GET %s", que, plantilla)
         inicio = time.monotonic()

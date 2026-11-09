@@ -7,6 +7,8 @@ from PySide6.QtCore import QEvent, QRect, Qt
 from PySide6.QtGui import QColor, QFont, QImage, QPainter, QPalette, QPixmap
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
+from app.widgets.selector_perfil import SelectorPerfil
+
 from videopipeline.i18n import _
 
 # Misma imagen que el icono de la ventana: la marca de la oveja con fondo
@@ -89,6 +91,11 @@ class Cabecera(QWidget):
         fila.setSpacing(12)
         fila.addWidget(self.logo)
         fila.addLayout(textos, 1)
+        self.selector_perfil = SelectorPerfil()
+        etiqueta_perfil = QLabel(_("Perfil:"))
+        etiqueta_perfil.setBuddy(self.selector_perfil)
+        fila.addWidget(etiqueta_perfil)
+        fila.addWidget(self.selector_perfil)
 
         self._actualizar_logo()
 
