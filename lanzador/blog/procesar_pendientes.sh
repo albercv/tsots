@@ -12,7 +12,7 @@ RAIZ="$(cd "$AQUI/../.." && pwd)"
 PYTHON="$RAIZ/.venv-clearvoice/bin/python"
 LIMITE="${TSOTS_BLOG_LIMITE:-1800}"  # segundos por carpeta; la variable es solo para los tests
 E2D=mcp__claude_ai_E2D_-_Blog__
-HERRAMIENTAS="${E2D}posts_create,${E2D}posts_request_upload,${E2D}posts_validate,${E2D}posts_set_cover,${E2D}posts_list_media,Read,Write,Bash($PYTHON -m videopipeline.blog_subida:*)"
+HERRAMIENTAS="${E2D}posts_create,${E2D}posts_request_upload,${E2D}posts_validate,${E2D}posts_set_cover,${E2D}posts_list_media,${E2D}posts_search,Read,Write,WebFetch(domain:evolve2digital.com),Bash($PYTHON -m videopipeline.blog_subida:*)"
 # Las prohibidas ganan a las permitidas y a cualquier modo de permisos: ni publicar
 # ni tocar un post que ya existe.
 PROHIBIDAS="${E2D}posts_update_frontmatter,${E2D}posts_delete,${E2D}posts_update_body,${E2D}posts_rebuild"
@@ -40,7 +40,9 @@ trap 'rmdir "$DIR/.bloqueo"' EXIT
 export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin"
 export PYTHONPATH="$RAIZ"
 CLAUDE="$(command -v claude)"
-INSTRUCCIONES="$(cat "$AQUI/instrucciones.md")"
+INSTRUCCIONES="$(cat "$AQUI/instrucciones.md")
+
+$(cat "$AQUI/guia_seo.md")"
 INSTRUCCIONES="${INSTRUCCIONES//@PYTHON@/$PYTHON}"
 
 # Mueve la carpeta a $1 (hechos o errores). Si no puede, la aparta con un
@@ -83,10 +85,12 @@ while [ "$nuevas" = 1 ]; do
             continue
         fi
         # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
+        # Sin los ajustes de usuario, los plugins y hooks personales no se cuelan en el
+        # artículo; el conector de claude.ai y el hook de --settings siguen activos.
         (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \
             "$CLAUDE" -p "$INSTRUCCIONES" --add-dir "$carpeta" \
             --allowedTools "$HERRAMIENTAS" --disallowedTools "$PROHIBIDAS" \
-            --settings "$AJUSTES") > "$carpeta/claude.log" 2>&1
+            --settings "$AJUSTES" --setting-sources project,local) > "$carpeta/claude.log" 2>&1
         rc=$?
         url="$(plutil -extract url raw -o - "$carpeta/resultado.json" 2>/dev/null)"
         if [ -n "$url" ]; then

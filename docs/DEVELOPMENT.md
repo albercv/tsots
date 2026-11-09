@@ -972,14 +972,23 @@ writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
   lock) is handled in the same run. Each name is handled at most once per
   run, so a folder that could not be moved never loops.
 - It skips hidden folders (`.<name>.tmp` is still being written) and runs
-  `claude -p` from each folder with `instrucciones.md` (`@PYTHON@` becomes
-  the install's `.venv-clearvoice/bin/python`), with a 30 min limit
+  `claude -p` from each folder with `instrucciones.md` followed by
+  `guia_seo.md` as the prompt (`@PYTHON@` becomes the install's
+  `.venv-clearvoice/bin/python`) and `--setting-sources project,local`, so
+  the user's own plugins and hooks (output styles, memory, SessionStart
+  context) never reach the article. The claude.ai connector and the
+  `--settings` hook stay active without user settings (checked on the real
+  CLI). It has a 30 min limit
   (`perl -e 'alarm …'`, since macOS has no `timeout`). Claude's output goes
   to `claude.log` in the folder.
 - Allowed tools, nothing else: `posts_create`, `posts_request_upload`,
-  `posts_validate`, `posts_set_cover` and `posts_list_media` from the
-  claude.ai connector "claude.ai E2D - Blog" (`mcp__claude_ai_E2D_-_Blog__*`),
-  `Read`, `Write` and `Bash(<python> -m videopipeline.blog_subida:*)`. No
+  `posts_validate`, `posts_set_cover`, `posts_list_media` and the read-only
+  `posts_search` from the claude.ai connector "claude.ai E2D - Blog"
+  (`mcp__claude_ai_E2D_-_Blog__*`), `Read`, `Write`,
+  `WebFetch(domain:evolve2digital.com)` (posts_search also returns drafts,
+  which 404 publicly, so each internal link is checked before use) and
+  `Bash(<python> -m videopipeline.blog_subida:*)`, which now also gets an
+  `--alt` per image. No
   delete or frontmatter tool, so the agent cannot publish or remove an
   existing post. `posts_update_frontmatter`, `posts_delete`,
   `posts_update_body` and `posts_rebuild` also go in `--disallowedTools`:
