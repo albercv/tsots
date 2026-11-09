@@ -27,7 +27,10 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QScrollArea,
+    QStyle,
     QVBoxLayout,
+    QWidget,
 )
 
 from videopipeline import linkedin
@@ -269,7 +272,12 @@ class DialogoPublicar(QDialog):
         self.setWindowTitle(_("Publicar en redes"))
         self.setMinimumWidth(640)
 
-        raiz = QVBoxLayout(self)
+        exterior = QVBoxLayout(self)
+        # Todo menos los botones va en una zona con scroll: en un portátil el
+        # formulario entero no cabe en el alto útil de la pantalla.
+        self.contenido = QWidget()
+        raiz = QVBoxLayout(self.contenido)
+        raiz.setContentsMargins(0, 0, 0, 0)
         cabecera = QLabel(self.video.name)
         cabecera.setStyleSheet("font-weight: bold;")
         raiz.addWidget(cabecera)
@@ -455,7 +463,14 @@ class DialogoPublicar(QDialog):
         self.boton_publicar.clicked.connect(self.publicar)
         botones.addWidget(self.boton_cerrar)
         botones.addWidget(self.boton_publicar)
-        raiz.addLayout(botones)
+        desplazable = QScrollArea()
+        desplazable.setWidgetResizable(True)
+        desplazable.setFrameShape(QScrollArea.Shape.NoFrame)
+        desplazable.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        desplazable.setWidget(self.contenido)
+        exterior.addWidget(desplazable, 1)
+        exterior.addLayout(botones)
+        self._botones = botones
 
         self.campo_titulo.textChanged.connect(self._al_cambiar_textos)
         self.campo_hashtags.textChanged.connect(self._al_cambiar_textos)
@@ -468,6 +483,20 @@ class DialogoPublicar(QDialog):
         self.refrescar_servicio()
         self._refrescar_aviso()
         self._medir_video()
+        self.ajustar_a_la_pantalla()
+
+    def ajustar_a_la_pantalla(self) -> None:
+        """Todo el contenido si cabe; si no, el alto de la pantalla (y scroll),
+        como en Redes…."""
+        margenes = self.layout().contentsMargins()
+        barra = self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        ideal = self.contenido.sizeHint()
+        alto = (ideal.height() + self._botones.sizeHint().height() + self.layout().spacing()
+                + margenes.top() + margenes.bottom())
+        # Margen para la barra de título, que no cuenta en el alto del diálogo.
+        alto_maximo = self.screen().availableGeometry().height() - 60
+        self.resize(max(self.minimumWidth(), ideal.width() + barra + margenes.left()
+                        + margenes.right()), min(alto, alto_maximo))
 
     # --- estado ---
 

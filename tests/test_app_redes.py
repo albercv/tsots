@@ -1751,3 +1751,25 @@ def test_arrastrar_imagen_propia(qtbot, video, ajustes, llavero_falso, tmp_path,
                         lambda *a, **k: ([str(otra)], ""))
     _menu_anadir(tira)["Otra imagen…"].trigger()
     assert tira.fotos() == (*fotos, propia, otra)
+
+
+def test_dialogo_publicar_cabe_en_la_pantalla_y_publicar_se_ve(qtbot, video, ajustes,
+                                                               monkeypatch):
+    """En un portátil el formulario entero (textos, redes, ubicación, cuándo,
+    servicio) pasa del alto útil: va en una zona con scroll y los botones
+    quedan fijos abajo."""
+    from PySide6.QtCore import QPoint, QRect
+
+    class PantallaBaja:
+        def availableGeometry(self):
+            return QRect(0, 0, 1440, 500)
+
+    monkeypatch.setattr(DialogoPublicar, "screen", lambda self: PantallaBaja())
+    dialogo, _ = _dialogo(qtbot, video, ajustes)
+    assert dialogo.contenido.sizeHint().height() > 500
+    dialogo.show()
+    qtbot.waitExposed(dialogo)
+    assert dialogo.height() <= 500
+    assert dialogo.boton_publicar.isVisible()
+    abajo = dialogo.boton_publicar.mapTo(dialogo, QPoint(0, dialogo.boton_publicar.height()))
+    assert abajo.y() <= dialogo.height()
