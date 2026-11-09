@@ -111,6 +111,9 @@ class DialogoRedes(QDialog):
         # Editable: un perfil que no está en la lista se escribe a mano.
         self.combo_perfil = QComboBox()
         self.combo_perfil.setEditable(True)
+        # Sin autocompletado: rellena el campo sin emitir textEdited y el diálogo
+        # guardaba los datos de un perfil bajo el nombre de otro (y cambiaba mayúsculas).
+        self.combo_perfil.setCompleter(None)
         self.combo_perfil.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self.campo_perfil = self.combo_perfil.lineEdit()
         self.campo_perfil.setPlaceholderText(_("Nombre del perfil en el servicio"))
@@ -599,6 +602,7 @@ class DialogoRedes(QDialog):
         self._refrescar_clave()
 
     def accept(self) -> None:
+        self._al_cambiar_perfil()  # lo guardado nunca es de un perfil distinto al escrito
         clave = self.campo_clave.text().strip()
         if clave:
             try:

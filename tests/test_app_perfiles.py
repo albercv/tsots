@@ -398,6 +398,51 @@ def test_escribir_un_perfil_nuevo_y_guardar_sin_perder_el_foco(qtbot, ajustes,
     assert personal.instagram_modo == ModoInstagram.PRUEBA
 
 
+def test_escribir_con_el_autocompletado_activo_no_guarda_datos_de_otro_perfil(
+        qtbot, ajustes, llavero_falso):
+    """Teclear «pe» no debe cargar «personal» con los datos de «six» ni al revés:
+    el autocompletado de Qt rellenaba el campo sin avisar a textEdited."""
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    _elegir(dialogo.combo_perfil, "six")
+    dialogo.show()
+    QTest.qWaitForWindowActive(dialogo)
+    dialogo.campo_perfil.clear()
+    dialogo.campo_perfil.setFocus()
+    QTest.keyClicks(dialogo.campo_perfil, "pe")
+    QTest.qWait(300)  # el autocompletado en línea rellena el campo tras teclear
+    dialogo.accept()
+    personal = ajustes.de_perfil(P, "personal")
+    assert personal.pagina_facebook == Pagina("111", "Personal")
+    assert personal.tiktok_modo == ModoTikTok.PUBLICO
+    assert personal.instagram_modo == ModoInstagram.PRUEBA
+    assert not personal.x_premium
+
+
+def test_guardar_carga_antes_el_perfil_escrito_si_no_es_el_cargado(qtbot, ajustes,
+                                                                    llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = DialogoRedes(ajustes)
+    qtbot.addWidget(dialogo)
+    _elegir(dialogo.combo_perfil, "six")
+    dialogo.campo_perfil.setText("personal")  # setText no emite textEdited
+    dialogo.accept()
+    assert ajustes.perfil_redes == "personal"
+    assert ajustes.de_perfil(P, "six").pagina_facebook == Pagina("222", "Six")
+    assert ajustes.de_perfil(P, "personal").pagina_facebook == Pagina("111", "Personal")
+    assert not ajustes.de_perfil(P, "personal").x_premium
+
+
+def test_cambiar_de_perfil_al_publicar_quita_la_ubicacion_solo_este_video(
+        qtbot, video, ajustes, llavero_falso):
+    _dos_perfiles(ajustes)
+    dialogo = _publicar(qtbot, video, ajustes)
+    dialogo._ubicacion_propia = Ciudad.SEVILLA
+    _elegir(dialogo.selector_perfil, "six")
+    assert dialogo._ubicacion_propia is None
+
+
 def _publicar(qtbot, video, ajustes, fabrica=None, **kwargs):
     dialogo = DialogoPublicar(video, _caption(), ajustes,
                               fabrica=fabrica or (lambda n, c, d: ProveedorFalso()), **kwargs)

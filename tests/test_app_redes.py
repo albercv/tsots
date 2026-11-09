@@ -208,6 +208,7 @@ def test_dialogo_redes_guarda_clave_en_llavero_y_perfil(qtbot, ajustes, llavero_
     assert "Sin clave" in dialogo.etiqueta_clave.text()
     assert not dialogo.boton_olvidar.isEnabled()
     dialogo.campo_perfil.setText("mi_perfil")
+    dialogo.campo_perfil.editingFinished.emit()  # al teclear, el perfil se carga antes de editar
     dialogo.campo_clave.setText(f" {CLAVE} ")
     dialogo.combo_tiktok.setCurrentIndex(dialogo.combo_tiktok.findData("publico"))
     dialogo.combo_instagram.setCurrentIndex(dialogo.combo_instagram.findData("normal"))
@@ -424,6 +425,7 @@ def test_dialogo_redes_explica_el_perfil_y_avisa_si_es_un_email(qtbot, ajustes,
     assert not dialogo.aviso_perfil.isHidden()
     assert "email" in dialogo.aviso_perfil.text()
     dialogo.campo_perfil.setText("mi_perfil")
+    dialogo.campo_perfil.editingFinished.emit()  # al teclear, el perfil se carga antes de editar
     assert dialogo.aviso_perfil.isHidden()
 
 
