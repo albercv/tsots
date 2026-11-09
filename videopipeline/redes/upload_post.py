@@ -436,12 +436,18 @@ class ProveedorUploadPost:
             raise ErrorConsulta(_("Respuesta inesperada del servicio: no trae los perfiles."))
         nombres: list[str] = []
         for elemento in bruto:
-            if not isinstance(elemento, dict):
+            if isinstance(elemento, str):  # una cadena suelta se toma como el nombre
+                nombre = elemento.strip()
+            elif isinstance(elemento, dict):
+                nombre = next((v.strip() for k in ("username", "profile", "name")
+                               if isinstance(v := elemento.get(k), str) and v.strip()), "")
+            else:
                 continue
-            nombre = next((v.strip() for k in ("username", "profile", "name")
-                           if isinstance(v := elemento.get(k), str) and v.strip()), "")
             if nombre and nombre not in nombres:
                 nombres.append(nombre)
+        if bruto and not nombres:  # hay lista pero ningún nombre: forma que no conocemos
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no se reconocen los nombres de los perfiles."))
         log.info("Perfiles: %d", len(nombres))
         return nombres
 

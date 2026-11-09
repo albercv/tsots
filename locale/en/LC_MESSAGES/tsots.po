@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 14:55+0100\n"
+"POT-Creation-Date: 2026-11-09 15:11+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1691,6 +1691,9 @@ msgstr "Redoing it will transcribe and burn in the subtitles again; the caption 
 #, python-brace-format
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
 msgstr "Unexpected response from the service (HTTP {codigo})."
+
+msgid "Respuesta inesperada del servicio: no se reconocen los nombres de los perfiles."
+msgstr "Unexpected response from the service: the profile names are not recognised."
 
 msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."
 msgstr "Unexpected response from the service: it does not include the connected accounts."

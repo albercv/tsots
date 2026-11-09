@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 14:55+0100\n"
+"POT-Creation-Date: 2026-11-09 15:11+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1645,6 +1645,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Respuesta inesperada del servicio (HTTP {codigo})."
+msgstr ""
+
+msgid "Respuesta inesperada del servicio: no se reconocen los nombres de los perfiles."
 msgstr ""
 
 msgid "Respuesta inesperada del servicio: no trae las cuentas conectadas."

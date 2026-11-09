@@ -851,10 +851,10 @@ def test_perfiles_de_la_cuenta():
     cuerpo = {"success": True, "profiles": [
         {"username": "personal", "social_accounts": {}}, {"profile": "sixpodcast"},
         {"name": " tercero "}, {"username": "", "name": "cuarto"},
-        {"social_accounts": {}}, "basura", {"username": "personal"}]}
+        {"social_accounts": {}}, " texto ", {"username": "personal"}]}
     servidor = Servidor(_responder_json(cuerpo))
     assert _proveedor(servidor, perfil="").perfiles() == [
-        "personal", "sixpodcast", "tercero", "cuarto"]
+        "personal", "sixpodcast", "tercero", "cuarto", "texto"]
     peticion = servidor.peticiones[0]
     assert peticion.method == "GET"
     assert str(peticion.url) == "https://api.upload-post.com/api/uploadposts/users"
@@ -872,6 +872,18 @@ def test_perfiles_errores_legibles_y_sin_clave(codigo, cuerpo, texto):
         _proveedor(Servidor(_responder_json(cuerpo, codigo))).perfiles()
     assert texto in str(error.value)
     assert CLAVE not in str(error.value)
+
+
+@pytest.mark.parametrize("perfiles", [[{"social_accounts": {}}], [{"username": ""}, 3, None], [""]])
+def test_perfiles_con_lista_pero_sin_ningun_nombre_es_un_error_legible(perfiles):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json({"profiles": perfiles}))).perfiles()
+    assert "inesperada" in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+def test_perfiles_lista_vacia_es_una_cuenta_sin_perfiles():
+    assert _proveedor(Servidor(_responder_json({"profiles": []}))).perfiles() == []
 
 
 def test_perfiles_sin_red():
