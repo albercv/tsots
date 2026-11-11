@@ -711,8 +711,8 @@ class DialogoPublicar(QDialog):
                             "Premium en Redes…)").format(maximo=MAX_TEXTO_X)
         if plataforma == Plataforma.LINKEDIN:
             if self._linkedin is None:
-                return False, "", _("Este vídeo no tiene post de LinkedIn: activa «Blog y "
-                                    "LinkedIn» y procésalo."), COLOR_SECUNDARIO
+                return False, "", _("Este vídeo no tiene post de LinkedIn: activa "
+                                    "«LinkedIn» y procésalo."), COLOR_SECUNDARIO
             if not self.tira_linkedin.fotos():
                 return False, "", _("Sin fotos: añade al menos una."), COLOR_AVISO
             texto_linkedin = self.campo_linkedin.toPlainText().strip()

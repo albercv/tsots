@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 15:11+0100\n"
+"POT-Creation-Date: 2026-11-11 21:59+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -208,7 +208,7 @@ msgstr ""
 msgid "Barras negras"
 msgstr ""
 
-msgid "Blog y LinkedIn"
+msgid "Blog"
 msgstr ""
 
 #, python-brace-format
@@ -702,7 +702,7 @@ msgstr ""
 msgid "Esperando confirmación…"
 msgstr ""
 
-msgid "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo."
+msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
 msgstr ""
 
 msgid ""
@@ -955,6 +955,9 @@ msgid "Limpiar hechos"
 msgstr ""
 
 msgid "Limpieza de audio"
+msgstr ""
+
+msgid "LinkedIn"
 msgstr ""
 
 msgid "Llavero"
@@ -1442,13 +1445,22 @@ msgstr ""
 msgid "Pregunta al servicio qué perfiles tiene tu cuenta"
 msgstr ""
 
-msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
+msgid "Prepara un borrador para el blog de evolve2digital. Se hace una vez por vídeo."
+msgstr ""
+
+msgid "Prepara un post de LinkedIn con portada, ideas clave y capturas del vídeo. Se hace una vez por vídeo."
 msgstr ""
 
 msgid "Preparación del audio"
 msgstr ""
 
+msgid "Preparando LinkedIn"
+msgstr ""
+
 msgid "Preparando blog y LinkedIn"
+msgstr ""
+
+msgid "Preparando el blog"
 msgstr ""
 
 msgid "Preview no disponible"

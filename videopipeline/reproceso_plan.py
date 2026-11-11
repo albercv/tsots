@@ -337,6 +337,12 @@ def revisar(ficha: Ficha, config: PipelineConfig) -> list[Consulta]:
 _NUEVO = object()  # título que esta pasada genera: distinto de cualquier quemado
 
 
+def partes_difusion(ficha: Ficha, config: PipelineConfig) -> tuple[str, ...]:
+    """Lo pedido de «blog» y «linkedin» que el vídeo aún no tiene."""
+    hechas = ficha.artefactos[DIFUSION].ajustes if DIFUSION in ficha.artefactos else {}
+    return tuple(p for p in ("blog", "linkedin") if getattr(config, p) and p not in hechas)
+
+
 def planificar(ficha: Ficha, config: PipelineConfig,
                decisiones: Decisiones) -> Plan:
     marcados = {paso for paso in PASOS if getattr(config, _MARCA[paso])}
@@ -511,9 +517,9 @@ def planificar(ficha: Ficha, config: PipelineConfig,
         elegidas.add(Accion.CAPTION)
         if transcripcion is None:
             elegidas.add(Accion.TRANSCRIBIR)
-    # Blog y LinkedIn: una vez por vídeo, aunque se borren sus salidas. Sus
-    # fotogramas salen de la base de esta pasada: el texto, de su misma línea.
-    if config.difusion and DIFUSION not in ficha.artefactos:
+    # Blog y LinkedIn: una vez por vídeo cada uno, aunque se borren sus salidas.
+    # Sus fotogramas salen de la base de esta pasada: el texto, de su misma línea.
+    if partes_difusion(ficha, config):
         elegidas.add(Accion.DIFUSION)
         if transcripcion is None or transcripcion.linea_tiempo != linea:
             elegidas.add(Accion.TRANSCRIBIR)

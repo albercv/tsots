@@ -30,7 +30,7 @@ def _sin_ffmpeg(origen, destino):
 
 def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY, cliente=CLIENTE,
             palabras=(Palabra("hola", 1.0, 1.5),), codificar=_sin_ffmpeg,
-            detector=lambda f: np.zeros((0, 5))):
+            detector=lambda f: np.zeros((0, 5)), **partes):
     final = tmp_path / "salida" / f"{nombre}_limpio.mp4"
     final.parent.mkdir(exist_ok=True)
     base = tmp_path / "base.mp4"
@@ -41,6 +41,7 @@ def _llamar(tmp_path, *, leer=None, nombre="x", hoy=HOY, cliente=CLIENTE,
         idioma="es", contexto_marca="", modelo="m", dir_blog=tmp_path / "blog",
         cliente=cliente, detector=detector,
         leer=leer or (lambda v, t: _nitida(int(t))), hoy=hoy, duracion=100.0, codificar=codificar,
+        **partes,
     )
 
 
@@ -123,6 +124,28 @@ def test_capturas_solo_de_fotogramas_sin_cara(tmp_path):
     final, _ = _llamar(tmp_path, leer=lambda v, t: _nitida(0 if t < 50 else 1),
                        detector=lambda f: CARA if f[1, 0, 2] == 0 else np.zeros((0, 5)))
     assert _fotos(final) == ["01_portada.png", "02_candidato_03.jpg", "03_candidato_05.jpg"]
+
+
+def test_solo_blog_no_toca_el_post_de_linkedin(tmp_path):
+    final = tmp_path / "salida" / "x_limpio.mp4"
+    car = final.with_suffix(".linkedin")
+    car.mkdir(parents=True)
+    (car / "01_portada.png").write_bytes(b"post ya preparado")
+
+    def sin_modelo(*a):
+        raise AssertionError("el blog solo no escribe post")
+
+    _, res = _llamar(tmp_path, cliente=sin_modelo, con_linkedin=False)
+    assert res.linkedin_md is None and res.fallo_linkedin is None
+    assert [p.name for p in car.iterdir()] == ["01_portada.png"]
+    assert (car / "01_portada.png").read_bytes() == b"post ya preparado"
+    assert len(list((res.carpeta_blog / "candidatos").glob("*.jpg"))) == 6
+
+
+def test_solo_linkedin_no_crea_carpeta_del_blog(tmp_path):
+    final, res = _llamar(tmp_path, con_blog=False)
+    assert res.carpeta_blog is None and not (tmp_path / "blog").exists()
+    assert res.linkedin_md.exists() and (final.with_suffix(".linkedin") / "01_portada.png").exists()
 
 
 def test_transcripcion_txt_en_lineas_cortas(tmp_path):

@@ -78,7 +78,7 @@ Pending work, most urgent first. Remove an item when it is merged into
       - The CLI path (`limpiarVideo.py`, `runner` calling `pipeline.run`
         without a record) never runs the blog/LinkedIn step: it only runs
         through `reproceso` (the GUI).
-      - The «Blog y LinkedIn» checkbox has a tooltip but no info-icon help
+      - The «Blog» and «LinkedIn» checkboxes have a tooltip but no info-icon help
         card (`AYUDAS` in `app/widgets/panel_opciones.py`).
       - **Publish…** needs a caption to open, so publishing only to
         LinkedIn from a video without a caption is not possible.

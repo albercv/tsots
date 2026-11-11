@@ -1609,7 +1609,7 @@ def test_linkedin_sin_acompanantes_deshabilitado(qtbot, video, ajustes, llavero_
     dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, L))
     assert not dialogo.casillas[L].isEnabled() and not dialogo.casillas[L].isChecked()
     assert dialogo.estados[L].text() == (
-        "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo.")
+        "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo.")
     assert dialogo.campo_linkedin.isHidden() and dialogo.tira_linkedin.isHidden()
     pub = dialogo.publicacion()
     assert pub.fotos == () and pub.texto_linkedin == ""

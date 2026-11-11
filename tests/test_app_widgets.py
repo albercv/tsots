@@ -238,17 +238,24 @@ def test_panel_caption_defecto_off_y_en_valores(qtbot):
     PipelineConfig(video=Path("/v.mp4"), **panel.valores()).validar()
 
 
-def test_casilla_difusion_se_guarda_y_restaura(qtbot):
+def test_casillas_blog_y_linkedin_por_separado(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    assert panel.valores()["difusion"] is False
-    panel.check_difusion.setChecked(True)
-    assert panel.valores()["difusion"] is True
+    assert (panel.valores()["blog"], panel.valores()["linkedin"]) == (False, False)
+    panel.check_linkedin.setChecked(True)
+    assert (panel.valores()["blog"], panel.valores()["linkedin"]) == (False, True)
     PipelineConfig(video=Path("/v.mp4"), **panel.valores()).validar()
-    panel.cargar({"difusion": "false"})
-    assert not panel.check_difusion.isChecked()
+    panel.cargar({"blog": "true", "linkedin": "false"})
+    assert panel.check_blog.isChecked() and not panel.check_linkedin.isChecked()
+
+
+def test_casilla_antigua_blog_y_linkedin_marca_las_dos(qtbot):
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
     panel.cargar({"difusion": "true"})
-    assert panel.check_difusion.isChecked()
+    assert panel.check_blog.isChecked() and panel.check_linkedin.isChecked()
+    panel.cargar({"difusion": "false"})
+    assert not panel.check_blog.isChecked() and not panel.check_linkedin.isChecked()
 
 
 def test_panel_caption_cargar_desde_qsettings(qtbot):

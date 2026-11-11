@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-09 15:11+0100\n"
+"POT-Creation-Date: 2026-11-11 21:59+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -213,8 +213,8 @@ msgstr "Add…"
 msgid "Barras negras"
 msgstr "Black bars"
 
-msgid "Blog y LinkedIn"
-msgstr "Blog and LinkedIn"
+msgid "Blog"
+msgstr "Blog"
 
 #, python-brace-format
 msgid "Blog y LinkedIn fallaron: {error}. Vídeo guardado igual.{sugerencia}"
@@ -718,8 +718,8 @@ msgstr "Waiting for the service to finish: {lista}…"
 msgid "Esperando confirmación…"
 msgstr "Waiting for confirmation…"
 
-msgid "Este vídeo no tiene post de LinkedIn: activa «Blog y LinkedIn» y procésalo."
-msgstr "This video has no LinkedIn post: turn on “Blog and LinkedIn” and process it."
+msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
+msgstr "This video has no LinkedIn post: turn on “LinkedIn” and process it."
 
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
@@ -985,6 +985,9 @@ msgstr "Clear finished"
 
 msgid "Limpieza de audio"
 msgstr "Audio cleaning"
+
+msgid "LinkedIn"
+msgstr "LinkedIn"
 
 msgid "Llavero"
 msgstr "Keychain"
@@ -1480,14 +1483,23 @@ msgstr "Asks the service which TikTok places have this name, so you can pick one
 msgid "Pregunta al servicio qué perfiles tiene tu cuenta"
 msgstr "Asks the service which profiles your account has"
 
-msgid "Prepara un borrador para el blog de evolve2digital y un post de LinkedIn con portada e imágenes del vídeo. Se hace una vez por vídeo."
-msgstr "Prepares a draft for the evolve2digital blog and a LinkedIn post with a cover and images from the video. Done once per video."
+msgid "Prepara un borrador para el blog de evolve2digital. Se hace una vez por vídeo."
+msgstr "Prepares a draft for the evolve2digital blog. Done once per video."
+
+msgid "Prepara un post de LinkedIn con portada, ideas clave y capturas del vídeo. Se hace una vez por vídeo."
+msgstr "Prepares a LinkedIn post with a cover, key ideas and screenshots from the video. Done once per video."
 
 msgid "Preparación del audio"
 msgstr "Audio preparation"
 
+msgid "Preparando LinkedIn"
+msgstr "Preparing LinkedIn"
+
 msgid "Preparando blog y LinkedIn"
 msgstr "Preparing blog and LinkedIn"
+
+msgid "Preparando el blog"
+msgstr "Preparing the blog"
 
 msgid "Preview no disponible"
 msgstr "Preview not available"
