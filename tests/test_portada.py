@@ -89,3 +89,22 @@ def test_vertical_con_cara_grande_no_se_corta(tam):
     assert (ys.max() - ys.min()) < 0.65 * tam[1]  # tope de tamaño de cara
     if tam == TAM_BLOG:
         assert (np.abs(a[:, -1] - FONDO).sum(axis=1) > 10).any()  # sin banda de fondo a la derecha
+
+
+def test_mas_lineas_permiten_letra_mas_grande():
+    idea = "Revisa quién supervisa a tus agentes antes de pagar el doble"
+
+    def alto(img):
+        x0, y0, x1, y1 = _caja_de_pixeles_blancos_o_turquesa(img)
+        return y1 - y0
+
+    normal = componer_portada(_negra(), idea, TAM_LINKEDIN)
+    holgada = componer_portada(_negra(), idea, TAM_LINKEDIN, max_lineas=5)
+    assert alto(holgada) > alto(normal)
+
+
+def test_idea_de_palabras_cortas_no_sube_hasta_la_cara():
+    """5 líneas a tamaño de título taparían la cara: el bloque no pasa del de la portada."""
+    img = componer_portada(_negra(), "Ofrece casos resueltos y visión crítica", TAM_LINKEDIN,
+                           max_lineas=5)
+    assert _caja_de_pixeles_blancos_o_turquesa(img)[1] >= 0.55 * img.height

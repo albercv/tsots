@@ -30,7 +30,8 @@ log = logging.getLogger(__name__)
 
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
 AGENTE = BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh"
-NUM_IMAGENES = 3  # fotogramas que acompañan a la portada en LinkedIn
+MAX_CAPTURAS = 2  # fotogramas sin cara (pantalla, demo): los de cara a cámara no aportan
+LINEAS_IDEA = 5  # una idea es más larga que el título de la portada
 
 
 @dataclass(frozen=True)
@@ -88,16 +89,21 @@ def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
         raise PasoFallido(_("No se ha encontrado ningún fotograma válido para la portada"))
     portada = _elegir_portada(candidatos)
     transcripcion = texto_plano(palabras)
-    texto, fallo = None, None
+    texto, ideas, fallo = None, [], None
     try:
-        texto = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
+        texto, ideas = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
     except Exception as error:  # noqa: BLE001 — sin texto de LinkedIn el blog sigue
         fallo = error
 
-    # LinkedIn: portada con logo + fotogramas repartidos en el tiempo
-    extras = _repartidos([c for c in candidatos if c is not portada], NUM_IMAGENES)
+    # LinkedIn: portada, una tarjeta por idea clave y capturas sin cara
     _componer(portada, titulo, TAM_LINKEDIN, car / "01_portada.png", con_logo=True)
-    for i, c in enumerate(extras, start=2):
+    fondos = [c for c in candidatos if c.cara and c is not portada] or [portada]
+    for i, idea in enumerate(ideas):
+        _componer(fondos[i % len(fondos)], idea, TAM_LINKEDIN, car / f"{i + 2:02d}_idea.png",
+                  con_logo=True, max_lineas=LINEAS_IDEA)
+    capturas = _repartidos([c for c in candidatos if not c.cara and c is not portada],
+                           MAX_CAPTURAS)
+    for i, c in enumerate(capturas, start=len(ideas) + 2):
         shutil.copy2(c.archivo, car / f"{i:02d}_{c.archivo.name}")
     if texto is not None:
         linkedin.escribir(texto, final)

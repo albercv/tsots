@@ -53,7 +53,7 @@ def _degradar(lienzo, x0, fw, vertical):
     return Image.fromarray(arr.astype(np.uint8))
 
 
-def _titulo(lienzo, titulo, vertical):
+def _titulo(lienzo, titulo, vertical, max_lineas):
     W, H = lienzo.size
     d = ImageDraw.Draw(lienzo)
     palabras = titulo.upper().split()
@@ -75,7 +75,8 @@ def _titulo(lienzo, titulo, vertical):
     tam = int(0.13 * H)
     while True:
         f, lineas = repartir(tam)
-        if len(lineas) <= 3 and all(d.textlength(p, font=f) <= ancho for p in palabras):
+        # El bloque no pasa del alto de 3 líneas a tamaño máximo: más arriba tapa la cara.
+        if len(lineas) <= max_lineas and len(lineas) * tam <= 0.39 * H and all(d.textlength(p, font=f) <= ancho for p in palabras):
             break
         tam -= 2
     alto = len(lineas) * tam * 0.95
@@ -89,8 +90,11 @@ def _titulo(lienzo, titulo, vertical):
 
 def componer_portada(fotograma: Image.Image, titulo: str, tamano: tuple[int, int], *,
                      cara: tuple[int, int, int, int] | None = None,
-                     con_logo: bool = False) -> Image.Image:
+                     con_logo: bool = False, max_lineas: int = 3) -> Image.Image:
     """Compone la portada de `tamano` a partir de un fotograma.
+
+    Las tarjetas de LinkedIn son portadas con una idea en vez del título: más
+    larga, así que piden más líneas para no encoger la letra.
 
     `cara` es (x1, y1, x2, y2) en píxeles del `fotograma`. El logo (solo
     LinkedIn) va arriba a la derecha porque el título ocupa la parte baja.
@@ -98,7 +102,7 @@ def componer_portada(fotograma: Image.Image, titulo: str, tamano: tuple[int, int
     vertical = tamano[1] > tamano[0]
     lienzo, x0, fw = _colocar_foto(fotograma, tamano, cara, vertical)
     lienzo = _degradar(lienzo, x0, fw, vertical)
-    _titulo(lienzo, titulo, vertical)
+    _titulo(lienzo, titulo, vertical, max_lineas)
     if con_logo:
         W = tamano[0]
         logo = Image.open(_LOGO).convert("RGBA")
