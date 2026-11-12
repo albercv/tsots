@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -22,7 +23,7 @@ from .caption import leer_md, texto_plano
 from .fotogramas import Candidato, extraer_candidatos
 from .i18n import _
 from .ollama import chat_json
-from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada
+from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada, componer_tarjeta
 from .steps import BASE_DIR, PasoFallido, codificar_web
 from .subtitles import Palabra
 
@@ -30,13 +31,13 @@ log = logging.getLogger(__name__)
 
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
 AGENTE = BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh"
-NUM_IMAGENES = 3  # fotogramas que acompañan a la portada en LinkedIn
+MAX_CAPTURAS = 2  # fotogramas sin cara (pantalla, demo): los de cara a cámara no aportan
 
 
 @dataclass(frozen=True)
 class Resultado:
-    linkedin_md: Path | None  # None si falló el texto: el blog sigue adelante
-    carpeta_blog: Path
+    linkedin_md: Path | None  # None si no se pidió o falló el texto: el blog sigue
+    carpeta_blog: Path | None  # None si no se pidió el blog
     fallo_linkedin: Exception | None = None
 
 
@@ -75,67 +76,88 @@ def _enlazar_o_copiar(origen: Path, destino: Path) -> None:
 
 def preparar(*, nombre: str, base: Path, video_blog: Path, final: Path,
              palabras: list[Palabra], titulo: str, idioma: str, contexto_marca: str,
-             modelo: str, dir_blog: Path = DIR_BLOG, cliente=chat_json,
+             modelo: str, con_blog: bool = True, con_linkedin: bool = True,
+             dir_blog: Path = DIR_BLOG, cliente=chat_json,
              detector=None, leer=None, hoy: date | None = None,
              duracion: float | None = None, codificar=codificar_web) -> Resultado:
     hoy = hoy or date.today()
     md, car = linkedin.rutas(final)
-    shutil.rmtree(car, ignore_errors=True)  # que no sobrevivan candidatos de otra pasada
-    candidatos = extraer_candidatos(base, palabras, car / "candidatos",
-                                    detector=detector, leer=leer, duracion=duracion)
-    if not candidatos:
-        shutil.rmtree(car, ignore_errors=True)
-        raise PasoFallido(_("No se ha encontrado ningún fotograma válido para la portada"))
-    portada = _elegir_portada(candidatos)
-    transcripcion = texto_plano(palabras)
-    texto, fallo = None, None
+    if con_linkedin:
+        shutil.rmtree(car, ignore_errors=True)  # que no sobrevivan candidatos de otra pasada
+    # Solo el blog: los candidatos van aparte para no tocar un post ya preparado.
+    with tempfile.TemporaryDirectory() as aparte:
+        dir_candidatos = car / "candidatos" if con_linkedin else Path(aparte)
+        candidatos = extraer_candidatos(base, palabras, dir_candidatos,
+                                        detector=detector, leer=leer, duracion=duracion)
+        if not candidatos:
+            if con_linkedin:
+                shutil.rmtree(car, ignore_errors=True)
+            raise PasoFallido(_("No se ha encontrado ningún fotograma válido para la portada"))
+        portada = _elegir_portada(candidatos)
+        transcripcion = texto_plano(palabras)
+        texto, fallo = None, None
+        if con_linkedin:
+            texto, fallo = _post_linkedin(candidatos, portada, titulo, final, car,
+                                          transcripcion, contexto_marca, modelo,
+                                          cliente, idioma)
+        destino = None
+        if con_blog:
+            destino = _carpeta_libre(dir_blog, f"{hoy:%Y-%m-%d}-{nombre}")
+            tmp = destino.parent / f".{nombre}.tmp"  # oculta: se renombra al final
+            shutil.rmtree(tmp, ignore_errors=True)
+            tmp.mkdir(parents=True)
+            try:
+                try:  # 190 MB hacían fallar la subida (502): se sube una versión de 720 px
+                    codificar(video_blog, tmp / "video.mp4")
+                except Exception:  # noqa: BLE001 — sin codificación se sube el original
+                    (tmp / "video.mp4").unlink(missing_ok=True)
+                    _enlazar_o_copiar(video_blog, tmp / "video.mp4")
+                trozos = transcripcion.split()  # en líneas cortas: `Read` corta las muy largas
+                (tmp / "transcripcion.txt").write_text(
+                    "\n".join(" ".join(trozos[i:i + 15]) for i in range(0, len(trozos), 15)),
+                    encoding="utf-8")
+                _componer(portada, titulo, TAM_BLOG, tmp / "portada.png")
+                shutil.copytree(dir_candidatos, tmp / "candidatos")
+                caption = leer_md(final.with_suffix(".md"))
+                meta = {
+                    "idioma": idioma, "nombre": nombre, "titulo_corto": titulo,
+                    "titulo_seo": caption.titulo if caption else None,
+                    "palabras_clave": caption.palabras_clave if caption else [],
+                    "contexto_marca": contexto_marca,
+                    "candidatos": [{"archivo": f"candidatos/{c.archivo.name}",
+                                    "segundo": round(c.segundo, 1), "texto": c.texto}
+                                   for c in candidatos],
+                }
+                (tmp / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
+                                               encoding="utf-8")
+                tmp.rename(destino)
+            except BaseException:
+                shutil.rmtree(tmp, ignore_errors=True)
+                raise
+    return Resultado(md if texto is not None else None, destino, fallo)
+
+
+def _post_linkedin(candidatos: list[Candidato], portada: Candidato, titulo: str,
+                   final: Path, car: Path, transcripcion: str, contexto_marca: str,
+                   modelo: str, cliente, idioma: str) -> tuple[str | None, Exception | None]:
+    """Fotos y texto del post; (texto, fallo): sin texto las fotos quedan igual."""
+    texto, ideas, fallo = None, [], None
     try:
-        texto = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
+        texto, ideas = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
     except Exception as error:  # noqa: BLE001 — sin texto de LinkedIn el blog sigue
         fallo = error
-
-    # LinkedIn: portada con logo + fotogramas repartidos en el tiempo
-    extras = _repartidos([c for c in candidatos if c is not portada], NUM_IMAGENES)
+    # Portada; luego, sin la cara: una tarjeta por idea clave y las capturas
     _componer(portada, titulo, TAM_LINKEDIN, car / "01_portada.png", con_logo=True)
-    for i, c in enumerate(extras, start=2):
+    sin_cara = [c for c in candidatos if not c.cara and c is not portada]
+    for i, idea in enumerate(ideas):  # sin capturas, sobre el fondo de la marca
+        fondo = Image.open(sin_cara[i % len(sin_cara)].archivo) if sin_cara else None
+        componer_tarjeta(idea, TAM_LINKEDIN, fondo=fondo).save(car / f"{i + 2:02d}_idea.png")
+    capturas = _repartidos(sin_cara, MAX_CAPTURAS)
+    for i, c in enumerate(capturas, start=len(ideas) + 2):
         shutil.copy2(c.archivo, car / f"{i:02d}_{c.archivo.name}")
     if texto is not None:
         linkedin.escribir(texto, final)
-
-    # Blog: carpeta oculta que se renombra al final
-    destino = _carpeta_libre(dir_blog, f"{hoy:%Y-%m-%d}-{nombre}")
-    tmp = destino.parent / f".{nombre}.tmp"
-    shutil.rmtree(tmp, ignore_errors=True)
-    tmp.mkdir(parents=True)
-    try:
-        try:  # 190 MB hacían fallar la subida (502): se sube una versión de 720 px
-            codificar(video_blog, tmp / "video.mp4")
-        except Exception:  # noqa: BLE001 — sin codificación se sube el original
-            (tmp / "video.mp4").unlink(missing_ok=True)
-            _enlazar_o_copiar(video_blog, tmp / "video.mp4")
-        trozos = transcripcion.split()  # en líneas cortas: `Read` corta las muy largas
-        (tmp / "transcripcion.txt").write_text(
-            "\n".join(" ".join(trozos[i:i + 15]) for i in range(0, len(trozos), 15)),
-            encoding="utf-8")
-        _componer(portada, titulo, TAM_BLOG, tmp / "portada.png")
-        shutil.copytree(car / "candidatos", tmp / "candidatos")
-        caption = leer_md(final.with_suffix(".md"))
-        meta = {
-            "idioma": idioma, "nombre": nombre, "titulo_corto": titulo,
-            "titulo_seo": caption.titulo if caption else None,
-            "palabras_clave": caption.palabras_clave if caption else [],
-            "contexto_marca": contexto_marca,
-            "candidatos": [{"archivo": f"candidatos/{c.archivo.name}",
-                            "segundo": round(c.segundo, 1), "texto": c.texto}
-                           for c in candidatos],
-        }
-        (tmp / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2),
-                                       encoding="utf-8")
-        tmp.rename(destino)
-    except BaseException:
-        shutil.rmtree(tmp, ignore_errors=True)
-        raise
-    return Resultado(md if texto is not None else None, destino, fallo)
+    return texto, fallo
 
 
 def lanzar_agente(dir_blog: Path = DIR_BLOG) -> bool:

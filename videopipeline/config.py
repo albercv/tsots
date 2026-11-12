@@ -69,7 +69,8 @@ class PipelineConfig:
     modelo_whisper: str = "turbo"
     tamano_subs: int = 100
     caption_seo: bool = False
-    difusion: bool = False  # blog y LinkedIn: una vez por vídeo
+    blog: bool = False  # borrador del blog: una vez por vídeo
+    linkedin: bool = False  # post de LinkedIn con fotos: una vez por vídeo
     titulo: bool = False  # título de inicio quemado; la CLI lo deja apagado
     contexto_marca: str = ""
     glosario: str = ""  # texto crudo; ver videopipeline/glosario.py

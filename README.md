@@ -9,7 +9,7 @@ cleans the noise out of the voice, cuts the silences, burns Reels-style
 subtitles and writes an SEO title, caption and hashtags with a local AI
 model. It can also prepare a blog article draft and a LinkedIn post from
 the video. Everything runs on your Mac; nothing is uploaded anywhere unless
-you publish it or tick **Blog and LinkedIn** (see
+you publish it or tick **Blog** (see
 [Blog and LinkedIn](#blog-and-linkedin)).
 
 | Input | Output |
@@ -17,8 +17,8 @@ you publish it or tick **Blog and LinkedIn** (see
 | `talk.mov` (any video with speech) | `talk_limpio.mp4` (clean voice, no silences, optional subtitles) |
 | | `talk_limpio.srt` (subtitles, if enabled) |
 | | `talk_limpio.md` (SEO title, caption and hashtags, if enabled) |
-| | `talk_limpio.linkedin.md` and `talk_limpio.linkedin/` (LinkedIn post and its photos, if **Blog and LinkedIn** is on) |
-| | `~/TSOTS/blog/pendientes/<date>-talk/` (hand-off folder for the blog draft, same option) |
+| | `talk_limpio.linkedin.md` and `talk_limpio.linkedin/` (LinkedIn post and its photos, if **LinkedIn** is on) |
+| | `~/TSOTS/blog/pendientes/<date>-talk/` (hand-off folder for the blog draft, if **Blog** is on) |
 
 ## Requirements
 
@@ -30,7 +30,7 @@ you publish it or tick **Blog and LinkedIn** (see
   subtitles. After that it works offline.
 - Memory: 16 GB is enough for everything except large language models;
   the app tells you which ones fit on your Mac.
-- Only for the blog draft (**Blog and LinkedIn**): the
+- Only for the blog draft (**Blog**): the
   [Claude Code](https://claude.com/claude-code) `claude` command, logged in
   with an account that has the **claude.ai E2D - Blog** connector. The
   LinkedIn post only needs Ollama.
@@ -115,10 +115,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      sounds like you. **Model** lists the Ollama models installed on your
      Mac; the ones that do not fit in memory appear disabled and the
      tooltip says why. The caption is written in the subtitle language.
-   - **Blog and LinkedIn** (checkbox in the SEO caption section): at the
-     end, prepares a LinkedIn post with photos and a folder for a blog
-     article draft (see [Blog and LinkedIn](#blog-and-linkedin)). It is
-     done **once per video**. To publish the LinkedIn post from
+   - **Blog** and **LinkedIn** (two independent checkboxes in the SEO
+     caption section): at the end, **Blog** prepares a folder for a blog
+     article draft and **LinkedIn** a post with photos (see
+     [Blog and LinkedIn](#blog-and-linkedin)). Each is done **once per
+     video**. To publish the LinkedIn post from
      **Publish…**, tick the SEO caption too: Publish… needs it to open.
    - **Vertical format**: also saves `name_limpio_vertical.mp4` (9:16,
      1080x1920) for Reels and TikTok; without audio or silences selected,
@@ -206,10 +207,12 @@ takes up.
   caption is kept.
 - **Caption only** can be requested on an already processed video: it uses
   whatever transcript exists and does not touch the picture.
-- **Blog and LinkedIn** is done once per video: ticking it on an already
-  processed video runs it, but processing the video again does not create
-  another draft or post, even if you deleted them. If it failed, it is
-  tried again the next time you process the video with the box ticked.
+- **Blog** and **LinkedIn** are done once per video each: ticking one on
+  an already processed video runs it (if the video already has its blog
+  draft and you tick LinkedIn, only the post is made), but processing the
+  video again does not create another draft or post, even if you deleted
+  them. If it failed, it is tried again the next time you process the
+  video with the box ticked.
 - **Publish…** works with any video that has a result and a caption. If the
   `.md` next to the video is missing, the app writes it again from the
   record.
@@ -297,17 +300,25 @@ when it found its `.md` next to the video.
 
 ## Blog and LinkedIn
 
-With **Blog and LinkedIn** ticked, after the video the app picks six sharp
-frames spread over the video (preferring ones with your whole face) from
-the version without subtitles, composes a cover with the short title, and
-asks the local model (Ollama) for a LinkedIn post of 1,300 to 2,500
-characters with 3 to 5 hashtags. Next to the video it leaves:
+The two checkboxes are independent. With either of them ticked, after the
+video the app picks six sharp frames spread over the video (preferring ones
+with your whole face) from the version without subtitles and composes a
+cover with the short title.
+
+With **LinkedIn** it also asks the local model (Ollama) for a post of
+1,300 to 2,500 characters with 3 to 5 hashtags and up to three key ideas
+from the video, each as a short headline. Next to the video it leaves:
 
 - `name_limpio.linkedin.md`: the text of the LinkedIn post.
-- `name_limpio.linkedin/`: the 4:5 cover, up to three frames and
-  `candidatos/` (all the frames, to swap them in **Publish…**).
+- `name_limpio.linkedin/`: the 4:5 cover, one 4:5 card per key idea, up
+  to two frames in which you do not appear (screen shares, demos:
+  talking-head frames are left out because they are nearly identical) and
+  `candidatos/` (all the frames, to swap them in **Publish…**). Only the
+  cover shows your face: each card puts the idea in large type over one of
+  those frames without you, blurred and darkened, or over the brand
+  background if the video is all on camera.
 
-For the blog it writes a folder to `~/TSOTS/blog/pendientes/` with the
+With **Blog** it writes a folder to `~/TSOTS/blog/pendientes/` with the
 video, the transcript, the 16:9 cover, the frames and their data. The app
 hands the pending folders to the blog agent when it finishes a video and
 when it opens (folders left from an earlier session), so they are only
@@ -410,7 +421,7 @@ What each mode does:
 | LinkedIn | **Photo post** | A post on your personal profile with the text and the photos. |
 
 **LinkedIn.** It only appears enabled when the video has its LinkedIn post
-(**Blog and LinkedIn**). It publishes **photos and text, not the video**
+(**LinkedIn**). It publishes **photos and text, not the video**
 (LinkedIn does not mix them in one post), with no link to the blog. You
 can edit the text (up to **3,000 characters**; an empty one disables
 LinkedIn) and change the photos: **Remove** one, **Add…** another frame

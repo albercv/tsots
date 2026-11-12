@@ -960,7 +960,7 @@ thread, for the account lookups (when the Publish dialog opens and on
 
 ## Blog agent
 
-`lanzador/blog/` turns each hand-off folder that the "Blog y LinkedIn" step
+`lanzador/blog/` turns each hand-off folder that the "Blog" step
 writes to `~/TSOTS/blog/pendientes/` into a **draft** on evolve2digital.com.
 
 - The app starts it. `videopipeline.difusion.lanzar_agente()` runs

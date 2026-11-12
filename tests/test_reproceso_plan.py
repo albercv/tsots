@@ -30,7 +30,8 @@ def dir_fichas(tmp_path, monkeypatch):
 def _panel(**valores) -> PipelineConfig:
     """Lo que pide el panel: ningún paso marcado salvo los que se pasan."""
     marcas = dict(paso_audio=False, paso_silencios=False, subtitulos=False,
-                  caption_seo=False, paso_vertical=False, difusion=False)
+                  caption_seo=False, paso_vertical=False, blog=False,
+                  linkedin=False)
     marcas.update(valores)
     return PipelineConfig(video=Path("/no/importa.mov"), **marcas)
 
@@ -434,7 +435,7 @@ def test_caption_sin_final_da_error(tmp_path):
 
 
 def test_difusion_pide_transcribir_si_falta(tmp_path):
-    plan = planificar(_ficha(tmp_path, {}), _panel(difusion=True), Decisiones())
+    plan = planificar(_ficha(tmp_path, {}), _panel(blog=True, linkedin=True), Decisiones())
 
     assert plan.acciones == [A.TRANSCRIBIR, A.DIFUSION]
 
@@ -442,7 +443,7 @@ def test_difusion_pide_transcribir_si_falta(tmp_path):
 def test_difusion_va_la_ultima(tmp_path):
     ficha = _ficha(tmp_path, {TRANSCRIPCION: _transcripcion("original")})
 
-    plan = planificar(ficha, _panel(caption_seo=True, difusion=True), Decisiones())
+    plan = planificar(ficha, _panel(caption_seo=True, blog=True, linkedin=True), Decisiones())
 
     assert plan.acciones == [A.CAPTION, A.DIFUSION]
 
@@ -450,9 +451,10 @@ def test_difusion_va_la_ultima(tmp_path):
 def test_difusion_una_vez_por_video(tmp_path):
     ficha = _ficha(tmp_path, {TRANSCRIPCION: _transcripcion("original"),
                               HORIZONTAL: _horizontal(),
-                              DIFUSION: Artefacto("hecho", None, {})})
+                              DIFUSION: Artefacto("hecho", None,
+                                                  {"blog": "b", "linkedin": None})})
 
-    plan = planificar(ficha, _panel(subtitulos=True, diseno="caja", difusion=True),
+    plan = planificar(ficha, _panel(subtitulos=True, diseno="caja", blog=True, linkedin=True),
                       Decisiones(rehacer=frozenset({"subtitulos"})))
 
     assert plan.acciones and A.DIFUSION not in plan.acciones
@@ -467,13 +469,28 @@ def test_difusion_una_vez_por_video(tmp_path):
 def test_difusion_transcribe_la_linea_de_tiempo_de_la_base(tmp_path, artefactos):
     """Cada fotograma va con el texto de su segundo en la base de esta pasada."""
     plan = planificar(_ficha(tmp_path, artefactos),
-                      _panel(paso_silencios=True, difusion=True), Decisiones())
+                      _panel(paso_silencios=True, blog=True, linkedin=True), Decisiones())
 
     assert A.TRANSCRIBIR in plan.acciones and plan.acciones[-1] == A.DIFUSION
 
 
+@pytest.mark.parametrize("hechas, pide, planifica", [
+    ({"blog": "b"}, {"linkedin": True}, True),
+    ({"blog": "b"}, {"blog": True}, False),
+    ({"linkedin": None}, {"blog": True}, True),  # su texto falló: no se repite
+    ({"linkedin": None}, {"linkedin": True}, False),
+])
+def test_blog_y_linkedin_una_vez_por_video_cada_uno(tmp_path, hechas, pide, planifica):
+    ficha = _ficha(tmp_path, {TRANSCRIPCION: _transcripcion("original"),
+                              DIFUSION: Artefacto("hecho", None, hechas)})
+
+    plan = planificar(ficha, _panel(**pide), Decisiones())
+
+    assert (A.DIFUSION in plan.acciones) is planifica
+
+
 def test_difusion_sin_final_da_error(tmp_path):
-    plan = planificar(_ficha(tmp_path, {}, final=None), _panel(difusion=True),
+    plan = planificar(_ficha(tmp_path, {}, final=None), _panel(blog=True, linkedin=True),
                       Decisiones())
 
     assert "el blog y LinkedIn" in plan.error

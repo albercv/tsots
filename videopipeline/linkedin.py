@@ -19,6 +19,8 @@ from .steps import PasoFallido
 MIN_CARACTERES, MAX_CARACTERES = 1300, 2500
 MIN_ACEPTADO = 600  # por debajo de esto el modelo no ha escrito un post
 MAX_HASHTAGS = 5
+MAX_IDEAS = 3
+PALABRAS_IDEA = (3, 12)  # menos no dice nada; más no cabe grande en la tarjeta
 
 # Post real aprobado por el usuario: referencia de estilo para el prompt.
 EJEMPLO_ES = """Si usas Claude Code con subagentes, estabas pagando por un trabajo que se hacía dos veces.
@@ -61,13 +63,16 @@ _SYSTEM_ES = (
     "por una flecha (→), una conclusión concreta y aplicable, y una pregunta "
     "final al lector.\n"
     "- hashtags: entre 3 y 5, relevantes al tema, que irán al final del post.\n"
+    "- ideas: 3 ideas clave del vídeo, cada una un titular corto (de 4 a 10 "
+    "palabras) que se entienda solo, sin leer el post, para ponerlo sobre una "
+    "imagen. Sin hashtags ni emojis.\n"
     "Cierra con una pregunta al lector, como en el ejemplo. Prohibido el CTA "
     "de Instagram/TikTok («enlace en bio», «sígueme para más»). No nombres "
     "productos, modelos, versiones, empresas ni cifras que no aparezcan "
     "literalmente en la transcripción: si la transcripción no lo nombra, no lo "
     "nombres.\n"
     "No inventes datos que no estén en la transcripción. Responde solo JSON "
-    'con el esquema {"texto": str, "hashtags": [str]}.\n\n'
+    'con el esquema {"texto": str, "hashtags": [str], "ideas": [str]}.\n\n'
     "Ejemplo de estilo (no copies su contenido ni sus datos, solo el tono, la "
     f"estructura y la longitud):\n{EJEMPLO_ES}"
 )
@@ -84,13 +89,16 @@ _SYSTEM_EN = (
     "(→), a concrete actionable takeaway, and a closing question to the "
     "reader.\n"
     "- hashtags: 3 to 5, relevant to the topic, to be placed at the end.\n"
+    "- ideas: 3 key ideas from the video, each a short headline (4 to 10 "
+    "words) that stands on its own, without reading the post, to be placed on "
+    "an image. No hashtags or emojis.\n"
     "Close with a question to the reader, as in the example. Instagram/TikTok "
     "style CTAs (\"link in bio\", \"follow me for more\") are forbidden. Do not "
     "name products, models, versions, companies or figures that do not appear "
     "literally in the transcript: if the transcript doesn't name it, don't name "
     "it.\n"
     "Do not invent data that isn't in the transcript. Respond only with JSON "
-    'with the schema {"texto": str, "hashtags": [str]}.\n\n'
+    'with the schema {"texto": str, "hashtags": [str], "ideas": [str]}.\n\n'
     "Style example below. It is in Spanish: only its tone, structure and length "
     "apply, do not copy its content or data, and write in English:\n"
     f"{EJEMPLO_ES}"
@@ -101,8 +109,9 @@ ESQUEMA: dict = {
     "properties": {
         "texto": {"type": "string"},
         "hashtags": {"type": "array", "items": {"type": "string"}},
+        "ideas": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["texto", "hashtags"],
+    "required": ["texto", "hashtags", "ideas"],
 }
 
 
@@ -148,9 +157,23 @@ def _limpiar(texto: str) -> str:
     return "\n".join(lineas).strip()
 
 
+def _ideas(crudas) -> list[str]:
+    """Titulares para las tarjetas; sin ideas válidas el post sale igual."""
+    elegidas: list[str] = []
+    for idea in crudas if isinstance(crudas, list) else []:
+        if not isinstance(idea, str):
+            continue
+        idea = " ".join(idea.split()).strip("«»\"“”'. ")
+        if (PALABRAS_IDEA[0] <= len(idea.split()) <= PALABRAS_IDEA[1]
+                and idea.lower() not in (e.lower() for e in elegidas)):
+            elegidas.append(idea)
+    return elegidas[:MAX_IDEAS]
+
+
 def generar(transcripcion: str, contexto_marca: str, modelo: str,
             cliente: Callable[[str, list[dict], dict], dict] = chat_json,
-            idioma: str = "es") -> str:
+            idioma: str = "es") -> tuple[str, list[str]]:
+    """(texto del post con hashtags, ideas clave para las tarjetas)."""
     datos = cliente(modelo, construir_mensajes(transcripcion, contexto_marca, idioma),
                     ESQUEMA)
     texto, hashtags = datos.get("texto"), datos.get("hashtags")
@@ -171,7 +194,9 @@ def generar(transcripcion: str, contexto_marca: str, modelo: str,
         if h and h not in elegidos and h not in HASHTAGS_GENERICOS:
             elegidos.append(h)
     texto = _cortar_por_parrafo(_limpiar(texto))
-    return "\n\n".join([texto, " ".join(elegidos[:MAX_HASHTAGS])]) if elegidos else texto
+    if elegidos:
+        texto = "\n\n".join([texto, " ".join(elegidos[:MAX_HASHTAGS])])
+    return texto, _ideas(datos.get("ideas"))
 
 
 def rutas(final: Path) -> tuple[Path, Path]:

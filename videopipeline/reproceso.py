@@ -32,7 +32,7 @@ from .pipeline import (
 from .reproceso_plan import (
     Accion, Plan, ajustes_audio, ajustes_caption, ajustes_silencios,
     ajustes_subtitulos, ajustes_transcripcion, ajustes_vertical, clave,
-    clave_seguimiento,
+    clave_seguimiento, partes_difusion,
 )
 from .seguimiento import RUTA_PESOS, preparar_seguimiento
 from .steps import (
@@ -518,9 +518,12 @@ class _Pasada:
     # --- Blog y LinkedIn ----------------------------------------------------
 
     def difusion(self, paso: int) -> None:
-        """Una vez por vídeo y la última: nunca hace fallar el vídeo."""
+        """Una vez por vídeo cada parte y la última: nunca hace fallar el vídeo."""
         ficha, c = self.ficha, self.c
-        self._paso(paso, _("Preparando blog y LinkedIn"))
+        partes = partes_difusion(ficha, c)
+        self._paso(paso, {("blog",): _("Preparando el blog"),
+                          ("linkedin",): _("Preparando LinkedIn")}.get(
+            partes, _("Preparando blog y LinkedIn")))
         servidor = None
         try:
             palabras = self._palabras()
@@ -545,7 +548,8 @@ class _Pasada:
                 nombre=ficha.nombre, base=self.base,
                 video_blog=final if horizontal else self.base, final=final,
                 palabras=palabras, titulo=corto, idioma=idioma,
-                contexto_marca=c.contexto_marca, modelo=c.modelo_caption)
+                contexto_marca=c.contexto_marca, modelo=c.modelo_caption,
+                con_blog="blog" in partes, con_linkedin="linkedin" in partes)
         except Exception as error:  # noqa: BLE001 — degradación deliberada
             _avisar(self.on_progress,
                     _("Blog y LinkedIn fallaron: {error}. Vídeo guardado igual."
@@ -554,12 +558,17 @@ class _Pasada:
             return
         finally:
             _cerrar_servidor(servidor, self.on_progress)
-        md = resultado.linkedin_md
-        ficha.artefactos[DIFUSION] = Artefacto("hecho", None, {
-            "blog": str(resultado.carpeta_blog),
-            "linkedin": str(md) if md else None})
+        # Cada parte hecha se apunta; la que falta se hará cuando se pida.
+        hechas = dict(ficha.artefactos[DIFUSION].ajustes) if DIFUSION in ficha.artefactos else {}
+        if resultado.carpeta_blog is not None:
+            hechas["blog"] = str(resultado.carpeta_blog)
+        if "linkedin" in partes:  # None si falló su texto: tampoco se repite
+            md = resultado.linkedin_md
+            hechas["linkedin"] = str(md) if md else None
+        ficha.artefactos[DIFUSION] = Artefacto("hecho", None, hechas)
         guardar(ficha)
-        if not lanzar_agente():  # convierte la carpeta nueva en borrador, sin esperarlo
+        # El agente convierte la carpeta nueva en borrador, sin esperarlo.
+        if resultado.carpeta_blog is not None and not lanzar_agente():
             _avisar(self.on_progress,
                     _("La carpeta del blog está lista, pero no se pudo arrancar "
                       "el agente del blog: comprueba que existe y es ejecutable "

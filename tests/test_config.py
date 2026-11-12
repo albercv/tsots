@@ -174,12 +174,13 @@ def test_titulo_defecto_y_json():
     assert PipelineConfig.from_json(c.to_json()) == c
 
 
-def test_difusion_defecto_y_json():
-    assert _config_minima().difusion is False
+def test_blog_y_linkedin_defecto_y_json():
+    assert (_config_minima().blog, _config_minima().linkedin) == (False, False)
     datos = json.loads(_config_minima().to_json())
-    datos.pop("difusion")  # JSON de una versión anterior
-    assert PipelineConfig.from_json(json.dumps(datos)).difusion is False
-    c = _config_minima(difusion=True)
+    datos.pop("blog"), datos.pop("linkedin")  # JSON de una versión anterior
+    c = PipelineConfig.from_json(json.dumps(datos))
+    assert (c.blog, c.linkedin) == (False, False)
+    c = _config_minima(blog=False, linkedin=True)
     assert PipelineConfig.from_json(c.to_json()) == c
 
 
