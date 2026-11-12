@@ -58,7 +58,8 @@ def _ficha(tmp_path) -> Ficha:
 def _panel(**valores) -> PipelineConfig:
     """Lo que pide el panel: ningún paso marcado salvo los que se pasan."""
     marcas = dict(paso_audio=False, paso_silencios=False, subtitulos=False,
-                  caption_seo=False, paso_vertical=False, difusion=False)
+                  caption_seo=False, paso_vertical=False, blog=False,
+                  linkedin=False)
     marcas.update(valores)
     return PipelineConfig(video=Path("/no/importa.mov"), **marcas)
 
@@ -900,8 +901,11 @@ def difusion(tmp_path, monkeypatch):
 
     def falso_preparar(**kwargs):
         recibido["preparar"].append(kwargs)
-        linkedin.escribir("Gancho.", kwargs["final"])
-        return Resultado(linkedin.rutas(kwargs["final"])[0], blog)
+        md = None
+        if kwargs["con_linkedin"]:
+            linkedin.escribir("Gancho.", kwargs["final"])
+            md = linkedin.rutas(kwargs["final"])[0]
+        return Resultado(md, blog if kwargs["con_blog"] else None)
 
     def falso_titulo(transcripcion, idioma, modelo, cliente=None):
         recibido["titulo"].append(transcripcion)
@@ -922,7 +926,7 @@ SILENCIOS_Y_DIFUSION = [A.CORTAR, A.TRANSCRIBIR, A.ESCRIBIR_FINAL, A.DIFUSION]
 
 def test_difusion_guarda_artefacto(falsos, difusion, tmp_path):
     ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, paso_silencios=True,
-                    difusion=True, contexto_marca="Soy Alberto")
+                    blog=True, linkedin=True, contexto_marca="Soy Alberto")
 
     [recibido] = difusion["preparar"]
     final = ficha.final.ruta
@@ -940,8 +944,26 @@ def test_difusion_guarda_artefacto(falsos, difusion, tmp_path):
         "linkedin": str(linkedin.rutas(recibido["final"])[0])})
     assert falsos[-2:] == ["ollama:asegurar", "ollama:cerrar"]
     assert difusion["agente"] == 1  # la carpeta nueva va al agente del blog
-    assert planificar(ficha, _panel(difusion=True), Decisiones()).vacio
+    assert planificar(ficha, _panel(blog=True, linkedin=True), Decisiones()).vacio
     assert _sin_restos(ficha)
+
+
+def test_blog_y_linkedin_en_pasadas_distintas(falsos, difusion, tmp_path):
+    ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, paso_silencios=True, blog=True)
+
+    [solo_blog] = difusion["preparar"]
+    assert (solo_blog["con_blog"], solo_blog["con_linkedin"]) == (True, False)
+    assert ficha.artefactos[DIFUSION].ajustes == {"blog": str(difusion["blog"])}
+    assert difusion["agente"] == 1
+
+    ficha = _pasada(ficha, [A.DIFUSION], paso_silencios=True, blog=True, linkedin=True)
+
+    solo_linkedin = difusion["preparar"][1]
+    assert (solo_linkedin["con_blog"], solo_linkedin["con_linkedin"]) == (False, True)
+    assert ficha.artefactos[DIFUSION].ajustes == {
+        "blog": str(difusion["blog"]),
+        "linkedin": str(linkedin.rutas(ficha.final.ruta)[0])}
+    assert difusion["agente"] == 1  # sin blog nuevo no hay agente que lanzar
 
 
 def test_difusion_avisa_si_el_agente_no_arranca(falsos, difusion, tmp_path):
@@ -949,7 +971,7 @@ def test_difusion_avisa_si_el_agente_no_arranca(falsos, difusion, tmp_path):
     eventos: list[dict] = []
 
     ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
-                    paso_silencios=True, difusion=True)
+                    paso_silencios=True, blog=True, linkedin=True)
 
     [aviso] = _avisos(eventos)
     assert "procesar_pendientes.sh" in aviso and "al abrir la app" in aviso
@@ -960,7 +982,7 @@ def test_difusion_sin_aviso_si_el_agente_arranca(falsos, difusion, tmp_path):
     eventos: list[dict] = []
 
     _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
-            paso_silencios=True, difusion=True)
+            paso_silencios=True, blog=True, linkedin=True)
 
     assert _avisos(eventos) == []
 
@@ -970,7 +992,7 @@ def test_difusion_usa_el_titulo_guardado_aunque_no_se_queme(
     ficha = _pasada(_ficha(tmp_path), CON_TITULO, paso_silencios=True,
                     titulo=True)
 
-    _pasada(ficha, [A.ESCRIBIR_FINAL, A.DIFUSION], difusion=True)
+    _pasada(ficha, [A.ESCRIBIR_FINAL, A.DIFUSION], blog=True, linkedin=True)
 
     assert difusion["preparar"][0]["titulo"] == "Audio limpio ya"
     assert difusion["titulo"] == []
@@ -982,7 +1004,7 @@ def test_difusion_sin_titulo_usa_el_titulo_seo(falsos, difusion, tmp_path):
     escribir_md(Caption("Cómo ahorrar tokens con Claude Code", "C", ["#ia"], []),
                 ficha.final.ruta.with_suffix(".md"))
 
-    _pasada(ficha, [A.TRANSCRIBIR, A.DIFUSION], paso_silencios=True, difusion=True)
+    _pasada(ficha, [A.TRANSCRIBIR, A.DIFUSION], paso_silencios=True, blog=True, linkedin=True)
 
     assert difusion["preparar"][0]["titulo"] == "Cómo ahorrar tokens con Claude"
 
@@ -993,13 +1015,13 @@ def test_difusion_sin_titulo_ni_caption_falla_y_se_reintenta(falsos, difusion,
     eventos: list[dict] = []
 
     ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
-                    paso_silencios=True, difusion=True)
+                    paso_silencios=True, blog=True, linkedin=True)
 
     [aviso] = _avisos(eventos)
     assert aviso.startswith("Blog y LinkedIn fallaron: No hay título para la portada")
     assert difusion["preparar"] == [] and difusion["agente"] == 0
     assert DIFUSION not in ficha.artefactos
-    plan = planificar(ficha, _panel(paso_silencios=True, difusion=True), Decisiones())
+    plan = planificar(ficha, _panel(paso_silencios=True, blog=True, linkedin=True), Decisiones())
     assert A.DIFUSION in plan.acciones
 
 
@@ -1013,7 +1035,7 @@ def test_difusion_sin_texto_de_linkedin_guarda_el_blog_y_avisa(
     eventos: list[dict] = []
 
     ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
-                    paso_silencios=True, difusion=True)
+                    paso_silencios=True, blog=True, linkedin=True)
 
     [aviso] = _avisos(eventos)
     assert aviso.startswith("El texto de LinkedIn falló: Ollama no responde.")
@@ -1022,14 +1044,14 @@ def test_difusion_sin_texto_de_linkedin_guarda_el_blog_y_avisa(
     assert ficha.artefactos[DIFUSION].ajustes == {
         "blog": str(difusion["blog"]), "linkedin": None}
     assert difusion["agente"] == 1
-    assert planificar(ficha, _panel(difusion=True), Decisiones()).vacio
+    assert planificar(ficha, _panel(blog=True, linkedin=True), Decisiones()).vacio
 
 
 def test_difusion_falla_sin_tumbar_el_video(falsos, difusion, tmp_path,
                                             monkeypatch):
     monkeypatch.setattr(reproceso, "preparar_difusion", _revienta)
     ficha = _ficha(tmp_path)
-    plan = planificar(ficha, _panel(paso_silencios=True, difusion=True),
+    plan = planificar(ficha, _panel(paso_silencios=True, blog=True, linkedin=True),
                       Decisiones())
     eventos: list[dict] = []
 
@@ -1051,7 +1073,7 @@ def test_transcripcion_fallida_para_la_difusion_avisa(falsos, difusion,
     eventos: list[dict] = []
 
     ficha = _pasada(_ficha(tmp_path), SILENCIOS_Y_DIFUSION, eventos=eventos,
-                    paso_silencios=True, difusion=True)
+                    paso_silencios=True, blog=True, linkedin=True)
 
     avisos = _avisos(eventos)
     assert len(avisos) == 1
@@ -1063,7 +1085,7 @@ def test_transcripcion_fallida_para_la_difusion_avisa(falsos, difusion,
 
 def test_r10_mueve_acompanantes_de_linkedin(falsos, difusion, tmp_path):
     ficha = _pasada(_ficha(tmp_path), [A.TRANSCRIBIR, A.VERTICAL, A.DIFUSION],
-                    paso_vertical=True, difusion=True)
+                    paso_vertical=True, blog=True, linkedin=True)
     md, fotos = linkedin.rutas(ficha.final.ruta)
     (fotos / "01_portada.png").write_bytes(b"PNG")
 

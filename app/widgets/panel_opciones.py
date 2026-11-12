@@ -355,15 +355,21 @@ class PanelOpciones(QWidget):
         fila_caption.addWidget(self.check_caption, 1)
         fila_caption.addWidget(self.boton_marca)
         caption_layout.addLayout(fila_caption)
-        self.check_difusion = QCheckBox(_("Blog y LinkedIn"))
-        self.check_difusion.setToolTip(
-            _(
-                "Prepara un borrador para el blog de evolve2digital y un post "
-                "de LinkedIn con portada e imágenes del vídeo. Se hace una vez "
-                "por vídeo."
-            )
+        self.check_blog = QCheckBox(_("Blog"))
+        self.check_blog.setToolTip(
+            _("Prepara un borrador para el blog de evolve2digital. Se hace una "
+              "vez por vídeo.")
         )
-        caption_layout.addWidget(self.check_difusion)
+        self.check_linkedin = QCheckBox(_("LinkedIn"))
+        self.check_linkedin.setToolTip(
+            _("Prepara un post de LinkedIn con portada, ideas clave y "
+              "capturas del vídeo. Se hace una vez por vídeo.")
+        )
+        fila_difusion = QHBoxLayout()
+        fila_difusion.addWidget(self.check_blog)
+        fila_difusion.addWidget(self.check_linkedin)
+        fila_difusion.addStretch(1)
+        caption_layout.addLayout(fila_difusion)
         # El glosario sirve a subtítulos, caption y título: activo si hay alguno.
         self.check_subtitulos.toggled.connect(self._actualizar_glosario)
         self.check_caption.toggled.connect(self._actualizar_glosario)
@@ -711,7 +717,8 @@ class PanelOpciones(QWidget):
             "idioma_subs": self.combo_idioma_subs.currentData(),
             "modelo_whisper": self.combo_modelo_whisper.currentData(),
             "caption_seo": self.check_caption.isChecked(),
-            "difusion": self.check_difusion.isChecked(),
+            "blog": self.check_blog.isChecked(),
+            "linkedin": self.check_linkedin.isChecked(),
         }
 
     def valores_shorts(self) -> dict:
@@ -786,7 +793,9 @@ class PanelOpciones(QWidget):
                 valor if isinstance(valor, bool)
                 else str(valor).lower() in ("true", "1")
             )
-        self.check_difusion.setChecked(_como_bool(valores.get("difusion"), False))
+        # «difusion»: la casilla única de antes, que hacía las dos cosas.
+        for clave, casilla in (("blog", self.check_blog), ("linkedin", self.check_linkedin)):
+            casilla.setChecked(_como_bool(valores.get(clave, valores.get("difusion")), False))
         self.check_shorts_subtitulos.setChecked(
             _como_bool(valores.get("shorts_subtitulos"), True))
         indice = self.combo_encuadre_shorts.findData(

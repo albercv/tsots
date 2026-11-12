@@ -9,7 +9,7 @@ limpia el ruido de la voz, recorta los silencios, quema subtítulos estilo
 Reels y genera título, caption y hashtags con un modelo de IA local.
 También puede preparar el borrador de un artículo de blog y un post de
 LinkedIn a partir del vídeo. Todo en tu Mac, sin subir nada a ningún
-servicio salvo que lo publiques o marques **Blog y LinkedIn** (ver
+servicio salvo que lo publiques o marques **Blog** (ver
 [Blog y LinkedIn](#blog-y-linkedin)).
 
 | Entrada | Salida |
@@ -17,8 +17,8 @@ servicio salvo que lo publiques o marques **Blog y LinkedIn** (ver
 | `charla.mov` (cualquier vídeo con voz) | `charla_limpio.mp4` (voz limpia, sin silencios, subtítulos opcionales) |
 | | `charla_limpio.srt` (subtítulos, si los activas) |
 | | `charla_limpio.md` (título SEO, caption y hashtags, si lo activas) |
-| | `charla_limpio.linkedin.md` y `charla_limpio.linkedin/` (post de LinkedIn y sus fotos, si activas **Blog y LinkedIn**) |
-| | `~/TSOTS/blog/pendientes/<fecha>-charla/` (carpeta para el borrador del blog, con la misma opción) |
+| | `charla_limpio.linkedin.md` y `charla_limpio.linkedin/` (post de LinkedIn y sus fotos, si activas **LinkedIn**) |
+| | `~/TSOTS/blog/pendientes/<fecha>-charla/` (carpeta para el borrador del blog, si activas **Blog**) |
 
 ## Requisitos
 
@@ -30,7 +30,7 @@ servicio salvo que lo publiques o marques **Blog y LinkedIn** (ver
   que uses subtítulos. Después funciona sin conexión.
 - Memoria: 16 GB es suficiente para todo salvo modelos de lenguaje grandes;
   la app te avisa de cuáles caben en tu Mac.
-- Solo para el borrador del blog (**Blog y LinkedIn**): el comando `claude`
+- Solo para el borrador del blog (**Blog**): el comando `claude`
   de [Claude Code](https://claude.com/claude-code), con la sesión iniciada
   en una cuenta que tenga el conector **claude.ai E2D - Blog**. El post de
   LinkedIn solo necesita Ollama.
@@ -118,10 +118,11 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      texto suene a ti. **Modelo** lista los modelos de Ollama instalados en
      tu Mac; los que no caben en memoria aparecen deshabilitados y el
      tooltip dice por qué.
-   - **Blog y LinkedIn** (casilla en la sección Caption SEO): al terminar,
-     prepara un post de LinkedIn con fotos y una carpeta para el borrador
-     de un artículo del blog (ver [Blog y LinkedIn](#blog-y-linkedin)). Se
-     hace **una vez por vídeo**. Para publicar el post de LinkedIn desde
+   - **Blog** y **LinkedIn** (dos casillas en la sección Caption SEO, una
+     independiente de la otra): al terminar, **Blog** prepara una carpeta
+     para el borrador de un artículo del blog y **LinkedIn** un post con
+     fotos (ver [Blog y LinkedIn](#blog-y-linkedin)). Cada uno se hace
+     **una vez por vídeo**. Para publicar el post de LinkedIn desde
      **Publicar…**, marca también el caption: Publicar… lo necesita para
      abrirse.
    - **Formato vertical**: guarda además `nombre_limpio_vertical.mp4`
@@ -209,10 +210,11 @@ ocupan sus datos.
   mantiene.
 - **Solo caption** se puede pedir sobre un vídeo ya procesado: usa la
   transcripción que haya y no toca la imagen.
-- **Blog y LinkedIn** se hace una vez por vídeo: marcarlo en un vídeo ya
-  procesado lo lanza, pero volver a procesar el vídeo no crea otro
-  borrador ni otro post, aunque los hayas borrado. Si falló, se vuelve a
-  intentar la próxima vez que proceses el vídeo con la casilla marcada.
+- **Blog** y **LinkedIn** se hacen una vez por vídeo cada uno: marcar uno
+  en un vídeo ya procesado lo lanza (si el vídeo ya tiene el blog y marcas
+  LinkedIn, solo se hace el post), pero volver a procesar el vídeo no crea
+  otro borrador ni otro post, aunque los hayas borrado. Si falló, se vuelve
+  a intentar la próxima vez que proceses el vídeo con la casilla marcada.
 - **Publicar…** funciona con cualquier vídeo que tenga resultado y caption.
   Si falta el `.md` junto al vídeo, la app lo vuelve a escribir desde la
   ficha.
@@ -297,17 +299,25 @@ encontró su `.md` junto al vídeo.
 
 ## Blog y LinkedIn
 
-Con **Blog y LinkedIn** marcado, al terminar el vídeo la app elige seis
-fotogramas nítidos repartidos por el vídeo (mejor si se te ve la cara
-entera) de la versión sin subtítulos, compone una portada con el título
-corto y pide al modelo local (Ollama) un post de LinkedIn de 1300 a 2500
-caracteres con 3 a 5 hashtags. Junto al vídeo deja:
+Las dos casillas son independientes. Con cualquiera de ellas marcada, al
+terminar el vídeo la app elige seis fotogramas nítidos repartidos por el
+vídeo (mejor si se te ve la cara entera) de la versión sin subtítulos y
+compone una portada con el título corto.
+
+Con **LinkedIn** pide además al modelo local (Ollama) un post de 1300 a
+2500 caracteres con 3 a 5 hashtags y hasta tres ideas clave del vídeo,
+cada una como un titular corto. Junto al vídeo deja:
 
 - `nombre_limpio.linkedin.md`: el texto del post de LinkedIn.
-- `nombre_limpio.linkedin/`: la portada 4:5, hasta tres fotogramas y
+- `nombre_limpio.linkedin/`: la portada 4:5, una tarjeta 4:5 por idea
+  clave, hasta dos fotogramas en los que no sales (pantalla compartida,
+  demos: los de cara a cámara no se añaden porque son casi iguales) y
   `candidatos/` (todos los fotogramas, para cambiarlos en **Publicar…**).
+  Solo la portada lleva tu cara: cada tarjeta pone la idea en grande sobre
+  uno de esos fotogramas sin ti, desenfocado y oscurecido, o sobre el fondo
+  de la marca si el vídeo es todo a cámara.
 
-Para el blog escribe una carpeta en `~/TSOTS/blog/pendientes/` con el
+Con **Blog** escribe una carpeta en `~/TSOTS/blog/pendientes/` con el
 vídeo, la transcripción, la portada 16:9, los fotogramas y sus datos. La
 app pasa las carpetas pendientes al agente del blog al terminar un vídeo y
 al abrirse (las que quedaron de otra sesión), así que solo se recogen con
@@ -411,7 +421,7 @@ Qué hace cada modo:
 | LinkedIn | **Post con fotos** | Un post en tu perfil personal con el texto y las fotos. |
 
 **LinkedIn.** Solo sale habilitado si el vídeo tiene su post de LinkedIn
-(**Blog y LinkedIn**). Publica **fotos y texto, no el vídeo** (LinkedIn no
+(**LinkedIn**). Publica **fotos y texto, no el vídeo** (LinkedIn no
 deja mezclarlos en un post), sin enlace al blog. Puedes editar el texto
 (hasta **3000 caracteres**; si está vacío, LinkedIn se deshabilita) y
 cambiar las fotos: **Quitar** una, **Añadir…** otro fotograma (u **Otra

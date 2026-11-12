@@ -3,7 +3,7 @@ fondo desde la izquierda y título en mayúsculas con una palabra en turquesa.""
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageFont
 
 TAM_BLOG = (1672, 941)
 TAM_LINKEDIN = (1080, 1350)
@@ -53,38 +53,50 @@ def _degradar(lienzo, x0, fw, vertical):
     return Image.fromarray(arr.astype(np.uint8))
 
 
-def _titulo(lienzo, titulo, vertical):
-    W, H = lienzo.size
-    d = ImageDraw.Draw(lienzo)
-    palabras = titulo.upper().split()
-    dest = palabra_destacada(titulo)
-    x_ini, x_fin = (0.07 * W, 0.93 * W) if vertical else (0.08 * W, 0.58 * W)
-    ancho = x_fin - x_ini
-
-    def repartir(tam):
+def _ajustar(d, palabras, ancho, tam, max_lineas):
+    """(fuente, tamaño, líneas) con la letra más grande, desde `tam`, con la
+    que `palabras` caben en `max_lineas` de `ancho`."""
+    while True:
         f = ImageFont.truetype(str(_FUENTE), tam)
         lineas, act = [], []
-        for i, p in enumerate(palabras):
+        for i in range(len(palabras)):
             if act and d.textlength(" ".join(palabras[j] for j in act + [i]), font=f) > ancho:
                 lineas.append(act)
                 act = [i]
             else:
                 act.append(i)
-        return f, lineas + [act]
-
-    tam = int(0.13 * H)
-    while True:
-        f, lineas = repartir(tam)
-        if len(lineas) <= 3 and all(d.textlength(p, font=f) <= ancho for p in palabras):
-            break
+        lineas.append(act)
+        if len(lineas) <= max_lineas and all(d.textlength(p, font=f) <= ancho for p in palabras):
+            return f, tam, lineas
         tam -= 2
-    alto = len(lineas) * tam * 0.95
-    y = H * 0.94 - alto if vertical else (H - alto) / 2
+
+
+def _escribir(d, texto, lineas, f, tam, x_ini, y):
+    palabras, dest = texto.upper().split(), palabra_destacada(texto)
     for k, linea in enumerate(lineas):
         x = x_ini
         for i in linea:
             d.text((x, y + k * tam * 0.95), palabras[i], font=f, fill=TURQUESA if i == dest else "#ffffff")
             x += d.textlength(palabras[i] + " ", font=f)
+
+
+def _titulo(lienzo, titulo, vertical):
+    W, H = lienzo.size
+    d = ImageDraw.Draw(lienzo)
+    x_ini, x_fin = (0.07 * W, 0.93 * W) if vertical else (0.08 * W, 0.58 * W)
+    f, tam, lineas = _ajustar(d, titulo.upper().split(), x_fin - x_ini, int(0.13 * H), 3)
+    alto = len(lineas) * tam * 0.95
+    y = H * 0.94 - alto if vertical else (H - alto) / 2
+    _escribir(d, titulo, lineas, f, tam, x_ini, y)
+
+
+def _poner_logo(lienzo):
+    """Arriba a la derecha: el texto ocupa la parte baja o el centro."""
+    W = lienzo.width
+    logo = Image.open(_LOGO).convert("RGBA")
+    s = int(0.09 * W)
+    logo = logo.resize((s, round(logo.height * s / logo.width)), Image.LANCZOS)
+    lienzo.paste(logo, (int(W - 0.04 * W - s), int(0.04 * W)), logo)
 
 
 def componer_portada(fotograma: Image.Image, titulo: str, tamano: tuple[int, int], *,
@@ -100,9 +112,37 @@ def componer_portada(fotograma: Image.Image, titulo: str, tamano: tuple[int, int
     lienzo = _degradar(lienzo, x0, fw, vertical)
     _titulo(lienzo, titulo, vertical)
     if con_logo:
-        W = tamano[0]
-        logo = Image.open(_LOGO).convert("RGBA")
-        s = int(0.09 * W)
-        logo = logo.resize((s, round(logo.height * s / logo.width)), Image.LANCZOS)
-        lienzo.paste(logo, (int(W - 0.04 * W - s), int(0.04 * W)), logo)
+        _poner_logo(lienzo)
+    return lienzo
+
+
+def componer_tarjeta(idea: str, tamano: tuple[int, int], *,
+                     fondo: Image.Image | None = None) -> Image.Image:
+    """Tarjeta de LinkedIn con una idea clave y sin la cara de quien habla.
+
+    `fondo` es una captura del vídeo sin la cara (pantalla, demo): va
+    desenfocada y oscurecida para que el texto se lea. Sin ella, el fondo de
+    la marca con un brillo turquesa abajo a la derecha.
+    """
+    W, H = tamano
+    if fondo is None:
+        yy, xx = np.mgrid[0:H, 0:W]
+        a = np.clip(1 - np.hypot(xx - W, yy - H) / (1.1 * H), 0, 1)[..., None] * 0.22
+        arr = (np.array(_RGB_FONDO, np.float32) * (1 - a)
+               + np.array(ImageColor.getrgb(TURQUESA), np.float32) * a)
+    else:
+        esc = max(W / fondo.width, H / fondo.height)
+        foto = fondo.convert("RGB").resize(
+            (round(fondo.width * esc), round(fondo.height * esc)), Image.LANCZOS)
+        x, y = (foto.width - W) // 2, (foto.height - H) // 2
+        foto = foto.crop((x, y, x + W, y + H)).filter(ImageFilter.GaussianBlur(0.013 * W))
+        arr = np.asarray(foto, np.float32) * 0.22 + np.array(_RGB_FONDO, np.float32) * 0.78
+    lienzo = Image.fromarray(arr.astype(np.uint8))
+    d = ImageDraw.Draw(lienzo)
+    x_ini = 0.09 * W
+    f, tam, lineas = _ajustar(d, idea.upper().split(), 0.82 * W, int(0.11 * H), 5)
+    y = (H - len(lineas) * tam * 0.95) / 2 + 0.03 * H  # centrado con la barra de encima
+    d.rectangle([x_ini, y - 0.06 * H, x_ini + 0.12 * W, y - 0.051 * H], fill=TURQUESA)
+    _escribir(d, idea, lineas, f, tam, x_ini, y)
+    _poner_logo(lienzo)
     return lienzo
