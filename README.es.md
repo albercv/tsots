@@ -310,10 +310,12 @@ cada una como un titular corto. Junto al vídeo deja:
 
 - `nombre_limpio.linkedin.md`: el texto del post de LinkedIn.
 - `nombre_limpio.linkedin/`: la portada 4:5, una tarjeta 4:5 por idea
-  clave (la idea en grande sobre un fotograma tuyo), hasta dos fotogramas
-  en los que no sales (pantalla compartida, demos: los de cara a cámara
-  no se añaden porque son casi iguales) y `candidatos/` (todos los
-  fotogramas, para cambiarlos en **Publicar…**).
+  clave, hasta dos fotogramas en los que no sales (pantalla compartida,
+  demos: los de cara a cámara no se añaden porque son casi iguales) y
+  `candidatos/` (todos los fotogramas, para cambiarlos en **Publicar…**).
+  Solo la portada lleva tu cara: cada tarjeta pone la idea en grande sobre
+  uno de esos fotogramas sin ti, desenfocado y oscurecido, o sobre el fondo
+  de la marca si el vídeo es todo a cámara.
 
 Con **Blog** escribe una carpeta en `~/TSOTS/blog/pendientes/` con el
 vídeo, la transcripción, la portada 16:9, los fotogramas y sus datos. La

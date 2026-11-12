@@ -23,7 +23,7 @@ from .caption import leer_md, texto_plano
 from .fotogramas import Candidato, extraer_candidatos
 from .i18n import _
 from .ollama import chat_json
-from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada
+from .portada import TAM_BLOG, TAM_LINKEDIN, componer_portada, componer_tarjeta
 from .steps import BASE_DIR, PasoFallido, codificar_web
 from .subtitles import Palabra
 
@@ -32,7 +32,6 @@ log = logging.getLogger(__name__)
 DIR_BLOG = Path.home() / "TSOTS" / "blog"
 AGENTE = BASE_DIR / "lanzador" / "blog" / "procesar_pendientes.sh"
 MAX_CAPTURAS = 2  # fotogramas sin cara (pantalla, demo): los de cara a cámara no aportan
-LINEAS_IDEA = 5  # una idea es más larga que el título de la portada
 
 
 @dataclass(frozen=True)
@@ -147,14 +146,13 @@ def _post_linkedin(candidatos: list[Candidato], portada: Candidato, titulo: str,
         texto, ideas = linkedin.generar(transcripcion, contexto_marca, modelo, cliente, idioma)
     except Exception as error:  # noqa: BLE001 — sin texto de LinkedIn el blog sigue
         fallo = error
-    # Portada, una tarjeta por idea clave y capturas sin cara
+    # Portada; luego, sin la cara: una tarjeta por idea clave y las capturas
     _componer(portada, titulo, TAM_LINKEDIN, car / "01_portada.png", con_logo=True)
-    fondos = [c for c in candidatos if c.cara and c is not portada] or [portada]
-    for i, idea in enumerate(ideas):
-        _componer(fondos[i % len(fondos)], idea, TAM_LINKEDIN, car / f"{i + 2:02d}_idea.png",
-                  con_logo=True, max_lineas=LINEAS_IDEA)
-    capturas = _repartidos([c for c in candidatos if not c.cara and c is not portada],
-                           MAX_CAPTURAS)
+    sin_cara = [c for c in candidatos if not c.cara and c is not portada]
+    for i, idea in enumerate(ideas):  # sin capturas, sobre el fondo de la marca
+        fondo = Image.open(sin_cara[i % len(sin_cara)].archivo) if sin_cara else None
+        componer_tarjeta(idea, TAM_LINKEDIN, fondo=fondo).save(car / f"{i + 2:02d}_idea.png")
+    capturas = _repartidos(sin_cara, MAX_CAPTURAS)
     for i, c in enumerate(capturas, start=len(ideas) + 2):
         shutil.copy2(c.archivo, car / f"{i:02d}_{c.archivo.name}")
     if texto is not None:

@@ -4,7 +4,7 @@ import pytest
 from PIL import Image
 
 from videopipeline.portada import (TAM_BLOG, TAM_LINKEDIN, componer_portada,
-                                   palabra_destacada)
+                                   componer_tarjeta, palabra_destacada)
 
 FONDO = (5, 10, 15)
 
@@ -91,20 +91,33 @@ def test_vertical_con_cara_grande_no_se_corta(tam):
         assert (np.abs(a[:, -1] - FONDO).sum(axis=1) > 10).any()  # sin banda de fondo a la derecha
 
 
-def test_mas_lineas_permiten_letra_mas_grande():
-    idea = "Revisa quién supervisa a tus agentes antes de pagar el doble"
-
-    def alto(img):
-        x0, y0, x1, y1 = _caja_de_pixeles_blancos_o_turquesa(img)
-        return y1 - y0
-
-    normal = componer_portada(_negra(), idea, TAM_LINKEDIN)
-    holgada = componer_portada(_negra(), idea, TAM_LINKEDIN, max_lineas=5)
-    assert alto(holgada) > alto(normal)
+def _rayas():
+    """Fotograma muy nítido: una fila blanca y otra negra."""
+    a = np.zeros((1080, 1920, 3), np.uint8)
+    a[::2] = 255
+    return Image.fromarray(a)
 
 
-def test_idea_de_palabras_cortas_no_sube_hasta_la_cara():
-    """5 líneas a tamaño de título taparían la cara: el bloque no pasa del de la portada."""
-    img = componer_portada(_negra(), "Ofrece casos resueltos y visión crítica", TAM_LINKEDIN,
-                           max_lineas=5)
-    assert _caja_de_pixeles_blancos_o_turquesa(img)[1] >= 0.55 * img.height
+def test_tarjeta_sin_fondo_es_de_marca():
+    img = componer_tarjeta("Centraliza todo el conocimiento empresarial", TAM_LINKEDIN)
+    assert img.size == (1080, 1350)
+    assert img.getpixel((5, 5)) == FONDO
+
+
+def test_tarjeta_con_fondo_lo_desenfoca_y_oscurece():
+    img = componer_tarjeta("Centraliza todo el conocimiento empresarial", TAM_LINKEDIN,
+                           fondo=_rayas())
+    zona = np.asarray(img)[20:200, 20:600].astype(int)  # arriba a la izquierda: sin texto ni logo
+    assert zona.std() < 10 and 20 < zona.mean() < 80
+
+
+@pytest.mark.parametrize("idea", ["Ofrece casos resueltos y visión crítica",
+                                  "Desinternacionalización de procesos empresariales críticos"])
+def test_tarjeta_texto_centrado_dentro_de_margenes(idea):
+    img = componer_tarjeta(idea, TAM_LINKEDIN)
+    W, H = img.size
+    debajo_del_logo = img.crop((0, int(0.15 * H), W, H))
+    x0, y0, x1, y1 = _caja_de_pixeles_blancos_o_turquesa(debajo_del_logo)
+    centro = 0.15 * H + (y0 + y1) / 2
+    assert centro == pytest.approx(H / 2, abs=0.1 * H)
+    assert x0 >= 0.08 * W and x1 <= 0.92 * W

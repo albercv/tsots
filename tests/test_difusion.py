@@ -111,7 +111,18 @@ def test_ideas_van_como_tarjetas_tras_la_portada(tmp_path):
                                     "ideas": ["Idea uno de prueba", "Idea dos de prueba"]}
     final, _ = _llamar(tmp_path, cliente=cliente, detector=lambda f: CARA)
     assert _fotos(final) == ["01_portada.png", "02_idea.png", "03_idea.png"]
-    assert Image.open(final.with_suffix(".linkedin") / "02_idea.png").size == (1080, 1350)
+    tarjeta = Image.open(final.with_suffix(".linkedin") / "02_idea.png")
+    assert tarjeta.size == (1080, 1350)
+    assert tarjeta.getpixel((5, 5)) == (5, 10, 15)  # sin capturas: fondo de marca, nunca la cara
+
+
+def test_tarjetas_sobre_captura_sin_cara(tmp_path):
+    cliente = lambda m, msgs, esq: {**CLIENTE(m, msgs, esq), "ideas": ["Idea uno de prueba"]}
+    final, _ = _llamar(tmp_path, cliente=cliente,
+                       leer=lambda v, t: _nitida(0 if t < 50 else 1),
+                       detector=lambda f: CARA if f[1, 0, 2] == 0 else np.zeros((0, 5)))
+    esquina = np.asarray(Image.open(final.with_suffix(".linkedin") / "02_idea.png"))[:50, :50]
+    assert esquina.mean() > 20  # la captura, desenfocada y oscurecida; no el fondo liso
 
 
 def test_video_a_camara_no_lleva_capturas(tmp_path):

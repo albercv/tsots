@@ -310,11 +310,13 @@ With **LinkedIn** it also asks the local model (Ollama) for a post of
 from the video, each as a short headline. Next to the video it leaves:
 
 - `name_limpio.linkedin.md`: the text of the LinkedIn post.
-- `name_limpio.linkedin/`: the 4:5 cover, one 4:5 card per key idea (the
-  idea in large type over a frame of you), up to two frames in which you
-  do not appear (screen shares, demos: talking-head frames are left out
-  because they are nearly identical) and `candidatos/` (all the frames, to
-  swap them in **Publish…**).
+- `name_limpio.linkedin/`: the 4:5 cover, one 4:5 card per key idea, up
+  to two frames in which you do not appear (screen shares, demos:
+  talking-head frames are left out because they are nearly identical) and
+  `candidatos/` (all the frames, to swap them in **Publish…**). Only the
+  cover shows your face: each card puts the idea in large type over one of
+  those frames without you, blurred and darkened, or over the brand
+  background if the video is all on camera.
 
 With **Blog** it writes a folder to `~/TSOTS/blog/pendientes/` with the
 video, the transcript, the 16:9 cover, the frames and their data. The app
