@@ -124,6 +124,8 @@ class VentanaPrincipal(QMainWindow):
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)
         self._procesando = False
+        # fila → (config, opciones) de las filas del lote a editar con Claude al terminar.
+        self._editar_al_terminar: dict[int, tuple[PipelineConfig, shorts.OpcionesShorts]] = {}
         self._reiniciando = False
 
         central = QWidget()
@@ -810,7 +812,13 @@ class VentanaPrincipal(QMainWindow):
         if not pendientes:
             return
         valores = self._guardar_panel()
-        shorts_al_procesar = self.panel.valores_shorts()["shorts_al_procesar"]
+        elegidos = self.panel.valores_shorts()
+        shorts_al_procesar = elegidos["shorts_al_procesar"]
+        editar_al_terminar = elegidos["shorts_editar"] and self.panel.hay_claude()
+        opciones_edicion = shorts.OpcionesShorts(
+            elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
+            editar=True, estilo=elegidos["shorts_estilo"])
+        self._editar_al_terminar = {}
         filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
         avisos = []
         for fila in pendientes:
@@ -857,6 +865,9 @@ class VentanaPrincipal(QMainWindow):
             if shorts_al_procesar:
                 datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
             self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
+            # Solo si el lote hace algo en el vídeo (no si solo corta shorts de uno intacto).
+            if editar_al_terminar and (ficha is None or not plan.vacio):
+                self._editar_al_terminar[fila] = (config, opciones_edicion)
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -1024,6 +1035,7 @@ class VentanaPrincipal(QMainWindow):
     def _al_terminar_trabajo(
         self, fila: int, ok: bool, salida: str, error: str
     ) -> None:
+        entrada = self._editar_al_terminar.pop(fila, None)
         if ok:
             cambios = {"salida": Path(salida)}
             ficha = self._ficha_de(self.modelo_cola.trabajo(fila))
@@ -1040,6 +1052,14 @@ class VentanaPrincipal(QMainWindow):
             actual = self.vista_cola.currentIndex()
             if actual.isValid() and actual.row() == fila:
                 self._mostrar_caption(self.modelo_cola.trabajo(fila))
+            if entrada and ficha is not None and ficha.final is not None:
+                config, opciones = entrada
+                if (shorts.es_final_vertical(ficha)
+                        and shorts.editado_al_dia(ficha.final.ruta) is None):
+                    try:
+                        shorts.editar_video(ficha, config, opciones)
+                    except Exception as error:  # noqa: BLE001 — se le cuenta al usuario
+                        self._al_avisar(fila, str(error))
         else:
             estado = (
                 EstadoTrabajo.CANCELADO
@@ -1079,6 +1099,7 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_terminar_cola(self) -> None:
         self._procesando = False
+        self._editar_al_terminar = {}  # las filas canceladas no se editan después
         # Trabajos que quedaron en PROCESANDO tras cancelar vuelven a ESPERA.
         for fila in range(self.modelo_cola.rowCount()):
             if self.modelo_cola.trabajo(fila).estado == EstadoTrabajo.PROCESANDO:

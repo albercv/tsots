@@ -2117,3 +2117,115 @@ def test_el_avance_de_la_edicion_se_refresca_solo(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     assert ventana._temporizador_edicion.isActive()
     assert ventana._temporizador_edicion.interval() == 5000
+
+
+# --- editar con Claude automático al procesar ---
+
+
+def _procesando_para_editar(qtbot, tmp_path, monkeypatch, casilla=True,
+                            vertical=True, falla=None):
+    """a.mp4 procesado con audio rehecho en el lote; devuelve (ventana, ficha,
+    llamadas_editar_video, mensajes). `procesar()` ya se ha pulsado."""
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _con_audio_y_silencios(ventana, tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.panel.check_editar_claude.setChecked(casilla)
+    ventana.panel.combo_estilo_shorts.setCurrentIndex(
+        ventana.panel.combo_estilo_shorts.findData("formal"))
+    _preguntando(monkeypatch, lambda c: {ficha.id: Decisiones(frozenset({"audio"}))})
+    _lanzando(ventana, monkeypatch)
+    llamadas, mensajes = [], []
+
+    def editar_falso(f, config, opciones):
+        llamadas.append(opciones)
+        if falla:
+            raise falla
+        return 1
+
+    monkeypatch.setattr("app.main.shorts.editar_video", editar_falso)
+    monkeypatch.setattr("app.main.shorts.es_final_vertical", lambda f: vertical)
+    monkeypatch.setattr("app.main.shorts.editado_al_dia", lambda final: None)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: mensajes.append(a[2]))
+    ventana.procesar()
+    _respondiendo(monkeypatch, QMessageBox.StandardButton.Yes)  # al cerrar con el lote en curso
+    return ventana, ficha, llamadas, mensajes
+
+
+def test_procesar_con_la_casilla_encola_el_video_al_terminar(
+        qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch)
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    [opciones] = llamadas
+    assert (opciones.editar, opciones.estilo) == (True, "formal")
+
+
+def test_sin_la_casilla_no_encola(qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch, casilla=False)
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    assert llamadas == []
+
+
+def test_crear_shorts_no_encola_el_video(qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch)
+    ventana._al_terminar_cola()  # fin del lote anterior
+    _eligiendo_la_fila(ventana)
+    ventana._crear_shorts()
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    assert llamadas == []
+
+
+def test_plan_vacio_no_encola(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    _con_audio_y_silencios(ventana, tmp_path)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.panel.check_editar_claude.setChecked(True)
+    _preguntando(monkeypatch, lambda c: {})
+    _lanzando(ventana, monkeypatch)
+    llamadas = []
+    monkeypatch.setattr("app.main.shorts.editar_video",
+                        lambda f, c, o: llamadas.append(o) or 1)
+    monkeypatch.setattr("app.main.shorts.es_final_vertical", lambda f: True)
+    monkeypatch.setattr("app.main.shorts.editado_al_dia", lambda final: None)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: None)
+    ventana.procesar()  # nada que hacer: la rama plan.vacio
+    assert ventana._editar_al_terminar == {} and llamadas == []
+
+
+def test_editado_al_dia_no_se_repite(qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch)
+    monkeypatch.setattr("app.main.shorts.editado_al_dia", lambda final: final)
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    assert llamadas == []
+
+
+def test_final_no_vertical_no_avisa(qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch, vertical=False)
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert llamadas == [] and not trabajo.aviso
+    assert trabajo.estado == EstadoTrabajo.HECHO
+
+
+def test_si_editar_video_falla_avisa_y_la_fila_sigue_hecha(
+        qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch, falla=PasoFallido("x"))
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    trabajo = ventana.modelo_cola.trabajo(0)
+    assert "x" in trabajo.aviso and trabajo.estado == EstadoTrabajo.HECHO
+
+
+def test_filas_sin_terminar_no_se_encolan_en_un_lote_posterior(
+        qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, _m = _procesando_para_editar(
+        qtbot, tmp_path, monkeypatch)
+    ventana._al_terminar_cola()  # cancelado antes de terminar la fila
+    ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
+    assert llamadas == []
