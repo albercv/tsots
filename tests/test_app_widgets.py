@@ -996,22 +996,22 @@ def test_combo_estilo_activo_con_claude_aunque_no_se_marque_la_casilla(qtbot, mo
     assert panel.hay_claude() is True
 
 
-def test_boton_editar_shorts_emite_senal(qtbot, monkeypatch):
+def test_boton_editar_con_claude_emite_senal(qtbot, monkeypatch):
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    assert panel.boton_editar_shorts.isEnabled() is False  # lo activa la ventana
-    panel.boton_editar_shorts.setEnabled(True)
-    with qtbot.waitSignal(panel.editar_shorts, timeout=1000):
-        panel.boton_editar_shorts.click()
+    assert panel.boton_editar_con_claude.isEnabled() is False  # lo activa la ventana
+    panel.boton_editar_con_claude.setEnabled(True)
+    with qtbot.waitSignal(panel.editar_con_claude, timeout=1000):
+        panel.boton_editar_con_claude.click()
 
 
-def test_boton_editar_shorts_explica_que_necesita_claude(qtbot, monkeypatch):
+def test_boton_editar_con_claude_explica_que_necesita_claude(qtbot, monkeypatch):
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     assert panel.hay_claude() is False
-    assert "claude" in panel.boton_editar_shorts.toolTip()
+    assert "claude" in panel.boton_editar_con_claude.toolTip()
 
 
 def test_sin_claude_casilla_desactivada(qtbot, monkeypatch):

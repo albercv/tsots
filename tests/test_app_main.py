@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import sys
 
 import pytest
@@ -1632,11 +1633,11 @@ def test_boton_publicar_shorts_activo_solo_con_una_fila_con_shorts(
     assert boton.isEnabled()
 
 
-def test_boton_editar_shorts_activo_con_shorts_claude_y_sin_procesar(
+def test_boton_editar_activo_con_shorts_o_con_final(
         qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
-    boton = ventana.panel.boton_editar_shorts
+    boton = ventana.panel.boton_editar_con_claude
     ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
     _eligiendo_la_fila(ventana, 0)
     assert not boton.isEnabled()  # fila sin shorts
@@ -1648,13 +1649,13 @@ def test_boton_editar_shorts_activo_con_shorts_claude_y_sin_procesar(
     assert not boton.isEnabled()
 
 
-def test_boton_editar_shorts_inactivo_sin_claude(qtbot, tmp_path, monkeypatch):
+def test_boton_editar_con_claude_inactivo_sin_claude(qtbot, tmp_path, monkeypatch):
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
     ventana.modelo_cola.actualizar(0, shorts=tmp_path / "a", n_shorts=2)
     _eligiendo_la_fila(ventana, 0)
-    assert not ventana.panel.boton_editar_shorts.isEnabled()
+    assert not ventana.panel.boton_editar_con_claude.isEnabled()
 
 
 def _editando_shorts(qtbot, tmp_path, monkeypatch, respuesta, editar=None):
@@ -1684,11 +1685,77 @@ def _editando_shorts(qtbot, tmp_path, monkeypatch, respuesta, editar=None):
     return ventana, ficha, llamadas, lanzados, mensajes
 
 
+def _editando_video(qtbot, tmp_path, monkeypatch, con_shorts, vertical=True):
+    """Como `_editando_shorts` pero con `editar_video` y `es_final_vertical`
+    falsos; devuelve (ventana, llamadas_video, llamadas_shorts, lanzados, mensajes)."""
+    ventana, _f, llamadas_shorts, lanzados, mensajes = _editando_shorts(
+        qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes)
+    if not con_shorts:
+        ventana.modelo_cola.actualizar(0, shorts=None, n_shorts=0)
+        shutil.rmtree(shorts.carpeta_shorts(_f))
+    llamadas_video = []
+    monkeypatch.setattr("app.main.shorts.es_final_vertical", lambda f: vertical)
+    monkeypatch.setattr("app.main.shorts.editar_video",
+                        lambda f, c, o: llamadas_video.append(o) or 1)
+    return ventana, llamadas_video, llamadas_shorts, lanzados, mensajes
+
+
+def test_editar_elige_el_video_si_no_hay_shorts(qtbot, tmp_path, monkeypatch):
+    ventana, video, shorts_, lanzados, _m = _editando_video(
+        qtbot, tmp_path, monkeypatch, con_shorts=False)
+    ventana.panel.boton_editar_con_claude.click()
+    [opciones] = video
+    assert (opciones.editar, opciones.estilo, opciones.encuadre) == (True, "formal", "barras")
+    assert shorts_ == [] and lanzados == [1]
+
+
+def test_editar_elige_los_shorts_si_no_hay_final_vertical(qtbot, tmp_path, monkeypatch):
+    ventana, video, shorts_, lanzados, _m = _editando_video(
+        qtbot, tmp_path, monkeypatch, con_shorts=True, vertical=False)
+    ventana.panel.boton_editar_con_claude.click()
+    assert video == [] and len(shorts_) == 1 and lanzados == [1]
+
+
+def test_editar_pregunta_si_hay_las_dos_cosas(qtbot, tmp_path, monkeypatch):
+    ventana, video, shorts_, lanzados, _m = _editando_video(
+        qtbot, tmp_path, monkeypatch, con_shorts=True)
+    monkeypatch.setattr(ventana, "_preguntar_que_editar", lambda n, nombre: "video")
+    ventana.panel.boton_editar_con_claude.click()
+    assert len(video) == 1 and shorts_ == [] and lanzados == [1]
+    monkeypatch.setattr(ventana, "_preguntar_que_editar", lambda n, nombre: None)
+    ventana.panel.boton_editar_con_claude.click()
+    assert len(video) == 1 and shorts_ == [] and lanzados == [1]
+
+
+def test_editar_avisa_si_no_hay_nada_que_editar(qtbot, tmp_path, monkeypatch):
+    ventana, video, shorts_, lanzados, mensajes = _editando_video(
+        qtbot, tmp_path, monkeypatch, con_shorts=False, vertical=False)
+    ventana.panel.boton_editar_con_claude.click()
+    assert video == [] and shorts_ == [] and lanzados == []
+    assert "1080×1920" in mensajes[-1]
+
+
+def test_la_barra_del_video_va_en_su_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    e1, e2 = _estado_edicion(), _estado_edicion(hechos=2)
+    monkeypatch.setattr("app.main.estado_edicion.leer",
+                        lambda d: {ficha.final.ruta: e1, carpeta: e2})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion == e1
+    monkeypatch.setattr("app.main.estado_edicion.leer", lambda d: {carpeta: e2})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion == e2
+
+
 def test_editar_shorts_existentes_encola_con_el_panel_y_lanza_el_agente(
         qtbot, tmp_path, monkeypatch):
     ventana, ficha, llamadas, lanzados, mensajes = _editando_shorts(
         qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes)
-    ventana.panel.boton_editar_shorts.click()
+    ventana.panel.boton_editar_con_claude.click()
     [(ficha_id, opciones)] = llamadas
     assert ficha_id == ficha.id
     assert (opciones.editar, opciones.estilo, opciones.encuadre) == (True, "formal", "barras")
@@ -1699,7 +1766,7 @@ def test_editar_shorts_existentes_encola_con_el_panel_y_lanza_el_agente(
 def test_editar_shorts_existentes_cancelado_no_encola(qtbot, tmp_path, monkeypatch):
     ventana, _ficha, llamadas, lanzados, _mensajes = _editando_shorts(
         qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.No)
-    ventana.panel.boton_editar_shorts.click()
+    ventana.panel.boton_editar_con_claude.click()
     assert llamadas == [] and lanzados == []
 
 
@@ -1709,7 +1776,7 @@ def test_editar_shorts_existentes_avisa_si_no_puede(qtbot, tmp_path, monkeypatch
 
     ventana, _ficha, _llamadas, lanzados, mensajes = _editando_shorts(
         qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes, editar=falla)
-    ventana.panel.boton_editar_shorts.click()
+    ventana.panel.boton_editar_con_claude.click()
     assert lanzados == []
     assert "sin transcripción" in mensajes[-1]
 

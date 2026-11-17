@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 15:34+0100\n"
+"POT-Creation-Date: 2026-11-17 17:53+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,6 +50,10 @@ msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ell
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene la transcripción de su vídeo: procésalo de nuevo para poder editarlo."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" no tiene la transcripción de sus shorts: créalos de nuevo con «Editar con Claude» marcado."
 msgstr ""
 
@@ -62,7 +66,15 @@ msgid "\"{nombre}\" no tiene shorts creados que editar."
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene un vídeo final que editar."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" tiene shorts y un vídeo final vertical. ¿Qué quieres editar con Claude?"
 msgstr ""
 
 #, python-brace-format
@@ -526,7 +538,10 @@ msgstr ""
 msgid "ERROR: {error}"
 msgstr ""
 
-msgid "Edita con Claude, en el estilo elegido, los shorts que ya tiene el vídeo elegido. Usa el encuadre y los subtítulos de este panel. Los editados aparecen junto a los originales al cabo de unos minutos por short."
+msgid "Edita con Claude los shorts al crearlos y los vídeos verticales al procesarlos."
+msgstr ""
+
+msgid "Edita con Claude, en el estilo de arriba, los shorts ya creados del vídeo elegido o el propio vídeo si su final es vertical 1080×1920. Usa el encuadre y los subtítulos de este panel. Cada short y cada vídeo es una ejecución de Claude, y los editados aparecen junto a los originales al cabo de unos minutos."
 msgstr ""
 
 msgid "Edita en silencio. Crea a lo grande."
@@ -535,7 +550,7 @@ msgstr ""
 msgid "Editar con Claude"
 msgstr ""
 
-msgid "Editar shorts ya creados"
+msgid "Editar con Claude…"
 msgstr ""
 
 msgid "Educación"
@@ -638,10 +653,20 @@ msgstr ""
 msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr ""
 
+msgid "El vídeo"
+msgstr ""
+
+msgid "El vídeo elegido no tiene shorts en su carpeta ni un vídeo final vertical de 1080×1920 que editar."
+msgstr ""
+
 msgid "El vídeo elegido no tiene shorts en su carpeta."
 msgstr ""
 
 msgid "El vídeo es demasiado grande para el servicio (413)."
+msgstr ""
+
+#, python-brace-format
+msgid "El vídeo final de \"{nombre}\" no mide 1080×1920: solo se puede editar un vídeo vertical de ese tamaño."
 msgstr ""
 
 #, python-brace-format
@@ -746,6 +771,9 @@ msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
 msgid "Escribe el perfil del servicio para comprobarlo."
+msgstr ""
+
+msgid "Ese vídeo ya estaba en cola para editarse."
 msgstr ""
 
 msgid "Esos shorts ya estaban en cola para editarse."
@@ -1040,6 +1068,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "Los shorts fallaron: {error}. El vídeo se ha procesado igual."
+msgstr ""
+
+#, python-brace-format
+msgid "Los {n} shorts"
 msgstr ""
 
 #, python-brace-format
@@ -1789,6 +1821,10 @@ msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb}
 msgstr ""
 
 #, python-brace-format
+msgid "Se editará con Claude el vídeo \"{nombre}\" en estilo {estilo}. Es una ejecución de Claude en tu cuenta. ¿Seguir?"
+msgstr ""
+
+#, python-brace-format
 msgid "Se editarán con Claude los shorts de \"{nombre}\" ({n}) en estilo {estilo}. Cada short es una ejecución de Claude en tu cuenta. ¿Seguir?"
 msgstr ""
 
@@ -2088,6 +2124,9 @@ msgid "Vía {servicio}"
 msgstr ""
 
 msgid "Vídeo de entrada."
+msgstr ""
+
+msgid "Vídeo en cola. El editado aparece junto al vídeo al cabo de unos minutos, y «Publicar…» lo usará."
 msgstr ""
 
 msgid "Vídeo final. Por defecto: nombre_limpio.mp4"

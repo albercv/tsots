@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 15:34+0100\n"
+"POT-Creation-Date: 2026-11-17 17:53+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -47,6 +47,10 @@ msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ell
 msgstr "\"{nombre}\" has the subtitles burned in and there is no version without them to cut the shorts from. Drag in the original and process it again."
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene la transcripción de su vídeo: procésalo de nuevo para poder editarlo."
+msgstr "\"{nombre}\" has no transcript of its video: process it again to be able to edit it."
+
+#, python-brace-format
 msgid "\"{nombre}\" no tiene la transcripción de sus shorts: créalos de nuevo con «Editar con Claude» marcado."
 msgstr "\"{nombre}\" has no transcript for its shorts: create them again with \"Edit with Claude\" ticked."
 
@@ -59,8 +63,16 @@ msgid "\"{nombre}\" no tiene shorts creados que editar."
 msgstr "\"{nombre}\" has no created shorts to edit."
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene un vídeo final que editar."
+msgstr "\"{nombre}\" has no final video to edit."
+
+#, python-brace-format
 msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
 msgstr "\"{nombre}\" will be redone from the original: the subtitles will be transcribed and burned in again. The caption is kept."
+
+#, python-brace-format
+msgid "\"{nombre}\" tiene shorts y un vídeo final vertical. ¿Qué quieres editar con Claude?"
+msgstr "\"{nombre}\" has shorts and a vertical final video. What do you want to edit with Claude?"
 
 #, python-brace-format
 msgid "\"{nombre}\" ya lleva los subtítulos quemados y no hay una versión sin ellos. Arrastra el original para rehacerlos."
@@ -544,8 +556,11 @@ msgstr "ERROR: cannot read the glossary: {ruta}"
 msgid "ERROR: {error}"
 msgstr "ERROR: {error}"
 
-msgid "Edita con Claude, en el estilo elegido, los shorts que ya tiene el vídeo elegido. Usa el encuadre y los subtítulos de este panel. Los editados aparecen junto a los originales al cabo de unos minutos por short."
-msgstr "Edits the selected video's existing shorts with Claude, in the chosen style. Uses the framing and subtitles set in this panel. Edited files appear next to the originals after a few minutes per short."
+msgid "Edita con Claude los shorts al crearlos y los vídeos verticales al procesarlos."
+msgstr "Edits shorts with Claude when they are created and vertical videos when they are processed."
+
+msgid "Edita con Claude, en el estilo de arriba, los shorts ya creados del vídeo elegido o el propio vídeo si su final es vertical 1080×1920. Usa el encuadre y los subtítulos de este panel. Cada short y cada vídeo es una ejecución de Claude, y los editados aparecen junto a los originales al cabo de unos minutos."
+msgstr "Edits with Claude, in the style above, the selected video's existing shorts or the video itself if its final is vertical 1080×1920. Uses the framing and subtitles set in this panel. Each short and each video is one Claude run, and the edited files appear next to the originals after a few minutes."
 
 msgid "Edita en silencio. Crea a lo grande."
 msgstr "Edit quieter. Create louder."
@@ -553,8 +568,8 @@ msgstr "Edit quieter. Create louder."
 msgid "Editar con Claude"
 msgstr "Edit with Claude"
 
-msgid "Editar shorts ya creados"
-msgstr "Edit existing shorts"
+msgid "Editar con Claude…"
+msgstr "Edit with Claude…"
 
 msgid "Educación"
 msgstr "Education"
@@ -656,11 +671,21 @@ msgstr "The vertical version of \"{nombre}\" cannot have subtitles: they are alr
 msgid "El vertical quedará desactualizado si no lo regeneras."
 msgstr "The vertical version will be out of date unless you regenerate it."
 
+msgid "El vídeo"
+msgstr "The video"
+
+msgid "El vídeo elegido no tiene shorts en su carpeta ni un vídeo final vertical de 1080×1920 que editar."
+msgstr "The selected video has no shorts in its folder nor a vertical 1080×1920 final video to edit."
+
 msgid "El vídeo elegido no tiene shorts en su carpeta."
 msgstr "The selected video has no shorts in its folder."
 
 msgid "El vídeo es demasiado grande para el servicio (413)."
 msgstr "The video is too large for the service (413)."
+
+#, python-brace-format
+msgid "El vídeo final de \"{nombre}\" no mide 1080×1920: solo se puede editar un vídeo vertical de ese tamaño."
+msgstr "The final video of \"{nombre}\" is not 1080×1920: only a vertical video of that size can be edited."
 
 #, python-brace-format
 msgid "El vídeo se envió pero no llegó la respuesta del servicio ({tipo})."
@@ -767,6 +792,9 @@ msgstr "Type the place you want to search for."
 
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
+
+msgid "Ese vídeo ya estaba en cola para editarse."
+msgstr "That video was already queued for editing."
 
 msgid "Esos shorts ya estaban en cola para editarse."
 msgstr "Those shorts were already queued for editing."
@@ -1074,6 +1102,10 @@ msgstr "{app} logo"
 #, python-brace-format
 msgid "Los shorts fallaron: {error}. El vídeo se ha procesado igual."
 msgstr "Shorts failed: {error}. The video was processed anyway."
+
+#, python-brace-format
+msgid "Los {n} shorts"
+msgstr "All {n} shorts"
 
 #, python-brace-format
 msgid "Los últimos {n} términos no caben en la pista para Whisper. Se siguen usando en las correcciones y en el caption."
@@ -1838,6 +1870,10 @@ msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb}
 msgstr "The data saved for redoing steps of \"{nombre}\" ({mb} MB) will be deleted. The videos and their caption are not touched."
 
 #, python-brace-format
+msgid "Se editará con Claude el vídeo \"{nombre}\" en estilo {estilo}. Es una ejecución de Claude en tu cuenta. ¿Seguir?"
+msgstr "The video \"{nombre}\" will be edited with Claude in the {estilo} style. It is one Claude run on your account. Continue?"
+
+#, python-brace-format
 msgid "Se editarán con Claude los shorts de \"{nombre}\" ({n}) en estilo {estilo}. Cada short es una ejecución de Claude en tu cuenta. ¿Seguir?"
 msgstr "The shorts of \"{nombre}\" ({n}) will be edited with Claude in the {estilo} style. Each short is one Claude run on your account. Continue?"
 
@@ -2152,6 +2188,9 @@ msgstr "Via {servicio}"
 
 msgid "Vídeo de entrada."
 msgstr "Input video."
+
+msgid "Vídeo en cola. El editado aparece junto al vídeo al cabo de unos minutos, y «Publicar…» lo usará."
+msgstr "Video queued. The edited file appears next to the video after a few minutes, and \"Publish…\" will use it."
 
 msgid "Vídeo final. Por defecto: nombre_limpio.mp4"
 msgstr "Final video. Default: name_limpio.mp4"
@@ -2479,6 +2518,9 @@ msgstr "📅 Scheduled for {fecha}"
 
 #~ msgid "Ciudad o lugar, p. ej. Madrid"
 #~ msgstr "City or place, e.g. Madrid"
+
+#~ msgid "Editar shorts ya creados"
+#~ msgstr "Edit existing shorts"
 
 #~ msgid "ID del lugar en X (opcional)"
 #~ msgstr "X place ID (optional)"
