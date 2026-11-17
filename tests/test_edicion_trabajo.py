@@ -128,3 +128,31 @@ def test_frases_sin_silencios_se_cortan(tmp_path, video_vertical):
     spans = [tuple(float(x) for x in f[1:f.index("]")].split("-")) for f in frases]
     assert len(frases) > 1 and all(b - a <= 8 for a, b in spans)
     assert any(f.endswith(",") for f in frases)
+
+
+def test_fallo_de_limpieza_tras_entregar_devuelve_none(tmp_path, video_vertical, monkeypatch):
+    t = _listo(tmp_path, video_vertical)
+    monkeypatch.setattr(ent.json, "dumps", lambda *a, **k: (_ for _ in ()).throw(OSError("escritura")))
+    assert entregar(t) is None
+    assert (tmp_path / "Episodio ¿20?.editado.mp4").exists()
+
+
+def _cambiar_destino(t, destino):
+    d = json.loads((t / "trabajo.json").read_text())
+    d["destino"] = str(destino)
+    (t / "trabajo.json").write_text(json.dumps(d))
+
+
+def test_destino_igual_al_origen(tmp_path, video_vertical):
+    t = _listo(tmp_path, video_vertical)
+    o = tmp_path / "Episodio ¿20?.mp4"
+    _cambiar_destino(t, o)
+    assert "original" in entregar(t)
+    assert o.read_bytes() == b"original"
+
+
+def test_destino_sin_sufijo_editado(tmp_path, video_vertical):
+    t = _listo(tmp_path, video_vertical)
+    _cambiar_destino(t, tmp_path / "otro.mp4")
+    assert ".editado.mp4" in entregar(t)
+    assert not (tmp_path / "otro.mp4").exists()

@@ -47,8 +47,13 @@ def entregar(trabajo: Path) -> str | None:
     if motivo:
         return motivo
     destino = Path(datos["destino"])
+    if destino.resolve() == Path(datos["origen"]).resolve():
+        return "El destino coincide con el original; no se sobrescribe"
+    if not destino.name.endswith(".editado.mp4"):
+        return f"El destino debe acabar en .editado.mp4: {destino.name}"
     tmp = destino.with_name(destino.name + ".tmp")
     try:
+        duracion = float(_duracion(trabajo / "salida.mp4"))
         with open(trabajo / "salida.mp4", "rb") as src, open(tmp, "wb") as dst:
             shutil.copyfileobj(src, dst)
             dst.flush()
@@ -57,23 +62,30 @@ def entregar(trabajo: Path) -> str | None:
     except Exception as e:  # noqa: BLE001
         tmp.unlink(missing_ok=True)
         return f"No se pudo copiar el resultado: {e}"
-    duracion = float(_duracion(destino))
-    (trabajo / "video.mp4").unlink(missing_ok=True)
-    (trabajo / "salida.mp4").unlink(missing_ok=True)
-    (trabajo / "resultado.json").write_text(json.dumps(
-        {"destino": str(destino), "estilo": datos["estilo"], "duracion": duracion,
-         "fecha": datetime.now().astimezone().isoformat(timespec="seconds")},
-        ensure_ascii=False), "utf-8")
+    # Entregado: un fallo de limpieza ya no cambia el resultado, solo avisa.
+    try:
+        (trabajo / "video.mp4").unlink(missing_ok=True)
+        (trabajo / "salida.mp4").unlink(missing_ok=True)
+        (trabajo / "resultado.json").write_text(json.dumps(
+            {"destino": str(destino), "estilo": datos["estilo"], "duracion": duracion,
+             "fecha": datetime.now().astimezone().isoformat(timespec="seconds")},
+            ensure_ascii=False), "utf-8")
+    except Exception as e:  # noqa: BLE001
+        print(f"Aviso: entregado, pero falló la limpieza del trabajo: {e}", file=sys.stderr)
     return None
 
 
 def main(args: list[str]) -> int:
-    motivo = entregar(Path(args[0]))
-    if motivo:
-        print(motivo)
+    try:
+        motivo = entregar(Path(args[0]))
+        if motivo:
+            print(motivo)
+            return 1
+        print(json.loads((Path(args[0]) / "trabajo.json").read_text("utf-8"))["destino"])
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"Error inesperado al entregar: {e}")
         return 1
-    print(json.loads((Path(args[0]) / "resultado.json").read_text("utf-8"))["destino"])
-    return 0
 
 
 if __name__ == "__main__":
