@@ -240,6 +240,13 @@ def sin_agente_del_blog(monkeypatch):
                         Path("/sin-agente-del-blog-en-los-tests"))
 
 
+@pytest.fixture(autouse=True)
+def sin_agente_de_edicion(monkeypatch):
+    """Red de seguridad: ningún test lanza el agente de edición real."""
+    monkeypatch.setattr("videopipeline.edicion.AGENTE",
+                        Path("/sin-agente-de-edicion-en-los-tests"))
+
+
 @pytest.fixture(scope="session")
 def video_vertical(tmp_path_factory) -> Path:
     """Vídeo vertical 1080x1920 de 4 s a 30 fps: `testsrc2` + voz de `say`
