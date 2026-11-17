@@ -126,3 +126,14 @@ def test_prompt_y_esquema_piden_ideas():
     assert "ideas" in ESQUEMA["properties"] and "ideas" in ESQUEMA["required"]
     for idioma in ("es", "en"):
         assert '"ideas": [str]' in construir_mensajes("hola", "", idioma)[0]["content"]
+
+
+def test_rutas_del_editado_son_las_de_su_original(tmp_path):
+    from videopipeline.linkedin import rutas
+    final = tmp_path / "x_limpio.mp4"
+    editado = tmp_path / "x_limpio.editado.mp4"
+    # Sin original al lado, el editado es un vídeo cualquiera.
+    assert rutas(editado)[0].name == "x_limpio.editado.linkedin.md"
+    final.write_bytes(b"MP4")
+    assert rutas(editado) == rutas(final)
+    assert rutas(final)[0].name == "x_limpio.linkedin.md"

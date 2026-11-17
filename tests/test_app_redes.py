@@ -1782,3 +1782,13 @@ def test_cabecera_marca_el_editado(qtbot, tmp_path, ajustes, video):
     assert dialogo.cabecera.text().endswith("(editado)")
     normal, _ = _dialogo(qtbot, video, ajustes)
     assert "(editado)" not in normal.cabecera.text()
+
+
+def test_linkedin_del_final_se_ve_al_publicar_su_editado(qtbot, tmp_path, video, ajustes,
+                                                        llavero_falso):
+    _con_linkedin(video)
+    editado = tmp_path / "clip_limpio.editado.mp4"
+    editado.write_bytes(b"MP4")
+    dialogo, _ = _dialogo_listo(qtbot, editado, ajustes, llavero_falso, marcadas=(Y, L))
+    assert not dialogo.campo_linkedin.isHidden() and not dialogo.tira_linkedin.isHidden()
+    assert dialogo.campo_linkedin.toPlainText() == TEXTO_LINKEDIN
