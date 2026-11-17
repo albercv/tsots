@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 18:19+0100\n"
+"POT-Creation-Date: 2026-11-17 19:28+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -615,8 +615,8 @@ msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno n
 msgstr "The pipeline runs ffmpeg, ffprobe and auto-editor from PATH and one of them was not found."
 
 #, python-brace-format
-msgid "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un emoji, 2. Mientras no lo cambies, se rellena con el título y los hashtags."
-msgstr "The X post. Without Premium it takes {maximo} characters: a URL counts 23 and an emoji 2. Until you change it, it is filled with the title and the hashtags."
+msgid "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un emoji, 2. Mientras no lo cambies, se rellena con el post que propuso el modelo (o el título) y los hashtags que caben."
+msgstr "The X post. Without Premium it takes {maximo} characters: a URL counts 23 and an emoji 2. Until you change it, it is filled with the post the model suggested (or the title) and the hashtags that fit."
 
 #, python-brace-format
 msgid "El proceso murió por una señal (código {codigo})"
@@ -914,6 +914,9 @@ msgstr "Vertical format"
 
 msgid "Fotos para LinkedIn:"
 msgstr "Photos for LinkedIn:"
+
+msgid "Fotos para X:"
+msgstr "Photos for X:"
 
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr "Writes name_limpio.md with a local model (Ollama) from the transcript."
@@ -1540,6 +1543,9 @@ msgstr "Another image…"
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr "To change the language the app will restart. Any process in progress will be cancelled. Restart now?"
 
+msgid "Para publicar fotos en su lugar, activa «LinkedIn» y procésalo."
+msgstr "To post photos instead, turn on “LinkedIn” and process it."
+
 #, python-brace-format
 msgid "Paso: {paso}"
 msgstr "Step: {paso}"
@@ -1908,6 +1914,9 @@ msgstr ""
 "\n"
 "{resumen}"
 
+msgid "Se publica un post con fotos."
+msgstr "A photo post is published instead."
+
 #, python-brace-format
 msgid ""
 "Se publicará «{titulo}» en:\n"
@@ -1993,6 +2002,9 @@ msgstr "Not checked. Press “Check connection” to see which accounts you have
 
 msgid "Sin conexión para descargar un modelo"
 msgstr "No connection to download a model"
+
+msgid "Sin fotos para X: añade al menos una."
+msgstr "No photos for X: add at least one."
 
 msgid "Sin fotos: añade al menos una."
 msgstr "No photos: add at least one."
@@ -2204,6 +2216,10 @@ msgstr "Regular video"
 
 msgid "Vídeos ("
 msgstr "Videos ("
+
+#, python-brace-format
+msgid "X admite {maximo} fotos por post: quita {sobran}."
+msgstr "X takes {maximo} photos per post: remove {sobran}."
 
 #, python-brace-format
 msgid "X sin Premium admite vídeos de hasta {maximo} MB; este ocupa {tamano} MB."

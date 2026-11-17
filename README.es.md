@@ -331,7 +331,8 @@ guía SEO (`lanzador/blog/guia_seo.md`: una palabra clave de búsqueda, título
 de 60 caracteres como mucho, entradilla que responde directamente,
 preguntas frecuentes si el vídeo da para ellas, textos alternativos en las
 imágenes y enlaces a posts publicados relacionados), y subir la portada,
-los fotogramas y el vídeo. Nunca añade datos que no estén en el vídeo. Necesita `claude` con la sesión
+el vídeo y los fotogramas que enseñan contenido (pantalla, demo): mira
+cada fotograma y deja fuera los tuyos hablando a cámara. Nunca añade datos que no estén en el vídeo. Necesita `claude` con la sesión
 iniciada y el conector **claude.ai E2D - Blog**. El artículo se crea siempre como **borrador**: el agente no puede
 publicar ni borrar posts. Revísalo y publícalo tú en el blog. Después,
 cada carpeta pasa a:
@@ -470,11 +471,17 @@ comprobar en segundo plano: una red sin conectar aparece deshabilitada
 aviso. Sin conexión se usa lo último que se supo.
 
 **Límites de X.** Un post de X admite **280 caracteres** (una URL cuenta
-23 y un emoji, 2). Publicar… propone un texto para X con el título y los
-hashtags (quita hashtags desde el final y, si hace falta, acorta el
-título); puedes editarlo y el contador muestra cuánto ocupa. Sin Premium,
-X solo admite vídeos de hasta **2:20** y **512 MB**: con un vídeo más
-largo o más pesado, X aparece deshabilitada con el motivo. Si tu cuenta
+23 y un emoji, 2). Junto al caption, el modelo escribe un post para X
+(gancho, 2-3 ideas del vídeo y una pregunta o llamada a la acción) y
+Publicar… lo propone con los hashtags que caben. Si el modelo se pasa,
+se quitan frases del medio (nunca la primera ni la última); un caption
+antiguo sin ese post usa el título. Puedes editarlo y el contador
+muestra cuánto ocupa. Sin Premium,
+X solo admite vídeos de hasta **2:20** y **512 MB**. Con un vídeo más
+largo o más pesado que tenga post de LinkedIn, X publica en su lugar un
+**post con fotos**: aparece «Fotos para X» con las 4 primeras de LinkedIn
+(portada e ideas), que puedes cambiar; X admite como mucho 4. Sin post de
+LinkedIn, X aparece deshabilitada con el motivo. Si tu cuenta
 tiene Premium, márcalo en Redes… («Mi cuenta de X tiene Premium»): se
 admiten vídeos largos y textos largos en un solo post. Si Upload-Post
 indica que la cuenta es Premium, la casilla se marca sola al comprobar la
@@ -490,6 +497,7 @@ Qué hace cada modo:
 | Instagram | **Reel de prueba** (por defecto) | Se enseña primero a quien no te sigue; Instagram lo comparte con tus seguidores solo si funciona. |
 | Instagram | **Reel normal** | Un reel normal, también en tu feed. |
 | X | **Post público** | Un post con el vídeo y el texto para X; nunca un hilo. |
+| X | **Post con fotos** | Solo si X no admite el vídeo (sin Premium: más de 2:20 o de 512 MB): hasta 4 fotos y el texto para X. |
 | Facebook | **Reel** (por defecto) | Un reel publicado en tu página. |
 | Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |

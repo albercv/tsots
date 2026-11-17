@@ -299,6 +299,7 @@ class DialogoPublicarShorts(DialogoPublicar):
         self.campo_caption.setPlainText(corto.caption.caption)
         self.campo_hashtags.setText(corto.caption.hashtags_texto)
         self._palabras_clave = tuple(corto.caption.palabras_clave)
+        self._post_x = corto.caption.post_x
         self._rellenar_x()
 
     def _siguiente(self) -> None:

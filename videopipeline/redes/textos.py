@@ -4,7 +4,8 @@ El caption se recorta si hace falta; los hashtags nunca se cortan por la
 mitad: van completos al final del texto.
 
 X es distinta: un post admite 280 caracteres contados a su manera (ver
-`longitud_x`) y su texto por defecto es título + hashtags.
+`longitud_x`) y su texto por defecto es el post que propuso el modelo (o el
+título) + los hashtags que quepan.
 """
 from __future__ import annotations
 
@@ -238,15 +239,48 @@ def recortar_x(texto: str, limite: int = MAX_TEXTO_X) -> str:
     return corte + ELIPSIS if corte else ""
 
 
+_FIN_FRASE = re.compile(r"(?<=[.!?…])(\s+)")
+
+
+def _resumir_x(texto: str, limite: int) -> str:
+    """Si `texto` no cabe en `limite`: el gancho (primera frase), la llamada
+    final (última) y, en orden, las frases del medio que quepan. Si ni el
+    gancho y la llamada caben, `recortar_x`."""
+    if longitud_x(texto) <= limite:
+        return texto
+    trozos = _FIN_FRASE.split(texto)  # frase, separador, frase, separador…
+    frases = list(zip(["", *trozos[1::2]], trozos[0::2]))  # (separador previo, frase)
+    if len(frases) < 3:
+        return recortar_x(texto, limite)
+
+    def unir(indices: list[int]) -> str:
+        return "".join(sep + frase for i in indices for sep, frase in [frases[i]]).lstrip()
+
+    elegidas = [0, len(frases) - 1]
+    if longitud_x(unir(elegidas)) > limite:
+        return recortar_x(texto, limite)
+    for i in range(1, len(frases) - 1):
+        prueba = elegidas[:-1] + [i, elegidas[-1]]
+        if longitud_x(unir(prueba)) <= limite:
+            elegidas = prueba
+    return unir(elegidas)
+
+
 def texto_x_por_defecto(publicacion: Publicacion) -> str:
-    """Título + hashtags en 280 caracteres de X: primero se quitan hashtags
-    desde el final; si ni el título solo cabe, se acorta el título."""
-    titulo = publicacion.titulo.strip()
+    """Post del modelo (o, si no hay, el título) + hashtags en 280 caracteres
+    de X: primero se quitan hashtags desde el final; si ni el texto solo
+    cabe, se acorta. Con Premium también: más allá de 280, X lo pliega.
+    El modelo a veces se pasa: su post se resume por frases dejando sitio
+    al primer hashtag."""
+    base = publicacion.post_x.strip() or publicacion.titulo.strip()
     hashtags = hashtags_para(Plataforma.X, publicacion)
+    if publicacion.post_x.strip():
+        reserva = longitud_x(f"\n\n{hashtags[0]}") if hashtags else 0
+        base = _resumir_x(base, MAX_TEXTO_X - reserva)
 
     def unir(etiquetas: list[str]) -> str:
         bloque = " ".join(etiquetas)
-        return f"{titulo}\n\n{bloque}" if titulo and bloque else (titulo or bloque)
+        return f"{base}\n\n{bloque}" if base and bloque else (base or bloque)
 
     while hashtags and longitud_x(unir(hashtags)) > MAX_TEXTO_X:
         hashtags.pop()

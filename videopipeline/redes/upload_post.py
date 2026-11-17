@@ -20,6 +20,9 @@ API (docs y openapi.json consultados el 2026-09-23):
   sin Premium. No se usan `reply_settings`, `nullcast`, `community_id`,
   `x_alt_text`, `x_paid_partnership` ni `x_subtitles_url` (solo admite una
   URL pública). Los resultados pueden venir como `x` o como `twitter`.
+  Con `fotos_x` (vídeo que X no admite), X va por `upload_photos` como
+  LinkedIn, con los mismos campos de X; más de 4 fotos serían un hilo
+  (docs del 2026-11-17): el diálogo no deja pasar de 4.
 - Facebook (`platform[]=facebook`): `facebook_page_id` (obligatorio; Meta
   solo deja publicar en páginas), `facebook_title`, `facebook_description`,
   `facebook_media_type` (REELS | VIDEO | STORIES) y `video_state`
@@ -333,8 +336,11 @@ class ProveedorUploadPost:
     def publicar(self, plataforma: Plataforma, publicacion: Publicacion,
                  opciones: Opciones) -> Resultado:
         linkedin = plataforma == Plataforma.LINKEDIN
-        # LinkedIn sube las fotos en lugar del vídeo.
-        archivos = [Path(f) for f in publicacion.fotos] if linkedin else [Path(publicacion.video)]
+        # LinkedIn, y X con `fotos_x`, suben las fotos en lugar del vídeo.
+        fotos = (publicacion.fotos if linkedin
+                 else publicacion.fotos_x if plataforma == Plataforma.X else ())
+        con_fotos = linkedin or bool(fotos)
+        archivos = [Path(f) for f in fotos] if con_fotos else [Path(publicacion.video)]
         video = archivos[0] if archivos else Path(publicacion.video)
         if not self._clave:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
@@ -347,7 +353,7 @@ class ProveedorUploadPost:
             return self._error(plataforma, _("No hay imágenes para LinkedIn"))
         for archivo in archivos:
             if not archivo.is_file():
-                texto = (_("No se encuentra la imagen: {nombre}") if linkedin
+                texto = (_("No se encuentra la imagen: {nombre}") if con_fotos
                          else _("No se encuentra el vídeo: {nombre}"))
                 return self._error(plataforma, texto.format(nombre=archivo.name))
         datos = campos(plataforma, publicacion, opciones, self._perfil, self._pagina_facebook)
@@ -360,7 +366,7 @@ class ProveedorUploadPost:
             plataforma, video, tamano, estado_video.st_mtime if estado_video else 0.0)
         limites = tiempos(tamano)
         # El perfil (`user`) no va al registro.
-        url = URL_FOTOS if linkedin else URL_SUBIDA
+        url = URL_FOTOS if con_fotos else URL_SUBIDA
         log.info("%s: POST %s (un único intento) · external_id %s · archivo %s (%d bytes) · "
                  "campos %s · esperas máx.: "
                  "conexión %.0f s, escritura %.0f s, lectura %.0f s",
@@ -371,7 +377,7 @@ class ProveedorUploadPost:
 
         def enviar(http: httpx.Client) -> httpx.Response:
             with ExitStack() as pila:
-                if linkedin:
+                if con_fotos:
                     files = [("photos[]", (a.name, pila.enter_context(a.open("rb")), _mime_foto(a)))
                              for a in archivos]
                 else:
@@ -394,7 +400,7 @@ class ProveedorUploadPost:
                         plataforma.nombre, time.monotonic() - inicio, self._traza(e))
             resultado = self._por_confirmar(plataforma, (
                 _("La publicación se envió pero no llegó la respuesta del servicio ({tipo}).")
-                if linkedin else
+                if con_fotos else
                 _("El vídeo se envió pero no llegó la respuesta del servicio ({tipo}).")).format(
                 tipo=type(e).__name__))
             self._registrar_resultado(resultado)
@@ -402,7 +408,7 @@ class ProveedorUploadPost:
         except OSError as e:
             log.warning("%s: no se pudo leer el vídeo: %s", plataforma.nombre, self._traza(e))
             return self._error(plataforma, (
-                _("No se pudo leer el archivo ({tipo}).") if linkedin
+                _("No se pudo leer el archivo ({tipo}).") if con_fotos
                 else _("No se pudo leer el vídeo ({tipo}).")).format(tipo=type(e).__name__))
         self._registrar_respuesta(plataforma, "subida", respuesta, time.monotonic() - inicio)
         resultado = self._interpretar_subida(plataforma, respuesta, opciones.programada)

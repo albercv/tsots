@@ -307,12 +307,13 @@ class DialogoPublicar(QDialog):
         self.campo_hashtags.setCursorPosition(0)
         formulario.addRow(_("Hashtags:"), self.campo_hashtags)
         self._palabras_clave = tuple(caption.palabras_clave)
+        self._post_x = caption.post_x
         self.campo_x = QPlainTextEdit()
-        self.campo_x.setFixedHeight(64)
+        self.campo_x.setFixedHeight(96)
         self.campo_x.setToolTip(_(
             "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un "
-            "emoji, 2. Mientras no lo cambies, se rellena con el título y los "
-            "hashtags.").format(maximo=MAX_TEXTO_X))
+            "emoji, 2. Mientras no lo cambies, se rellena con el post que propuso el "
+            "modelo (o el título) y los hashtags que caben.").format(maximo=MAX_TEXTO_X))
         self.contador_x = QLabel()
         fila_x = QHBoxLayout()
         fila_x.addWidget(self.campo_x, 1)
@@ -335,6 +336,13 @@ class DialogoPublicar(QDialog):
         if self._linkedin is None:
             formulario.setRowVisible(fila_linkedin, False)
             formulario.setRowVisible(self.tira_linkedin, False)
+        # X: un vídeo que X no admite va como post con fotos, empezando por
+        # las primeras de LinkedIn. La fila solo se ve entonces (`_refrescar`).
+        self.tira_x = TiraImagenes(fotos_linkedin[:limites.MAX_FOTOS_X],
+                                   linkedin.rutas(self.video)[1] / "candidatos")
+        formulario.addRow(_("Fotos para X:"), self.tira_x)
+        formulario.setRowVisible(self.tira_x, False)
+        self._formulario = formulario
         raiz.addWidget(grupo_textos)
         self.grupo_textos = grupo_textos
 
@@ -480,6 +488,7 @@ class DialogoPublicar(QDialog):
         self.campo_x.textChanged.connect(self._al_editar_x)
         self.campo_linkedin.textChanged.connect(self._refrescar)
         self.tira_linkedin.cambiada.connect(self._refrescar)
+        self.tira_x.cambiada.connect(self._refrescar)
         self.radio_programar.toggled.connect(self._refrescar)
         self.campo_fecha.dateTimeChanged.connect(self._refrescar)
         self._rellenar_x()
@@ -571,8 +580,10 @@ class DialogoPublicar(QDialog):
             hashtags=tuple(self.campo_hashtags.text().split()),
             palabras_clave=self._palabras_clave,
             texto_x=self.campo_x.toPlainText().strip(),
+            post_x=self._post_x,
             fotos=self.tira_linkedin.fotos(),
             texto_linkedin=self.campo_linkedin.toPlainText().strip(),
+            fotos_x=self.tira_x.fotos() if self._x_con_fotos() else (),
         )
 
     # --- ubicación ---
@@ -684,6 +695,12 @@ class DialogoPublicar(QDialog):
 
     # --- estado de cada plataforma ---
 
+    def _x_con_fotos(self) -> bool:
+        """X no admite el vídeo (sin Premium: más de 2:20 o de 512 MB) y hay
+        post de LinkedIn: X publica un post con fotos."""
+        return (self._linkedin is not None and not self.ajustes.x_premium
+                and bool(limites.motivo_no_admite_x(self.duracion, self.tamano, False)))
+
     def _al_marcar(self, plataforma: Plataforma, marcada: bool) -> None:
         if self._aplicando:
             return
@@ -702,14 +719,24 @@ class DialogoPublicar(QDialog):
         if plataforma in self._cuentas and cuenta is None:
             texto, color = consulta_cuentas.describir(plataforma, None, servicio)
             return False, "", texto, color
-        bloqueo = ""
+        bloqueo = aviso_x = ""
         if plataforma == Plataforma.X and not self.ajustes.x_premium:
             if self.duracion is None:
                 return False, "", _("Comprobando la duración del vídeo…"), COLOR_SECUNDARIO
             motivo = limites.motivo_no_admite_x(self.duracion, self.tamano, False)
+            if motivo and self._linkedin is None:
+                return False, "", " ".join([motivo, _(
+                    "Para publicar fotos en su lugar, activa «LinkedIn» y procésalo.")]), \
+                    COLOR_AVISO
             if motivo:
-                return False, "", motivo, COLOR_AVISO
-            if longitud_x(self.campo_x.toPlainText().strip()) > MAX_TEXTO_X:
+                fotos_x = len(self.tira_x.fotos())
+                if not fotos_x:
+                    return False, "", _("Sin fotos para X: añade al menos una."), COLOR_AVISO
+                if fotos_x > limites.MAX_FOTOS_X:
+                    bloqueo = _("X admite {maximo} fotos por post: quita {sobran}.").format(
+                        maximo=limites.MAX_FOTOS_X, sobran=fotos_x - limites.MAX_FOTOS_X)
+                aviso_x = " ".join([motivo, _("Se publica un post con fotos.")])
+            if not bloqueo and longitud_x(self.campo_x.toPlainText().strip()) > MAX_TEXTO_X:
                 bloqueo = _("Texto para X de más de {maximo} caracteres: acórtalo (o marca "
                             "Premium en Redes…)").format(maximo=MAX_TEXTO_X)
         if plataforma == Plataforma.LINKEDIN:
@@ -728,6 +755,8 @@ class DialogoPublicar(QDialog):
             bloqueo = _("Falta la página de Facebook: elígela en Redes…")
         texto, color = (consulta_cuentas.describir(plataforma, cuenta, servicio)
                         if cuenta is not None else ("", ""))
+        if aviso_x:
+            texto, color = " · ".join(filter(None, (aviso_x, texto))), color or COLOR_SECUNDARIO
         return True, bloqueo, texto, color
 
     def _refrescar_plataformas(self) -> list[str]:
@@ -839,6 +868,10 @@ class DialogoPublicar(QDialog):
         self.contador_linkedin.setText(f"{largo_linkedin}/{maximo_linkedin}")
         self.contador_linkedin.setStyleSheet(
             f"color: {COLOR_AVISO};" if largo_linkedin > maximo_linkedin else "")
+        x_con_fotos = self._x_con_fotos()
+        self._formulario.setRowVisible(self.tira_x, x_con_fotos)
+        self.modos[Plataforma.X].setText(_("Post con fotos") if x_con_fotos
+                                         else _("Post público"))
         bloqueos = self._refrescar_plataformas()
         listo, _motivo = self._listo()
         programar = self.radio_programar.isChecked()
@@ -1073,6 +1106,9 @@ class DialogoPublicar(QDialog):
                      longitud_x(publicacion.texto_x), "sí" if opciones.x_premium else "no",
                      limites.duracion_legible(self.duracion) if self.duracion else "duración ?",
                      self.tamano if self.tamano is not None else "?")
+            if publicacion.fotos_x:
+                log.info("X: post con fotos en lugar del vídeo: %s",
+                         ", ".join(map(str, publicacion.fotos_x)))
         if Plataforma.FACEBOOK in plataformas:
             log.info("Página de Facebook: %s", "sí" if self.ajustes.pagina_facebook else "no")
         if Plataforma.LINKEDIN in plataformas:
@@ -1137,14 +1173,14 @@ class DialogoPublicar(QDialog):
         if plataforma == Plataforma.FACEBOOK:
             return _(ETIQUETAS_FACEBOOK[opciones.facebook_modo])
         if plataforma == Plataforma.X:
-            return _("Post público")
+            return _("Post con fotos") if self._x_con_fotos() else _("Post público")
         if plataforma == Plataforma.LINKEDIN:
             return _("Post con fotos")
         return _("Short público")
 
     def _bloquear(self, bloqueado: bool) -> None:
         for widget in (self.campo_titulo, self.campo_caption, self.campo_hashtags,
-                       self.campo_x, self.campo_linkedin, self.tira_linkedin,
+                       self.campo_x, self.campo_linkedin, self.tira_linkedin, self.tira_x,
                        self.combo_tiktok, self.combo_instagram,
                        self.combo_facebook, self.boton_redes, self.selector_perfil,
                        self.boton_cerrar,
