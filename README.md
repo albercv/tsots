@@ -330,7 +330,8 @@ background to write the article in the evolve2digital.com style, following
 an SEO guide (`lanzador/blog/guia_seo.md`: one search keyword, a title of
 60 characters at most, a direct-answer lead, an FAQ when the video covers
 it, image alt texts and links to related published posts), and to upload
-the cover, frames and video. It never adds facts that are not in the video. It needs `claude` logged in with the
+the cover, the video and the frames that show content (screen, demo): it
+looks at each frame and leaves out the ones of you talking to camera. It never adds facts that are not in the video. It needs `claude` logged in with the
 **claude.ai E2D - Blog** connector. The article is always created as a **draft**: the agent cannot publish
 or delete posts. Review and publish it yourself on the blog. Each folder
 then moves to:

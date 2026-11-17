@@ -254,6 +254,16 @@ def test_guia_seo_fija_palabra_clave_enlaces_y_alt():
         assert marca in texto
 
 
+def test_instrucciones_miran_los_fotogramas_antes_de_elegirlos():
+    # El post de odin_17_11 llevó dos fotogramas de cara elegidos por su `texto`,
+    # con un alt que describía una pantalla que no salía en la imagen.
+    texto = " ".join(INSTRUCCIONES.read_text().split())
+    assert "Mira cada `candidatos/candidato_NN.jpg` con `Read`" in texto
+    assert "hablando a cámara" in texto and "no pongas ningún `[image:…]`" in texto
+    assert "describe lo que se ve en la imagen, no lo que se dice" in texto
+    assert "candidato_0" not in texto  # el ejemplo no sugiere fotogramas concretos
+
+
 def test_instrucciones_reintentan_la_misma_orden_una_vez():
     texto = " ".join(INSTRUCCIONES.read_text().split())
     assert "repite **la misma orden** una vez" in texto and "ya estaban subidos" in texto
