@@ -117,3 +117,14 @@ def test_fallo_de_copia_limpia_tmp(tmp_path, video_vertical, monkeypatch):
     monkeypatch.setattr(ent.os, "replace", lambda *a: (_ for _ in ()).throw(OSError("disco")))
     assert "disco" in entregar(t)
     assert not list(tmp_path.glob("*.tmp")) and (t / "salida.mp4").exists()
+
+
+def test_frases_sin_silencios_se_cortan(tmp_path, video_vertical):
+    t = _trabajo(tmp_path, video_vertical)
+    (t / "palabras.json").write_text(json.dumps([
+        {"texto": f"w{i}" + ("," if i % 6 == 5 else ""), "inicio": round(i * 0.3, 2),
+         "fin": round(i * 0.3 + 0.3, 2)} for i in range(40)]))
+    frases = preparar(t).read_text("utf-8").split("## Frases\n")[1].split("\n\n")[0].splitlines()
+    spans = [tuple(float(x) for x in f[1:f.index("]")].split("-")) for f in frases]
+    assert len(frases) > 1 and all(b - a <= 8 for a, b in spans)
+    assert any(f.endswith(",") for f in frases)

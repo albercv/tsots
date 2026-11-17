@@ -14,12 +14,17 @@ SILENCIO_FRASE = 0.5
 
 
 def _frases(palabras: list[Palabra]) -> list[str]:
+    """Corta en silencios >= 0.5 s, tras . ? ! , si la frase ya dura >= 3 s, y siempre a los 8 s."""
     grupos: list[list[Palabra]] = []
+    abierta = False
     for p in palabras:
-        if grupos and p.inicio - grupos[-1][-1].fin < SILENCIO_FRASE:
+        if abierta and p.inicio - grupos[-1][-1].fin < SILENCIO_FRASE:
             grupos[-1].append(p)
         else:
             grupos.append([p])
+        g = grupos[-1]
+        dur = p.fin - g[0].inicio
+        abierta = not (dur >= 8 or (dur >= 3 and p.texto.rstrip().endswith((".", "?", "!", ","))))
     return [f"[{g[0].inicio:.2f}-{g[-1].fin:.2f}] {' '.join(p.texto for p in g)}" for g in grupos]
 
 
