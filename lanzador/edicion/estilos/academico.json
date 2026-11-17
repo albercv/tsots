@@ -5,7 +5,7 @@
   "zoom_max": 0,
   "zoom_lento": 0,
   "sfx": {"pop": -24, "pluck": -24},
-  "musica": null,
+  "musica": {"bpm": 72, "db": -24, "progresion": "tranquila", "fade_out": 1.5},
   "paleta": {
     "acento": [255, 90, 0], "fondo": [20, 35, 70, 235], "texto": [255, 255, 255],
     "fuente": ["/System/Library/Fonts/Helvetica.ttc", 0]

@@ -3,16 +3,21 @@
 `derivar` es pura (sin ffmpeg ni PIL); `renderizar` ejecuta el resultado.
 """
 import json
+import logging
 import shutil
 import sys
+import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
+from videopipeline import edicion
 from videopipeline.edicion import componer, emojis, estilos, musica, rotulos, sonidos
 from videopipeline.edicion.componer import Overlay, Zoom
 from videopipeline.edicion.estilos import Estilo
 from videopipeline.edicion.plan import DURACION, DURACION_FINAL, Momento, Plan, leer
 from videopipeline.edicion.sonidos import EventoSfx
+
+log = logging.getLogger(__name__)
 
 DUR_MIN = 0.2
 FREQS_TAP = (650, 700, 750, 800, 850, 900)
@@ -148,6 +153,24 @@ def _render_pieza(p: Pieza, estilo: Estilo, fps: int, destino: Path) -> Path:
     return rotulos.render_slot(fr, destino, fps)
 
 
+def _pista_musica(m: dict | None, estilo_id: str, duracion: float, tmp: Path,
+                  semilla: str) -> Path | None:
+    """La música del short: una pista propia del estilo (en rotación) o, si no
+    hay o falla, la sintetizada con una variante que depende del trabajo."""
+    if not m:
+        return None
+    tmp.mkdir(parents=True, exist_ok=True)
+    destino = tmp / "musica.wav"
+    propia = musica.elegir_pista(estilo_id, edicion.DIR_MUSICA)
+    if propia is not None:
+        try:
+            return musica.preparar_pista(propia, duracion, m["fade_out"], destino)
+        except Exception as error:  # noqa: BLE001 — la sintetizada siempre vale
+            log.warning("Música propia descartada: %s", error)
+    return musica.pista(duracion, m["bpm"], m["progresion"], m["fade_out"], destino,
+                        variante=zlib.crc32(semilla.encode("utf-8")))
+
+
 def renderizar(trabajo: Path, borrador: bool = False) -> Path:
     trabajo = Path(trabajo)
     datos = json.loads((trabajo / "trabajo.json").read_text("utf-8"))
@@ -164,10 +187,7 @@ def renderizar(trabajo: Path, borrador: bool = False) -> Path:
     overlays = [Overlay(_render_pieza(p, estilo, fps, tmp / f"slot_{i:02d}.mov"), p.t, p.dur)
                 for i, p in enumerate(specs.piezas)]
     pista_sfx = sonidos.pista(specs.sfx, duracion, tmp / "sfx.wav")
-    pista_musica = None
-    if specs.musica:
-        m = specs.musica
-        pista_musica = musica.pista(duracion, m["bpm"], m["progresion"], m["fade_out"], tmp / "musica.wav")
+    pista_musica = _pista_musica(specs.musica, estilo.id, duracion, tmp, trabajo.name)
     franja = tuple(zonas["franja_zoom"]) if zonas.get("franja_zoom") else None
     salida = trabajo / "salida.mp4"
     componer.componer(video, salida, overlays, franja, specs.zooms, [pista_sfx], pista_musica,
