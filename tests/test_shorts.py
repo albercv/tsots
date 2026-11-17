@@ -1111,3 +1111,27 @@ def test_encolar_que_falla_no_rompe_crear(ficha_con_base, dir_edicion, monkeypat
     monkeypatch.setattr(edicion, "encolar", explota)
     resultado = _crear(ficha_con_base, shorts.OpcionesShorts(editar=True))
     assert resultado.n == 2 and len(list(resultado.carpeta.glob("*.mp4"))) == 2
+
+
+def _carpeta_con_corto(tmp_path) -> Path:
+    from videopipeline.caption import escribir_md
+    escribir_md(Caption("SEO", "Cuerpo", ["#t"], ["k"]), tmp_path / "X.md")
+    (tmp_path / "X.mp4").write_bytes(b"MP4")
+    (tmp_path / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "X.mp4", "titulo": "T", "inicio": 0.0, "fin": 30.0}]}))
+    return tmp_path
+
+
+def test_listar_prefiere_editado(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    (carpeta / "X.editado.mp4").write_bytes(b"MP4")
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.editado.mp4" and corto.editado is True
+    assert corto.caption.titulo == "SEO"
+
+
+def test_listar_ignora_tmp(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    (carpeta / "X.editado.mp4.tmp").write_bytes(b"MP4")
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.mp4" and corto.editado is False

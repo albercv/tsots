@@ -94,3 +94,8 @@ def test_registro_antiguo_sin_campos_nuevos(tmp_path):
         encoding="utf-8")
     [entrada] = registro.leer(video)
     assert entrada.programada == "" and entrada.referencia == ""
+
+
+def test_ruta_del_editado_es_la_del_original():
+    from pathlib import Path
+    assert registro.ruta(Path("a/X.editado.mp4")) == Path("a/X.publicado.json")

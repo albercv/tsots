@@ -35,7 +35,8 @@ class Entrada:
 
 def ruta(video: Path) -> Path:
     video = Path(video)
-    return video.with_name(video.stem + SUFIJO)
+    # El editado comparte registro con su original: un short, un registro.
+    return video.with_name(video.stem.removesuffix(".editado") + SUFIJO)
 
 
 def leer(video: Path) -> list[Entrada]:

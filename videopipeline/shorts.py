@@ -487,6 +487,7 @@ class Corto:
     titulo: str
     duracion: float  # s, según el JSON (el vídeo real puede diferir una fracción)
     caption: Caption | None  # `None`: sin `.md`, no se puede publicar
+    editado: bool = False  # `mp4` es el `<stem>.editado.mp4`, no el original
 
 
 def listar(carpeta: Path) -> list[Corto]:
@@ -505,9 +506,12 @@ def listar(carpeta: Path) -> list[Corto]:
                 continue
             mp4 = carpeta / archivo
             if mp4.is_file():
-                cortos.append(Corto(mp4, str(c.get("titulo_video") or c.get("titulo") or
-                                             mp4.stem), duracion,
-                                    leer_md(mp4.with_suffix(".md"))))
+                caption = leer_md(mp4.with_suffix(".md"))  # siempre el del original
+                editado = mp4.with_name(mp4.stem + ".editado.mp4")
+                es_editado = editado.is_file()  # nunca el `.tmp`
+                cortos.append(Corto(editado if es_editado else mp4,
+                                    str(c.get("titulo_video") or c.get("titulo") or
+                                        mp4.stem), duracion, caption, es_editado))
         except (KeyError, ValueError, TypeError, AttributeError):
             continue
     return cortos

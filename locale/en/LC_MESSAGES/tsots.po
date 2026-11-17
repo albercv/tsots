@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-11 21:59+0100\n"
+"POT-Creation-Date: 2026-11-17 14:15+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -88,6 +88,9 @@ msgstr "%m/%d/%Y at %H:%M"
 
 msgid "(detectado en tu cuenta)"
 msgstr "(detected on your account)"
+
+msgid "(editado)"
+msgstr "(edited)"
 
 msgid "(sin elegir)"
 msgstr "(none selected)"
