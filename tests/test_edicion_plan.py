@@ -151,3 +151,12 @@ def test_cli(tmp_path, capsys):
     assert "nada" in capsys.readouterr().out
     (tmp_path / "plan.json").write_text("{")
     assert validar_plan.main([str(tmp_path)]) == 1
+
+
+def test_texto_str_o_lista_incorrecta():
+    for tipo in ("etiqueta", "titulo"):
+        _, errs = val([Momento(tipo, t=1.0, palabra="hola", texto="HOLA")])
+        assert errs and '["HOLA"]' in errs[0]
+        assert val([Momento(tipo, t=1.0, palabra="hola", texto=["A", "B", "C"])])[1]
+    assert val([Momento("contador", t=1.0, palabra="hola", lista=1, num=1, texto=["X"])])[1]
+    assert val([], {"texto": "FIN", "check": False})[1]

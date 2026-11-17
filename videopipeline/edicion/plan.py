@@ -114,8 +114,9 @@ def _malos(texto: str, check: bool) -> str:
 
 
 def _revisar_lineas(lineas, check, grande, estilo, etq: str) -> list[str]:
-    if not lineas or not all(isinstance(l, str) and l.strip() for l in lineas):
-        return [f"{etq}: 'texto' debe ser una lista de líneas no vacías"]
+    if (not isinstance(lineas, list) or not 1 <= len(lineas) <= 2
+            or not all(isinstance(l, str) and l.strip() for l in lineas)):
+        return [f"{etq}: 'texto' debe ser una lista de 1 o 2 líneas no vacías, p. ej. \"texto\": [\"HOLA\"]"]
     errs = []
     for l in lineas:
         m = _malos(l, check)
