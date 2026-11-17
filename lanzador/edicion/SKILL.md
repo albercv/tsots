@@ -18,7 +18,8 @@ Trabajas sin nadie delante: no hagas preguntas. Sigue estos pasos en orden.
 
 1. Ejecuta `@PYTHON@ -m videopipeline.edicion.preparar <trabajo>` y lee con
    Read el fichero `<trabajo>/contexto.md`.
-2. Escribe con Write el fichero `<trabajo>/plan.json` (formato abajo).
+2. Escribe con Write el fichero `plan.json` en la carpeta actual (es la carpeta
+   del trabajo; no hagas `cd` a ningún sitio). Formato abajo.
 3. Ejecuta `@PYTHON@ -m videopipeline.edicion.validar_plan <trabajo>`. Si no
    imprime `OK`, corrige `plan.json` según cada línea de error y vuelve a
    ejecutarlo. Como mucho 3 intentos.
