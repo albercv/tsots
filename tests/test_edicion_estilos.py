@@ -28,3 +28,9 @@ def test_densidades_de_la_tabla():
 def test_academico_sin_musica_ni_zoom():
     e = cargar("academico")
     assert e.musica is None and e.zoom_max == 0 and e.zoom_lento == 0
+
+
+def test_titulo_en_todos_y_formal_sin_zoom_de_golpe():
+    for i in IDS:
+        assert "titulo" in cargar(i).tipos
+    assert "zoom" not in cargar("formal").tipos
