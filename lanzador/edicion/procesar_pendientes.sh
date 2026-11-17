@@ -32,11 +32,11 @@ trap 'rmdir "$DIR/.bloqueo"' EXIT
 export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin"
 export PYTHONPATH="$RAIZ"
 CLAUDE="$(command -v claude)"
-# Sin el frontmatter YAML (empieza por «-»: el CLI lo tomaría por una opción) y con
-# una primera línea de texto normal.
+# Sin el frontmatter YAML (empieza por «-»: el CLI lo tomaría por una opción), con
+# una primera línea de texto normal y sin el modo interactivo (es para el chat).
 INSTRUCCIONES="Instrucciones para editar un short:
 
-$(awk '/^---$/ && n < 2 { n++; next } n != 1' "$AQUI/SKILL.md")"
+$(awk '/^---$/ && n < 2 { n++; next } /^## Modo interactivo/ { exit } n != 1' "$AQUI/SKILL.md")"
 INSTRUCCIONES="${INSTRUCCIONES//@PYTHON@/$PYTHON}"
 
 # Mueve la carpeta a $1 (hechos o errores). Si no puede, la aparta con un
@@ -46,6 +46,7 @@ mover() {
     nombre="$(basename "$carpeta")"
     destino="$DIR/$1/$nombre"
     rm -rf "$carpeta/tmp"  # los slots renderizados pesan cientos de MB y se regeneran
+    rm -f "$carpeta/tsots"
     if [ ! -e "$destino" ] && mv "$carpeta" "$destino"; then
         [ "$1" = hechos ] && rm -f "$destino/video.mp4"
         echo "$(ahora) $nombre: $2"
@@ -72,6 +73,7 @@ while [ "$nuevas" = 1 ]; do
         vistas="$vistas${carpeta##*/}/"
         nuevas=1
         touch "$DIR/.bloqueo"
+        date +%s > "$carpeta/inicio"  # para el avance que se ve en la cola
         if [ -z "$CLAUDE" ]; then
             echo "No se encuentra claude (ni en PATH, ni en ~/.local/bin, ni en /opt/homebrew/bin)" \
                 > "$carpeta/motivo.txt"
@@ -85,7 +87,13 @@ while [ "$nuevas" = 1 ]; do
             mover errores "error, $motivo"
             continue
         fi
-        HERRAMIENTAS="Read,Edit(./plan.json),Bash($PYTHON -m videopipeline.edicion.preparar:*),Bash($PYTHON -m videopipeline.edicion.validar_plan:*),Bash($PYTHON -m videopipeline.edicion.renderizar:*),Bash($PYTHON -m videopipeline.edicion.verificar:*)"
+        # Atajo «./tsots <paso> .» para Claude: un comando corto sin rutas, comillas ni
+        # variables, que Claude Code no pide aprobar (en segundo plano nadie aprueba).
+        # Solo los cuatro pasos de Claude: entregar es cosa de este script.
+        printf '#!/bin/bash\ncase "$1" in preparar|validar_plan|renderizar|verificar) ;;\n*) echo "paso no permitido: $1" >&2; exit 2 ;;\nesac\nexport PYTHONPATH=%q\nexec %q -m "videopipeline.edicion.$1" "${@:2}"\n' \
+            "$RAIZ" "$PYTHON" > "$carpeta/tsots"
+        chmod +x "$carpeta/tsots"
+        HERRAMIENTAS="Read,Edit(./plan.json),Bash(./tsots:*)"
         # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
         # Sin los ajustes de usuario, los plugins y hooks personales no se cuelan.
         (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \

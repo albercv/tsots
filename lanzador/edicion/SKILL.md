@@ -14,21 +14,26 @@ Nunca decides posiciones, sonidos ni duraciones: eso lo añade el código.
 ## Modo trabajo
 
 Trabajas sin nadie delante: no hagas preguntas. Sigue estos pasos en orden.
-`<trabajo>` es la ruta que aparece tras «Trabajo:» al final de este texto.
+`<trabajo>` es la ruta que aparece tras «Trabajo:» al final de este texto, y
+ya es tu carpeta actual.
 
-1. Ejecuta `@PYTHON@ -m videopipeline.edicion.preparar <trabajo>` y lee con
-   Read el fichero `<trabajo>/contexto.md`.
-2. Escribe con Write el fichero `plan.json` en la carpeta actual (es la carpeta
-   del trabajo; no hagas `cd` a ningún sitio). Formato abajo.
-3. Ejecuta `@PYTHON@ -m videopipeline.edicion.validar_plan <trabajo>`. Si no
-   imprime `OK`, corrige `plan.json` según cada línea de error y vuelve a
-   ejecutarlo. Como mucho 3 intentos.
-4. Ejecuta `@PYTHON@ -m videopipeline.edicion.renderizar <trabajo>`.
-5. Ejecuta `@PYTHON@ -m videopipeline.edicion.verificar <trabajo>` y lee con
-   Read `<trabajo>/verificacion.png`. Si en algún fotograma ves texto cortado,
-   un gráfico sobre los subtítulos o sobre el título, o falta un elemento:
-   corrige `plan.json` y repite los pasos 3 a 5 **una sola vez**.
-6. Para. No ejecutes `entregar` ni toques ningún otro fichero.
+Los comandos se escriben **exactamente así**, copiados tal cual: `./tsots`, el
+paso y un punto. Sin `cd`, sin rutas, sin comillas y sin variables delante;
+cualquier otra forma pide un permiso que nadie puede dar y el trabajo se pierde.
+
+1. Ejecuta `./tsots preparar .` y lee con Read el fichero `<trabajo>/contexto.md`.
+2. Escribe con Write el fichero `<trabajo>/plan.json`. Formato abajo.
+3. Ejecuta `./tsots validar_plan .`. Si no imprime `OK`, corrige `plan.json`
+   según cada línea de error y vuelve a ejecutarlo. Como mucho 3 intentos; si
+   sigue fallando, para.
+4. Ejecuta `./tsots renderizar .`.
+5. Ejecuta `./tsots verificar .` y lee con Read `<trabajo>/verificacion.png`.
+   Si en algún fotograma ves texto cortado, un gráfico sobre los subtítulos o
+   sobre el título, o falta un elemento: corrige `plan.json` y repite los
+   pasos 3 a 5 **una sola vez**.
+6. Para. No ejecutes nada más ni toques ningún otro fichero.
+
+Si un comando te pide aprobación o se deniega, no busques otra forma: para.
 
 ## Formato de plan.json
 

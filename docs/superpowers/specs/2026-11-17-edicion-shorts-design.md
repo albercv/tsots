@@ -473,3 +473,23 @@ los muestra como "(editado)". Repetir un short en formal y académico.
 - El desplegable **Estilo** ya no depende de la casilla «Editar con Claude»:
   está activo siempre que se encuentre `claude`, porque también es el estilo
   del botón. (Cambia lo dicho en 5.1.)
+
+## 10. Ampliación: avance en la cola y atajo `./tsots` (2026-11-17)
+
+- **Avance:** `videopipeline/edicion/estado.py` lee `~/TSOTS/edicion` y agrupa
+  los trabajos por la carpeta de shorts de su `origen`. Una tanda son los
+  trabajos de esa carpeta encolados a la vez que los pendientes (o, sin
+  pendientes, los terminados en las últimas 6 h). Da hechos, errores, en cola,
+  el short en curso, su fase (por los ficheros que deja: `contexto.md`,
+  `plan.json`, `plan.validado.json`, `salida.mp4`) y el tiempo restante con la
+  media de los ya hechos de la tanda (sin datos, 2 min por short). El agente
+  escribe `inicio` (epoch) en cada trabajo al empezarlo; el bloqueo dice si el
+  agente está en marcha.
+- **Cola:** un delegado pinta, debajo de la fila del vídeo, una barra con ese
+  estado; la ventana lo refresca cada 5 s y el tooltip lista los fallidos.
+- **Atajo `./tsots`:** con permisos por ruta absoluta del Python, Haiku a veces
+  escribía el comando con `cd`, comillas o variables y Claude Code pedía
+  aprobación (3 de 15 shorts del Episodio 20 fallaron así). Ahora el agente
+  deja en cada trabajo un `./tsots` que solo acepta `preparar`,
+  `validar_plan`, `renderizar` y `verificar`, y el único permiso Bash es
+  `Bash(./tsots:*)`. El prompt del agente ya no lleva el modo interactivo.

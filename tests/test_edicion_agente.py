@@ -60,12 +60,29 @@ def test_exito(tmp_path, video_vertical):
     assert "@PYTHON@" not in args[1]
     permitidas = args[args.index("--allowedTools") + 1].split(",")
     prohibidas = args[args.index("--disallowedTools") + 1].split(",")
-    assert "Edit(./plan.json)" in permitidas and str(edi) not in ",".join(permitidas)
-    assert [p for p in permitidas if p.startswith("Edit")] == ["Edit(./plan.json)"]
-    assert not any(p.startswith("Write") for p in permitidas)
+    # Sin rutas ni Python en los permisos: solo el atajo ./tsots del trabajo.
+    assert permitidas == ["Read", "Edit(./plan.json)", "Bash(./tsots:*)"]
     assert "Edit" not in prohibidas and "NotebookEdit" in prohibidas
     assert not args[1].startswith("-") and "name: editar-short" not in args[1]
+    assert "./tsots preparar ." in args[1]
+    assert "Modo interactivo" not in args[1]  # es para el chat, no para el agente
     assert not (edi / ".bloqueo").exists()
+    assert int((hecho / "inicio").read_text()) > 0  # para el avance en la cola
+    assert not (hecho / "tsots").exists()
+
+
+def test_el_atajo_solo_ejecuta_los_pasos_de_claude(tmp_path, video_vertical):
+    edi, _origen = _trabajo(tmp_path, video_vertical)
+    r = _ejecutar(tmp_path, edi,
+                  "./tsots entregar . > /dev/null 2>&1; echo $? > rc_entregar\n"
+                  "./tsots validar_plan . > validar.txt 2>&1; echo $? > rc_validar\n"
+                  "cp video.mp4 salida.mp4\n")
+    assert r.returncode == 0, r.stderr
+    hecho = edi / "hechos" / NOMBRE
+    assert (hecho / "rc_entregar").read_text().strip() == "2"  # entregar es del script
+    # validar_plan sí corre (y falla: no hay plan.json), con el Python de TSOTS
+    assert (hecho / "rc_validar").read_text().strip() == "1"
+    assert "plan.json" in (hecho / "validar.txt").read_text()
 
 
 def test_salida_mala_va_a_errores(tmp_path, video_vertical):
