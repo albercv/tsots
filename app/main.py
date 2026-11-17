@@ -638,6 +638,7 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar en redes"),
                 _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
             return
+        video = shorts.editado_al_dia(video) or video  # el editado, si está al día
         dialogo = DialogoPublicar(video, caption, self.ajustes,
                                   perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(

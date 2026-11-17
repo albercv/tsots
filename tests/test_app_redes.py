@@ -1773,3 +1773,12 @@ def test_dialogo_publicar_cabe_en_la_pantalla_y_publicar_se_ve(qtbot, video, aju
     assert dialogo.boton_publicar.isVisible()
     abajo = dialogo.boton_publicar.mapTo(dialogo, QPoint(0, dialogo.boton_publicar.height()))
     assert abajo.y() <= dialogo.height()
+
+
+def test_cabecera_marca_el_editado(qtbot, tmp_path, ajustes, video):
+    editado = tmp_path / "clip_limpio.editado.mp4"
+    editado.write_bytes(b"MP4")
+    dialogo, _ = _dialogo(qtbot, editado, ajustes)
+    assert dialogo.cabecera.text().endswith("(editado)")
+    normal, _ = _dialogo(qtbot, video, ajustes)
+    assert "(editado)" not in normal.cabecera.text()

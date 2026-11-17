@@ -2229,3 +2229,33 @@ def test_filas_sin_terminar_no_se_encolan_en_un_lote_posterior(
     ventana._al_terminar_cola()  # cancelado antes de terminar la fila
     ventana._al_terminar_trabajo(0, True, str(ficha.final.ruta), "")
     assert llamadas == []
+
+
+@pytest.mark.parametrize("editado_nuevo", [True, False])
+def test_publicar_sube_el_editado_al_dia(qtbot, tmp_path, monkeypatch, editado_nuevo):
+    import os
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    salida = _hecho_con_caption(ventana, tmp_path)
+    editado = salida.with_name(salida.stem + ".editado.mp4")
+    editado.write_bytes(b"MP4")
+    tiempo = salida.stat().st_mtime + (100 if editado_nuevo else -100)
+    os.utime(editado, (tiempo, tiempo))
+    recibido = []
+
+    class Falso:
+        configurar_redes = type("S", (), {"connect": lambda s, f: None})()
+        perfil_usado = ""
+        publicando = False
+
+        def __init__(self, video, *a, **k):
+            recibido.append(video)
+
+        def exec(self):
+            return 0
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    assert recibido == [editado if editado_nuevo else salida]

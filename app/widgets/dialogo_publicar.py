@@ -278,7 +278,10 @@ class DialogoPublicar(QDialog):
         self.contenido = QWidget()
         raiz = QVBoxLayout(self.contenido)
         raiz.setContentsMargins(0, 0, 0, 0)
-        cabecera = QLabel(self.video.name)
+        nombre = self.video.name
+        if nombre.endswith(".editado.mp4"):
+            nombre = f"{nombre} {_('(editado)')}"
+        cabecera = QLabel(nombre)
         cabecera.setStyleSheet("font-weight: bold;")
         raiz.addWidget(cabecera)
         self.cabecera = cabecera
