@@ -12,6 +12,8 @@ from videopipeline.subtitles import Palabra
 log = logging.getLogger(__name__)
 
 DIR_EDICION = Path.home() / "TSOTS" / "edicion"
+# Música de fondo propia, una carpeta por estilo (divertido/, formal/, academico/).
+DIR_MUSICA = Path.home() / "TSOTS" / "musica"
 AGENTE = BASE_DIR / "lanzador" / "edicion" / "procesar_pendientes.sh"
 
 

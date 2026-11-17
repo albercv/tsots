@@ -25,9 +25,10 @@ def test_densidades_de_la_tabla():
     assert cargar("academico").densidad_max == 0.2
 
 
-def test_academico_sin_musica_ni_zoom():
+def test_academico_musica_suave_y_sin_zoom():
     e = cargar("academico")
-    assert e.musica is None and e.zoom_max == 0 and e.zoom_lento == 0
+    assert (e.musica["db"], e.musica["progresion"]) == (-24, "tranquila")
+    assert e.zoom_max == 0 and e.zoom_lento == 0
 
 
 def test_titulo_en_todos_y_formal_sin_zoom_de_golpe():

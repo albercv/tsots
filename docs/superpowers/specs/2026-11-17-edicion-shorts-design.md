@@ -493,3 +493,18 @@ los muestra como "(editado)". Repetir un short en formal y académico.
   deja en cada trabajo un `./tsots` que solo acepta `preparar`,
   `validar_plan`, `renderizar` y `verificar`, y el único permiso Bash es
   `Bash(./tsots:*)`. El prompt del agente ya no lleva el modo interactivo.
+## 11. Ampliación: música propia y sintetizada variada (2026-11-17)
+
+- `edicion.DIR_MUSICA = ~/TSOTS/musica`, una carpeta por estilo. `musica.elegir_pista`
+  coge la siguiente pista por orden alfabético en rotación (estado en
+  `.rotacion.json`): dos shorts seguidos no repiten si hay más de una.
+- `musica.preparar_pista` la repite o recorta al largo del short en el filtro
+  (`atrim` + `apad`, no `-t`: al repetir un mp3 se pierden ms), la normaliza a
+  -16 LUFS (el volumen del estilo se aplica al mezclar) y le pone entrada de
+  0,3 s y salida de `fade_out`.
+- Sin pistas, o si la pista falla, la sintetizada: `musica.pista(..., variante)`
+  con 5 progresiones × 5 transportes × 5 tempos; la variante sale del nombre
+  del trabajo (crc32), así que cada short suena distinto y siempre igual al
+  repetirlo.
+- Académico pasa de sin música a música tranquila a -24 dB (la tabla 5.6 ya
+  lo admitía).

@@ -376,6 +376,13 @@ The untouched original stays where it is.
   decides, validating, rendering, checking) and the estimated time left,
   based on how long the finished ones took. When the batch ends it shows how
   many were edited and how many failed; hover the row to see which.
+- **Background music:** put royalty-free tracks in
+  `~/TSOTS/musica/divertido/`, `formal/` and `academico/` (mp3, wav, m4a,
+  aac, flac or ogg). Each short takes the next track of its style in turn, so
+  two shorts in a row never share a track, looped or trimmed to the short's
+  length and evened out in volume. With no tracks for a style, TSOTS
+  synthesizes the music, with a different chord progression, key and tempo
+  per short. Only use music whose license allows it in your videos.
 - Finished jobs go to `~/TSOTS/edicion/hechos/`; failed ones to
   `errores/` with a `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publish shorts…** uploads the edited file when it exists and marks it

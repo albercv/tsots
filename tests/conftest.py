@@ -251,6 +251,7 @@ def sin_agente_de_edicion(monkeypatch):
 def sin_dir_de_edicion_real(monkeypatch, tmp_path):
     """Red de seguridad: ningún test encola trabajos en ~/TSOTS/edicion."""
     monkeypatch.setattr("videopipeline.edicion.DIR_EDICION", tmp_path / "dir-edicion-falso")
+    monkeypatch.setattr("videopipeline.edicion.DIR_MUSICA", tmp_path / "dir-musica-falso")
 
 
 @pytest.fixture(scope="session")
