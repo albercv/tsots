@@ -331,7 +331,8 @@ guía SEO (`lanzador/blog/guia_seo.md`: una palabra clave de búsqueda, título
 de 60 caracteres como mucho, entradilla que responde directamente,
 preguntas frecuentes si el vídeo da para ellas, textos alternativos en las
 imágenes y enlaces a posts publicados relacionados), y subir la portada,
-los fotogramas y el vídeo. Nunca añade datos que no estén en el vídeo. Necesita `claude` con la sesión
+el vídeo y los fotogramas que enseñan contenido (pantalla, demo): mira
+cada fotograma y deja fuera los tuyos hablando a cámara. Nunca añade datos que no estén en el vídeo. Necesita `claude` con la sesión
 iniciada y el conector **claude.ai E2D - Blog**. El artículo se crea siempre como **borrador**: el agente no puede
 publicar ni borrar posts. Revísalo y publícalo tú en el blog. Después,
 cada carpeta pasa a:

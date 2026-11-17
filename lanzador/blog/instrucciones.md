@@ -9,10 +9,10 @@ La carpeta actual es la del vídeo y contiene:
 - `meta.json`: `idioma`, `nombre`, `titulo_corto`, `titulo_seo` (puede ser
   `null`), `palabras_clave`, `contexto_marca` y `candidatos`, una lista de
   fotogramas `{archivo, segundo, texto}`; `texto` es lo que se dice en ese
-  momento del vídeo.
+  momento del vídeo, no lo que se ve.
 - `transcripcion.txt`: todo lo que se dice en el vídeo.
-- `video.mp4`, `portada.png` (la portada del artículo) y
-  `candidatos/candidato_00.jpg`, `candidatos/candidato_01.jpg`…
+- `video.mp4`, `portada.png` (la portada del artículo) y los fotogramas
+  `candidatos/candidato_NN.jpg`.
 
 Herramientas del blog que puedes usar (ninguna otra):
 
@@ -63,13 +63,19 @@ al escribir el artículo.
    - Descripción (`description`): según la guía (apartado 2).
 
 3. **Imágenes del artículo:**
-   - Elige 2 o 3 fotogramas de `meta.candidatos` cuyo `texto` encaje con una
-     sección.
+   - Mira cada `candidatos/candidato_NN.jpg` con `Read` antes de elegir:
+     `texto` no dice qué sale en la imagen.
+   - Descarta los que muestran sobre todo a la persona hablando a cámara: su
+     cara ya está en el vídeo y no aporta nada. Sirven los que enseñan
+     contenido: una pantalla, una demo, un documento, un objeto.
+   - De los que sirven, elige hasta 3 que encajen con una sección, por lo que
+     se ve en ellos. Si ninguno sirve, no pongas ningún `[image:…]`.
    - Ponlos como `[image:fotograma_1]`, `[image:fotograma_2]` y
      `[image:fotograma_3]`, cada uno en su propia línea, dentro de la sección
      que encaja y numerados en el orden en que aparecen.
    - Apunta qué `archivo` corresponde a cada `fotograma_N` y escribe su texto
-     alternativo, y el de la portada, según la guía (apartado 5).
+     alternativo, y el de la portada, según la guía (apartado 5): describe lo
+     que se ve en la imagen, no lo que se dice en ese momento.
    - No uses `[image:…]` con ningún otro nombre.
 
 4. **Crea el borrador** con `mcp__claude_ai_E2D_-_Blog__posts_create`:
@@ -98,12 +104,13 @@ al escribir el artículo.
    - Llama a `mcp__claude_ai_E2D_-_Blog__posts_request_upload` con ese `slug`
      y `locale`. Devuelve un `uploadUrl`.
    - Ejecuta con `Bash` esta orden, sustituyendo `<uploadUrl>` (entre las
-     comillas simples), poniendo un `--fichero` por cada fotograma elegido en
-     el paso 3 y un `--alt` con su texto alternativo, entre comillas simples,
-     por la portada y por cada fotograma:
+     comillas simples), poniendo un `--fichero <archivo>=fotograma_N` por cada
+     fotograma elegido en el paso 3 (ninguno si no elegiste ninguno) y un
+     `--alt` con su texto alternativo, entre comillas simples, por la portada
+     y por cada fotograma:
 
      ```
-     @PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada --fichero video.mp4=video --fichero candidatos/candidato_03.jpg=fotograma_1 --fichero candidatos/candidato_05.jpg=fotograma_2 --portada portada --alt 'portada=<texto>' --alt 'fotograma_1=<texto>' --alt 'fotograma_2=<texto>'
+     @PYTHON@ -m videopipeline.blog_subida '<uploadUrl>' --fichero portada.png=portada --fichero video.mp4=video --fichero <archivo>=fotograma_1 --fichero <archivo>=fotograma_2 --portada portada --alt 'portada=<texto>' --alt 'fotograma_1=<texto>' --alt 'fotograma_2=<texto>'
      ```
 
    - Es una sola orden: sin `cd`, sin `&&`, sin `;` y sin tuberías.
