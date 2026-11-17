@@ -470,9 +470,12 @@ disabled ("Not connected in Upload-Post") and one that needs
 reconnecting shows a warning. Offline, the last known result is used.
 
 **X limits.** An X post takes **280 characters** (a URL counts 23 and an
-emoji 2). Publish… suggests a text for X made of the title and the
-hashtags (it drops hashtags from the end and, if needed, shortens the
-title); you can edit it and the counter shows its length. Without
+emoji 2). Along with the caption, the model writes an X post (a hook,
+2-3 ideas from the video and a question or call to action) and Publish…
+suggests it with the hashtags that fit. If the model writes too much,
+sentences from the middle are dropped (never the first or the last); an
+old caption without that post uses the title. You can edit it and the
+counter shows its length. Without
 Premium, X only accepts videos up to **2:20** and **512 MB**: with a
 longer or heavier video, X is disabled with the reason. If your account
 has Premium, tick it in Networks… ("My X account has Premium"): long

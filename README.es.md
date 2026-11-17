@@ -471,9 +471,12 @@ comprobar en segundo plano: una red sin conectar aparece deshabilitada
 aviso. Sin conexión se usa lo último que se supo.
 
 **Límites de X.** Un post de X admite **280 caracteres** (una URL cuenta
-23 y un emoji, 2). Publicar… propone un texto para X con el título y los
-hashtags (quita hashtags desde el final y, si hace falta, acorta el
-título); puedes editarlo y el contador muestra cuánto ocupa. Sin Premium,
+23 y un emoji, 2). Junto al caption, el modelo escribe un post para X
+(gancho, 2-3 ideas del vídeo y una pregunta o llamada a la acción) y
+Publicar… lo propone con los hashtags que caben. Si el modelo se pasa,
+se quitan frases del medio (nunca la primera ni la última); un caption
+antiguo sin ese post usa el título. Puedes editarlo y el contador
+muestra cuánto ocupa. Sin Premium,
 X solo admite vídeos de hasta **2:20** y **512 MB**: con un vídeo más
 largo o más pesado, X aparece deshabilitada con el motivo. Si tu cuenta
 tiene Premium, márcalo en Redes… («Mi cuenta de X tiene Premium»): se
