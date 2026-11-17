@@ -52,10 +52,26 @@ def _ejecutar(cmd: list[str]) -> str:
         raise RuntimeError(f"ffmpeg falló al componer: {e.stderr}") from e
 
 
+def _duracion(fuente: Path) -> str:
+    return subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", str(fuente)],
+        capture_output=True, text=True, check=True).stdout.strip()
+
+
+def _tiene_audio(fuente: Path) -> bool:
+    return bool(subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries",
+         "stream=index", "-of", "csv=p=0", str(fuente)],
+        capture_output=True, text=True, check=True).stdout.strip())
+
+
 def componer(fuente: Path, destino: Path, overlays: list[Overlay],
              franja: tuple[int, int] | None, zooms: list[Zoom],
              sfx: list[Path], musica: Path | None, musica_db: float,
              borrador: bool = False) -> None:
+    if not _tiene_audio(fuente):
+        raise ValueError(f"La fuente no tiene pista de audio: {fuente}")
     entradas = ["-i", str(fuente)]
     fc: list[str] = []
     fa: list[str] = []
@@ -111,5 +127,6 @@ def componer(fuente: Path, destino: Path, overlays: list[Overlay],
            "-c:a", "aac", "-b:a", "160k" if borrador else "256k",
            "-ar", "48000", "-movflags", "+faststart"]
     cmd = [FFMPEG, "-y", "-v", "error", *entradas, "-filter_complex", ";".join(fc + fa),
-           "-map", "[vout]", "-map", "[aout]", *cod, str(destino)]
+           "-map", "[vout]", "-map", "[aout]", "-t", _duracion(fuente), *cod,
+           str(destino)]
     _ejecutar(cmd)

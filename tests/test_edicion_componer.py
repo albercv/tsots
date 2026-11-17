@@ -97,3 +97,21 @@ def test_borrador_720(video_vertical, tmp_path):
     sal = _comp(video_vertical, tmp_path / "s.mp4", borrador=True,
                 sfx=[_wav(tmp_path / "x.wav")])
     assert _sonda(sal, "v:0", "width,height") == "720,1280"
+
+
+def test_overlay_pasado_del_final_no_alarga(video_vertical, tmp_path):
+    rojo = tmp_path / "rojo.mov"
+    subprocess.run(
+        [FFMPEG, "-v", "error", "-y", "-f", "lavfi", "-i",
+         f"color=c=red:s={W}x{H}:d=2:r=30", "-c:v", "libx264", "-pix_fmt",
+         "yuv420p", str(rojo)], check=True)
+    sal = _comp(video_vertical, tmp_path / "s.mp4",
+                overlays=[Overlay(rojo, 3.0, 2.0)])
+    assert abs(float(_sonda(sal, "v:0", "duration")) - 4) < 0.1
+    assert abs(float(_sonda(sal, "a:0", "duration")) - 4) < 0.1
+
+
+def test_fuente_sin_audio_error_claro(video_sin_audio, tmp_path):
+    import pytest
+    with pytest.raises(ValueError, match="audio"):
+        _comp(video_sin_audio, tmp_path / "s.mp4")
