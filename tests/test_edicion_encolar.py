@@ -1,3 +1,5 @@
+import json
+
 from videopipeline.edicion import encolar
 from videopipeline.subtitles import Palabra
 
@@ -21,3 +23,15 @@ def test_encolar_nombre_ocupado(tmp_path):
 
 def test_encolar_salta_lo_que_no_existe(tmp_path):
     assert _llamar(tmp_path, tmp_path / "ed", ("falta",)) == []
+
+
+def test_encolar_guarda_el_grupo(tmp_path):
+    carpeta = tmp_path / "c"
+    carpeta.mkdir()
+    (carpeta / "s.mp4").write_bytes(b"V")
+    d = tmp_path / "ed"
+    con = encolar(carpeta, "ep", ["s"], {}, "formal", {}, "es", "cara",
+                  dir_edicion=d, grupo="/x/v.mp4")[0]
+    sin = _llamar(carpeta, d)[0]
+    assert json.loads((con / "trabajo.json").read_text())["grupo"] == "/x/v.mp4"
+    assert json.loads((sin / "trabajo.json").read_text())["grupo"] == str(carpeta)

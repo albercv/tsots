@@ -201,6 +201,11 @@ def generar(transcripcion: str, contexto_marca: str, modelo: str,
 
 def rutas(final: Path) -> tuple[Path, Path]:
     """(texto .md, carpeta de fotos) junto al vídeo final."""
+    # El editado usa el post de su original, solo si `<stem>.mp4` está al lado.
+    if final.stem.endswith(".editado"):
+        original = final.with_name(final.stem.removesuffix(".editado") + ".mp4")
+        if original.exists():
+            final = original
     return (final.with_suffix(".linkedin.md"), final.with_suffix(".linkedin"))
 
 

@@ -45,11 +45,13 @@ def lanzar_agente_edicion(dir_edicion: Path = DIR_EDICION) -> bool:
 
 def encolar(carpeta: Path, episodio: str, stems: list[str],
             tramos: dict[str, list[Palabra]], estilo: str, zonas: dict[str, dict],
-            idioma: str, encuadre: str, dir_edicion: Path = DIR_EDICION) -> list[Path]:
+            idioma: str, encuadre: str, dir_edicion: Path = DIR_EDICION,
+            grupo: str | None = None) -> list[Path]:
     """Deja un trabajo en `pendientes/` por cada short `<stem>.mp4` de `carpeta`.
 
     Cada uno se escribe en `.<nombre>.tmp` y se renombra al acabar. Nunca lanza:
-    un trabajo que falla se registra y se salta."""
+    un trabajo que falla se registra y se salta. `grupo` agrupa los trabajos de
+    una tanda en la cola (por defecto, la carpeta de shorts)."""
     from videopipeline.difusion import _carpeta_libre, _enlazar_o_copiar
     creados = []
     for stem in stems:
@@ -76,6 +78,7 @@ def encolar(carpeta: Path, episodio: str, stems: list[str],
                 "origen_tam": info.st_size, "origen_mtime": info.st_mtime,
                 "estilo": estilo, "idioma": idioma, "resolucion": [1080, 1920],
                 "encuadre": encuadre, "zonas": zonas.get(stem, {}),
+                "grupo": grupo or str(carpeta),
             }, ensure_ascii=False, indent=2), encoding="utf-8")
             tmp.rename(destino)
             creados.append(destino)

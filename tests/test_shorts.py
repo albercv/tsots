@@ -13,7 +13,8 @@ from videopipeline import pipeline, reproceso, shorts
 from videopipeline.caption import Caption
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    BASE, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, Artefacto, Ficha, Huella,
+    BASE, HORIZONTAL, SEGUIMIENTO, TRANSCRIPCION, VERTICAL, Artefacto, Ficha,
+    Huella,
     _escribir_json, cargar, guardar,
 )
 from videopipeline.reproceso_plan import clave_seguimiento
@@ -1196,3 +1197,185 @@ def test_listar_ignora_tmp(tmp_path):
     (carpeta / "X.editado.mp4.tmp").write_bytes(b"MP4")
     (corto,) = shorts.listar(carpeta)
     assert corto.mp4.name == "X.mp4" and corto.editado is False
+
+
+# --- editar_video: un final que ya es un vertical 1080×1920 ---
+
+def _vertical(monkeypatch, base=(1920, 1080)):
+    """El final mide 1080×1920; la base, `base`; ffprobe no se usa."""
+    monkeypatch.setattr(
+        shorts, "resolucion_video",
+        lambda ruta: (1080, 1920) if ruta.name.endswith(("_limpio.mp4", "_vertical.mp4"))
+        else base)
+
+
+def _trabajo_unico(dir_edicion):
+    (trabajo,) = (dir_edicion / "pendientes").iterdir()
+    return trabajo, _leer_json(trabajo / "trabajo.json")
+
+
+def test_editar_video_encola_el_final_con_todas_las_palabras(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    final = e.ficha.final.ruta
+    assert shorts.editar_video(e.ficha, e.config,
+                               shorts.OpcionesShorts(editar=True, estilo="formal")) == 1
+    trabajo, datos = _trabajo_unico(dir_edicion)
+    assert datos["origen"] == datos["grupo"] == str(final)
+    assert datos["destino"] == str(final.with_suffix(".editado.mp4"))
+    assert datos["estilo"] == "formal"
+    todas = reproceso._Pasada(e.ficha, reproceso.Plan([], e.config, []), None)._palabras()
+    assert _leer_json(trabajo / "palabras.json") == [asdict(p) for p in todas]
+
+
+def test_zonas_con_los_ajustes_guardados_del_final_horizontal(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    e.ficha.artefactos[HORIZONTAL].ajustes = {
+        "subtitulos": {"diseno": "reels_karaoke", "posicion": 75, "tamano": 150},
+        "titulo": "X"}
+    e.config = replace(e.config, diseno="reels_bold", posicion_subs=50, tamano_subs=100,
+                       subtitulos=False)
+    shorts.editar_video(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    esperadas = shorts.zonas_edicion.calcular(
+        replace(e.config, subtitulos=True, diseno="reels_karaoke", posicion_subs=75,
+                tamano_subs=150), "central", (1080, 1920), con_titulo=True)
+    _, datos = _trabajo_unico(dir_edicion)
+    assert datos["zonas"] == esperadas and datos["zonas"]["franja_zoom"] is None
+
+
+def test_sin_subtitulos_ni_titulo_guardados(ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    e.ficha.artefactos[HORIZONTAL].ajustes = {}
+    e.config = replace(e.config, subtitulos=True)
+    shorts.editar_video(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    zonas = _trabajo_unico(dir_edicion)[1]["zonas"]
+    assert zonas["subtitulos"] is None and zonas["titulo"] is None
+
+
+def test_vertical_unico_usa_los_ajustes_del_vertical(ficha_con_base, dir_edicion,
+                                                     monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    final = e.ficha.carpeta_salida / "charla_vertical.mp4"
+    final.write_bytes(b"V")
+    e.ficha.final = Huella.de(final)
+    assert e.ficha.final.ruta == e.ficha.ruta_final(False)
+    subs = {"diseno": "reels_karaoke", "posicion": 70, "tamano": 120}
+    e.ficha.artefactos[VERTICAL] = Artefacto(
+        "v", None, {"vertical": {"encuadre": "difuminado"}, "subtitulos": subs})
+    shorts.editar_video(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    esperadas = shorts.zonas_edicion.calcular(
+        replace(e.config, subtitulos=True, diseno="reels_karaoke", posicion_subs=70,
+                tamano_subs=120), "difuminado", (1920, 1080), con_titulo=False)
+    _, datos = _trabajo_unico(dir_edicion)
+    assert datos["zonas"] == esperadas and datos["encuadre"] == "difuminado"
+    assert datos["zonas"]["franja_zoom"] is not None
+
+
+def test_editado_al_dia(tmp_path):
+    final = tmp_path / "v.mp4"
+    final.write_bytes(b"F")
+    assert shorts.editado_al_dia(final) is None
+    editado = tmp_path / "v.editado.mp4"
+    editado.write_bytes(b"E")
+    os.utime(final, (100, 100))
+    os.utime(editado, (100, 100))
+    assert shorts.editado_al_dia(final) == editado
+    os.utime(editado, (50, 50))
+    assert shorts.editado_al_dia(final) is None
+
+
+@pytest.mark.parametrize("medida", [(1920, 1080), (720, 1280)])
+def test_editar_video_rechaza_lo_que_no_es_1080x1920(
+        ficha_con_base, dir_edicion, monkeypatch, medida):
+    e = ficha_con_base
+    monkeypatch.setattr(shorts, "resolucion_video", lambda ruta: medida)
+    assert shorts.es_final_vertical(e.ficha) is False
+    with pytest.raises(PasoFallido, match="1080×1920"):
+        shorts.editar_video(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    assert not (dir_edicion / "pendientes").exists()
+
+
+def test_es_final_vertical_nunca_lanza(ficha_con_base, monkeypatch):
+    def roto(ruta):
+        raise PasoFallido("ffprobe")
+    monkeypatch.setattr(shorts, "resolucion_video", roto)
+    assert shorts.es_final_vertical(ficha_con_base.ficha) is False
+    ficha_con_base.ficha.final = None
+    assert shorts.es_final_vertical(ficha_con_base.ficha) is False
+
+
+def test_editar_video_sin_transcripcion(ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    del e.ficha.artefactos[TRANSCRIPCION]
+    with pytest.raises(PasoFallido, match="transcripción"):
+        shorts.editar_video(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+
+
+def test_editar_video_dos_veces(ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 0
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 1
+
+
+def _a_hechos(dir_edicion):
+    """Simula que el agente terminó: todos los trabajos pasan a hechos/."""
+    (dir_edicion / "hechos").mkdir(exist_ok=True)
+    for t in (dir_edicion / "pendientes").iterdir():
+        t.rename(dir_edicion / "hechos" / t.name)
+
+
+def test_editar_video_un_pendiente_con_sufijo_bloquea_otro_clic(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    _a_hechos(dir_edicion)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1  # reedición: «-2»
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 0
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 1
+
+
+def test_editar_video_un_pendiente_con_el_origen_cambiado_no_bloquea(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    with e.ficha.final.ruta.open("ab") as f:  # el final se rehízo
+        f.write(b"mas")
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_un_pendiente_con_sufijo_bloquea_otro_clic(
+        ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    _a_hechos(dir_edicion)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 0
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_un_pendiente_con_el_origen_cambiado_no_bloquea(
+        ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    corto = next(e.carpeta.glob("*.mp4"))
+    with corto.open("ab") as f:  # ese short se rehízo
+        f.write(b"mas")
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 1

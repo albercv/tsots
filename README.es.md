@@ -346,31 +346,44 @@ cada carpeta pasa a:
 El registro del agente es `~/TSOTS/blog/agente.log`. Un fallo de este paso
 nunca hace fallar el vídeo: se guarda igual, con un aviso.
 
-## Editar shorts con Claude
+## Editar shorts y vídeos verticales con Claude
 
-Al crear shorts puedes pedir que Claude edite cada uno: rótulos,
-contadores, emojis, transiciones, zooms y sonidos, en el estilo que
-elijas. El original queda intacto donde estaba.
+Claude puede editar cada short, o el propio final de un vídeo cuando es
+vertical 1080×1920: rótulos, contadores, emojis, transiciones, zooms y
+sonidos, en el estilo que elijas. El original queda intacto donde estaba.
 
 - En el panel de Shorts marca **Editar con Claude** y elige el **Estilo**
   (Divertido / Formal / Académico). Es un único ajuste para todo el lote de
   shorts que crees. Aparece desactivado (con un aviso al pasar el ratón)
   cuando no se encuentra el comando `claude`.
-- **Shorts que ya tienes:** elige el vídeo en la cola, el **Estilo** y
-  pulsa **Editar shorts ya creados**. Encola todos los shorts de ese vídeo
-  (con el encuadre y los subtítulos del panel, así que deja los que usaste
-  al crearlos) y empieza a editarlos en el momento; no hace falta marcar
-  **Editar con Claude**. Los que ya esperan en cola no se repiten.
-- Se encola un trabajo por short en `~/TSOTS/edicion/pendientes/`. Cuando
+- **Vídeos que salen verticales:** la misma casilla **Editar con Claude**
+  también edita, al procesar con **Procesar**, cada vídeo cuyo final sale
+  vertical 1080×1920. Se encola cuando termina su procesamiento y el agente
+  arranca cuando termina la cola. No se repite si no se procesó nada de ese
+  vídeo o ya existe un editado al día. Con **Crear shorts al procesar**
+  también marcado, se editan el vídeo y sus shorts.
+- **Shorts o vídeos que ya tienes:** elige el vídeo en la cola, el
+  **Estilo** y pulsa **Editar con Claude…**. Si tiene shorts, edita los
+  shorts (con el encuadre y los subtítulos del panel, así que deja los que
+  usaste al crearlos; el vídeo usa los que se guardaron con él); si no tiene y su final es vertical 1080×1920, edita
+  el propio vídeo; si tiene ambos, pregunta cuál (**Los N shorts** / **El
+  vídeo**); si ninguno, avisa de que hace falta un final vertical 1080×1920
+  o shorts. Empieza a editar en el momento y no hace falta marcar **Editar
+  con Claude**; úsalo para volver a editar a propósito. Cada short o vídeo
+  es una ejecución de Claude con tu cuenta. Un short o vídeo que ya tiene en
+  cola un trabajo vigente no se repite (si su original cambió después, ese
+  trabajo no cuenta).
+- Se encola un trabajo por short (o vídeo) en `~/TSOTS/edicion/pendientes/`. Cuando
   termina la cola de procesamiento (y al abrir la app) TSOTS lanza
   `lanzador/edicion/procesar_pendientes.sh`. Este ejecuta `claude -p
   --model claude-haiku-5-5` una vez por trabajo, uno tras otro, con un
   límite de 1200 s por trabajo (`TSOTS_EDICION_LIMITE`). Haiku solo decide
   los momentos; rótulos, contadores, emojis, transiciones, zooms y sonidos
   salen de código, y el código renderiza. El resultado se comprueba y se
-  guarda como `NN - título.editado.mp4` junto al original. Un short de
-  112 s tardó unos 2-3 minutos.
-- **Avance en la cola:** debajo de la fila del vídeo una barra muestra
+  guarda como `NN - título.editado.mp4` junto al original; en un vídeo, es
+  `<final>.editado.mp4` junto al final (el final limpio nunca se toca). Un
+  short de 112 s tardó unos 2-3 minutos.
+- **Avance en la cola:** debajo de la fila del vídeo (también en la edición del propio vídeo) una barra muestra
   cuántos shorts van, en qué paso está el actual (preparando, Claude decide,
   validando, montando el vídeo, revisando) y el tiempo que falta, estimado
   con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
@@ -387,7 +400,13 @@ elijas. El original queda intacto donde estaba.
   `errores/` con un `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publicar shorts…** sube el archivo editado si existe y lo marca
   "(editado)". Sigue habiendo un solo registro de publicación por short.
-- Volver a crear los shorts borra los `.editado.mp4` antiguos. Un trabajo
+  **Publicar…** en un vídeo sube su archivo editado si es más nuevo que el
+  final, y lo marca "(editado)" en el diálogo; el caption, el post de
+  LinkedIn y el registro de publicación siguen siendo los del final.
+- Volver a crear los shorts borra los `.editado.mp4` antiguos, y
+  reprocesar un vídeo que rehace su final borra su editado anterior.
+- **Límites:** solo se editan finales de exactamente 1080×1920; el
+  `_limpio_vertical.mp4` que acompaña a un final horizontal no se edita. Un trabajo
   pendiente cuyo original cambió acaba en `errores/` con "origen cambiado".
 - **Reintentar un trabajo fallido:** mueve su carpeta de `errores/` de
   vuelta a `pendientes/` (conserva `video.mp4`) y reabre la app o termina

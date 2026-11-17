@@ -219,7 +219,7 @@ class PanelOpciones(QWidget):
     pasos_cambiados = Signal()
     crear_shorts = Signal()
     publicar_shorts = Signal()
-    editar_shorts = Signal()
+    editar_con_claude = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -469,17 +469,23 @@ class PanelOpciones(QWidget):
         if not self._claude_disponible:
             self.check_editar_claude.setEnabled(False)
             self.check_editar_claude.setToolTip(sin_claude)
-        # También es el estilo de «Editar shorts ya creados»: no depende de la casilla.
+        else:
+            self.check_editar_claude.setToolTip(
+                _("Edita con Claude los shorts al crearlos y los vídeos "
+                  "verticales al procesarlos."))
+        # También es el estilo de «Editar con Claude…»: no depende de la casilla.
         self.combo_estilo_shorts.setEnabled(self._claude_disponible)
-        self.boton_editar_shorts = QPushButton(_("Editar shorts ya creados"))
-        self.boton_editar_shorts.setToolTip(
+        self.boton_editar_con_claude = QPushButton(_("Editar con Claude…"))
+        self.boton_editar_con_claude.setToolTip(
             sin_claude if not self._claude_disponible else
-            _("Edita con Claude, en el estilo elegido, los shorts que ya tiene el "
-              "vídeo elegido. Usa el encuadre y los subtítulos de este panel. "
-              "Los editados aparecen junto a los originales al cabo de unos "
-              "minutos por short."))
-        self.boton_editar_shorts.setEnabled(False)
-        self.boton_editar_shorts.clicked.connect(self.editar_shorts)
+            _("Edita con Claude, en el estilo de arriba, los shorts ya creados del "
+              "vídeo elegido o el propio vídeo si su final es vertical "
+              "1080×1920. Los shorts usan el encuadre y los subtítulos de este "
+              "panel; el vídeo, los que se guardaron con él. Cada "
+              "short y cada vídeo es una ejecución de Claude, y los editados "
+              "aparecen junto a los originales al cabo de unos minutos."))
+        self.boton_editar_con_claude.setEnabled(False)
+        self.boton_editar_con_claude.clicked.connect(self.editar_con_claude)
         self.check_shorts_al_procesar = QCheckBox(_("Crear shorts al procesar"))
         self.check_shorts_al_procesar.setToolTip(
             _("Al terminar de procesar cada vídeo, saca sus mejores trozos de "
@@ -507,7 +513,7 @@ class PanelOpciones(QWidget):
         # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
         form_shorts.addRow("", self.boton_crear_shorts)
         form_shorts.addRow("", self.boton_publicar_shorts)
-        form_shorts.addRow("", self.boton_editar_shorts)
+        form_shorts.addRow("", self.boton_editar_con_claude)
         self.check_shorts_al_procesar.toggled.connect(self._actualizar_cabecera_shorts)
 
         for seccion in self.secciones.values():
