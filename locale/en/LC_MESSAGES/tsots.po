@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-11 21:59+0100\n"
+"POT-Creation-Date: 2026-11-17 14:43+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -89,6 +89,9 @@ msgstr "%m/%d/%Y at %H:%M"
 msgid "(detectado en tu cuenta)"
 msgstr "(detected on your account)"
 
+msgid "(editado)"
+msgstr "(edited)"
+
 msgid "(sin elegir)"
 msgstr "(none selected)"
 
@@ -132,6 +135,9 @@ msgstr "April"
 
 msgid "Abrir log"
 msgstr "Open log"
+
+msgid "Académico"
+msgstr "Academic"
 
 msgid "Acelerar"
 msgstr "Speed up"
@@ -464,6 +470,20 @@ msgstr "Subtitle design"
 msgid "Diseño:"
 msgstr "Style:"
 
+msgid "Divertido"
+msgstr "Fun"
+
+msgid ""
+"Divertido: ritmo ágil, zooms y emojis.\n"
+"Formal: sobrio, sin adornos.\n"
+"Académico: claro y didáctico, con rótulos de apoyo.\n"
+"Claude (Haiku) edita cada short en segundo plano al acabar el lote, con la cuenta que tengas iniciada en `claude`."
+msgstr ""
+"Fun: lively pacing, zooms and emojis.\n"
+"Formal: sober, no frills.\n"
+"Academic: clear and instructive, with supporting captions.\n"
+"Claude (Haiku) edits each short in the background after the batch, using the account logged in to `claude`."
+
 msgid "Dom"
 msgstr "Sun"
 
@@ -495,6 +515,9 @@ msgstr "ERROR: {error}"
 
 msgid "Edita en silencio. Crea a lo grande."
 msgstr "Edit quieter. Create louder."
+
+msgid "Editar con Claude"
+msgstr "Edit with Claude"
 
 msgid "Educación"
 msgstr "Education"
@@ -721,12 +744,18 @@ msgstr "Waiting for confirmation…"
 msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
 msgstr "This video has no LinkedIn post: turn on “LinkedIn” and process it."
 
+msgid "Estilo de la edición"
+msgstr "Editing style"
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
 msgstr ""
 "Style of the text burned into the video: font, color, outline or background box, and base size.\n"
 "The Karaoke designs highlight each word as it is spoken."
+
+msgid "Estilo:"
+msgstr "Style:"
 
 #, python-brace-format
 msgid ""
@@ -808,6 +837,9 @@ msgstr "Text file with your own terms for the transcription (one line per term; 
 
 msgid "Fondo difuminado (16:9)"
 msgstr "Blurred background (16:9)"
+
+msgid "Formal"
+msgstr "Formal"
 
 msgid "Formato vertical"
 msgstr "Vertical format"
@@ -1112,6 +1144,9 @@ msgstr "Nothing to do"
 msgid "Nada que hacer en: {nombres}"
 msgstr "Nothing to do for: {nombres}"
 
+msgid "Necesita Claude Code instalado y con la sesión iniciada (comando claude)."
+msgstr "Needs Claude Code installed and logged in (claude command)."
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr "Needs ~{total} GB of memory ({modelo} GB for the model + context) and this Mac leaves ~{memoria} GB for models."
@@ -1255,6 +1290,10 @@ msgstr "The accounts could not be checked; using the last known result."
 #, python-brace-format
 msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
+
+#, python-brace-format
+msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
+msgstr "Could not queue the shorts for editing with Claude: {error}"
 
 #, python-brace-format
 msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."

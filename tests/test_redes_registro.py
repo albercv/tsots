@@ -94,3 +94,10 @@ def test_registro_antiguo_sin_campos_nuevos(tmp_path):
         encoding="utf-8")
     [entrada] = registro.leer(video)
     assert entrada.programada == "" and entrada.referencia == ""
+
+
+def test_editado_sin_original_conserva_su_nombre(tmp_path):
+    (tmp_path / "X.mp4").write_bytes(b"")
+    assert registro.ruta(tmp_path / "X.editado.mp4") == tmp_path / "X.publicado.json"
+    # sin `X.mp4` al lado, `.editado` es parte del nombre de un vídeo cualquiera
+    assert registro.ruta(tmp_path / "Y.editado.mp4") == tmp_path / "Y.editado.publicado.json"

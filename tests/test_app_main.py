@@ -851,6 +851,26 @@ def test_al_arrancar_lanza_el_agente_del_blog_sin_bloquear(qtbot, tmp_path, monk
     qtbot.waitUntil(lambda: llamadas == [True], timeout=1000)
 
 
+def test_datos_shorts_llevan_edicion(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.panel.check_editar_claude.setChecked(True)
+    ventana.panel.combo_estilo_shorts.setCurrentIndex(
+        ventana.panel.combo_estilo_shorts.findData("formal"))
+    datos = ventana._datos_shorts("x")
+    assert (datos["editar"], datos["estilo"]) == (True, "formal")
+
+
+def test_al_terminar_cola_lanza_agente_de_edicion(qtbot, tmp_path, monkeypatch):
+    llamadas = []
+    monkeypatch.setattr("app.main.lanzar_agente_edicion", lambda: llamadas.append(True))
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    qtbot.wait(50)
+    llamadas.clear()
+    ventana._al_terminar_cola()
+    assert llamadas == [True]
+
+
 def test_audio_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     assert ventana.panel.seccion_abierta() == "audio"
@@ -1663,7 +1683,8 @@ def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
     datos = json.loads(texto)
     assert fila == 0
     assert datos["shorts"] == {
-        "ficha": ficha.id, "subtitulos": False, "encuadre": "barras"}
+        "ficha": ficha.id, "subtitulos": False, "encuadre": "barras",
+        "editar": False, "estilo": "divertido"}
     assert "reproceso" not in datos
     assert ventana._procesando
     guardado = ventana.ajustes.cargar_panel()
@@ -1774,7 +1795,8 @@ def test_procesar_con_shorts_al_procesar_los_anade(
         if al_procesar:
             assert datos["shorts"] == {
                 "ficha": ventana.modelo_cola.trabajo(fila).ficha_id,
-                "subtitulos": False, "encuadre": "central"}
+                "subtitulos": False, "encuadre": "central",
+                "editar": False, "estilo": "divertido"}
         else:
             assert "shorts" not in datos
 

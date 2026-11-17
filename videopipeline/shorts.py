@@ -9,6 +9,7 @@ de la ficha y publica la carpeta.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import shutil
 from collections.abc import Callable
@@ -16,8 +17,11 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
+from . import edicion
 from .caption import Caption, leer_md, texto_plano
 from .config import ENCUADRES, PipelineConfig
+from .edicion import estilos
+from .edicion import zonas as zonas_edicion
 from .ficha import TRANSCRIPCION, Ficha, _escribir_json
 from .i18n import _
 from .ollama import asegurar_servidor, chat_json, systemone
@@ -28,9 +32,11 @@ from .reproceso_plan import (
     Accion, Plan, _base_vale, _subs_bloqueados, _vale, seguimiento_vale,
 )
 from .seguimiento import recortar_comandos
-from .steps import PasoFallido, duracion_video
+from .steps import PasoFallido, duracion_video, resolucion_video
 from .subtitles import Palabra, agrupar, generar_srt
 from .titulo import generar_titulo
+
+log = logging.getLogger(__name__)
 
 DURACION_MIN = 60.0
 DURACION_MAX = 179.0
@@ -441,12 +447,19 @@ _SUFIJOS = (".mp4", ".srt", ".md")
 class OpcionesShorts:
     subtitulos: bool = True
     encuadre: str = "cara"
+    editar: bool = False
+    estilo: str = "divertido"
 
     @classmethod
     def de_datos(cls, datos: dict) -> OpcionesShorts:
-        """Las del JSON del runner. ValueError si el encuadre no existe."""
+        """Las del JSON del runner. ValueError si el encuadre o el estilo no existen."""
         opciones = cls(bool(datos.get("subtitulos", True)),
-                       datos.get("encuadre", "cara"))
+                       datos.get("encuadre", "cara"),
+                       bool(datos.get("editar", False)),
+                       datos.get("estilo", "divertido"))
+        if opciones.estilo not in estilos.IDS:
+            raise ValueError(f"estilo inválido: {opciones.estilo!r} "
+                             f"(esperado uno de {estilos.IDS})")
         if opciones.encuadre not in ENCUADRES:
             raise ValueError(f"encuadre inválido: {opciones.encuadre!r} "
                              f"(esperado uno de {ENCUADRES})")
@@ -474,6 +487,7 @@ class Corto:
     titulo: str
     duracion: float  # s, según el JSON (el vídeo real puede diferir una fracción)
     caption: Caption | None  # `None`: sin `.md`, no se puede publicar
+    editado: bool = False  # `mp4` es el `<stem>.editado.mp4`, no el original
 
 
 def listar(carpeta: Path) -> list[Corto]:
@@ -492,9 +506,14 @@ def listar(carpeta: Path) -> list[Corto]:
                 continue
             mp4 = carpeta / archivo
             if mp4.is_file():
-                cortos.append(Corto(mp4, str(c.get("titulo_video") or c.get("titulo") or
-                                             mp4.stem), duracion,
-                                    leer_md(mp4.with_suffix(".md"))))
+                caption = leer_md(mp4.with_suffix(".md"))  # siempre el del original
+                editado = mp4.with_name(mp4.stem + ".editado.mp4")
+                # nunca el `.tmp`; un editado más viejo que su original es de otro lote
+                es_editado = (editado.is_file()
+                              and editado.stat().st_mtime >= mp4.stat().st_mtime)
+                cortos.append(Corto(editado if es_editado else mp4,
+                                    str(c.get("titulo_video") or c.get("titulo") or
+                                        mp4.stem), duracion, caption, es_editado))
         except (KeyError, ValueError, TypeError, AttributeError):
             continue
     return cortos
@@ -639,6 +658,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             else None)
     config_vertical = replace(config, encuadre=opciones.encuadre)
     total = 2 + len(elegidos)
+    tramos = {}
     tmp = carpeta / TMP
     comandos = tmp / "tramo.cmd"
     shutil.rmtree(tmp, ignore_errors=True)
@@ -648,6 +668,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             progreso = _con_etiqueta(on_progress, _("Creando short {n} de {total}")
                                      .format(n=i, total=len(elegidos)))
             tramo = tramo_palabras(palabras, c.inicio, c.fin)
+            tramos[stem] = tramo
             bloques = (agrupar(tramo, config.diseno)
                        if opciones.subtitulos and tramo else None)
             seguimiento = None
@@ -690,9 +711,26 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             # Un short nuevo con el mismo nombre no hereda un «ya publicado».
             if anterior.endswith(".mp4"):
                 registro.ruta(carpeta / anterior).unlink(missing_ok=True)
+                editado = carpeta / (anterior[:-4] + ".editado.mp4")
+                editado.unlink(missing_ok=True)
+                editado.with_name(editado.name + ".tmp").unlink(missing_ok=True)
         for nuevo in nuevos:
             (tmp / nuevo).replace(carpeta / nuevo)
         _escribir_json(carpeta / "shorts.json", {**datos, "archivos": nuevos})
+        if opciones.editar:
+            try:  # editar es un extra: nunca hace fallar la creación
+                resolucion = resolucion_video(pasada.base)
+                zonas = {stem: zonas_edicion.calcular(
+                    replace(config, subtitulos=opciones.subtitulos), opciones.encuadre, resolucion,
+                    con_titulo=bool(c.titulo_video))
+                    for c, stem in zip(elegidos, nombres)}
+                edicion.encolar(carpeta, nombre, nombres, tramos, opciones.estilo,
+                                zonas, config.idioma_subs, opciones.encuadre,
+                                dir_edicion=edicion.DIR_EDICION)
+            except Exception as error:  # noqa: BLE001
+                log.warning("No se pudieron encolar los shorts para edición: %s", error)
+                _avisar(on_progress, _("No se pudieron encolar los shorts para la edición "
+                                       "con Claude: {error}").format(error=error))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
         with suppress(OSError):

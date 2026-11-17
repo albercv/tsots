@@ -238,3 +238,46 @@ def sin_agente_del_blog(monkeypatch):
     tests que lo prueban ponen el suyo."""
     monkeypatch.setattr("videopipeline.difusion.AGENTE",
                         Path("/sin-agente-del-blog-en-los-tests"))
+
+
+@pytest.fixture(autouse=True)
+def sin_agente_de_edicion(monkeypatch):
+    """Red de seguridad: ningún test lanza el agente de edición real."""
+    monkeypatch.setattr("videopipeline.edicion.AGENTE",
+                        Path("/sin-agente-de-edicion-en-los-tests"))
+
+
+@pytest.fixture(autouse=True)
+def sin_dir_de_edicion_real(monkeypatch, tmp_path):
+    """Red de seguridad: ningún test encola trabajos en ~/TSOTS/edicion."""
+    monkeypatch.setattr("videopipeline.edicion.DIR_EDICION", tmp_path / "dir-edicion-falso")
+
+
+@pytest.fixture(scope="session")
+def video_vertical(tmp_path_factory) -> Path:
+    """Vídeo vertical 1080x1920 de 4 s a 30 fps: `testsrc2` + voz de `say`
+    (si existe) rellena hasta 4 s, o un seno de 440 Hz."""
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        pytest.skip("ffmpeg no disponible")
+    carpeta = tmp_path_factory.mktemp("media_vertical")
+    say = shutil.which("say")
+    if say is not None:
+        aiff = carpeta / "voz.aiff"
+        subprocess.run([say, "-o", str(aiff), "hola mundo esto es una prueba"],
+                       check=True)
+        audio = ["-i", str(aiff), "-af", "apad=whole_dur=4"]
+    else:
+        audio = ["-f", "lavfi", "-i", "sine=frequency=440:duration=4"]
+    destino = carpeta / "vertical.mp4"
+    subprocess.run(
+        [
+            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "lavfi", "-i", "testsrc2=s=1080x1920:d=4:r=30",
+            *audio,
+            "-t", "4", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac",
+            str(destino),
+        ],
+        check=True,
+    )
+    return destino

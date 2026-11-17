@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-11 21:59+0100\n"
+"POT-Creation-Date: 2026-11-17 14:43+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -92,6 +92,9 @@ msgstr ""
 msgid "(detectado en tu cuenta)"
 msgstr ""
 
+msgid "(editado)"
+msgstr ""
+
 msgid "(sin elegir)"
 msgstr ""
 
@@ -134,6 +137,9 @@ msgid "Abril"
 msgstr ""
 
 msgid "Abrir log"
+msgstr ""
+
+msgid "Académico"
 msgstr ""
 
 msgid "Acelerar"
@@ -450,6 +456,16 @@ msgstr ""
 msgid "Diseño:"
 msgstr ""
 
+msgid "Divertido"
+msgstr ""
+
+msgid ""
+"Divertido: ritmo ágil, zooms y emojis.\n"
+"Formal: sobrio, sin adornos.\n"
+"Académico: claro y didáctico, con rótulos de apoyo.\n"
+"Claude (Haiku) edita cada short en segundo plano al acabar el lote, con la cuenta que tengas iniciada en `claude`."
+msgstr ""
+
 msgid "Dom"
 msgstr ""
 
@@ -480,6 +496,9 @@ msgid "ERROR: {error}"
 msgstr ""
 
 msgid "Edita en silencio. Crea a lo grande."
+msgstr ""
+
+msgid "Editar con Claude"
 msgstr ""
 
 msgid "Educación"
@@ -705,9 +724,15 @@ msgstr ""
 msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
 msgstr ""
 
+msgid "Estilo de la edición"
+msgstr ""
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
+msgstr ""
+
+msgid "Estilo:"
 msgstr ""
 
 #, python-brace-format
@@ -783,6 +808,9 @@ msgid "Fichero de texto con términos propios para la transcripción (una línea
 msgstr ""
 
 msgid "Fondo difuminado (16:9)"
+msgstr ""
+
+msgid "Formal"
 msgstr ""
 
 msgid "Formato vertical"
@@ -1078,6 +1106,9 @@ msgstr ""
 msgid "Nada que hacer en: {nombres}"
 msgstr ""
 
+msgid "Necesita Claude Code instalado y con la sesión iniciada (comando claude)."
+msgstr ""
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr ""
@@ -1216,6 +1247,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "No se pudieron descargar los pesos del detector de caras: {error}"
+msgstr ""
+
+#, python-brace-format
+msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
 msgstr ""
 
 #, python-brace-format

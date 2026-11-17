@@ -940,6 +940,7 @@ def test_seccion_shorts_valores_por_defecto(qtbot):
     assert panel.valores_shorts() == {
         "shorts_subtitulos": True, "shorts_encuadre": "cara",
         "shorts_al_procesar": False,
+        "shorts_editar": False, "shorts_estilo": "divertido",
     }
     assert panel.check_shorts_subtitulos.text() == "Subtítulos"
     assert panel.check_shorts_al_procesar.text() == "Crear shorts al procesar"
@@ -961,12 +962,48 @@ def test_cargar_restaura_shorts_menos_al_procesar(qtbot):
     assert panel.valores_shorts() == {
         "shorts_subtitulos": False, "shorts_encuadre": "barras",
         "shorts_al_procesar": False,
+        "shorts_editar": False, "shorts_estilo": "divertido",
     }
     panel.cargar({})  # ajustes de antes de los shorts: valores por defecto
     assert panel.valores_shorts() == {
         "shorts_subtitulos": True, "shorts_encuadre": "cara",
         "shorts_al_procesar": False,
+        "shorts_editar": False, "shorts_estilo": "divertido",
     }
+
+
+def test_editar_y_estilo_se_guardan_y_restauran(qtbot, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.check_editar_claude.setChecked(True)
+    panel.combo_estilo_shorts.setCurrentIndex(panel.combo_estilo_shorts.findData("formal"))
+    valores = panel.valores_shorts()
+    assert (valores["shorts_editar"], valores["shorts_estilo"]) == (True, "formal")
+    panel.cargar({})
+    panel.cargar({"shorts_editar": "true", "shorts_estilo": "academico"})
+    valores = panel.valores_shorts()
+    assert (valores["shorts_editar"], valores["shorts_estilo"]) == (True, "academico")
+
+
+def test_combo_desactivado_sin_casilla(qtbot, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.combo_estilo_shorts.isEnabled() is False
+    panel.check_editar_claude.setChecked(True)
+    assert panel.combo_estilo_shorts.isEnabled() is True
+
+
+def test_sin_claude_casilla_desactivada(qtbot, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    panel.cargar({"shorts_editar": "true"})
+    assert panel.check_editar_claude.isEnabled() is False
+    assert panel.check_editar_claude.isChecked() is False
+    assert "claude" in panel.check_editar_claude.toolTip()
+    assert panel.combo_estilo_shorts.isEnabled() is False
 
 
 def test_boton_crear_shorts_emite_senal(qtbot):
@@ -1121,7 +1158,7 @@ def test_panel_cada_valor_tiene_icono_de_ayuda(qtbot):
     qtbot.addWidget(panel)
     panel.show()
     assert set(panel.iconos_info) == set(AYUDAS)
-    assert len(AYUDAS) == 14
+    assert len(AYUDAS) == 15
     for clave, icono in panel.iconos_info.items():
         assert hasattr(panel, clave)
         assert icono.titulo.strip() and len(icono.cuerpo.strip()) > 20, clave
