@@ -987,7 +987,7 @@ def test_editar_y_estilo_se_guardan_y_restauran(qtbot, monkeypatch):
 
 
 def test_combo_estilo_activo_con_claude_aunque_no_se_marque_la_casilla(qtbot, monkeypatch):
-    # El estilo también vale para «Editar shorts ya creados», sin editar al crear.
+    # El estilo también vale para «Editar con Claude…», sin editar al crear.
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)

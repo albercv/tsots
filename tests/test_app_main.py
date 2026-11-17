@@ -1646,6 +1646,24 @@ def test_boton_editar_activo_con_shorts_o_con_final(
     assert boton.isEnabled()
     ventana._procesando = True
     ventana._refrescar_boton()
+    assert not boton.isEnabled()  # procesando
+
+
+def test_boton_editar_activo_con_solo_final(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    boton = ventana.panel.boton_editar_con_claude
+    ficha = _ficha_hecha(tmp_path)  # tiene final y no tiene shorts
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    assert boton.isEnabled()
+    ventana._procesando = True
+    ventana._refrescar_boton()
+    assert not boton.isEnabled()
+    ventana._procesando = False
+    ficha.final = None  # ni final ni shorts: nada que editar
+    guardar(ficha)
+    ventana._refrescar_boton()
     assert not boton.isEnabled()
 
 
@@ -1751,7 +1769,7 @@ def test_la_barra_del_video_va_en_su_fila(qtbot, tmp_path, monkeypatch):
     assert ventana.modelo_cola.trabajo(0).edicion == e2
 
 
-def test_editar_shorts_existentes_encola_con_el_panel_y_lanza_el_agente(
+def test_editar_con_claude_shorts_encola_con_el_panel_y_lanza_el_agente(
         qtbot, tmp_path, monkeypatch):
     ventana, ficha, llamadas, lanzados, mensajes = _editando_shorts(
         qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes)
@@ -1763,14 +1781,14 @@ def test_editar_shorts_existentes_encola_con_el_panel_y_lanza_el_agente(
     assert "2" in mensajes[-1]
 
 
-def test_editar_shorts_existentes_cancelado_no_encola(qtbot, tmp_path, monkeypatch):
+def test_editar_con_claude_shorts_cancelado_no_encola(qtbot, tmp_path, monkeypatch):
     ventana, _ficha, llamadas, lanzados, _mensajes = _editando_shorts(
         qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.No)
     ventana.panel.boton_editar_con_claude.click()
     assert llamadas == [] and lanzados == []
 
 
-def test_editar_shorts_existentes_avisa_si_no_puede(qtbot, tmp_path, monkeypatch):
+def test_editar_con_claude_shorts_avisa_si_no_puede(qtbot, tmp_path, monkeypatch):
     def falla(f, config, opciones):
         raise PasoFallido("sin transcripción")
 
