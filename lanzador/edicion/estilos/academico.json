@@ -4,7 +4,7 @@
   "transiciones": "A",
   "zoom_max": 0,
   "zoom_lento": 0,
-  "sfx": {"tick": -24, "whoosh_a": -16},
+  "sfx": {"pop": -24, "pluck": -24},
   "musica": null,
   "paleta": {
     "acento": [255, 90, 0], "fondo": [20, 35, 70, 235], "texto": [255, 255, 255],

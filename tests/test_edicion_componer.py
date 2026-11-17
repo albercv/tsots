@@ -115,3 +115,16 @@ def test_fuente_sin_audio_error_claro(video_sin_audio, tmp_path):
     import pytest
     with pytest.raises(ValueError, match="audio"):
         _comp(video_sin_audio, tmp_path / "s.mp4")
+
+
+def test_zoom_con_rampa_renderiza(video_vertical, tmp_path):
+    sal = _comp(video_vertical, tmp_path / "s.mp4", franja=(600, 1200),
+                zooms=[Zoom(0.5, 3, 1.0, 1.3)])
+    assert abs(float(_sonda(sal, "v:0", "duration")) - 4) < 0.1
+
+
+def test_rampa_de_zoom_es_smoothstep():
+    from videopipeline.edicion.componer import _z_por_tramos
+    expr = _z_por_tramos([Zoom(1, 3, 1.0, 1.2), Zoom(5, 7, 1.1, 1.1)])
+    assert "clip((it-1)/(3-1),0,1)" in expr and "(3-2*" in expr
+    assert "(5-7)" not in expr and "if(between(it,5,7),1.1," in expr  # el mantenido no rampa

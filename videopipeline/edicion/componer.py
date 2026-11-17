@@ -29,10 +29,14 @@ class Zoom:
 
 
 def _z_por_tramos(zooms: list[Zoom]) -> str:
-    """Expresión de zoompan: rampa lineal z0->z1 en [t0,t1], 1 fuera."""
+    """Expresión de zoompan: rampa suave (smoothstep) z0->z1 en [t0,t1], 1 fuera."""
     expr = "1"
     for z in reversed(zooms):
-        rampa = f"({z.z0}+({z.z1}-{z.z0})*(it-{z.t0})/({z.t1}-{z.t0}))"
+        if z.z0 == z.z1:  # mantenido: sin rampa
+            rampa = f"{z.z0}"
+        else:
+            x = f"clip((it-{z.t0})/({z.t1}-{z.t0}),0,1)"
+            rampa = f"({z.z0}+({z.z1}-{z.z0})*{x}*{x}*(3-2*{x}))"
         expr = f"if(between(it,{z.t0},{z.t1}),{rampa},{expr})"
     return expr
 

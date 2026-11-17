@@ -22,8 +22,10 @@ def calcular(config: PipelineConfig, encuadre: str, resolucion_fuente: tuple[int
     subtitulos = None
     if config.subtitulos:
         y1 = ALTO_VERTICAL - int(ALTO_VERTICAL * (100 - config.posicion_subs) / 100)
-        # shortcut: asume subtítulos de 1 línea; si un preset parte en 2, la franja de zoom puede pisar la de arriba — ampliar a 2 líneas si pasa
-        subtitulos = [y1 - round(0.85 * fuente), y1]
+        # Los presets «frases» parten el texto en 2 líneas (partir_en_dos): 0.85 de texto
+        # la primera y 1.2 de interlineado + texto la segunda.
+        lineas = 2 if PRESETS[config.diseno].tipo == "frases" else 1
+        subtitulos = [y1 - round(0.85 * fuente) - (lineas - 1) * round(1.2 * fuente), y1]
 
     franja = None
     if contenido[1] > 0:  # a marco completo no hay franja de vídeo reencuadrable

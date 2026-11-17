@@ -1086,6 +1086,10 @@ def test_crear_con_editar_encola_un_trabajo_por_short(ficha_con_base, dir_edicio
         assert datos["origen_mtime"] == origen.stat().st_mtime
         assert datos["estilo"] == "formal" and datos["encuadre"] == "cara"
         assert isinstance(datos["zonas"], dict) and datos["zonas"]
+        # con encuadre cara y subtítulos quemados, el zoom no pisa los subtítulos
+        zonas = datos["zonas"]
+        assert zonas["subtitulos"] is not None
+        assert zonas["franja_zoom"][1] <= zonas["subtitulos"][0]
         assert (t / "video.mp4").is_file()
         palabras = _leer_json(t / "palabras.json")
         assert palabras and palabras[0]["inicio"] < 5  # tiempos relativos al short
@@ -1113,6 +1117,15 @@ def test_encolar_que_falla_no_rompe_crear(ficha_con_base, dir_edicion, monkeypat
     assert resultado.n == 2 and len(list(resultado.carpeta.glob("*.mp4"))) == 2
 
 
+def test_encolar_que_falla_avisa(ficha_con_base, dir_edicion, monkeypatch):
+    from videopipeline import edicion
+    monkeypatch.setattr(edicion, "encolar",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    eventos = []
+    _crear(ficha_con_base, shorts.OpcionesShorts(editar=True), eventos)
+    assert any("boom" in str(e) for e in eventos)
+
+
 def _carpeta_con_corto(tmp_path) -> Path:
     from videopipeline.caption import escribir_md
     escribir_md(Caption("SEO", "Cuerpo", ["#t"], ["k"]), tmp_path / "X.md")
@@ -1128,6 +1141,15 @@ def test_listar_prefiere_editado(tmp_path):
     (corto,) = shorts.listar(carpeta)
     assert corto.mp4.name == "X.editado.mp4" and corto.editado is True
     assert corto.caption.titulo == "SEO"
+
+
+def test_listar_ignora_editado_mas_viejo_que_el_original(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    editado = carpeta / "X.editado.mp4"
+    editado.write_bytes(b"MP4")
+    os.utime(editado, (1, 1))
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.mp4" and corto.editado is False
 
 
 def test_listar_ignora_tmp(tmp_path):

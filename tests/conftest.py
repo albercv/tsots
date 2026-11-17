@@ -247,6 +247,12 @@ def sin_agente_de_edicion(monkeypatch):
                         Path("/sin-agente-de-edicion-en-los-tests"))
 
 
+@pytest.fixture(autouse=True)
+def sin_dir_de_edicion_real(monkeypatch, tmp_path):
+    """Red de seguridad: ningún test encola trabajos en ~/TSOTS/edicion."""
+    monkeypatch.setattr("videopipeline.edicion.DIR_EDICION", tmp_path / "dir-edicion-falso")
+
+
 @pytest.fixture(scope="session")
 def video_vertical(tmp_path_factory) -> Path:
     """Vídeo vertical 1080x1920 de 4 s a 30 fps: `testsrc2` + voz de `say`

@@ -36,7 +36,11 @@ class Entrada:
 def ruta(video: Path) -> Path:
     video = Path(video)
     # El editado comparte registro con su original: un short, un registro.
-    return video.with_name(video.stem.removesuffix(".editado") + SUFIJO)
+    stem = video.stem
+    # Solo es un editado si su original `<stem>.mp4` está al lado.
+    if stem.endswith(".editado") and video.with_name(stem.removesuffix(".editado") + ".mp4").exists():
+        stem = stem.removesuffix(".editado")
+    return video.with_name(stem + SUFIJO)
 
 
 def leer(video: Path) -> list[Entrada]:

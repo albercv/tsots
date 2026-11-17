@@ -508,7 +508,9 @@ def listar(carpeta: Path) -> list[Corto]:
             if mp4.is_file():
                 caption = leer_md(mp4.with_suffix(".md"))  # siempre el del original
                 editado = mp4.with_name(mp4.stem + ".editado.mp4")
-                es_editado = editado.is_file()  # nunca el `.tmp`
+                # nunca el `.tmp`; un editado más viejo que su original es de otro lote
+                es_editado = (editado.is_file()
+                              and editado.stat().st_mtime >= mp4.stat().st_mtime)
                 cortos.append(Corto(editado if es_editado else mp4,
                                     str(c.get("titulo_video") or c.get("titulo") or
                                         mp4.stem), duracion, caption, es_editado))
@@ -719,7 +721,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             try:  # editar es un extra: nunca hace fallar la creación
                 resolucion = resolucion_video(pasada.base)
                 zonas = {stem: zonas_edicion.calcular(
-                    config, opciones.encuadre, resolucion,
+                    replace(config, subtitulos=opciones.subtitulos), opciones.encuadre, resolucion,
                     con_titulo=bool(c.titulo_video))
                     for c, stem in zip(elegidos, nombres)}
                 edicion.encolar(carpeta, nombre, nombres, tramos, opciones.estilo,
@@ -727,6 +729,8 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
                                 dir_edicion=edicion.DIR_EDICION)
             except Exception as error:  # noqa: BLE001
                 log.warning("No se pudieron encolar los shorts para edición: %s", error)
+                _avisar(on_progress, _("No se pudieron encolar los shorts para la edición "
+                                       "con Claude: {error}").format(error=error))
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
         with suppress(OSError):

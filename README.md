@@ -353,7 +353,7 @@ counters, emojis, transitions, zooms and sounds, in the style you choose.
 The untouched original stays where it is.
 
 - In the Shorts panel tick **Edit with Claude** and pick a **Style**
-  (Funny / Formal / Academic). It is one setting for the whole batch of
+  (Fun / Formal / Academic). It is one setting for the whole batch of
   shorts you create. It is disabled (hover for the reason) when the
   `claude` command is not found.
 - One job per short is queued in `~/TSOTS/edicion/pendientes/`. When the
@@ -368,7 +368,7 @@ The untouched original stays where it is.
 - Finished jobs go to `~/TSOTS/edicion/hechos/`; failed ones to
   `errores/` with a `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publish shorts…** uploads the edited file when it exists and marks it
-  "(editado)". There is still one publication record per short.
+  "(edited)". There is still one publication record per short.
 - Creating the shorts again deletes the old `.editado.mp4` files. A pending
   job whose original changed ends in `errores/` with "origen cambiado".
 - **Retry a failed job:** move its folder from `errores/` back to

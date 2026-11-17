@@ -149,3 +149,17 @@ def test_renderizar_clip(tmp_path, video_vertical):
 
 def test_renderizar_plan_vacio(tmp_path, video_vertical):
     assert renderizar(_trabajo(tmp_path, video_vertical, []), borrador=True).exists()
+
+
+def test_sfx_academico_solo_en_contadores():
+    A = estilos.cargar("academico")
+    s = der([M("etiqueta", 1, texto=["A"]), M("transicion", 5), M("titulo", 8, texto=["T"]),
+             M("contador", 10, lista=1, num=1, texto="X"),
+             M("contador", 12, lista=2, num=2, texto="Y")], estilo=A)
+    assert {e.tipo for e in s.sfx} == {"pop", "pluck"}
+
+
+def test_sfx_formal_tics_alternos_audibles():
+    F = estilos.cargar("formal")
+    s = der([M("etiqueta", 1, texto=["A"]), M("etiqueta", 4, texto=["B"])], estilo=F)
+    assert [e.tipo for e in s.sfx] == ["tick", "tick2"]

@@ -5,8 +5,9 @@ FUENTE = (1920, 1080)
 
 
 def _cfg(**kw):
-    return PipelineConfig(video="x.mp4", diseno="karaoke_verde", posicion_subs=75,
-                          tamano_subs=150, subtitulos=True, **kw)
+    kw = {"diseno": "karaoke_verde", **kw}
+    return PipelineConfig(video="x.mp4", posicion_subs=75, tamano_subs=150,
+                          subtitulos=True, **kw)
 
 
 def test_difuminado():
@@ -41,3 +42,9 @@ def test_graficos_por_encima():
     assert calcular(_cfg(), "difuminado", FUENTE, True)["graficos_hasta"] == 656
     z = calcular(_cfg(), "central", FUENTE, True)
     assert z["graficos_hasta"] == z["subtitulos"][0] - 201
+
+
+def test_frases_parten_en_dos_lineas():
+    dos = calcular(_cfg(diseno="caja"), "difuminado", FUENTE, True)  # fuente 129 px
+    assert dos["subtitulos"] == [1175, 1440]  # 0.85 + 1.2 líneas de fuente (1 línea: 1330)
+    assert dos["franja_zoom"][1] == dos["subtitulos"][0]
