@@ -69,6 +69,13 @@ def ejecutar(ficha: Ficha, plan: Plan, on_progress: Progreso | None = None) -> P
     return ficha.final.ruta
 
 
+def _borrar_editado(final: Path) -> None:
+    """Un final nuevo deja sin sentido su `.editado.mp4`: nunca se publica."""
+    editado = final.with_name(final.stem + ".editado.mp4")
+    editado.unlink(missing_ok=True)
+    editado.with_name(editado.name + ".tmp").unlink(missing_ok=True)
+
+
 def _ajeno(ruta: Path) -> str:
     return _('No se toca "{ruta}": ha cambiado fuera de la app o no lo creó '
              'ella. Muévelo o bórralo y vuelve a procesar.').format(ruta=ruta)
@@ -416,6 +423,7 @@ class _Pasada:
         if not ficha.hay_horizontal():
             ficha.vertical = ficha.final  # el vertical único lo acompaña hasta R10
         ficha.final = Huella.de(destino)
+        _borrar_editado(destino)
         ficha.artefactos[HORIZONTAL] = Artefacto(clave(self.linea, ajustes), None,
                                                  ajustes)
         # El vertical que había ya no es de este final (R7): si esta pasada lo
@@ -503,6 +511,7 @@ class _Pasada:
             ficha.vertical = Huella.de(destino)
         else:
             ficha.final = Huella.de(destino)
+            _borrar_editado(destino)
             if bloques:
                 self._escribir_srt(bloques, destino)
         ajustes = {"vertical": ajustes_vertical(c)}
