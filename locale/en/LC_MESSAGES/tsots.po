@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 14:43+0100\n"
+"POT-Creation-Date: 2026-11-17 15:01+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -47,8 +47,16 @@ msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ell
 msgstr "\"{nombre}\" has the subtitles burned in and there is no version without them to cut the shorts from. Drag in the original and process it again."
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene la transcripción de sus shorts: créalos de nuevo con «Editar con Claude» marcado."
+msgstr "\"{nombre}\" has no transcript for its shorts: create them again with \"Edit with Claude\" ticked."
+
+#, python-brace-format
 msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
 msgstr "\"{nombre}\" has no output to show. Drag in the original to process it again."
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene shorts creados que editar."
+msgstr "\"{nombre}\" has no created shorts to edit."
 
 #, python-brace-format
 msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
@@ -513,11 +521,17 @@ msgstr "ERROR: cannot read the glossary: {ruta}"
 msgid "ERROR: {error}"
 msgstr "ERROR: {error}"
 
+msgid "Edita con Claude, en el estilo elegido, los shorts que ya tiene el vídeo elegido. Usa el encuadre y los subtítulos de este panel. Los editados aparecen junto a los originales al cabo de unos minutos por short."
+msgstr "Edits the selected video's existing shorts with Claude, in the chosen style. Uses the framing and subtitles set in this panel. Edited files appear next to the originals after a few minutes per short."
+
 msgid "Edita en silencio. Crea a lo grande."
 msgstr "Edit quieter. Create louder."
 
 msgid "Editar con Claude"
 msgstr "Edit with Claude"
+
+msgid "Editar shorts ya creados"
+msgstr "Edit existing shorts"
 
 msgid "Educación"
 msgstr "Education"
@@ -730,6 +744,9 @@ msgstr "Type the place you want to search for."
 
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
+
+msgid "Esos shorts ya estaban en cola para editarse."
+msgstr "Those shorts were already queued for editing."
 
 msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
 msgstr "Wait for the current check to finish and try again."
@@ -1797,6 +1814,10 @@ msgstr "Subtitles will be added to \"{nombre}\"."
 msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
 msgstr "The data saved for redoing steps of \"{nombre}\" ({mb} MB) will be deleted. The videos and their caption are not touched."
 
+#, python-brace-format
+msgid "Se editarán con Claude los shorts de \"{nombre}\" ({n}) en estilo {estilo}. Cada short es una ejecución de Claude en tu cuenta. ¿Seguir?"
+msgstr "The shorts of \"{nombre}\" ({n}) will be edited with Claude in the {estilo} style. Each short is one Claude run on your account. Continue?"
+
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr "Publishing to social networks is in progress. Wait for it to finish before quitting."
 
@@ -2284,6 +2305,10 @@ msgstr "{n} model(s) do not fit in memory (see tooltip)."
 #, python-brace-format
 msgid "{n} por confirmar"
 msgstr "{n} unconfirmed"
+
+#, python-brace-format
+msgid "{n} shorts en cola. Cada editado aparece junto a su original al cabo de unos minutos, y «Publicar shorts…» lo usará."
+msgstr "{n} shorts queued. Each edited file appears next to its original after a few minutes, and \"Publish shorts…\" will use it."
 
 #, python-brace-format
 msgid "{plataforma} (borrador)"

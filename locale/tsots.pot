@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 14:43+0100\n"
+"POT-Creation-Date: 2026-11-17 15:01+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,7 +50,15 @@ msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ell
 msgstr ""
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene la transcripción de sus shorts: créalos de nuevo con «Editar con Claude» marcado."
+msgstr ""
+
+#, python-brace-format
 msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
+msgstr ""
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene shorts creados que editar."
 msgstr ""
 
 #, python-brace-format
@@ -495,10 +503,16 @@ msgstr ""
 msgid "ERROR: {error}"
 msgstr ""
 
+msgid "Edita con Claude, en el estilo elegido, los shorts que ya tiene el vídeo elegido. Usa el encuadre y los subtítulos de este panel. Los editados aparecen junto a los originales al cabo de unos minutos por short."
+msgstr ""
+
 msgid "Edita en silencio. Crea a lo grande."
 msgstr ""
 
 msgid "Editar con Claude"
+msgstr ""
+
+msgid "Editar shorts ya creados"
 msgstr ""
 
 msgid "Educación"
@@ -709,6 +723,9 @@ msgid "Escribe el lugar que quieres buscar."
 msgstr ""
 
 msgid "Escribe el perfil del servicio para comprobarlo."
+msgstr ""
+
+msgid "Esos shorts ya estaban en cola para editarse."
 msgstr ""
 
 msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
@@ -1748,6 +1765,10 @@ msgstr ""
 msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
 msgstr ""
 
+#, python-brace-format
+msgid "Se editarán con Claude los shorts de \"{nombre}\" ({n}) en estilo {estilo}. Cada short es una ejecución de Claude en tu cuenta. ¿Seguir?"
+msgstr ""
+
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr ""
 
@@ -2220,6 +2241,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "{n} por confirmar"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} shorts en cola. Cada editado aparece junto a su original al cabo de unos minutos, y «Publicar shorts…» lo usará."
 msgstr ""
 
 #, python-brace-format
