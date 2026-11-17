@@ -32,7 +32,11 @@ trap 'rmdir "$DIR/.bloqueo"' EXIT
 export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin"
 export PYTHONPATH="$RAIZ"
 CLAUDE="$(command -v claude)"
-INSTRUCCIONES="$(cat "$AQUI/SKILL.md")"
+# Sin el frontmatter YAML (empieza por «-»: el CLI lo tomaría por una opción) y con
+# una primera línea de texto normal.
+INSTRUCCIONES="Instrucciones para editar un short:
+
+$(awk '/^---$/ && n < 2 { n++; next } n != 1' "$AQUI/SKILL.md")"
 INSTRUCCIONES="${INSTRUCCIONES//@PYTHON@/$PYTHON}"
 
 # Mueve la carpeta a $1 (hechos o errores). Si no puede, la aparta con un

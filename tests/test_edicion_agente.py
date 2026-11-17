@@ -57,6 +57,7 @@ def test_exito(tmp_path, video_vertical):
     assert args[args.index("--model") + 1] == "claude-haiku-5-5"
     assert args[1].endswith(f"\n\nTrabajo: {edi / 'pendientes' / NOMBRE}")
     assert "@PYTHON@" not in args[1]
+    assert not args[1].startswith("-") and "name: editar-short" not in args[1]
     assert not (edi / ".bloqueo").exists()
 
 
@@ -87,6 +88,8 @@ def test_tiempo_agotado(tmp_path, video_vertical):
     assert "Tiempo agotado" in (edi / "errores" / NOMBRE / "motivo.txt").read_text()
 
 
+@pytest.mark.skipif(Path("/opt/homebrew/bin/claude").exists(),
+                    reason="el script también busca claude en /opt/homebrew/bin")
 def test_sin_claude(tmp_path, video_vertical):
     edi, _ = _trabajo(tmp_path, video_vertical)
     r = _ejecutar(tmp_path, edi)
