@@ -346,32 +346,44 @@ then moves to:
 The agent's log is `~/TSOTS/blog/agente.log`. A failure in this step
 never stops the video: it is saved anyway, with a warning.
 
-## Edit shorts with Claude
+## Edit shorts and vertical videos with Claude
 
-When you create shorts you can have Claude edit each one: on-screen labels,
-counters, emojis, transitions, zooms and sounds, in the style you choose.
-The untouched original stays where it is.
+Claude can edit each short, or a video's own final when it is vertical
+1080×1920: on-screen labels, counters, emojis, transitions, zooms and
+sounds, in the style you choose. The untouched original stays where it is.
 
 - In the Shorts panel tick **Edit with Claude** and pick a **Style**
   (Fun / Formal / Academic). It is one setting for the whole batch of
   shorts you create. It is disabled (hover for the reason) when the
   `claude` command is not found.
-- **Shorts you already have:** select the video in the queue, pick the
-  **Style** and click **Edit existing shorts**. It queues every short of
-  that video (using the framing and subtitle settings of the panel, so keep
-  the ones you created them with) and starts editing right away; you do not
-  need to tick **Edit with Claude**. Shorts already waiting are not queued
-  twice.
-- One job per short is queued in `~/TSOTS/edicion/pendientes/`. When the
+- **Videos that come out vertical:** the same **Edit with Claude** checkbox
+  also edits, when you process with **Process**, each video whose final
+  comes out vertical 1080×1920. It is queued when that video's processing
+  ends, and the agent starts when the queue ends. It is not repeated if
+  nothing was processed for that video or an up-to-date edited file already
+  exists. With **Create shorts when processing** also on, both the video
+  and its shorts are edited.
+- **Shorts or videos you already have:** select the video in the queue,
+  pick the **Style** and click **Edit with Claude…**. If it has shorts it
+  edits them (using the framing and subtitle settings of the panel, so keep
+  the ones you created them with); if it has none and its final is vertical
+  1080×1920 it edits the video itself; if it has both it asks which
+  (**All N shorts** / **The video**); if neither, it warns that a vertical
+  1080×1920 final or shorts are needed. Editing starts right away and you do
+  not need to tick **Edit with Claude**; use it to re-edit on purpose. Each
+  short or video is one Claude run on your account. Items already waiting
+  are not queued twice.
+- One job per short (or video) is queued in `~/TSOTS/edicion/pendientes/`. When the
   processing queue ends (and when the app opens) TSOTS launches
   `lanzador/edicion/procesar_pendientes.sh`. It runs `claude -p --model
   claude-haiku-5-5` once per job, one after another, with a 1200 s limit
   per job (`TSOTS_EDICION_LIMITE`). Haiku only decides the moments; labels,
   counters, emojis, transitions, zooms and sounds come from code, and the
   code renders. The result is checked and saved as
-  `NN - title.editado.mp4` next to the original. A 112 s short took about
-  2-3 minutes.
-- **Progress in the queue:** under the video's row a bar shows how many
+  `NN - title.editado.mp4` next to the original; for a video, it is
+  `<final>.editado.mp4` next to the final (the clean final is never
+  touched). A 112 s short took about 2-3 minutes.
+- **Progress in the queue:** under the video's row (also for a video's own edit) a bar shows how many
   shorts are done, which step the current one is in (preparing, Claude
   decides, validating, rendering, checking) and the estimated time left,
   based on how long the finished ones took. When the batch ends it shows how
@@ -387,7 +399,13 @@ The untouched original stays where it is.
   `errores/` with a `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publish shorts…** uploads the edited file when it exists and marks it
   "(edited)". There is still one publication record per short.
-- Creating the shorts again deletes the old `.editado.mp4` files. A pending
+  **Publish…** on a video uploads its edited file when it is newer than the
+  final, shown as "(edited)" in the dialog; the caption, the LinkedIn post
+  and the published record stay the final's.
+- Creating the shorts again deletes the old `.editado.mp4` files, and
+  reprocessing a video that rebuilds its final deletes its old edited file.
+- **Limits:** only finals of exactly 1080×1920 are edited; the
+  `_limpio_vertical.mp4` that comes with a horizontal final is not. A pending
   job whose original changed ends in `errores/` with "origen cambiado".
 - **Retry a failed job:** move its folder from `errores/` back to
   `pendientes/` (it keeps `video.mp4`), then reopen the app or finish
