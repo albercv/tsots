@@ -12,7 +12,7 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from .seguimiento import UMBRAL_CONFIANZA, Detector, _detector_s3fd
+from .seguimiento import Detector, _detector_s3fd
 from .steps import duracion_video
 from .subtitles import Palabra
 
@@ -20,6 +20,9 @@ NUM_CANDIDATOS = 6
 NITIDEZ_MINIMA = 40.0
 MARGEN_BORDE = 0.02  # fracción del ancho/alto que la cara deja libre en cada borde
 CARA_MIN_ALTO = 0.12  # fracción mínima del alto del fotograma
+# Más alto que el del seguimiento (0.8): S3FD da 0.998-1.0 a las caras de verdad y
+# 0.86-0.97 a dedos, texto de pantalla o la barba (medido 2026-11-17, 10 vídeos).
+UMBRAL_CARA = 0.99
 DESPLAZAMIENTOS = (0.0, -1.0, 1.0, -2.0, 2.0)  # segundos alrededor de cada momento
 
 
@@ -54,7 +57,7 @@ def cara_completa(
     for x1, y1, x2, y2, score in cajas:
         area = (x2 - x1) * (y2 - y1)
         if (
-            score >= UMBRAL_CONFIANZA
+            score >= UMBRAL_CARA
             and x1 >= MARGEN_BORDE * ancho
             and x2 <= (1 - MARGEN_BORDE) * ancho
             and y1 >= MARGEN_BORDE * alto
