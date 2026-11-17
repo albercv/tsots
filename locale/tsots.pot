@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 19:14+0100\n"
+"POT-Creation-Date: 2026-11-17 19:28+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -887,6 +887,9 @@ msgstr ""
 msgid "Fotos para LinkedIn:"
 msgstr ""
 
+msgid "Fotos para X:"
+msgstr ""
+
 msgid "Genera nombre_limpio.md con un modelo local (Ollama) a partir de la transcripción."
 msgstr ""
 
@@ -1498,6 +1501,9 @@ msgstr ""
 msgid "Para cambiar el idioma la app se reiniciará. Se cancelará cualquier proceso en marcha. ¿Reiniciar ahora?"
 msgstr ""
 
+msgid "Para publicar fotos en su lugar, activa «LinkedIn» y procésalo."
+msgstr ""
+
 #, python-brace-format
 msgid "Paso: {paso}"
 msgstr ""
@@ -1851,6 +1857,9 @@ msgid ""
 "{resumen}"
 msgstr ""
 
+msgid "Se publica un post con fotos."
+msgstr ""
+
 #, python-brace-format
 msgid ""
 "Se publicará «{titulo}» en:\n"
@@ -1932,6 +1941,9 @@ msgid "Sin comprobar. Pulsa «Comprobar conexión» para ver qué cuentas tienes
 msgstr ""
 
 msgid "Sin conexión para descargar un modelo"
+msgstr ""
+
+msgid "Sin fotos para X: añade al menos una."
 msgstr ""
 
 msgid "Sin fotos: añade al menos una."
@@ -2140,6 +2152,10 @@ msgid "Vídeo normal"
 msgstr ""
 
 msgid "Vídeos ("
+msgstr ""
+
+#, python-brace-format
+msgid "X admite {maximo} fotos por post: quita {sobran}."
 msgstr ""
 
 #, python-brace-format

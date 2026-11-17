@@ -477,8 +477,11 @@ Publicar… lo propone con los hashtags que caben. Si el modelo se pasa,
 se quitan frases del medio (nunca la primera ni la última); un caption
 antiguo sin ese post usa el título. Puedes editarlo y el contador
 muestra cuánto ocupa. Sin Premium,
-X solo admite vídeos de hasta **2:20** y **512 MB**: con un vídeo más
-largo o más pesado, X aparece deshabilitada con el motivo. Si tu cuenta
+X solo admite vídeos de hasta **2:20** y **512 MB**. Con un vídeo más
+largo o más pesado que tenga post de LinkedIn, X publica en su lugar un
+**post con fotos**: aparece «Fotos para X» con las 4 primeras de LinkedIn
+(portada e ideas), que puedes cambiar; X admite como mucho 4. Sin post de
+LinkedIn, X aparece deshabilitada con el motivo. Si tu cuenta
 tiene Premium, márcalo en Redes… («Mi cuenta de X tiene Premium»): se
 admiten vídeos largos y textos largos en un solo post. Si Upload-Post
 indica que la cuenta es Premium, la casilla se marca sola al comprobar la
@@ -494,6 +497,7 @@ Qué hace cada modo:
 | Instagram | **Reel de prueba** (por defecto) | Se enseña primero a quien no te sigue; Instagram lo comparte con tus seguidores solo si funciona. |
 | Instagram | **Reel normal** | Un reel normal, también en tu feed. |
 | X | **Post público** | Un post con el vídeo y el texto para X; nunca un hilo. |
+| X | **Post con fotos** | Solo si X no admite el vídeo (sin Premium: más de 2:20 o de 512 MB): hasta 4 fotos y el texto para X. |
 | Facebook | **Reel** (por defecto) | Un reel publicado en tu página. |
 | Facebook | **Vídeo normal** | Un vídeo publicado en tu página. |
 | Facebook | **Borrador** | Un reel sin publicar; lo terminas en Facebook. |

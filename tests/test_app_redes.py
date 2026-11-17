@@ -1023,7 +1023,9 @@ def test_x_deshabilitada_por_duracion_sin_premium(qtbot, video, ajustes, llavero
     assert not dialogo.casillas[X].isEnabled()
     assert not dialogo.casillas[X].isChecked()
     assert dialogo.estados[X].text() == (
-        "X sin Premium admite vídeos de hasta 2:20; este dura 2:48.")
+        "X sin Premium admite vídeos de hasta 2:20; este dura 2:48. Para publicar fotos "
+        "en su lugar, activa «LinkedIn» y procésalo.")
+    assert dialogo.tira_x.isHidden() and dialogo.publicacion().fotos_x == ()
     assert X not in dialogo.plataformas()
     assert dialogo.boton_publicar.isEnabled()  # las demás siguen
     # Con Premium vuelve, y marcada como estaba.
@@ -1804,3 +1806,57 @@ def test_linkedin_del_final_se_ve_al_publicar_su_editado(qtbot, tmp_path, video,
     dialogo, _ = _dialogo_listo(qtbot, editado, ajustes, llavero_falso, marcadas=(Y, L))
     assert not dialogo.campo_linkedin.isHidden() and not dialogo.tira_linkedin.isHidden()
     assert dialogo.campo_linkedin.toPlainText() == TEXTO_LINKEDIN
+
+
+def test_x_con_video_largo_publica_un_post_con_fotos(qtbot, video, ajustes, llavero_falso,
+                                                    monkeypatch):
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", lambda v: 184.0)
+    fotos, _candidatos = _con_linkedin(video, n=6)
+    dialogo, proveedor = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, X))
+    qtbot.waitUntil(lambda: dialogo.duracion is not None, timeout=3000)
+    assert dialogo.casillas[X].isEnabled() and dialogo.casillas[X].isChecked()
+    assert dialogo.modos[X].text() == "Post con fotos"
+    assert dialogo.estados[X].text().startswith(
+        "X sin Premium admite vídeos de hasta 2:20; este dura 3:04. Se publica un post con "
+        "fotos.")
+    # Empieza con las 4 primeras de LinkedIn: portada + 3.
+    assert not dialogo.tira_x.isHidden() and dialogo.tira_x.fotos() == tuple(fotos[:4])
+    assert dialogo.publicacion().fotos_x == tuple(fotos[:4])
+    # Más de 4 sería un hilo: bloquea.
+    dialogo.tira_x.anadir([fotos[4]])
+    assert not dialogo.boton_publicar.isEnabled()
+    assert dialogo.estados[X].text() == "X admite 4 fotos por post: quita 1."
+    dialogo.tira_x.quitar(fotos[0])
+    assert dialogo.boton_publicar.isEnabled()
+    preguntas = _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=5000):
+        dialogo.boton_publicar.click()
+    assert "X: Post con fotos" in preguntas[0]
+    enviada = next(c[2] for c in proveedor.llamadas if c[1] == X)
+    assert enviada.fotos_x == (*fotos[1:4], fotos[4])
+    assert "X: post con fotos en lugar del vídeo" in _log(dialogo)
+
+
+def test_x_con_video_largo_sin_fotos_se_deshabilita(qtbot, video, ajustes, llavero_falso,
+                                                   monkeypatch):
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", lambda v: 184.0)
+    fotos, _candidatos = _con_linkedin(video, n=2)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, X))
+    qtbot.waitUntil(lambda: dialogo.duracion is not None, timeout=3000)
+    for foto in fotos:
+        dialogo.tira_x.quitar(foto)
+    assert not dialogo.casillas[X].isEnabled()
+    assert dialogo.estados[X].text() == "Sin fotos para X: añade al menos una."
+    assert not dialogo.tira_x.isHidden()  # para poder añadirlas
+
+
+@pytest.mark.parametrize("duracion, premium", [(90.0, False), (184.0, True)])
+def test_x_sube_el_video_si_x_lo_admite(qtbot, video, ajustes, llavero_falso, monkeypatch,
+                                       duracion, premium):
+    monkeypatch.setattr(dialogo_publicar, "medir_duracion", lambda v: duracion)
+    ajustes.x_premium = premium
+    _con_linkedin(video)
+    dialogo, _p = _dialogo_listo(qtbot, video, ajustes, llavero_falso, marcadas=(Y, X))
+    qtbot.waitUntil(lambda: dialogo.duracion is not None, timeout=3000)
+    assert dialogo.casillas[X].isChecked() and dialogo.modos[X].text() == "Post público"
+    assert dialogo.tira_x.isHidden() and dialogo.publicacion().fotos_x == ()

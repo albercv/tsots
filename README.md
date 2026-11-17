@@ -476,8 +476,11 @@ suggests it with the hashtags that fit. If the model writes too much,
 sentences from the middle are dropped (never the first or the last); an
 old caption without that post uses the title. You can edit it and the
 counter shows its length. Without
-Premium, X only accepts videos up to **2:20** and **512 MB**: with a
-longer or heavier video, X is disabled with the reason. If your account
+Premium, X only accepts videos up to **2:20** and **512 MB**. With a
+longer or heavier video that has a LinkedIn post, X publishes a **photo
+post** instead: "Photos for X" appears with the first 4 LinkedIn photos
+(cover and ideas), which you can change; X takes at most 4. Without a
+LinkedIn post, X is disabled with the reason. If your account
 has Premium, tick it in Networks… ("My X account has Premium"): long
 videos and long texts in a single post are then allowed. If Upload-Post
 reports the account as Premium, the box is ticked for you when you check
@@ -493,6 +496,7 @@ What each mode does:
 | Instagram | **Trial reel** (default) | Shown to non-followers first; Instagram shares it with your followers only if it performs. |
 | Instagram | **Regular reel** | A normal reel, also shown in your feed. |
 | X | **Public post** | A post with the video and the text for X; never a thread. |
+| X | **Photo post** | Only when X does not accept the video (without Premium: over 2:20 or 512 MB): up to 4 photos and the text for X. |
 | Facebook | **Reel** (default) | A reel published on your Page. |
 | Facebook | **Regular video** | A video published on your Page. |
 | Facebook | **Draft** | An unpublished reel; you finish it in Facebook. |
