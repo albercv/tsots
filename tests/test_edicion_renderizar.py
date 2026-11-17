@@ -90,6 +90,12 @@ def test_cierre_omitido_si_zoom_solapa():
     assert Zoom(17, 20, 1, D.zoom_lento) not in s.zooms
 
 
+def test_golpe_temprano_omite_entrada_lenta():
+    s = der([M("zoom", t0=1.0, t1=3.0)])
+    assert not any(z.t0 == 0 for z in s.zooms) and Zoom(1.0, 3.0, D.zoom_max, D.zoom_max) in s.zooms
+    assert not any(z.t0 == 2.5 for z in s.zooms)
+
+
 def test_final_ocupa_hasta_el_fin():
     s = der([], final={"texto": ["FIN"], "check": True})
     p = s.piezas[-1]

@@ -115,9 +115,11 @@ def _zooms(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> list[Zoo
     if zl > 0 and duracion > 2.5:
         tiempos = [m.t0 if m.tipo == "zoom" else m.t for m in plan.momentos]
         h = min([5.0, duracion] + [t for t in tiempos if t >= 2.5])
-        zooms.append(Zoom(0, 2.5, 1, zl))
-        if h > 2.5:
-            zooms.append(Zoom(2.5, h, zl, zl))
+        # un zoom de golpe dentro de la entrada+mantenido: se omiten (zooms solapados son ambiguos)
+        if not any(z.t0 < max(2.5, h) for z in punch):
+            zooms.append(Zoom(0, 2.5, 1, zl))
+            if h > 2.5:
+                zooms.append(Zoom(2.5, h, zl, zl))
         ini = duracion - 3
         if ini >= max(2.5, h) and not any(z.t1 > ini for z in punch):
             zooms.append(Zoom(ini, duracion, 1, zl))
