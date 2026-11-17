@@ -77,7 +77,7 @@ while [ "$nuevas" = 1 ]; do
             mover errores "error, sin claude"
             continue
         fi
-        HERRAMIENTAS="Read,Write($carpeta/plan.json),Bash($PYTHON -m videopipeline.edicion.preparar:*),Bash($PYTHON -m videopipeline.edicion.validar_plan:*),Bash($PYTHON -m videopipeline.edicion.renderizar:*),Bash($PYTHON -m videopipeline.edicion.verificar:*)"
+        HERRAMIENTAS="Read,Edit($carpeta/plan.json),Bash($PYTHON -m videopipeline.edicion.preparar:*),Bash($PYTHON -m videopipeline.edicion.validar_plan:*),Bash($PYTHON -m videopipeline.edicion.renderizar:*),Bash($PYTHON -m videopipeline.edicion.verificar:*)"
         # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
         # Sin los ajustes de usuario, los plugins y hooks personales no se cuelan.
         (cd "$carpeta" && perl -e 'alarm shift; exec @ARGV' "$LIMITE" \
@@ -85,7 +85,7 @@ while [ "$nuevas" = 1 ]; do
 
 Trabajo: $carpeta" --model claude-haiku-5-5 --add-dir "$carpeta" \
             --allowedTools "$HERRAMIENTAS" \
-            --disallowedTools "Edit,NotebookEdit,WebFetch,WebSearch" \
+            --disallowedTools "NotebookEdit,WebFetch,WebSearch" \
             --setting-sources project,local) > "$carpeta/claude.log" 2>&1
         rc=$?
         # Solo entregar.py entrega, y solo si la salida pasa sus comprobaciones.

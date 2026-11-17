@@ -57,6 +57,11 @@ def test_exito(tmp_path, video_vertical):
     assert args[args.index("--model") + 1] == "claude-haiku-5-5"
     assert args[1].endswith(f"\n\nTrabajo: {edi / 'pendientes' / NOMBRE}")
     assert "@PYTHON@" not in args[1]
+    permitidas = args[args.index("--allowedTools") + 1].split(",")
+    prohibidas = args[args.index("--disallowedTools") + 1].split(",")
+    plan = str(edi / "pendientes" / NOMBRE / "plan.json")
+    assert f"Edit({plan})" in permitidas and not any(p.startswith("Write") for p in permitidas)
+    assert "Edit" not in prohibidas and "NotebookEdit" in prohibidas
     assert not args[1].startswith("-") and "name: editar-short" not in args[1]
     assert not (edi / ".bloqueo").exists()
 
