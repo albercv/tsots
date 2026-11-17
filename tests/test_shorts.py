@@ -1324,3 +1324,58 @@ def test_editar_video_dos_veces(ficha_con_base, dir_edicion, monkeypatch):
     assert shorts.editar_video(e.ficha, e.config, opciones) == 1
     assert shorts.editar_video(e.ficha, e.config, opciones) == 0
     assert len(list((dir_edicion / "pendientes").iterdir())) == 1
+
+
+def _a_hechos(dir_edicion):
+    """Simula que el agente terminó: todos los trabajos pasan a hechos/."""
+    (dir_edicion / "hechos").mkdir(exist_ok=True)
+    for t in (dir_edicion / "pendientes").iterdir():
+        t.rename(dir_edicion / "hechos" / t.name)
+
+
+def test_editar_video_un_pendiente_con_sufijo_bloquea_otro_clic(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    _a_hechos(dir_edicion)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1  # reedición: «-2»
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 0
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 1
+
+
+def test_editar_video_un_pendiente_con_el_origen_cambiado_no_bloquea(
+        ficha_con_base, dir_edicion, monkeypatch):
+    e = ficha_con_base
+    _vertical(monkeypatch)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    with e.ficha.final.ruta.open("ab") as f:  # el final se rehízo
+        f.write(b"mas")
+    assert shorts.editar_video(e.ficha, e.config, opciones) == 1
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_un_pendiente_con_sufijo_bloquea_otro_clic(
+        ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    _a_hechos(dir_edicion)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 0
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_un_pendiente_con_el_origen_cambiado_no_bloquea(
+        ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    corto = next(e.carpeta.glob("*.mp4"))
+    with corto.open("ab") as f:  # ese short se rehízo
+        f.write(b"mas")
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 1

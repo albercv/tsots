@@ -20,7 +20,7 @@ from pathlib import Path
 from . import edicion
 from .caption import Caption, leer_md, texto_plano
 from .config import ENCUADRES, PipelineConfig
-from .edicion import estilos
+from .edicion import entregar, estilos
 from .edicion import zonas as zonas_edicion
 from .ficha import HORIZONTAL, TRANSCRIPCION, VERTICAL, Ficha, _escribir_json
 from .i18n import _
@@ -750,9 +750,26 @@ def _encolar_edicion(carpeta: Path, nombre: str, config: PipelineConfig,
                            dir_edicion=edicion.DIR_EDICION)
 
 
+def _ya_en_cola(archivo: Path) -> bool:
+    """`archivo` ya espera su edición en `pendientes/`: algún trabajo cuyo origen
+    es él y que sigue vigente. Se mira el origen, no el nombre de la carpeta
+    (`encolar` añade «-2», «-3»… si el nombre está tomado); uno obsoleto, de un
+    original que cambió, no cuenta porque el agente lo va a rechazar."""
+    for trabajo in (edicion.DIR_EDICION / "pendientes").glob("*/trabajo.json"):
+        if trabajo.parent.name.startswith("."):
+            continue
+        try:
+            datos = json.loads(trabajo.read_text(encoding="utf-8"))
+            if datos["origen"] == str(archivo) and entregar.origen_cambiado(datos) is None:
+                return True
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return False
+
+
 def editar_existentes(ficha: Ficha, config: PipelineConfig,
                       opciones: OpcionesShorts) -> int:
-    """Botón «Editar shorts ya creados»: encola para Claude los shorts que ya
+    """Botón «Editar con Claude…»: encola para Claude los shorts que ya
     tiene `ficha`, con las palabras de su transcripción, como si se acabaran de
     crear. Los que ya esperan en `pendientes/` no se repiten. Devuelve cuántos
     encola; PasoFallido si no tiene shorts o le falta la transcripción."""
@@ -774,11 +791,10 @@ def editar_existentes(ficha: Ficha, config: PipelineConfig,
                             'créalos de nuevo con «Editar con Claude» marcado.'
                             ).format(nombre=ficha.nombre))
     palabras = pasada._palabras() or []
-    pendientes = edicion.DIR_EDICION / "pendientes"
     cortes = []
     for c in creados:
         stem = Path(c["archivo"]).stem
-        if (pendientes / f"{ficha.nombre} - {stem}").exists():
+        if _ya_en_cola(carpeta / c["archivo"]):
             continue  # ya espera su edición (p. ej. un doble clic)
         cortes.append((stem, tramo_palabras(palabras, float(c["inicio"]), float(c["fin"])),
                        c.get("titulo_video") or ""))
@@ -822,7 +838,7 @@ def editar_video(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts)
         raise PasoFallido(_('"{nombre}" no tiene la transcripción de su vídeo: '
                             'procésalo de nuevo para poder editarlo.'
                             ).format(nombre=ficha.nombre))
-    if (edicion.DIR_EDICION / "pendientes" / f"{ficha.nombre} - {final.stem}").exists():
+    if _ya_en_cola(final):
         return 0  # ya espera su edición (p. ej. un doble clic)
     palabras = pasada._palabras() or []
 
