@@ -356,6 +356,12 @@ The untouched original stays where it is.
   (Fun / Formal / Academic). It is one setting for the whole batch of
   shorts you create. It is disabled (hover for the reason) when the
   `claude` command is not found.
+- **Shorts you already have:** select the video in the queue, pick the
+  **Style** and click **Edit existing shorts**. It queues every short of
+  that video (using the framing and subtitle settings of the panel, so keep
+  the ones you created them with) and starts editing right away; you do not
+  need to tick **Edit with Claude**. Shorts already waiting are not queued
+  twice.
 - One job per short is queued in `~/TSOTS/edicion/pendientes/`. When the
   processing queue ends (and when the app opens) TSOTS launches
   `lanzador/edicion/procesar_pendientes.sh`. It runs `claude -p --model

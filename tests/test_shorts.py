@@ -1095,6 +1095,45 @@ def test_crear_con_editar_encola_un_trabajo_por_short(ficha_con_base, dir_edicio
         assert palabras and palabras[0]["inicio"] < 5  # tiempos relativos al short
 
 
+def test_editar_existentes_encola_los_shorts_ya_creados(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)  # sin «Editar con Claude»: nada en cola
+    assert not (dir_edicion / "pendientes").exists()
+    n = shorts.editar_existentes(
+        e.ficha, e.config, shorts.OpcionesShorts(editar=True, estilo="academico"))
+    trabajos = sorted((dir_edicion / "pendientes").iterdir())
+    assert n == len(trabajos) == 2
+    creados = {c["archivo"]: c for c in _leer_json(e.carpeta / "shorts.json")["candidatos"]
+               if c["archivo"]}
+    palabras = reproceso._Pasada(e.ficha, reproceso.Plan([], e.config, []), None)._palabras()
+    for t in trabajos:
+        datos = _leer_json(t / "trabajo.json")
+        origen = Path(datos["origen"])
+        assert origen.parent == e.carpeta and origen.is_file()
+        assert datos["estilo"] == "academico" and datos["encuadre"] == "cara"
+        assert datos["zonas"]["franja_zoom"][1] <= datos["zonas"]["subtitulos"][0]
+        c = creados[origen.name]
+        # las mismas palabras que se quemaron como subtítulos de ese short
+        esperadas = [asdict(p) for p in shorts.tramo_palabras(palabras, c["inicio"], c["fin"])]
+        assert _leer_json(t / "palabras.json") == esperadas
+
+
+def test_editar_existentes_no_repite_los_que_ya_esperan(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 0  # doble clic
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_sin_shorts(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    with pytest.raises(PasoFallido):
+        shorts.editar_existentes(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    assert not (dir_edicion / "pendientes").exists()
+
+
 def test_regenerar_borra_editado_viejo(ficha_con_base):
     e = ficha_con_base
     _crear(e)

@@ -986,13 +986,32 @@ def test_editar_y_estilo_se_guardan_y_restauran(qtbot, monkeypatch):
     assert (valores["shorts_editar"], valores["shorts_estilo"]) == (True, "academico")
 
 
-def test_combo_desactivado_sin_casilla(qtbot, monkeypatch):
+def test_combo_estilo_activo_con_claude_aunque_no_se_marque_la_casilla(qtbot, monkeypatch):
+    # El estilo también vale para «Editar shorts ya creados», sin editar al crear.
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    assert panel.combo_estilo_shorts.isEnabled() is False
-    panel.check_editar_claude.setChecked(True)
     assert panel.combo_estilo_shorts.isEnabled() is True
+    assert panel.check_editar_claude.isChecked() is False
+    assert panel.hay_claude() is True
+
+
+def test_boton_editar_shorts_emite_senal(qtbot, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.boton_editar_shorts.isEnabled() is False  # lo activa la ventana
+    panel.boton_editar_shorts.setEnabled(True)
+    with qtbot.waitSignal(panel.editar_shorts, timeout=1000):
+        panel.boton_editar_shorts.click()
+
+
+def test_boton_editar_shorts_explica_que_necesita_claude(qtbot, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    assert panel.hay_claude() is False
+    assert "claude" in panel.boton_editar_shorts.toolTip()
 
 
 def test_sin_claude_casilla_desactivada(qtbot, monkeypatch):

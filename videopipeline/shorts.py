@@ -719,14 +719,9 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         _escribir_json(carpeta / "shorts.json", {**datos, "archivos": nuevos})
         if opciones.editar:
             try:  # editar es un extra: nunca hace fallar la creación
-                resolucion = resolucion_video(pasada.base)
-                zonas = {stem: zonas_edicion.calcular(
-                    replace(config, subtitulos=opciones.subtitulos), opciones.encuadre, resolucion,
-                    con_titulo=bool(c.titulo_video))
-                    for c, stem in zip(elegidos, nombres)}
-                edicion.encolar(carpeta, nombre, nombres, tramos, opciones.estilo,
-                                zonas, config.idioma_subs, opciones.encuadre,
-                                dir_edicion=edicion.DIR_EDICION)
+                _encolar_edicion(carpeta, nombre, config, opciones, pasada.base,
+                                 [(stem, tramos[stem], c.titulo_video)
+                                  for c, stem in zip(elegidos, nombres)])
             except Exception as error:  # noqa: BLE001
                 log.warning("No se pudieron encolar los shorts para edición: %s", error)
                 _avisar(on_progress, _("No se pudieron encolar los shorts para la edición "
@@ -736,3 +731,57 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         with suppress(OSError):
             carpeta.rmdir()  # solo si ha quedado vacía: un primer intento fallido
     return Resultado(carpeta, len(elegidos))
+
+
+def _encolar_edicion(carpeta: Path, nombre: str, config: PipelineConfig,
+                     opciones: OpcionesShorts, base: Path,
+                     cortes: list[tuple[str, list[Palabra], str]]) -> list[Path]:
+    """Un trabajo de «Editar con Claude» por short (`stem`, sus palabras, su
+    título quemado), con las zonas de los subtítulos de los shorts, no los del
+    vídeo principal."""
+    resolucion = resolucion_video(base)
+    config_shorts = replace(config, subtitulos=opciones.subtitulos)
+    zonas = {stem: zonas_edicion.calcular(config_shorts, opciones.encuadre, resolucion,
+                                          con_titulo=bool(titulo))
+             for stem, _palabras, titulo in cortes}
+    return edicion.encolar(carpeta, nombre, [stem for stem, *_resto in cortes],
+                           {stem: palabras for stem, palabras, _titulo in cortes},
+                           opciones.estilo, zonas, config.idioma_subs, opciones.encuadre,
+                           dir_edicion=edicion.DIR_EDICION)
+
+
+def editar_existentes(ficha: Ficha, config: PipelineConfig,
+                      opciones: OpcionesShorts) -> int:
+    """Botón «Editar shorts ya creados»: encola para Claude los shorts que ya
+    tiene `ficha`, con las palabras de su transcripción, como si se acabaran de
+    crear. Los que ya esperan en `pendientes/` no se repiten. Devuelve cuántos
+    encola; PasoFallido si no tiene shorts o le falta la transcripción."""
+    carpeta = carpeta_shorts(ficha)
+    try:
+        datos = json.loads((carpeta / "shorts.json").read_text(encoding="utf-8"))
+        candidatos = datos["candidatos"] if datos.get("ficha") == ficha.id else []
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        candidatos = []
+    creados = [c for c in candidatos if isinstance(c, dict) and c.get("archivo")
+               and not c.get("descarte") and Path(c["archivo"]).name == c["archivo"]
+               and (carpeta / c["archivo"]).is_file()]
+    if not creados:
+        raise PasoFallido(_('"{nombre}" no tiene shorts creados que editar.'
+                            ).format(nombre=ficha.nombre))
+    pasada = _Pasada(ficha, Plan([], config, []), None)
+    if not _transcrita(ficha, pasada.linea):
+        raise PasoFallido(_('"{nombre}" no tiene la transcripción de sus shorts: '
+                            'créalos de nuevo con «Editar con Claude» marcado.'
+                            ).format(nombre=ficha.nombre))
+    palabras = pasada._palabras() or []
+    pendientes = edicion.DIR_EDICION / "pendientes"
+    cortes = []
+    for c in creados:
+        stem = Path(c["archivo"]).stem
+        if (pendientes / f"{ficha.nombre} - {stem}").exists():
+            continue  # ya espera su edición (p. ej. un doble clic)
+        cortes.append((stem, tramo_palabras(palabras, float(c["inicio"]), float(c["fin"])),
+                       c.get("titulo_video") or ""))
+    if not cortes:
+        return 0
+    return len(_encolar_edicion(carpeta, ficha.nombre, config, opciones, pasada.base, cortes))
