@@ -27,8 +27,9 @@ _PUNTUACION = set(" .,:;¿?¡!«»\"'·-%&()/")
 
 
 def glifos_validos(texto: str, check: bool) -> bool:
-    """Solo letras (con acentos y Ñ), dígitos y puntuación básica; '✓' solo con check."""
-    return all(c.isalnum() or c in _PUNTUACION or (check and c == _CHECK) for c in texto)
+    """Solo letras latinas (con acentos y Ñ), dígitos ASCII y puntuación básica; '✓' solo con check."""
+    return all((c.isalpha() and ord(c) < 0x250 and c not in "ªº") or c in "0123456789" or c in _PUNTUACION
+               or (check and c == _CHECK) for c in texto)
 
 
 def _fuente(paleta: Paleta, size: int) -> ImageFont.FreeTypeFont:

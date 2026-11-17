@@ -60,3 +60,9 @@ def test_contador_lados():
     r = list(rotulos.frames_contador(1, "TIENDA", 1.0, "R", P, 30))[-6]
     assert _x_min_opaco(l) < 540
     assert _x_min_opaco(r) > 540
+
+
+def test_glifos_solo_latinos():
+    assert rotulos.glifos_validos("AÑO 2024: ¿QUÉ?", False)
+    for malo in ("m²", "1ª", "ПРИВЕТ", "你好", "HOLA 🍉"):
+        assert not rotulos.glifos_validos(malo, False)
