@@ -11,7 +11,12 @@ from PySide6.QtGui import QBrush, QColor
 from videopipeline.i18n import N_, _
 
 if TYPE_CHECKING:
+    from videopipeline.edicion.estado import EstadoEdicion
     from videopipeline.ficha import Ficha
+
+# El avance de «Editar con Claude» de los shorts de la fila (`EstadoEdicion`),
+# que el delegado de la cola pinta como una segunda línea con barra.
+ROL_EDICION = Qt.ItemDataRole.UserRole + 1
 
 
 class EstadoTrabajo(Enum):
@@ -61,6 +66,7 @@ class Trabajo:
     ficha_id: str | None = None
     resumen: str = ""
     ocupa: int = 0  # bytes de la ficha
+    edicion: EstadoEdicion | None = None  # avance de «Editar con Claude»
 
 
 class ModeloCola(QAbstractListModel):
@@ -103,7 +109,13 @@ class ModeloCola(QAbstractListModel):
                 piezas.append(_("Vertical: {ruta}").format(ruta=trabajo.salida_vertical))
             if trabajo.shorts:
                 piezas.append(_("Shorts: {ruta}").format(ruta=trabajo.shorts))
+            if trabajo.edicion and trabajo.edicion.con_error:
+                piezas.append(_("Con error en la edición con Claude: {lista}. El motivo "
+                                "está en ~/TSOTS/edicion/errores/.").format(
+                    lista=", ".join(trabajo.edicion.con_error)))
             return "\n".join(piezas) if piezas else None
+        if role == ROL_EDICION:
+            return trabajo.edicion
         if role == Qt.ItemDataRole.ForegroundRole:
             if trabajo.estado == EstadoTrabajo.ERROR:
                 return QBrush(QColor("#c62828"))
