@@ -691,8 +691,9 @@ class VentanaPrincipal(QMainWindow):
     def _editar_con_claude(self) -> None:
         """Botón «Editar con Claude…»: encola con Claude los shorts del vídeo
         elegido o el propio vídeo (si su final es vertical 1080×1920), con el
-        estilo, el encuadre y los subtítulos del panel, y arranca el agente sin
-        esperar a que acabe ninguna cola."""
+        estilo del panel (los shorts, además, con su encuadre y subtítulos; el
+        vídeo, con los que se guardaron con él), y arranca el agente sin esperar
+        a que acabe ninguna cola."""
         indices = self.vista_cola.selectedIndexes()
         if self._procesando or not indices:
             return
@@ -771,11 +772,14 @@ class VentanaPrincipal(QMainWindow):
             nuevo = None
             if estados:
                 ficha = self._ficha_de(trabajo)
-                if ficha is not None and ficha.final is not None:
-                    nuevo = estados.get(ficha.final.ruta.resolve())
                 carpeta = self._carpeta_shorts_de(trabajo)
-                if nuevo is None and carpeta:
-                    nuevo = estados.get(carpeta.resolve())
+                rutas = [ficha.final.ruta if ficha is not None and ficha.final else None,
+                         carpeta]
+                candidatos = [estados[r.resolve()] for r in rutas
+                              if r is not None and r.resolve() in estados]
+                # Una tanda terminada se queda visible horas: no tapa a la activa.
+                nuevo = next((e for e in candidatos if e.restante_s is not None),
+                             candidatos[0] if candidatos else None)
             if nuevo != trabajo.edicion:
                 cambia_el_alto |= (nuevo is None) != (trabajo.edicion is None)
                 self.modelo_cola.actualizar(fila, edicion=nuevo)
@@ -1031,7 +1035,8 @@ class VentanaPrincipal(QMainWindow):
         self.modelo_cola.actualizar(fila, shorts=Path(carpeta), n_shorts=n)
 
     def _al_avisar(self, fila: int, texto: str) -> None:
-        self.modelo_cola.actualizar(fila, aviso=texto)
+        previo = self.modelo_cola.trabajo(fila).aviso
+        self.modelo_cola.actualizar(fila, aviso=f"{previo} · {texto}" if previo else texto)
 
     def _al_terminar_trabajo(
         self, fila: int, ok: bool, salida: str, error: str
@@ -1057,10 +1062,14 @@ class VentanaPrincipal(QMainWindow):
                 config, opciones = entrada
                 if (shorts.es_final_vertical(ficha)
                         and shorts.editado_al_dia(ficha.final.ruta) is None):
+                    # shortcut: corre en el hilo de la interfaz; ffprobe y `encolar`
+                    # pueden copiar el final entero si la salida y ~/TSOTS están en
+                    # volúmenes distintos y congelar la ventana un momento. Pasarlo a
+                    # un worker si se nota.
                     try:
                         shorts.editar_video(ficha, config, opciones)
-                    except Exception as error:  # noqa: BLE001 — se le cuenta al usuario
-                        self._al_avisar(fila, str(error))
+                    except Exception as fallo:  # noqa: BLE001 — se le cuenta al usuario
+                        self._al_avisar(fila, str(fallo))
         else:
             estado = (
                 EstadoTrabajo.CANCELADO

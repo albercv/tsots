@@ -480,7 +480,8 @@ class PanelOpciones(QWidget):
             sin_claude if not self._claude_disponible else
             _("Edita con Claude, en el estilo de arriba, los shorts ya creados del "
               "vídeo elegido o el propio vídeo si su final es vertical "
-              "1080×1920. Usa el encuadre y los subtítulos de este panel. Cada "
+              "1080×1920. Los shorts usan el encuadre y los subtítulos de este "
+              "panel; el vídeo, los que se guardaron con él. Cada "
               "short y cada vídeo es una ejecución de Claude, y los editados "
               "aparecen junto a los originales al cabo de unos minutos."))
         self.boton_editar_con_claude.setEnabled(False)

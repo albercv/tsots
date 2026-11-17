@@ -365,13 +365,14 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
 - **Shorts o vídeos que ya tienes:** elige el vídeo en la cola, el
   **Estilo** y pulsa **Editar con Claude…**. Si tiene shorts, edita los
   shorts (con el encuadre y los subtítulos del panel, así que deja los que
-  usaste al crearlos); si no tiene y su final es vertical 1080×1920, edita
+  usaste al crearlos; el vídeo usa los que se guardaron con él); si no tiene y su final es vertical 1080×1920, edita
   el propio vídeo; si tiene ambos, pregunta cuál (**Los N shorts** / **El
   vídeo**); si ninguno, avisa de que hace falta un final vertical 1080×1920
   o shorts. Empieza a editar en el momento y no hace falta marcar **Editar
   con Claude**; úsalo para volver a editar a propósito. Cada short o vídeo
-  es una ejecución de Claude con tu cuenta. Los que ya esperan en cola no
-  se repiten.
+  es una ejecución de Claude con tu cuenta. Un short o vídeo que ya tiene en
+  cola un trabajo vigente no se repite (si su original cambió después, ese
+  trabajo no cuenta).
 - Se encola un trabajo por short (o vídeo) en `~/TSOTS/edicion/pendientes/`. Cuando
   termina la cola de procesamiento (y al abrir la app) TSOTS lanza
   `lanzador/edicion/procesar_pendientes.sh`. Este ejecuta `claude -p

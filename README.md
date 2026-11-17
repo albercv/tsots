@@ -366,13 +366,14 @@ sounds, in the style you choose. The untouched original stays where it is.
 - **Shorts or videos you already have:** select the video in the queue,
   pick the **Style** and click **Edit with Claude…**. If it has shorts it
   edits them (using the framing and subtitle settings of the panel, so keep
-  the ones you created them with); if it has none and its final is vertical
+  the ones you created them with; the video uses the ones saved with it); if it has none and its final is vertical
   1080×1920 it edits the video itself; if it has both it asks which
   (**All N shorts** / **The video**); if neither, it warns that a vertical
   1080×1920 final or shorts are needed. Editing starts right away and you do
   not need to tick **Edit with Claude**; use it to re-edit on purpose. Each
-  short or video is one Claude run on your account. Items already waiting
-  are not queued twice.
+  short or video is one Claude run on your account. A short or video that
+  already has an up-to-date job waiting is not queued twice (a waiting job
+  whose original has changed since does not count).
 - One job per short (or video) is queued in `~/TSOTS/edicion/pendientes/`. When the
   processing queue ends (and when the app opens) TSOTS launches
   `lanzador/edicion/procesar_pendientes.sh`. It runs `claude -p --model

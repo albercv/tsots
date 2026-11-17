@@ -1769,6 +1769,36 @@ def test_la_barra_del_video_va_en_su_fila(qtbot, tmp_path, monkeypatch):
     assert ventana.modelo_cola.trabajo(0).edicion == e2
 
 
+def test_la_barra_prefiere_la_edicion_con_trabajo_pendiente(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    terminado = _estado_edicion(restante_s=None, en_cola=0, actual=None)
+    activo = _estado_edicion(hechos=0)
+    monkeypatch.setattr("app.main.estado_edicion.leer",
+                        lambda d: {ficha.final.ruta: terminado, carpeta: activo})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion == activo
+    monkeypatch.setattr("app.main.estado_edicion.leer",
+                        lambda d: {ficha.final.ruta: activo, carpeta: terminado})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion == activo
+
+
+def test_segundo_clic_en_editar_el_video_avisa_de_que_ya_esta_en_cola(
+        qtbot, tmp_path, monkeypatch):
+    ventana, video, _s, _l, mensajes = _editando_video(
+        qtbot, tmp_path, monkeypatch, con_shorts=False)
+    respuestas = iter([1, 0])
+    monkeypatch.setattr("app.main.shorts.editar_video",
+                        lambda f, c, o: next(respuestas))
+    ventana.panel.boton_editar_con_claude.click()
+    ventana.panel.boton_editar_con_claude.click()
+    assert "ya estaba en cola" in mensajes[-1]
+
+
 def test_editar_con_claude_shorts_encola_con_el_panel_y_lanza_el_agente(
         qtbot, tmp_path, monkeypatch):
     ventana, ficha, llamadas, lanzados, mensajes = _editando_shorts(
