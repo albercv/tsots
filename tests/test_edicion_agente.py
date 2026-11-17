@@ -61,7 +61,7 @@ def test_exito(tmp_path, video_vertical):
     prohibidas = args[args.index("--disallowedTools") + 1].split(",")
     assert "Edit(./plan.json)" in permitidas and str(edi) not in ",".join(permitidas)
     assert [p for p in permitidas if p.startswith("Edit")] == ["Edit(./plan.json)"]
-    assert True and not any(p.startswith("Write") for p in permitidas)
+    assert not any(p.startswith("Write") for p in permitidas)
     assert "Edit" not in prohibidas and "NotebookEdit" in prohibidas
     assert not args[1].startswith("-") and "name: editar-short" not in args[1]
     assert not (edi / ".bloqueo").exists()
