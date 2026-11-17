@@ -1991,3 +1991,44 @@ def test_la_geometria_de_la_disposicion_anterior_no_se_restaura(tmp_path):
     ajustes.guardar_geometria(b"nueva")
     assert ajustes.cargar_geometria() == b"nueva"
     assert ajustes._q.value("ventana/geometria") == b"vieja"
+
+
+def _estado_edicion(**cambios):
+    from videopipeline.edicion.estado import EstadoEdicion
+    base = dict(total=3, hechos=1, errores=0, en_cola=1, actual="02 - Dos",
+                fase="montando", porcentaje=50.0, restante_s=200.0,
+                agente_activo=True, con_error=())
+    return EstadoEdicion(**{**base, **cambios})
+
+
+def test_la_fila_muestra_el_avance_de_la_edicion_con_claude(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    estado = _estado_edicion()
+    monkeypatch.setattr("app.main.estado_edicion.leer", lambda d: {carpeta: estado})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion == estado
+    monkeypatch.setattr("app.main.estado_edicion.leer", lambda d: {})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion is None
+
+
+def test_la_edicion_de_otra_carpeta_no_se_pone_en_la_fila(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    monkeypatch.setattr("app.main.estado_edicion.leer",
+                        lambda d: {tmp_path / "otra": _estado_edicion()})
+    ventana._refrescar_edicion()
+    assert ventana.modelo_cola.trabajo(0).edicion is None
+
+
+def test_el_avance_de_la_edicion_se_refresca_solo(qtbot, tmp_path, monkeypatch):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    assert ventana._temporizador_edicion.isActive()
+    assert ventana._temporizador_edicion.interval() == 5000

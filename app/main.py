@@ -32,6 +32,8 @@ from videopipeline import i18n, shorts
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.difusion import lanzar_agente
+from videopipeline import edicion
+from videopipeline.edicion import estado as estado_edicion
 from videopipeline.edicion import lanzar_agente_edicion
 from videopipeline.ficha import (
     CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
@@ -44,6 +46,7 @@ from videopipeline.reproceso_plan import Consulta, Decisiones, planificar, revis
 from .queue_model import EstadoTrabajo, ModeloCola, resumen_de
 from .settings import Ajustes
 from .widgets.cabecera import Cabecera
+from .widgets.delegado_cola import DelegadoCola
 from .widgets.dialogo_glosario import DialogoGlosario
 from .widgets.dialogo_marca import DialogoMarca
 from .widgets import dialogo_publicar
@@ -140,6 +143,7 @@ class VentanaPrincipal(QMainWindow):
 
         self.vista_cola = QListView()
         self.vista_cola.setModel(self.modelo_cola)
+        self.vista_cola.setItemDelegate(DelegadoCola(self.vista_cola))
         self.vista_cola.doubleClicked.connect(self._abrir_resultado)
         self.etiqueta_cola = QLabel(_("Cola"))
         columna_izquierda.addWidget(self.etiqueta_cola)
@@ -281,6 +285,12 @@ class VentanaPrincipal(QMainWindow):
         # Carpetas del blog que quedaron de otra sesión, ya con la ventana en marcha.
         QTimer.singleShot(0, lanzar_agente)
         QTimer.singleShot(0, lanzar_agente_edicion)
+        # El avance de «Editar con Claude» va debajo de la fila de cada vídeo.
+        self._temporizador_edicion = QTimer(self)
+        self._temporizador_edicion.setInterval(5000)
+        self._temporizador_edicion.timeout.connect(self._refrescar_edicion)
+        self._temporizador_edicion.start()
+        QTimer.singleShot(0, self._refrescar_edicion)
 
     def _fijar_alto_pestanas(self) -> None:
         """Alto fijo para la zona de pestañas: el de la previsualización a
@@ -698,12 +708,31 @@ class VentanaPrincipal(QMainWindow):
             QMessageBox.warning(self, _("Editar con Claude"), str(error))
             return
         lanzar_agente_edicion()
+        self._refrescar_edicion()
         QMessageBox.information(
             self, _("Editar con Claude"),
             _("{n} shorts en cola. Cada editado aparece junto a su original al "
               "cabo de unos minutos, y «Publicar shorts…» lo usará.").format(n=encolados)
             if encolados else
             _("Esos shorts ya estaban en cola para editarse."))
+
+    def _refrescar_edicion(self) -> None:
+        """Pone en cada fila con shorts el avance de su edición con Claude, si
+        se está editando o se editó hace poco (lo lee de ~/TSOTS/edicion)."""
+        estados = {carpeta.resolve(): e
+                   for carpeta, e in estado_edicion.leer(edicion.DIR_EDICION).items()}
+        cambia_el_alto = False
+        for fila in range(self.modelo_cola.rowCount()):
+            trabajo = self.modelo_cola.trabajo(fila)
+            if not estados and trabajo.edicion is None:
+                continue
+            carpeta = self._carpeta_shorts_de(trabajo) if estados else None
+            nuevo = estados.get(carpeta.resolve()) if carpeta else None
+            if nuevo != trabajo.edicion:
+                cambia_el_alto |= (nuevo is None) != (trabajo.edicion is None)
+                self.modelo_cola.actualizar(fila, edicion=nuevo)
+        if cambia_el_alto:
+            self.vista_cola.doItemsLayout()
 
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
@@ -1011,6 +1040,7 @@ class VentanaPrincipal(QMainWindow):
                 self.modelo_cola.actualizar(fila, estado=EstadoTrabajo.ESPERA)
         self._refrescar_boton()
         lanzar_agente_edicion()
+        self._refrescar_edicion()
 
     def _refrescar_boton(self, *args) -> None:
         if self._procesando:

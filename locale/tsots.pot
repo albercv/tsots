@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 15:01+0100\n"
+"POT-Creation-Date: 2026-11-17 15:34+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -319,6 +319,25 @@ msgstr ""
 msgid "Ciudad:"
 msgstr ""
 
+msgid "Claude decide"
+msgstr ""
+
+#, python-brace-format
+msgid "Claude {i} de {total} · {short}: {fase} · {faltan}"
+msgstr ""
+
+#, python-brace-format
+msgid "Claude: {hechos} de {total} hechos · {faltan}"
+msgstr ""
+
+#, python-brace-format
+msgid "Claude: {n} editados"
+msgstr ""
+
+#, python-brace-format
+msgid "Claude: {n} en cola · empieza al terminar la cola o al abrir la app"
+msgstr ""
+
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
 msgstr ""
@@ -351,6 +370,10 @@ msgid "Con Premium, TSOTS deja pasar vídeos más largos y textos largos en un s
 msgstr ""
 
 msgid "Con el estilo de la sección Subtítulos."
+msgstr ""
+
+#, python-brace-format
+msgid "Con error en la edición con Claude: {lista}. El motivo está en ~/TSOTS/edicion/errores/."
 msgstr ""
 
 msgid "Conecta a internet y vuelve a procesar; los modelos se descargan una sola vez."
@@ -2154,6 +2177,10 @@ msgstr ""
 msgid "error"
 msgstr ""
 
+#, python-brace-format
+msgid "faltan ~{min} min"
+msgstr ""
+
 msgid "ffmpeg no encuentra la cabecera (moov) o no reconoce los datos: el archivo está incompleto o corrupto (truncado, aún se estaba escribiendo, o un paso anterior dejó una salida a medias)."
 msgstr ""
 
@@ -2178,13 +2205,22 @@ msgstr ""
 msgid "medium (más preciso)"
 msgstr ""
 
+msgid "montando el vídeo"
+msgstr ""
+
 msgid "no disponible"
 msgstr ""
 
 msgid "ollama pull <modelo>  (el nombre exacto está en el detalle técnico)"
 msgstr ""
 
+msgid "preparando"
+msgstr ""
+
 msgid "procesando"
+msgstr ""
+
+msgid "revisando"
 msgstr ""
 
 #, python-brace-format
@@ -2207,6 +2243,9 @@ msgid "subtítulos"
 msgstr ""
 
 msgid "turbo (recomendado)"
+msgstr ""
+
+msgid "validando"
 msgstr ""
 
 msgid "vertical"
@@ -2233,6 +2272,10 @@ msgstr ""
 
 #, python-brace-format
 msgid "{nombre}: el proceso murió por una señal"
+msgstr ""
+
+#, python-brace-format
+msgid "{n} con error"
 msgstr ""
 
 #, python-brace-format

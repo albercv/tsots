@@ -370,6 +370,19 @@ elijas. El original queda intacto donde estaba.
   salen de código, y el código renderiza. El resultado se comprueba y se
   guarda como `NN - título.editado.mp4` junto al original. Un short de
   112 s tardó unos 2-3 minutos.
+- **Avance en la cola:** debajo de la fila del vídeo una barra muestra
+  cuántos shorts van, en qué paso está el actual (preparando, Claude decide,
+  validando, montando el vídeo, revisando) y el tiempo que falta, estimado
+  con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
+  editaron y cuántos fallaron; al pasar el ratón por la fila, cuáles.
+- **Música de fondo:** mete pistas libres de derechos en
+  `~/TSOTS/musica/divertido/`, `formal/` y `academico/` (mp3, wav, m4a,
+  aac, flac u ogg). Cada short coge la siguiente pista de su estilo por
+  turno, así que dos shorts seguidos nunca repiten pista, repetida o
+  recortada al largo del short y con el volumen igualado. Sin pistas para un
+  estilo, TSOTS sintetiza la música, con otra progresión de acordes, otro
+  tono y otro tempo en cada short. Usa solo música cuya licencia permita
+  ponerla en tus vídeos.
 - Los trabajos terminados van a `~/TSOTS/edicion/hechos/`; los fallidos, a
   `errores/` con un `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publicar shorts…** sube el archivo editado si existe y lo marca
