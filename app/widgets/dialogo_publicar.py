@@ -307,12 +307,13 @@ class DialogoPublicar(QDialog):
         self.campo_hashtags.setCursorPosition(0)
         formulario.addRow(_("Hashtags:"), self.campo_hashtags)
         self._palabras_clave = tuple(caption.palabras_clave)
+        self._post_x = caption.post_x
         self.campo_x = QPlainTextEdit()
-        self.campo_x.setFixedHeight(64)
+        self.campo_x.setFixedHeight(96)
         self.campo_x.setToolTip(_(
             "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un "
-            "emoji, 2. Mientras no lo cambies, se rellena con el título y los "
-            "hashtags.").format(maximo=MAX_TEXTO_X))
+            "emoji, 2. Mientras no lo cambies, se rellena con el post que propuso el "
+            "modelo (o el título) y los hashtags que caben.").format(maximo=MAX_TEXTO_X))
         self.contador_x = QLabel()
         fila_x = QHBoxLayout()
         fila_x.addWidget(self.campo_x, 1)
@@ -571,6 +572,7 @@ class DialogoPublicar(QDialog):
             hashtags=tuple(self.campo_hashtags.text().split()),
             palabras_clave=self._palabras_clave,
             texto_x=self.campo_x.toPlainText().strip(),
+            post_x=self._post_x,
             fotos=self.tira_linkedin.fotos(),
             texto_linkedin=self.campo_linkedin.toPlainText().strip(),
         )

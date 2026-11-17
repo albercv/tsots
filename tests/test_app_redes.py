@@ -1,6 +1,7 @@
 """Ajustes de redes, diálogo Redes… y diálogo Publicar (sin red ni Llavero real)."""
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -980,6 +981,17 @@ def test_texto_de_x_precargado_con_contador_y_regenerado(qtbot, video, ajustes,
     dialogo.campo_x.setPlainText("")
     dialogo.campo_titulo.setText("Tercero")
     assert dialogo.campo_x.toPlainText() == "Tercero\n\n#uno"
+
+
+def test_texto_de_x_precargado_con_el_post_del_modelo(qtbot, video, ajustes):
+    caption = replace(_caption(), post_x="Gancho.\n\nDos ideas. ¿Y tú?")
+    dialogo = DialogoPublicar(video, caption, ajustes, fabrica=lambda *a: ProveedorFalso())
+    qtbot.addWidget(dialogo)
+    assert dialogo.campo_x.toPlainText() == "Gancho.\n\nDos ideas. ¿Y tú?\n\n#ia #pymes"
+    # El título ya no manda: solo los hashtags siguen cambiando el texto.
+    dialogo.campo_titulo.setText("Otro")
+    dialogo.campo_hashtags.setText("#uno")
+    assert dialogo.publicacion().texto_x == "Gancho.\n\nDos ideas. ¿Y tú?\n\n#uno"
 
 
 def test_texto_de_x_largo_sin_premium_bloquea_y_con_premium_no(qtbot, video, ajustes,

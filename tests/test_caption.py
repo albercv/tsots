@@ -61,8 +61,8 @@ def test_construir_mensajes_idioma_desconocido_usa_espanol():
     assert "Transcripción:\nx" == m[1]["content"]
 
 
-def test_esquema_exige_los_cuatro_campos():
-    assert set(cap.ESQUEMA["required"]) == {"titulo", "caption", "hashtags",
+def test_esquema_pide_los_cinco_campos():
+    assert set(cap.ESQUEMA["required"]) == {"titulo", "caption", "post_x", "hashtags",
                                             "palabras_clave"}
 
 
@@ -240,9 +240,9 @@ def test_prompt_incluye_terminos_del_glosario(idioma):
 
 
 def test_prompt_sin_terminos_no_menciona_glosario():
-    con = cap.construir_mensajes("t", "", "es", terminos=("X",))[0]["content"]
+    con = cap.construir_mensajes("t", "", "es", terminos=("Zebrix",))[0]["content"]
     sin = cap.construir_mensajes("t", "", "es")[0]["content"]
-    assert len(con) > len(sin) and "X" not in sin
+    assert len(con) > len(sin) and "Zebrix" not in sin
 
 
 def test_generar_pasa_terminos_al_prompt():
@@ -254,3 +254,38 @@ def test_generar_pasa_terminos_al_prompt():
 
     cap.generar("t", "", "m", cliente=cliente, terminos=("Claude Code",))
     assert "Claude Code" in vistos[0]
+
+
+@pytest.mark.parametrize("idioma", ["es", "en"])
+def test_prompt_pide_post_x_con_su_limite(idioma):
+    system = cap.construir_mensajes("x", "", idioma=idioma)[0]["content"]
+    assert f"post_x" in system
+    assert f"{cap.MIN_POST_X}" in system and f"{cap.MAX_POST_X}" in system
+
+
+def test_post_x_deja_sitio_a_un_hashtag_en_los_280_de_x():
+    from videopipeline.redes.textos import MAX_TEXTO_X
+    assert cap.MIN_POST_X < cap.MAX_POST_X <= MAX_TEXTO_X - len("\n\n#hashtag_largo")
+
+
+def test_generar_limpia_post_x_y_lo_tolera_ausente():
+    datos = _respuesta_ok() | {"post_x": "  Gancho   claro.\n\n\n\nIdea  uno. \n¿Y tú? "}
+    c = cap.generar("t", "", "m", cliente=lambda *_: datos)
+    assert c.post_x == "Gancho claro.\n\nIdea uno.\n¿Y tú?"
+    assert cap.generar("t", "", "m", cliente=lambda *_: _respuesta_ok()).post_x == ""
+
+
+def test_md_ida_y_vuelta_con_post_x(tmp_path):
+    c = cap.Caption("T", "Cuerpo", ["#a"], ["ia"],
+                    post_x="Gancho.\n\n- idea con guion\n## X\n¿Y tú?")
+    ruta = tmp_path / "v_limpio.md"
+    cap.escribir_md(c, ruta)
+    assert cap.leer_md(ruta) == c
+
+
+def test_md_antiguo_sin_post_x_se_lee_igual(tmp_path):
+    ruta = tmp_path / "v_limpio.md"
+    ruta.write_text("# T\n\n## Caption\nCuerpo\n## X\n\n## Hashtags\n#a\n\n"
+                    "## Palabras clave\n- ia\n", encoding="utf-8")
+    c = cap.leer_md(ruta)
+    assert (c.caption, c.palabras_clave, c.post_x) == ("Cuerpo\n## X", ["ia"], "")

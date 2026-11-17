@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 18:19+0100\n"
+"POT-Creation-Date: 2026-11-17 19:14+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -615,8 +615,8 @@ msgid "El pipeline invoca ffmpeg, ffprobe y auto-editor desde el PATH y alguno n
 msgstr "The pipeline runs ffmpeg, ffprobe and auto-editor from PATH and one of them was not found."
 
 #, python-brace-format
-msgid "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un emoji, 2. Mientras no lo cambies, se rellena con el título y los hashtags."
-msgstr "The X post. Without Premium it takes {maximo} characters: a URL counts 23 and an emoji 2. Until you change it, it is filled with the title and the hashtags."
+msgid "El post de X. Sin Premium admite {maximo} caracteres: una URL cuenta 23 y un emoji, 2. Mientras no lo cambies, se rellena con el post que propuso el modelo (o el título) y los hashtags que caben."
+msgstr "The X post. Without Premium it takes {maximo} characters: a URL counts 23 and an emoji 2. Until you change it, it is filled with the post the model suggested (or the title) and the hashtags that fit."
 
 #, python-brace-format
 msgid "El proceso murió por una señal (código {codigo})"
