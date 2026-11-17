@@ -65,6 +65,13 @@ def test_contadores_alternan_lado():
     assert len({p.dur for p in c}) == 1
 
 
+def test_contadores_lado_por_lista():
+    ms = [M("contador", 1 + 2 * i, lista=1, num=i + 1, texto="X") for i in range(3)]
+    ms += [M("contador", 8 + 2 * i, lista=2, num=i + 1, texto="Y") for i in range(2)]
+    c = [p for p in der(ms).piezas if p.clase == "contador"]
+    assert [p.params["lado"] for p in c] == ["L", "R", "L", "L", "R"]
+
+
 def test_emoji_lateral_con_etiqueta():
     s = der([M("etiqueta", 2, texto=["A"]), M("emoji", 3, emoji="🍉"), M("emoji", 10, emoji="🍌")])
     e = [p for p in s.piezas if p.clase == "emoji"]

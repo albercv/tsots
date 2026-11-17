@@ -55,7 +55,8 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> Specs:
 
     sonido("boom", 0.05)
     visuales = sorted((m for m in plan.momentos if m.tipo != "zoom"), key=lambda m: m.t)
-    ticks = lado = letra = 0
+    ticks = letra = 0
+    lado: dict = {}  # contador de lado por lista: cada lista empieza en L
     for m in (m for m in visuales if m.tipo != "emoji"):
         t = m.t
         if m.tipo == "etiqueta":
@@ -68,8 +69,8 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> Specs:
                 sonido("impact", t)
         elif m.tipo == "contador":
             if pieza("contador", t, DURACION["contador"], num=m.num, texto=_lineas(m.texto)[0],
-                     lado="LR"[lado % 2]):
-                lado += 1
+                     lado="LR"[lado.get(m.lista, 0) % 2]):
+                lado[m.lista] = lado.get(m.lista, 0) + 1
                 sonido("pop" if m.lista == 1 else "pluck", t + 0.08, num=m.num)
         elif m.tipo == "transicion":
             nueva = estilo.transiciones[letra % len(estilo.transiciones)]  # letras distintas: no repite
