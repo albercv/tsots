@@ -1403,3 +1403,33 @@ def test_linkedin_413_habla_de_las_fotos(tmp_path):
     servidor = Servidor(lambda req, s: httpx.Response(413, text="Too Large"))
     r = _proveedor(servidor).publicar(Plataforma.LINKEDIN, _pub_linkedin(tmp_path), Opciones())
     assert "413" in r.error and "fotos" in r.error and "vídeo" not in r.error
+
+
+def test_x_con_fotos_sube_fotos_a_upload_photos_con_los_campos_de_x(tmp_path):
+    servidor = Servidor(_ok_sync)
+    fotos = _pub_linkedin(tmp_path, n=4).fotos
+    pub = replace(_pub(tmp_path / "no_existe.mp4"), texto_x="Post de X", fotos_x=fotos)
+    r = _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
+    assert r.ok and r.url == "https://x.example/v/1"
+    peticion = servidor.peticiones[0]
+    assert str(peticion.url) == "https://api.upload-post.com/api/upload_photos"
+    campos = servidor.formularios[0]
+    assert campos["platform[]"] == ["x"] and campos["x_title"] == ["Post de X"]
+    assert campos["x_long_text_as_post"] == ["false"]
+    assert peticion.content.count(b'name="photos[]"') == 4
+    assert b'name="video"' not in peticion.content
+
+
+def test_x_sin_fotos_sube_el_video_y_las_fotos_de_linkedin_no_cuentan(tmp_path, video):
+    servidor = Servidor(_ok_sync)
+    pub = replace(_pub(video), fotos=_pub_linkedin(tmp_path).fotos)
+    _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
+    assert str(servidor.peticiones[0].url) == "https://api.upload-post.com/api/upload"
+    assert b'name="video"' in servidor.peticiones[0].content
+
+
+def test_x_con_una_foto_ausente_no_envia(tmp_path):
+    servidor = Servidor(_ok_sync)
+    pub = replace(_pub(tmp_path / "v.mp4"), fotos_x=(tmp_path / "falta.png",))
+    r = _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
+    assert not r.ok and "falta.png" in r.error and servidor.peticiones == []

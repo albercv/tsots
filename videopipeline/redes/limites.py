@@ -2,6 +2,8 @@
 
 Hoy solo X los tiene: sin Premium admite vídeos de hasta 140 s (2:20) y
 512 MB. Con Premium, los límites son de horas y de GB: no se comprueban.
+Un vídeo que X no admite puede ir como post con fotos: hasta 4 (con más,
+el servicio lo publicaría como hilo).
 """
 from __future__ import annotations
 
@@ -11,6 +13,7 @@ from ..i18n import _
 
 MAX_DURACION_X = 140  # segundos
 MAX_TAMANO_X = 512 * 1024 * 1024  # bytes
+MAX_FOTOS_X = 4
 _MB = 1024 * 1024
 
 

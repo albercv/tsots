@@ -233,6 +233,8 @@ class Publicacion:
     # vídeo: `texto_linkedin` es el post completo, revisado por el usuario.
     fotos: tuple[Path, ...] = ()
     texto_linkedin: str = ""
+    # X sube estas fotos en lugar del vídeo (un vídeo que X no admite).
+    fotos_x: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True)
