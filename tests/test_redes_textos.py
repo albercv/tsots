@@ -202,3 +202,39 @@ def test_facebook_texto_es_caption_mas_hashtags_y_titulo_el_titulo():
 
 def test_max_texto_linkedin():
     assert MAX_TEXTO[Plataforma.LINKEDIN] == 3000
+
+
+def test_texto_x_por_defecto_usa_el_post_del_modelo_antes_que_el_titulo():
+    assert texto_x_por_defecto(_pub(post_x="Gancho.\n\nIdea.")) == "Gancho.\n\nIdea.\n\n#a #b"
+    assert texto_x_por_defecto(_pub(post_x="  ")) == "Título\n\n#a #b"
+
+
+@pytest.mark.parametrize("largo", [200, 250, 275, 400])
+def test_texto_x_con_post_del_modelo_nunca_pasa_de_280(largo):
+    post = ("Idea concreta del vídeo. " * 30)[:largo].strip()
+    hashtags = ("#inteligenciaartificial", "#automatizacion", "#evolve2digital", "#a", "#b")
+    texto = texto_x_por_defecto(_pub(post_x=post, hashtags=hashtags))
+    assert longitud_x(texto) <= MAX_TEXTO_X
+    if largo <= 250:  # el tamaño que pide el prompt deja sitio a algún hashtag
+        assert texto.startswith(post + "\n\n#inteligenciaartificial")
+
+
+def test_texto_para_x_sin_texto_propio_usa_el_post_del_modelo():
+    pub = _pub(post_x="Post del modelo.")
+    assert texto_para(Plataforma.X, pub) == "Post del modelo.\n\n#a #b"
+
+
+def test_post_del_modelo_largo_conserva_gancho_llamada_y_un_hashtag():
+    gancho, llamada = "Gancho que engancha.", "¿Lo has probado ya?"
+    medio = [f"Idea {i} del vídeo con bastante detalle concreto." for i in range(12)]
+    post = "\n\n".join([gancho, " ".join(medio), llamada])
+    texto = texto_x_por_defecto(_pub(post_x=post, hashtags=("#odin", "#ia")))
+    assert longitud_x(texto) <= MAX_TEXTO_X
+    assert texto.startswith(gancho + "\n\nIdea 0")
+    assert texto.endswith(llamada + "\n\n#odin") or texto.endswith(llamada + "\n\n#odin #ia")
+    assert "…" not in texto
+
+
+def test_post_del_modelo_de_una_sola_frase_larga_se_recorta():
+    texto = texto_x_por_defecto(_pub(post_x="palabra " * 60, hashtags=("#a",)))
+    assert longitud_x(texto) <= MAX_TEXTO_X and texto.endswith("…\n\n#a")

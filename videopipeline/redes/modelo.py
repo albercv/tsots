@@ -224,8 +224,11 @@ class Publicacion:
     hashtags: tuple[str, ...] = ()
     palabras_clave: tuple[str, ...] = ()
     # Texto propio del post de X, revisado por el usuario. Vacío: se usa el
-    # de por defecto (título + hashtags, ver `textos.texto_x_por_defecto`).
+    # de por defecto (`post_x` o el título, + hashtags; ver
+    # `textos.texto_x_por_defecto`).
     texto_x: str = ""
+    # Post de X que propuso el modelo con el caption, sin hashtags.
+    post_x: str = ""
     # LinkedIn publica fotos (portada + fotogramas) y un texto largo, no el
     # vídeo: `texto_linkedin` es el post completo, revisado por el usuario.
     fotos: tuple[Path, ...] = ()

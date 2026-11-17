@@ -20,6 +20,8 @@ from .subtitles import Palabra
 MAX_PALABRAS = 3500
 MAX_TITULO = 60
 NUM_HASHTAGS = 5
+# Post de X: deja sitio en sus 280 caracteres para «\n\n» y 1-2 hashtags.
+MIN_POST_X, MAX_POST_X = 200, 250
 
 # Etiquetas de relleno que no describen el vídeo: se descartan siempre.
 HASHTAGS_GENERICOS = frozenset({
@@ -41,6 +43,13 @@ _SYSTEM_ES = (
     "- caption: 120-200 palabras. Primera línea = gancho. Desarrollo con las 2-3 "
     "ideas clave del vídeo. Cierra con una llamada a la acción. Tono cercano y "
     "profesional. Sin hashtags dentro del caption.\n"
+    f"- post_x: post para X (Twitter) de {MIN_POST_X} a {MAX_POST_X} caracteres "
+    f"(unas 30-40 palabras; nunca más de {MAX_POST_X} caracteres), sin "
+    "hashtags, enlaces ni emojis. Primera frase = gancho; después las 2-3 "
+    "ideas clave del vídeo en frases cortas y concretas; la última frase, una "
+    "pregunta o una llamada a la acción. Aprovecha el espacio con contenido "
+    "del vídeo, sin relleno, sin presentarte («Soy…», «Hoy quiero…») y sin "
+    "«enlace en bio».\n"
     "- palabras_clave: 5-8 términos de búsqueda en español que describan el "
     "tema concreto del vídeo.\n"
     f"- hashtags: exactamente {NUM_HASHTAGS}, ordenados del más al menos "
@@ -61,6 +70,13 @@ _SYSTEM_EN = (
     "- caption: 120-200 words. First line = hook. Development with the video's "
     "2-3 key ideas. Close with a call to action. Warm and professional tone. "
     "No hashtags inside the caption.\n"
+    f"- post_x: a post for X (Twitter) of {MIN_POST_X} to {MAX_POST_X} "
+    f"characters (about 30-40 words; never more than {MAX_POST_X} characters), "
+    "without hashtags, links or emojis. First sentence = hook; then the "
+    "video's 2-3 key ideas in short, concrete sentences; the last sentence, a "
+    "question or a call to action. Use the space for content from the video, "
+    "no filler, no self-introduction (\"I'm…\", \"Today I want…\") and no "
+    "\"link in bio\".\n"
     "- palabras_clave: 5-8 search keywords describing the video's specific "
     "topic.\n"
     f"- hashtags: exactly {NUM_HASHTAGS}, ordered from most to least "
@@ -77,13 +93,14 @@ ESQUEMA: dict = {
     "properties": {
         "titulo": {"type": "string"},
         "caption": {"type": "string"},
+        "post_x": {"type": "string"},
         # Orden importante: Ollama genera los campos en este orden, así los
         # hashtags salen después del caption y las palabras clave.
         "palabras_clave": {"type": "array", "items": {"type": "string"}},
         "hashtags": {"type": "array", "items": {"type": "string"},
                      "minItems": NUM_HASHTAGS, "maxItems": NUM_HASHTAGS},
     },
-    "required": ["titulo", "caption", "hashtags", "palabras_clave"],
+    "required": ["titulo", "caption", "post_x", "hashtags", "palabras_clave"],
 }
 
 
@@ -93,6 +110,8 @@ class Caption:
     caption: str
     hashtags: list[str]
     palabras_clave: list[str]
+    # Post de X que propuso el modelo, sin hashtags. Vacío en los .md antiguos.
+    post_x: str = ""
 
     @property
     def hashtags_texto(self) -> str:
@@ -185,7 +204,8 @@ def _elegir_hashtags(propuestos: list, palabras_clave: list[str]) -> list[str]:
 
 
 def _validar(datos: dict) -> Caption:
-    faltan = [c for c in ESQUEMA["required"] if c not in datos]
+    # Sin `post_x` el caption vale igual: X usa entonces el título.
+    faltan = [c for c in ESQUEMA["required"] if c not in datos and c != "post_x"]
     tipos_mal = (
         not isinstance(datos.get("titulo"), str)
         or not isinstance(datos.get("caption"), str)
@@ -206,7 +226,16 @@ def _validar(datos: dict) -> Caption:
         caption=datos["caption"].strip(),
         hashtags=_elegir_hashtags(datos["hashtags"], palabras_clave),
         palabras_clave=palabras_clave,
+        post_x=_limpiar_post_x(datos.get("post_x")),
     )
+
+
+def _limpiar_post_x(texto) -> str:
+    """Sin espacios sobrantes ni más de una línea en blanco seguida."""
+    if not isinstance(texto, str):
+        return ""
+    lineas = "\n".join(" ".join(linea.split()) for linea in texto.strip().splitlines())
+    return re.sub(r"\n{3,}", "\n\n", lineas)
 
 
 def generar(
@@ -237,6 +266,8 @@ def escribir_md(caption: Caption, ruta: Path) -> None:
         "## Palabras clave",
         *[f"- {p}" for p in caption.palabras_clave], "",
     ]
+    if caption.post_x.strip():
+        lineas += ["## X", caption.post_x.strip(), ""]
     ruta.write_text("\n".join(lineas), encoding="utf-8")
 
 
@@ -279,14 +310,20 @@ def leer_md(ruta: Path) -> Caption | None:
     if pos_h is None or pos_h <= 2:
         return None
 
+    # «## X» (opcional) va al final: solo se busca tras las palabras clave.
+    pos_x = next((i for i in range(pos_pc + 1, len(lineas)) if lineas[i] == "## X"),
+                 len(lineas))
+
     # Extraer secciones
     caption = "\n".join(lineas[3:pos_h]).strip()
     hashtags = "\n".join(lineas[pos_h + 1:pos_pc]).split()
-    palabras_clave = [l[2:].strip() for l in lineas[pos_pc + 1:] if l.startswith("- ")]
+    palabras_clave = [l[2:].strip() for l in lineas[pos_pc + 1:pos_x] if l.startswith("- ")]
+    post_x = "\n".join(lineas[pos_x + 1:]).strip()
 
     return Caption(
         titulo=titulo,
         caption=caption,
         hashtags=hashtags,
         palabras_clave=palabras_clave,
+        post_x=post_x,
     )
