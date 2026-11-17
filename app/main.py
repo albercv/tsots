@@ -32,6 +32,7 @@ from videopipeline import i18n, shorts
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.difusion import lanzar_agente
+from videopipeline.edicion import lanzar_agente_edicion
 from videopipeline.ficha import (
     CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
     olvidar, reconocer,
@@ -278,6 +279,7 @@ class VentanaPrincipal(QMainWindow):
         self._ajustar_a_pantalla()
         # Carpetas del blog que quedaron de otra sesión, ya con la ventana en marcha.
         QTimer.singleShot(0, lanzar_agente)
+        QTimer.singleShot(0, lanzar_agente_edicion)
 
     def _fijar_alto_pestanas(self) -> None:
         """Alto fijo para la zona de pestañas: el de la previsualización a
@@ -789,6 +791,8 @@ class VentanaPrincipal(QMainWindow):
             "ficha": ficha_id,
             "subtitulos": valores["shorts_subtitulos"],
             "encuadre": valores["shorts_encuadre"],
+            "editar": valores["shorts_editar"],
+            "estilo": valores["shorts_estilo"],
         }
 
     def _crear_shorts(self) -> None:
@@ -960,6 +964,7 @@ class VentanaPrincipal(QMainWindow):
             if self.modelo_cola.trabajo(fila).estado == EstadoTrabajo.PROCESANDO:
                 self.modelo_cola.actualizar(fila, estado=EstadoTrabajo.ESPERA)
         self._refrescar_boton()
+        lanzar_agente_edicion()
 
     def _refrescar_boton(self, *args) -> None:
         if self._procesando:
