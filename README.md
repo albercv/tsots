@@ -371,6 +371,11 @@ The untouched original stays where it is.
   code renders. The result is checked and saved as
   `NN - title.editado.mp4` next to the original. A 112 s short took about
   2-3 minutes.
+- **Progress in the queue:** under the video's row a bar shows how many
+  shorts are done, which step the current one is in (preparing, Claude
+  decides, validating, rendering, checking) and the estimated time left,
+  based on how long the finished ones took. When the batch ends it shows how
+  many were edited and how many failed; hover the row to see which.
 - Finished jobs go to `~/TSOTS/edicion/hechos/`; failed ones to
   `errores/` with a `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
 - **Publish shorts…** uploads the edited file when it exists and marks it

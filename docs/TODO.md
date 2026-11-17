@@ -11,7 +11,6 @@ Pending work, most urgent first. Remove an item when it is merged into
 - [ ] **Pre-check in `procesar_pendientes.sh`** that the original is
       unchanged before running `claude`: today a superseded job still spends
       a Haiku run before `entregar` rejects it ("origen cambiado").
-- [ ] **`SKILL.md`: say explicitly** "si sigue fallando tras 3 intentos,
       para".
 - [ ] **Real-app acceptance of Edit with Claude:** create shorts of an
       episode with the box ticked, wait for `hechos/`, open two edited
