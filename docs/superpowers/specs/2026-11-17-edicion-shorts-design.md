@@ -454,3 +454,22 @@ los muestra como "(editado)". Repetir un short en formal y académico.
 - Presupuestos y niveles exactos dentro de los márgenes de la tabla 5.6.
 - Cómo reparametrizar `gen_overlays.py` (FPS y paleta hoy son constantes)
   sin romper su uso actual.
+
+## 9. Ampliación: editar shorts ya creados (2026-11-17)
+
+- Botón **«Editar shorts ya creados»** en la sección Shorts, debajo de
+  «Publicar shorts…». Activo cuando el vídeo elegido tiene shorts, no se
+  está procesando y se encontró `claude`.
+- `shorts.editar_existentes(ficha, config, opciones)` lee `shorts.json` (solo
+  si es de esa ficha), recalcula las palabras de cada short con
+  `tramo_palabras` sobre la transcripción de la ficha (las mismas que se
+  quemaron como subtítulos) y encola con el mismo `_encolar_edicion` que
+  `crear`. No repite los shorts que ya esperan en `pendientes/`. Sin shorts o
+  sin transcripción, `PasoFallido`.
+- El encuadre y los subtítulos de un short no se guardan al crearlo, así que
+  se usan los del panel en ese momento.
+- Pide confirmación (cada short es una ejecución de Claude) y lanza el agente
+  en el momento, sin esperar a ninguna cola.
+- El desplegable **Estilo** ya no depende de la casilla «Editar con Claude»:
+  está activo siempre que se encuentre `claude`, porque también es el estilo
+  del botón. (Cambia lo dicho en 5.1.)

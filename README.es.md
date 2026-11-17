@@ -356,6 +356,11 @@ elijas. El original queda intacto donde estaba.
   (Divertido / Formal / Académico). Es un único ajuste para todo el lote de
   shorts que crees. Aparece desactivado (con un aviso al pasar el ratón)
   cuando no se encuentra el comando `claude`.
+- **Shorts que ya tienes:** elige el vídeo en la cola, el **Estilo** y
+  pulsa **Editar shorts ya creados**. Encola todos los shorts de ese vídeo
+  (con el encuadre y los subtítulos del panel, así que deja los que usaste
+  al crearlos) y empieza a editarlos en el momento; no hace falta marcar
+  **Editar con Claude**. Los que ya esperan en cola no se repiten.
 - Se encola un trabajo por short en `~/TSOTS/edicion/pendientes/`. Cuando
   termina la cola de procesamiento (y al abrir la app) TSOTS lanza
   `lanzador/edicion/procesar_pendientes.sh`. Este ejecuta `claude -p
