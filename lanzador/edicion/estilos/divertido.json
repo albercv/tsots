@@ -1,0 +1,19 @@
+{
+  "densidad_max": 0.4,
+  "tipos": ["etiqueta", "contador", "emoji", "golpe", "error", "zoom", "transicion"],
+  "transiciones": "ABCDEFG",
+  "zoom_max": 1.25,
+  "zoom_lento": 1.08,
+  "sfx": {
+    "whoosh_a": -16, "whoosh_b": -16, "whoosh_c": -16, "whoosh_d": -16,
+    "whoosh_e": -16, "whoosh_f": -16, "whoosh_g": -16,
+    "pop": -14, "pluck": -14, "ding": -14, "boom": -14,
+    "impact": -12, "tick": -20, "tick2": -20, "tap": -16, "riser": -18,
+    "golpe": -10, "error": -14
+  },
+  "musica": {"bpm": 98, "db": -14, "progresion": "lofi", "fade_out": 1.5},
+  "paleta": {
+    "acento": [255, 90, 0], "fondo": [10, 10, 10, 235], "texto": [255, 255, 255],
+    "fuente": ["/System/Library/Fonts/Helvetica.ttc", 1]
+  }
+}

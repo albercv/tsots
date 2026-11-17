@@ -1,0 +1,13 @@
+{
+  "densidad_max": 0.16666666666666666,
+  "tipos": ["etiqueta", "contador", "zoom", "transicion"],
+  "transiciones": "BG",
+  "zoom_max": 0,
+  "zoom_lento": 1.06,
+  "sfx": {"tick": -24, "whoosh_b": -16, "whoosh_g": -16},
+  "musica": {"bpm": 80, "db": -20, "progresion": "tranquila", "fade_out": 1.5},
+  "paleta": {
+    "acento": [255, 90, 0], "fondo": [235, 235, 235, 235], "texto": [40, 40, 40],
+    "fuente": ["/System/Library/Fonts/Helvetica.ttc", 0]
+  }
+}
