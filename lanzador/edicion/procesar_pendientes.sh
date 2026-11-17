@@ -45,6 +45,7 @@ mover() {
     local nombre destino
     nombre="$(basename "$carpeta")"
     destino="$DIR/$1/$nombre"
+    rm -rf "$carpeta/tmp"  # los slots renderizados pesan cientos de MB y se regeneran
     if [ ! -e "$destino" ] && mv "$carpeta" "$destino"; then
         [ "$1" = hechos ] && rm -f "$destino/video.mp4"
         echo "$(ahora) $nombre: $2"

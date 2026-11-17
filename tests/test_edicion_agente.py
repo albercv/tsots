@@ -48,8 +48,9 @@ def _ejecutar(tmp_path, edi, claude=None, **extra):
 
 def test_exito(tmp_path, video_vertical):
     edi, origen = _trabajo(tmp_path, video_vertical)
-    r = _ejecutar(tmp_path, edi, "cp video.mp4 salida.mp4\n")
+    r = _ejecutar(tmp_path, edi, "mkdir tmp; echo x > tmp/slot_00.mov\ncp video.mp4 salida.mp4\n")
     assert r.returncode == 0, r.stderr
+    assert not (edi / "hechos" / NOMBRE / "tmp").exists()
     hecho = edi / "hechos" / NOMBRE
     assert (origen.parent / f"{NOMBRE}.editado.mp4").exists()
     assert (hecho / "resultado.json").exists() and not (hecho / "video.mp4").exists()
@@ -69,9 +70,10 @@ def test_exito(tmp_path, video_vertical):
 
 def test_salida_mala_va_a_errores(tmp_path, video_vertical):
     edi, origen = _trabajo(tmp_path, video_vertical)
-    r = _ejecutar(tmp_path, edi, "echo nada\n")
+    r = _ejecutar(tmp_path, edi, "mkdir tmp; echo x > tmp/slot_00.mov\n")
     assert r.returncode == 0, r.stderr
     error = edi / "errores" / NOMBRE
+    assert not (error / "tmp").exists()
     assert "No existe salida.mp4" in (error / "motivo.txt").read_text()
     assert (error / "video.mp4").exists()  # para reintentar
     assert not (origen.parent / f"{NOMBRE}.editado.mp4").exists()
