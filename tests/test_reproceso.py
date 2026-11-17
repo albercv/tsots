@@ -1097,3 +1097,39 @@ def test_r10_mueve_acompanantes_de_linkedin(falsos, difusion, tmp_path):
     assert (nuevas_fotos / "01_portada.png").read_bytes() == b"PNG"
     assert not md.exists() and not fotos.exists()
     assert _sin_restos(ficha)
+
+
+def _con_editado(final: Path) -> tuple[Path, Path]:
+    editado = final.with_name(final.stem + ".editado.mp4")
+    tmp = editado.with_name(editado.name + ".tmp")
+    editado.write_bytes(b"EDITADO")
+    tmp.write_bytes(b"TMP")
+    return editado, tmp
+
+
+def test_escribir_un_final_nuevo_borra_su_editado(tmp_path):
+    ficha = _pasada(_ficha(tmp_path),
+                    [A.CORTAR, A.TRANSCRIBIR, A.QUEMAR],
+                    paso_silencios=True, subtitulos=True)
+    final = ficha.final.ruta
+    editado, tmp = _con_editado(final)
+
+    ficha = _pasada(ficha, [A.TRANSCRIBIR, A.QUEMAR], REHACER_SUBS,
+                    subtitulos=True)
+
+    assert final.is_file() and ficha.final.coincide(final)
+    assert not editado.exists() and not tmp.exists()
+
+
+def test_vertical_unico_nuevo_borra_su_editado(tmp_path):
+    ficha = _pasada(_ficha(tmp_path), [A.TRANSCRIBIR, A.VERTICAL],
+                    subtitulos=True, paso_vertical=True)
+    final = ficha.final.ruta
+    editado, tmp = _con_editado(final)
+
+    ficha = _pasada(ficha, [A.TRANSCRIBIR, A.VERTICAL],
+                    Decisiones(rehacer=frozenset({"subtitulos", "vertical"})),
+                    subtitulos=True, paso_vertical=True)
+
+    assert final.is_file() and ficha.final.coincide(final)
+    assert not editado.exists() and not tmp.exists()

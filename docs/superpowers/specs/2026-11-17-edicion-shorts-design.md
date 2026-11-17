@@ -508,3 +508,10 @@ los muestra como "(editado)". Repetir un short en formal y académico.
   repetirlo.
 - Académico pasa de sin música a música tranquila a -24 dB (la tabla 5.6 ya
   lo admitía).
+
+## 12. Ampliación: editar un vídeo suelto (2026-11-17)
+
+Ver `2026-11-17-editar-video-suelto-design.md`. Añade la edición del propio
+final de un vídeo cuando es vertical 1080×1920 (no solo de sus shorts): el
+botón «Editar con Claude…» y la casilla «Editar con Claude» al procesar lo
+cubren, el resultado es `<final>.editado.mp4` y «Publicar…» sube el editado.

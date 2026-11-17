@@ -15,12 +15,15 @@ AHORA = 1_800_000_000.0
 
 def _trabajo(dir_ed: Path, sub: str, carpeta: Path, stem: str, encolado: float,
              inicio: float | None = None, fin: float | None = None,
-             archivos: tuple[str, ...] = ()) -> Path:
+             archivos: tuple[str, ...] = (), grupo: str | None = None) -> Path:
     """Una carpeta de trabajo con sus marcas de tiempo."""
     t = dir_ed / sub / f"Ep - {stem}"
     t.mkdir(parents=True)
     tj = t / "trabajo.json"
-    tj.write_text(json.dumps({"origen": str(carpeta / f"{stem}.mp4")}))
+    datos = {"origen": str(carpeta / f"{stem}.mp4")}
+    if grupo is not None:
+        datos["grupo"] = grupo
+    tj.write_text(json.dumps(datos))
     os.utime(tj, (encolado, encolado))
     if inicio is not None:
         (t / "inicio").write_text(str(int(inicio)))
@@ -126,3 +129,18 @@ def test_trabajo_ilegible_se_ignora(tmp_path):
     (tmp_path / "pendientes" / "roto" / "trabajo.json").write_text("{no es json")
     (tmp_path / "pendientes" / ".oculto.tmp").mkdir()
     assert estado.leer(tmp_path, ahora=AHORA) == {}
+
+
+def test_estado_agrupa_por_grupo(tmp_path):
+    carpeta = tmp_path / "salida"
+    _trabajo(tmp_path, "pendientes", carpeta, "a", AHORA - 100, grupo="/x/a.mp4")
+    _trabajo(tmp_path, "pendientes", carpeta, "b", AHORA - 100, grupo="/x/b.mp4")
+    est = estado.leer(tmp_path, ahora=AHORA)
+    assert set(est) == {Path("/x/a.mp4"), Path("/x/b.mp4")}
+    assert all(e.total == 1 for e in est.values())
+
+
+def test_estado_sin_grupo_agrupa_por_carpeta(tmp_path):
+    carpeta = tmp_path / "salida"
+    _trabajo(tmp_path, "pendientes", carpeta, "a", AHORA - 100)
+    assert set(estado.leer(tmp_path, ahora=AHORA)) == {carpeta}

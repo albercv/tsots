@@ -124,6 +124,8 @@ class VentanaPrincipal(QMainWindow):
         self.modelo_cola = ModeloCola(self)
         self.ejecutor = EjecutorCola(self)
         self._procesando = False
+        # fila → (config, opciones) de las filas del lote a editar con Claude al terminar.
+        self._editar_al_terminar: dict[int, tuple[PipelineConfig, shorts.OpcionesShorts]] = {}
         self._reiniciando = False
 
         central = QWidget()
@@ -268,7 +270,7 @@ class VentanaPrincipal(QMainWindow):
         self.panel.pasos_cambiados.connect(self._refrescar_boton)
         self.panel.crear_shorts.connect(self._crear_shorts)
         self.panel.publicar_shorts.connect(self._publicar_shorts)
-        self.panel.editar_shorts.connect(self._editar_shorts_existentes)
+        self.panel.editar_con_claude.connect(self._editar_con_claude)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -636,6 +638,7 @@ class VentanaPrincipal(QMainWindow):
                 self, _("Publicar en redes"),
                 _("No se encuentra el vídeo terminado:\n{ruta}").format(ruta=video))
             return
+        video = shorts.editado_al_dia(video) or video  # el editado, si está al día
         dialogo = DialogoPublicar(video, caption, self.ajustes,
                                   perfil=ficha.perfil if ficha else "", parent=self)
         dialogo.configurar_redes.connect(
@@ -670,51 +673,91 @@ class VentanaPrincipal(QMainWindow):
             dialogo.deleteLater()
         self._recargar_perfil()
 
-    def _editar_shorts_existentes(self) -> None:
-        """Botón «Editar shorts ya creados»: encola con Claude los shorts del
-        vídeo elegido, con el estilo, el encuadre y los subtítulos del panel,
-        y arranca el agente sin esperar a que acabe ninguna cola."""
+    def _preguntar_que_editar(self, n_shorts: int, nombre: str) -> str | None:
+        """El vídeo tiene shorts y un final vertical: qué editar con Claude.
+        Devuelve "shorts", "video" o None si cancela."""
+        caja = QMessageBox(self)
+        caja.setWindowTitle(_("Editar con Claude"))
+        caja.setText(_('"{nombre}" tiene shorts y un vídeo final vertical. '
+                       '¿Qué quieres editar con Claude?').format(nombre=nombre))
+        shorts_ = caja.addButton(_("Los {n} shorts").format(n=n_shorts),
+                                 QMessageBox.ButtonRole.AcceptRole)
+        video = caja.addButton(_("El vídeo"), QMessageBox.ButtonRole.AcceptRole)
+        cancelar = caja.addButton(_("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        caja.setDefaultButton(cancelar)
+        caja.exec()
+        return {shorts_: "shorts", video: "video"}.get(caja.clickedButton())
+
+    def _editar_con_claude(self) -> None:
+        """Botón «Editar con Claude…»: encola con Claude los shorts del vídeo
+        elegido o el propio vídeo (si su final es vertical 1080×1920), con el
+        estilo del panel (los shorts, además, con su encuadre y subtítulos; el
+        vídeo, con los que se guardaron con él), y arranca el agente sin esperar
+        a que acabe ninguna cola."""
         indices = self.vista_cola.selectedIndexes()
         if self._procesando or not indices:
             return
         trabajo = self.modelo_cola.trabajo(indices[0].row())
         ficha = self._ficha_de(trabajo)
         carpeta = self._carpeta_shorts_de(trabajo)
-        if ficha is None or carpeta is None:
-            QMessageBox.warning(self, _("Editar con Claude"),
-                                _("El vídeo elegido no tiene shorts en su carpeta."))
+        vertical = ficha is not None and shorts.es_final_vertical(ficha)
+        if ficha is None or (carpeta is None and not vertical):
+            QMessageBox.warning(
+                self, _("Editar con Claude"),
+                _("El vídeo elegido no tiene shorts en su carpeta ni un vídeo "
+                  "final vertical de 1080×1920 que editar."))
             return
+        if carpeta is not None and vertical:
+            n = len(shorts.listar(carpeta)) or len(list(carpeta.glob("*.mp4")))
+            que = self._preguntar_que_editar(n, trabajo.ruta.name)
+            if que is None:
+                return
+        else:
+            que = "shorts" if carpeta is not None else "video"
         valores = self._guardar_panel()
         elegidos = self.panel.valores_shorts()
-        n = len(shorts.listar(carpeta)) or len(list(carpeta.glob("*.mp4")))
-        respuesta = QMessageBox.question(
-            self, _("Editar con Claude"),
-            _('Se editarán con Claude los shorts de "{nombre}" ({n}) en estilo '
-              '{estilo}. Cada short es una ejecución de Claude en tu cuenta. '
-              '¿Seguir?').format(nombre=trabajo.ruta.name, n=n,
-                                 estilo=self.panel.combo_estilo_shorts.currentText()),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if respuesta != QMessageBox.StandardButton.Yes:
-            return
+        estilo = self.panel.combo_estilo_shorts.currentText()
+        if que == "shorts":
+            n = len(shorts.listar(carpeta)) or len(list(carpeta.glob("*.mp4")))
+            texto = _('Se editarán con Claude los shorts de "{nombre}" ({n}) en '
+                      'estilo {estilo}. Cada short es una ejecución de Claude en '
+                      'tu cuenta. ¿Seguir?').format(
+                nombre=trabajo.ruta.name, n=n, estilo=estilo)
+        else:
+            texto = _('Se editará con Claude el vídeo "{nombre}" en estilo '
+                      '{estilo}. Es una ejecución de Claude en tu cuenta. '
+                      '¿Seguir?').format(nombre=trabajo.ruta.name, estilo=estilo)
+        # Con shorts y vídeo ya se eligió en el diálogo de arriba: no se pregunta dos veces.
+        if not (carpeta is not None and vertical):
+            respuesta = QMessageBox.question(
+                self, _("Editar con Claude"), texto,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if respuesta != QMessageBox.StandardButton.Yes:
+                return
         opciones = shorts.OpcionesShorts(
             elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
             editar=True, estilo=elegidos["shorts_estilo"])
+        editar = shorts.editar_existentes if que == "shorts" else shorts.editar_video
         try:
-            encolados = shorts.editar_existentes(
-                ficha, self._config_de(trabajo, valores), opciones)
+            encolados = editar(ficha, self._config_de(trabajo, valores), opciones)
         except Exception as error:  # noqa: BLE001 — se le cuenta al usuario
             QMessageBox.warning(self, _("Editar con Claude"), str(error))
             return
         lanzar_agente_edicion()
         self._refrescar_edicion()
-        QMessageBox.information(
-            self, _("Editar con Claude"),
-            _("{n} shorts en cola. Cada editado aparece junto a su original al "
-              "cabo de unos minutos, y «Publicar shorts…» lo usará.").format(n=encolados)
-            if encolados else
-            _("Esos shorts ya estaban en cola para editarse."))
+        if que == "shorts":
+            mensaje = (_("{n} shorts en cola. Cada editado aparece junto a su "
+                         "original al cabo de unos minutos, y «Publicar shorts…» "
+                         "lo usará.").format(n=encolados) if encolados else
+                       _("Esos shorts ya estaban en cola para editarse."))
+        else:
+            mensaje = (_("Vídeo en cola. El editado aparece junto al vídeo al "
+                         "cabo de unos minutos, y «Publicar…» lo usará.")
+                       if encolados else
+                       _("Ese vídeo ya estaba en cola para editarse."))
+        QMessageBox.information(self, _("Editar con Claude"), mensaje)
 
     def _refrescar_edicion(self) -> None:
         """Pone en cada fila con shorts el avance de su edición con Claude, si
@@ -726,8 +769,17 @@ class VentanaPrincipal(QMainWindow):
             trabajo = self.modelo_cola.trabajo(fila)
             if not estados and trabajo.edicion is None:
                 continue
-            carpeta = self._carpeta_shorts_de(trabajo) if estados else None
-            nuevo = estados.get(carpeta.resolve()) if carpeta else None
+            nuevo = None
+            if estados:
+                ficha = self._ficha_de(trabajo)
+                carpeta = self._carpeta_shorts_de(trabajo)
+                rutas = [ficha.final.ruta if ficha is not None and ficha.final else None,
+                         carpeta]
+                candidatos = [estados[r.resolve()] for r in rutas
+                              if r is not None and r.resolve() in estados]
+                # Una tanda terminada se queda visible horas: no tapa a la activa.
+                nuevo = next((e for e in candidatos if e.restante_s is not None),
+                             candidatos[0] if candidatos else None)
             if nuevo != trabajo.edicion:
                 cambia_el_alto |= (nuevo is None) != (trabajo.edicion is None)
                 self.modelo_cola.actualizar(fila, edicion=nuevo)
@@ -765,7 +817,13 @@ class VentanaPrincipal(QMainWindow):
         if not pendientes:
             return
         valores = self._guardar_panel()
-        shorts_al_procesar = self.panel.valores_shorts()["shorts_al_procesar"]
+        elegidos = self.panel.valores_shorts()
+        shorts_al_procesar = elegidos["shorts_al_procesar"]
+        editar_al_terminar = elegidos["shorts_editar"] and self.panel.hay_claude()
+        opciones_edicion = shorts.OpcionesShorts(
+            elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
+            editar=True, estilo=elegidos["shorts_estilo"])
+        self._editar_al_terminar = {}
         filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
         avisos = []
         for fila in pendientes:
@@ -812,6 +870,9 @@ class VentanaPrincipal(QMainWindow):
             if shorts_al_procesar:
                 datos["shorts"] = self._datos_shorts(trabajo.ficha_id)
             self._anotar_perfil(trabajo.ficha_id, self.ajustes.perfil_redes)
+            # Solo si el lote hace algo en el vídeo (no si solo corta shorts de uno intacto).
+            if editar_al_terminar and (ficha is None or not plan.vacio):
+                self._editar_al_terminar[fila] = (config, opciones_edicion)
             trabajos.append((fila, json.dumps(datos, ensure_ascii=False)))
         if sin_nada:
             QMessageBox.information(
@@ -974,11 +1035,13 @@ class VentanaPrincipal(QMainWindow):
         self.modelo_cola.actualizar(fila, shorts=Path(carpeta), n_shorts=n)
 
     def _al_avisar(self, fila: int, texto: str) -> None:
-        self.modelo_cola.actualizar(fila, aviso=texto)
+        previo = self.modelo_cola.trabajo(fila).aviso
+        self.modelo_cola.actualizar(fila, aviso=f"{previo} · {texto}" if previo else texto)
 
     def _al_terminar_trabajo(
         self, fila: int, ok: bool, salida: str, error: str
     ) -> None:
+        entrada = self._editar_al_terminar.pop(fila, None)
         if ok:
             cambios = {"salida": Path(salida)}
             ficha = self._ficha_de(self.modelo_cola.trabajo(fila))
@@ -995,6 +1058,18 @@ class VentanaPrincipal(QMainWindow):
             actual = self.vista_cola.currentIndex()
             if actual.isValid() and actual.row() == fila:
                 self._mostrar_caption(self.modelo_cola.trabajo(fila))
+            if entrada and ficha is not None and ficha.final is not None:
+                config, opciones = entrada
+                if (shorts.es_final_vertical(ficha)
+                        and shorts.editado_al_dia(ficha.final.ruta) is None):
+                    # shortcut: corre en el hilo de la interfaz; ffprobe y `encolar`
+                    # pueden copiar el final entero si la salida y ~/TSOTS están en
+                    # volúmenes distintos y congelar la ventana un momento. Pasarlo a
+                    # un worker si se nota.
+                    try:
+                        shorts.editar_video(ficha, config, opciones)
+                    except Exception as fallo:  # noqa: BLE001 — se le cuenta al usuario
+                        self._al_avisar(fila, str(fallo))
         else:
             estado = (
                 EstadoTrabajo.CANCELADO
@@ -1034,6 +1109,7 @@ class VentanaPrincipal(QMainWindow):
 
     def _al_terminar_cola(self) -> None:
         self._procesando = False
+        self._editar_al_terminar = {}  # las filas canceladas no se editan después
         # Trabajos que quedaron en PROCESANDO tras cancelar vuelven a ESPERA.
         for fila in range(self.modelo_cola.rowCount()):
             if self.modelo_cola.trabajo(fila).estado == EstadoTrabajo.PROCESANDO:
@@ -1065,11 +1141,15 @@ class VentanaPrincipal(QMainWindow):
             and self.vista_cola.selectionModel().hasSelection()
         )
         indices = self.vista_cola.selectedIndexes()
-        con_shorts = bool(indices) and self._carpeta_shorts_de(
-            self.modelo_cola.trabajo(indices[0].row())) is not None
+        trabajo = self.modelo_cola.trabajo(indices[0].row()) if indices else None
+        con_shorts = self._carpeta_shorts_de(trabajo) is not None
         self.panel.boton_publicar_shorts.setEnabled(con_shorts)
-        self.panel.boton_editar_shorts.setEnabled(
-            con_shorts and not self._procesando and self.panel.hay_claude())
+        ficha = self._ficha_de(trabajo) if trabajo is not None else None
+        # Sin ffprobe aquí: que el final sea 1080×1920 se comprueba al pulsar.
+        con_final = ficha is not None and ficha.final is not None
+        self.panel.boton_editar_con_claude.setEnabled(
+            (con_shorts or con_final) and not self._procesando
+            and self.panel.hay_claude())
 
     # --- idioma ---
 

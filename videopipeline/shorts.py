@@ -20,9 +20,9 @@ from pathlib import Path
 from . import edicion
 from .caption import Caption, leer_md, texto_plano
 from .config import ENCUADRES, PipelineConfig
-from .edicion import estilos
+from .edicion import entregar, estilos
 from .edicion import zonas as zonas_edicion
-from .ficha import TRANSCRIPCION, Ficha, _escribir_json
+from .ficha import HORIZONTAL, TRANSCRIPCION, VERTICAL, Ficha, _escribir_json
 from .i18n import _
 from .ollama import asegurar_servidor, chat_json, systemone
 from .pipeline import Progreso, _avisar, _emitir, _fase_caption, _fase_vertical
@@ -750,9 +750,26 @@ def _encolar_edicion(carpeta: Path, nombre: str, config: PipelineConfig,
                            dir_edicion=edicion.DIR_EDICION)
 
 
+def _ya_en_cola(archivo: Path) -> bool:
+    """`archivo` ya espera su edición en `pendientes/`: algún trabajo cuyo origen
+    es él y que sigue vigente. Se mira el origen, no el nombre de la carpeta
+    (`encolar` añade «-2», «-3»… si el nombre está tomado); uno obsoleto, de un
+    original que cambió, no cuenta porque el agente lo va a rechazar."""
+    for trabajo in (edicion.DIR_EDICION / "pendientes").glob("*/trabajo.json"):
+        if trabajo.parent.name.startswith("."):
+            continue
+        try:
+            datos = json.loads(trabajo.read_text(encoding="utf-8"))
+            if datos["origen"] == str(archivo) and entregar.origen_cambiado(datos) is None:
+                return True
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return False
+
+
 def editar_existentes(ficha: Ficha, config: PipelineConfig,
                       opciones: OpcionesShorts) -> int:
-    """Botón «Editar shorts ya creados»: encola para Claude los shorts que ya
+    """Botón «Editar con Claude…»: encola para Claude los shorts que ya
     tiene `ficha`, con las palabras de su transcripción, como si se acabaran de
     crear. Los que ya esperan en `pendientes/` no se repiten. Devuelve cuántos
     encola; PasoFallido si no tiene shorts o le falta la transcripción."""
@@ -774,14 +791,74 @@ def editar_existentes(ficha: Ficha, config: PipelineConfig,
                             'créalos de nuevo con «Editar con Claude» marcado.'
                             ).format(nombre=ficha.nombre))
     palabras = pasada._palabras() or []
-    pendientes = edicion.DIR_EDICION / "pendientes"
     cortes = []
     for c in creados:
         stem = Path(c["archivo"]).stem
-        if (pendientes / f"{ficha.nombre} - {stem}").exists():
+        if _ya_en_cola(carpeta / c["archivo"]):
             continue  # ya espera su edición (p. ej. un doble clic)
         cortes.append((stem, tramo_palabras(palabras, float(c["inicio"]), float(c["fin"])),
                        c.get("titulo_video") or ""))
     if not cortes:
         return 0
     return len(_encolar_edicion(carpeta, ficha.nombre, config, opciones, pasada.base, cortes))
+
+
+def es_final_vertical(ficha: Ficha) -> bool:
+    """El final de `ficha` existe y ya es un vertical de 1080×1920. Nunca lanza."""
+    try:
+        return (ficha.final is not None and ficha.final.ruta.is_file()
+                and resolucion_video(ficha.final.ruta) == (1080, 1920))
+    except Exception:  # noqa: BLE001 — ffprobe roto o vídeo ilegible: no lo es
+        return False
+
+
+def editado_al_dia(final: Path) -> Path | None:
+    """El `.editado.mp4` de `final` si existe y no es más viejo que él."""
+    editado = final.with_name(final.stem + ".editado.mp4")
+    if editado.is_file() and editado.stat().st_mtime >= final.stat().st_mtime:
+        return editado
+    return None
+
+
+def editar_video(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts) -> int:
+    """Encola para Claude el final de `ficha` entero (ya vertical 1080×1920),
+    con todas las palabras de su transcripción y las zonas de los subtítulos y
+    el título que se le quemaron. Devuelve 1 si lo encola y 0 si ya esperaba;
+    PasoFallido si no hay final, no es 1080×1920 o falta la transcripción."""
+    if ficha.final is None or not ficha.final.ruta.is_file():
+        raise PasoFallido(_('"{nombre}" no tiene un vídeo final que editar.'
+                            ).format(nombre=ficha.nombre))
+    final = ficha.final.ruta
+    if not es_final_vertical(ficha):
+        raise PasoFallido(_('El vídeo final de "{nombre}" no mide 1080×1920: '
+                            'solo se puede editar un vídeo vertical de ese tamaño.'
+                            ).format(nombre=ficha.nombre))
+    pasada = _Pasada(ficha, Plan([], config, []), None)
+    if not _transcrita(ficha, pasada.linea):
+        raise PasoFallido(_('"{nombre}" no tiene la transcripción de su vídeo: '
+                            'procésalo de nuevo para poder editarlo.'
+                            ).format(nombre=ficha.nombre))
+    if _ya_en_cola(final):
+        return 0  # ya espera su edición (p. ej. un doble clic)
+    palabras = pasada._palabras() or []
+
+    horizontal = final != ficha.ruta_final(False)
+    artefacto = ficha.artefactos.get(HORIZONTAL if horizontal else VERTICAL)
+    ajustes = artefacto.ajustes if artefacto else {}
+    subs = ajustes.get("subtitulos") or {}
+    campos = {campo: subs[clave] for clave, campo in
+              (("diseno", "diseno"), ("posicion", "posicion_subs"),
+               ("tamano", "tamano_subs")) if clave in subs}
+    config_video = replace(config, subtitulos="subtitulos" in ajustes, **campos)
+    if horizontal:  # un vertical hecho aparte: ocupa el marco entero
+        encuadre, resolucion = "central", (1080, 1920)
+    else:  # el vertical único se recortó de la base con su encuadre
+        encuadre = (ajustes.get("vertical") or {}).get("encuadre", "central")
+        resolucion = resolucion_video(pasada.base)
+    zonas = zonas_edicion.calcular(config_video, encuadre, resolucion,
+                                   con_titulo=bool(ajustes.get("titulo")))
+    idioma = subs.get("idioma") or config.idioma_subs
+    return len(edicion.encolar(
+        final.parent, ficha.nombre, [final.stem], {final.stem: palabras},
+        opciones.estilo, {final.stem: zonas}, idioma, encuadre,
+        dir_edicion=edicion.DIR_EDICION, grupo=str(final)))

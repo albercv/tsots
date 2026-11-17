@@ -2,7 +2,7 @@
 editando, cuántos van, en qué fase está el actual y cuánto falta.
 
 Solo lee `~/TSOTS/edicion`: los trabajos de `pendientes/`, `hechos/` y
-`errores/` se agrupan por la carpeta de shorts de su vídeo (la del `origen`
+`errores/` se agrupan por su `grupo` (la tanda; si no lo trae, la carpeta del `origen`
 de su `trabajo.json`). La fase del trabajo en curso sale de los ficheros que
 va dejando (`contexto.md`, `plan.json`, …), y su inicio de `inicio`, que
 escribe el agente al empezarlo. El tiempo restante es una estimación con lo
@@ -81,7 +81,10 @@ def _trabajos(dir_edicion: Path) -> list[_Trabajo]:
         for ruta in carpetas:
             tj = ruta / "trabajo.json"
             try:
-                origen = Path(json.loads(tj.read_text(encoding="utf-8"))["origen"])
+                datos = json.loads(tj.read_text(encoding="utf-8"))
+                origen = Path(datos["origen"])
+                # los trabajos viejos no traen `grupo`: se agrupan por carpeta
+                grupo = Path(datos["grupo"]) if datos.get("grupo") else origen.parent
                 encolado = tj.stat().st_mtime
             except (OSError, ValueError, KeyError, TypeError):
                 continue
@@ -90,7 +93,7 @@ def _trabajos(dir_edicion: Path) -> list[_Trabajo]:
                 fin = _mtime(ruta / "resultado.json") or _mtime(ruta)
             elif donde == "errores":
                 fin = _mtime(ruta / "motivo.txt") or _mtime(ruta)
-            trabajos.append(_Trabajo(origen.parent, origen.stem, donde, ruta, encolado,
+            trabajos.append(_Trabajo(grupo, origen.stem, donde, ruta, encolado,
                                      _numero(ruta / "inicio"), fin))
     return trabajos
 
