@@ -36,10 +36,57 @@ def test_video_corto_da_menos_candidatos(tmp_path):
 
 
 def test_cara_completa_descarta_cortada_y_pequena():
-    cajas = np.array([[0, 10, 50, 80, 0.99],
-                      [60, 40, 66, 46, 0.99],
-                      [80, 20, 130, 85, 0.95]])
+    cajas = np.array([[0, 10, 50, 80, 1.0],
+                      [60, 40, 66, 46, 1.0],
+                      [80, 20, 130, 85, 0.999]])
     assert cara_completa(cajas, 160, 90) == (80, 20, 130, 85)
+
+
+# S3FD sobre los candidatos de odin_17_11 (1080×1920): 00, 03 y 05 son la cara;
+# 01 es un dedo ante la pantalla, 04 texto de pantalla y 02 no tiene detección.
+# La de 0.97 sale en otros vídeos sobre la barba, debajo de la cara de verdad.
+ODIN_17_11 = {
+    "00": [[232, 502, 831, 1265, 1.0]],
+    "01": [[542, 1079, 1037, 1815, 0.864]],
+    "02": [],
+    "03": [[173, 512, 850, 1446, 1.0]],
+    "04": [[27, 193, 188, 555, 0.875], [370, 988, 630, 1321, 0.635]],
+    "05": [[172, 515, 875, 1458, 1.0]],
+    "barba": [[359, 1130, 686, 1487, 0.974]],
+}
+
+
+@pytest.mark.parametrize("nombre", ODIN_17_11)
+def test_cara_completa_solo_acepta_caras_reales(nombre):
+    cara = cara_completa(np.array(ODIN_17_11[nombre]).reshape(-1, 5), 1080, 1920)
+    assert (cara is not None) == (nombre in {"00", "03", "05"})
+
+
+def test_portada_sale_de_una_cara_real_aunque_haya_falsos_mas_nitidos(tmp_path):
+    from videopipeline.difusion import _elegir_portada
+
+    # un momento por candidato; el 04 (falso positivo) es el más nítido
+    nombres = ["00", "01", "02", "03", "04", "05"]
+    instantes = momentos(100.0)
+    nitida = np.zeros((1920, 1080, 3), np.uint8)
+    nitida[::2] = 255
+    borrosa = nitida.copy()
+    borrosa[::4] = 0  # menos nítido, pero por encima del mínimo
+
+    def nombre_en(f):
+        return nombres[int(f[0, 0, 1])]
+
+    def leer(v, t):
+        i = min(range(6), key=lambda j: abs(instantes[j] - t))
+        img = (nitida if nombres[i] == "04" else borrosa).copy()
+        img[0, 0] = (0, i, 0)  # marca el candidato en un píxel
+        return img
+
+    cands = extraer_candidatos(Path("v.mp4"), [], tmp_path,
+                               detector=lambda f: np.array(ODIN_17_11[nombre_en(f)]),
+                               leer=leer, duracion=100.0)
+    assert [c.cara is not None for c in cands] == [True, False, False, True, False, True]
+    assert _elegir_portada(cands) in [cands[0], cands[3], cands[5]]
 
 
 def test_prefiere_fotograma_con_cara_a_mas_nitido(tmp_path):
@@ -51,7 +98,7 @@ def test_prefiere_fotograma_con_cara_a_mas_nitido(tmp_path):
 
     def detector(f):
         if np.array_equal(f, cv2.cvtColor(con_cara, cv2.COLOR_BGR2RGB)):
-            return np.array([[80, 20, 130, 85, 0.95]])
+            return np.array([[80, 20, 130, 85, 0.999]])
         return np.zeros((0, 5))
 
     cands = extraer_candidatos(Path("v.mp4"), [], tmp_path, n=1, detector=detector,
