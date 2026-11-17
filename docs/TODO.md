@@ -5,6 +5,19 @@ Pending work, most urgent first. Remove an item when it is merged into
 
 ## Features
 
+- [ ] **Zoom that follows the active speaker** in edited shorts (today the
+      zoom is centred).
+- [ ] **Style per short** instead of one style for the whole batch.
+- [ ] **Pre-check in `procesar_pendientes.sh`** that the original is
+      unchanged before running `claude`: today a superseded job still spends
+      a Haiku run before `entregar` rejects it ("origen cambiado").
+- [ ] **`SKILL.md`: say explicitly** "si sigue fallando tras 3 intentos,
+      para".
+- [ ] **Real-app acceptance of Edit with Claude:** create shorts of an
+      episode with the box ticked, wait for `hechos/`, open two edited
+      files, check "(editado)" in Publish shorts…, repeat in Formal and
+      Academic; note times and failures.
+
 - [ ] **Change the time of a scheduled post** from the calendar (Upload-Post
       `PATCH /api/uploadposts/schedule/<job_id>`; today: cancel and
       schedule again).

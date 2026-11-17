@@ -14,6 +14,7 @@ from app.main import VentanaPrincipal
 from app.queue_model import EstadoTrabajo
 from app.settings import Ajustes
 from videopipeline import shorts
+from videopipeline.steps import PasoFallido
 from videopipeline.caption import leer_md
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
@@ -851,6 +852,26 @@ def test_al_arrancar_lanza_el_agente_del_blog_sin_bloquear(qtbot, tmp_path, monk
     qtbot.waitUntil(lambda: llamadas == [True], timeout=1000)
 
 
+def test_datos_shorts_llevan_edicion(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.panel.check_editar_claude.setChecked(True)
+    ventana.panel.combo_estilo_shorts.setCurrentIndex(
+        ventana.panel.combo_estilo_shorts.findData("formal"))
+    datos = ventana._datos_shorts("x")
+    assert (datos["editar"], datos["estilo"]) == (True, "formal")
+
+
+def test_al_terminar_cola_lanza_agente_de_edicion(qtbot, tmp_path, monkeypatch):
+    llamadas = []
+    monkeypatch.setattr("app.main.lanzar_agente_edicion", lambda: llamadas.append(True))
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    qtbot.wait(50)
+    llamadas.clear()
+    ventana._al_terminar_cola()
+    assert llamadas == [True]
+
+
 def test_audio_abierto_al_arrancar_en_la_ventana(qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
     assert ventana.panel.seccion_abierta() == "audio"
@@ -1611,6 +1632,88 @@ def test_boton_publicar_shorts_activo_solo_con_una_fila_con_shorts(
     assert boton.isEnabled()
 
 
+def test_boton_editar_shorts_activo_con_shorts_claude_y_sin_procesar(
+        qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    boton = ventana.panel.boton_editar_shorts
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4", "b.mp4"))
+    _eligiendo_la_fila(ventana, 0)
+    assert not boton.isEnabled()  # fila sin shorts
+    ventana.modelo_cola.actualizar(1, shorts=tmp_path / "b", n_shorts=2)
+    _eligiendo_la_fila(ventana, 1)
+    assert boton.isEnabled()
+    ventana._procesando = True
+    ventana._refrescar_boton()
+    assert not boton.isEnabled()
+
+
+def test_boton_editar_shorts_inactivo_sin_claude(qtbot, tmp_path, monkeypatch):
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ventana.anadir_videos(_videos(tmp_path, "a.mp4"))
+    ventana.modelo_cola.actualizar(0, shorts=tmp_path / "a", n_shorts=2)
+    _eligiendo_la_fila(ventana, 0)
+    assert not ventana.panel.boton_editar_shorts.isEnabled()
+
+
+def _editando_shorts(qtbot, tmp_path, monkeypatch, respuesta, editar=None):
+    """Ventana con a.mp4 y sus shorts elegida, estilo formal y encuadre barras;
+    devuelve (ventana, ficha, llamadas, lanzados, mensajes)."""
+    monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    carpeta = _con_shorts_hechos(ficha)
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    ventana.modelo_cola.actualizar(0, shorts=carpeta, n_shorts=1)
+    _eligiendo_la_fila(ventana)
+    panel = ventana.panel
+    panel.combo_encuadre_shorts.setCurrentIndex(panel.combo_encuadre_shorts.findData("barras"))
+    panel.combo_estilo_shorts.setCurrentIndex(panel.combo_estilo_shorts.findData("formal"))
+    llamadas, lanzados, mensajes = [], [], []
+
+    def editar_falso(f, config, opciones):
+        llamadas.append((f.id, opciones))
+        return editar(f, config, opciones) if editar else 2
+
+    monkeypatch.setattr("app.main.shorts.editar_existentes", editar_falso)
+    monkeypatch.setattr("app.main.lanzar_agente_edicion", lambda: lanzados.append(1))
+    monkeypatch.setattr(QMessageBox, "question", lambda *a, **k: respuesta)
+    monkeypatch.setattr(QMessageBox, "information", lambda *a, **k: mensajes.append(a[2]))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: mensajes.append(a[2]))
+    return ventana, ficha, llamadas, lanzados, mensajes
+
+
+def test_editar_shorts_existentes_encola_con_el_panel_y_lanza_el_agente(
+        qtbot, tmp_path, monkeypatch):
+    ventana, ficha, llamadas, lanzados, mensajes = _editando_shorts(
+        qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes)
+    ventana.panel.boton_editar_shorts.click()
+    [(ficha_id, opciones)] = llamadas
+    assert ficha_id == ficha.id
+    assert (opciones.editar, opciones.estilo, opciones.encuadre) == (True, "formal", "barras")
+    assert lanzados == [1]
+    assert "2" in mensajes[-1]
+
+
+def test_editar_shorts_existentes_cancelado_no_encola(qtbot, tmp_path, monkeypatch):
+    ventana, _ficha, llamadas, lanzados, _mensajes = _editando_shorts(
+        qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.No)
+    ventana.panel.boton_editar_shorts.click()
+    assert llamadas == [] and lanzados == []
+
+
+def test_editar_shorts_existentes_avisa_si_no_puede(qtbot, tmp_path, monkeypatch):
+    def falla(f, config, opciones):
+        raise PasoFallido("sin transcripción")
+
+    ventana, _ficha, _llamadas, lanzados, mensajes = _editando_shorts(
+        qtbot, tmp_path, monkeypatch, QMessageBox.StandardButton.Yes, editar=falla)
+    ventana.panel.boton_editar_shorts.click()
+    assert lanzados == []
+    assert "sin transcripción" in mensajes[-1]
+
+
 def test_publicar_shorts_abre_el_dialogo_con_los_de_la_carpeta(
         qtbot, tmp_path, monkeypatch):
     ventana = _ventana(qtbot, tmp_path, monkeypatch)
@@ -1663,7 +1766,8 @@ def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
     datos = json.loads(texto)
     assert fila == 0
     assert datos["shorts"] == {
-        "ficha": ficha.id, "subtitulos": False, "encuadre": "barras"}
+        "ficha": ficha.id, "subtitulos": False, "encuadre": "barras",
+        "editar": False, "estilo": "divertido"}
     assert "reproceso" not in datos
     assert ventana._procesando
     guardado = ventana.ajustes.cargar_panel()
@@ -1774,7 +1878,8 @@ def test_procesar_con_shorts_al_procesar_los_anade(
         if al_procesar:
             assert datos["shorts"] == {
                 "ficha": ventana.modelo_cola.trabajo(fila).ficha_id,
-                "subtitulos": False, "encuadre": "central"}
+                "subtitulos": False, "encuadre": "central",
+                "editar": False, "estilo": "divertido"}
         else:
             assert "shorts" not in datos
 

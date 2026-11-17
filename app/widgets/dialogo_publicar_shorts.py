@@ -89,7 +89,7 @@ class DialogoPublicarShorts(DialogoPublicar):
         rejilla.setColumnStretch(0, 2)
         rejilla.setColumnStretch(3, 3)
         for i, corto in enumerate(self._cortos):
-            casilla = QCheckBox(corto.titulo)
+            casilla = QCheckBox(corto.titulo + (" " + _("(editado)") if corto.editado else ""))
             casilla.setToolTip(corto.mp4.name)
             campo = self._nuevo_campo_fecha(self._fecha_inicial + timedelta(days=i))
             estado = QLabel()

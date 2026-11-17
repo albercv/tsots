@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-11 21:59+0100\n"
+"POT-Creation-Date: 2026-11-17 15:01+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -47,8 +47,16 @@ msgid "\"{nombre}\" lleva los subtítulos quemados y no hay una versión sin ell
 msgstr "\"{nombre}\" has the subtitles burned in and there is no version without them to cut the shorts from. Drag in the original and process it again."
 
 #, python-brace-format
+msgid "\"{nombre}\" no tiene la transcripción de sus shorts: créalos de nuevo con «Editar con Claude» marcado."
+msgstr "\"{nombre}\" has no transcript for its shorts: create them again with \"Edit with Claude\" ticked."
+
+#, python-brace-format
 msgid "\"{nombre}\" no tiene ninguna salida que mostrar. Arrastra el original para procesarlo de nuevo."
 msgstr "\"{nombre}\" has no output to show. Drag in the original to process it again."
+
+#, python-brace-format
+msgid "\"{nombre}\" no tiene shorts creados que editar."
+msgstr "\"{nombre}\" has no created shorts to edit."
 
 #, python-brace-format
 msgid "\"{nombre}\" se rehará desde el original: se volverán a transcribir y quemar los subtítulos. El caption se mantiene."
@@ -88,6 +96,9 @@ msgstr "%m/%d/%Y at %H:%M"
 
 msgid "(detectado en tu cuenta)"
 msgstr "(detected on your account)"
+
+msgid "(editado)"
+msgstr "(edited)"
 
 msgid "(sin elegir)"
 msgstr "(none selected)"
@@ -132,6 +143,9 @@ msgstr "April"
 
 msgid "Abrir log"
 msgstr "Open log"
+
+msgid "Académico"
+msgstr "Academic"
 
 msgid "Acelerar"
 msgstr "Speed up"
@@ -464,6 +478,20 @@ msgstr "Subtitle design"
 msgid "Diseño:"
 msgstr "Style:"
 
+msgid "Divertido"
+msgstr "Fun"
+
+msgid ""
+"Divertido: ritmo ágil, zooms y emojis.\n"
+"Formal: sobrio, sin adornos.\n"
+"Académico: claro y didáctico, con rótulos de apoyo.\n"
+"Claude (Haiku) edita cada short en segundo plano al acabar el lote, con la cuenta que tengas iniciada en `claude`."
+msgstr ""
+"Fun: lively pacing, zooms and emojis.\n"
+"Formal: sober, no frills.\n"
+"Academic: clear and instructive, with supporting captions.\n"
+"Claude (Haiku) edits each short in the background after the batch, using the account logged in to `claude`."
+
 msgid "Dom"
 msgstr "Sun"
 
@@ -493,8 +521,17 @@ msgstr "ERROR: cannot read the glossary: {ruta}"
 msgid "ERROR: {error}"
 msgstr "ERROR: {error}"
 
+msgid "Edita con Claude, en el estilo elegido, los shorts que ya tiene el vídeo elegido. Usa el encuadre y los subtítulos de este panel. Los editados aparecen junto a los originales al cabo de unos minutos por short."
+msgstr "Edits the selected video's existing shorts with Claude, in the chosen style. Uses the framing and subtitles set in this panel. Edited files appear next to the originals after a few minutes per short."
+
 msgid "Edita en silencio. Crea a lo grande."
 msgstr "Edit quieter. Create louder."
+
+msgid "Editar con Claude"
+msgstr "Edit with Claude"
+
+msgid "Editar shorts ya creados"
+msgstr "Edit existing shorts"
 
 msgid "Educación"
 msgstr "Education"
@@ -708,6 +745,9 @@ msgstr "Type the place you want to search for."
 msgid "Escribe el perfil del servicio para comprobarlo."
 msgstr "Enter the service profile to check it."
 
+msgid "Esos shorts ya estaban en cola para editarse."
+msgstr "Those shorts were already queued for editing."
+
 msgid "Espera a que termine la consulta en curso y vuelve a intentarlo."
 msgstr "Wait for the current check to finish and try again."
 
@@ -721,12 +761,18 @@ msgstr "Waiting for confirmation…"
 msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
 msgstr "This video has no LinkedIn post: turn on “LinkedIn” and process it."
 
+msgid "Estilo de la edición"
+msgstr "Editing style"
+
 msgid ""
 "Estilo del texto quemado en el vídeo: fuente, color, contorno o caja de fondo y tamaño base.\n"
 "Los Karaoke resaltan cada palabra a medida que se dice."
 msgstr ""
 "Style of the text burned into the video: font, color, outline or background box, and base size.\n"
 "The Karaoke designs highlight each word as it is spoken."
+
+msgid "Estilo:"
+msgstr "Style:"
 
 #, python-brace-format
 msgid ""
@@ -808,6 +854,9 @@ msgstr "Text file with your own terms for the transcription (one line per term; 
 
 msgid "Fondo difuminado (16:9)"
 msgstr "Blurred background (16:9)"
+
+msgid "Formal"
+msgstr "Formal"
 
 msgid "Formato vertical"
 msgstr "Vertical format"
@@ -1112,6 +1161,9 @@ msgstr "Nothing to do"
 msgid "Nada que hacer en: {nombres}"
 msgstr "Nothing to do for: {nombres}"
 
+msgid "Necesita Claude Code instalado y con la sesión iniciada (comando claude)."
+msgstr "Needs Claude Code installed and logged in (claude command)."
+
 #, python-brace-format
 msgid "Necesita ~{total} GB de memoria ({modelo} GB del modelo + contexto) y este Mac deja ~{memoria} GB para modelos."
 msgstr "Needs ~{total} GB of memory ({modelo} GB for the model + context) and this Mac leaves ~{memoria} GB for models."
@@ -1255,6 +1307,10 @@ msgstr "The accounts could not be checked; using the last known result."
 #, python-brace-format
 msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
+
+#, python-brace-format
+msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
+msgstr "Could not queue the shorts for editing with Claude: {error}"
 
 #, python-brace-format
 msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
@@ -1758,6 +1814,10 @@ msgstr "Subtitles will be added to \"{nombre}\"."
 msgid "Se borrarán los datos guardados para rehacer pasos de \"{nombre}\" ({mb} MB). Los vídeos y su caption no se tocan."
 msgstr "The data saved for redoing steps of \"{nombre}\" ({mb} MB) will be deleted. The videos and their caption are not touched."
 
+#, python-brace-format
+msgid "Se editarán con Claude los shorts de \"{nombre}\" ({n}) en estilo {estilo}. Cada short es una ejecución de Claude en tu cuenta. ¿Seguir?"
+msgstr "The shorts of \"{nombre}\" ({n}) will be edited with Claude in the {estilo} style. Each short is one Claude run on your account. Continue?"
+
 msgid "Se está publicando en redes. Espera a que termine para salir."
 msgstr "Publishing to social networks is in progress. Wait for it to finish before quitting."
 
@@ -2245,6 +2305,10 @@ msgstr "{n} model(s) do not fit in memory (see tooltip)."
 #, python-brace-format
 msgid "{n} por confirmar"
 msgstr "{n} unconfirmed"
+
+#, python-brace-format
+msgid "{n} shorts en cola. Cada editado aparece junto a su original al cabo de unos minutos, y «Publicar shorts…» lo usará."
+msgstr "{n} shorts queued. Each edited file appears next to its original after a few minutes, and \"Publish shorts…\" will use it."
 
 #, python-brace-format
 msgid "{plataforma} (borrador)"

@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 
 from videopipeline import subtitles
 from videopipeline.config import MODELOS_POR_TAREA, pasos_desde_modo
+from videopipeline.edicion import claude_disponible
 from videopipeline.i18n import N_, _
 from videopipeline.ollama import (
     Modelo, cabe, motivo_no_cabe, motivo_pesado, pesado,
@@ -61,6 +62,12 @@ ETIQUETA_ENCUADRE = {
     N_("Fondo difuminado (16:9)"): "difuminado",
     N_("Barras negras"): "barras",
     N_("Seguir la cara (4:3)"): "cara",
+}
+
+ETIQUETA_ESTILO = {
+    N_("Divertido"): "divertido",
+    N_("Formal"): "formal",
+    N_("Académico"): "academico",
 }
 
 ETIQUETA_MODELO_WHISPER = {
@@ -182,6 +189,14 @@ AYUDAS = {
            "Recorte central, Fondo difuminado, Barras negras o Seguir la "
            "cara (por defecto; más lento porque analiza el vídeo)."),
     ),
+    "combo_estilo_shorts": (
+        N_("Estilo de la edición"),
+        N_("Divertido: ritmo ágil, zooms y emojis.\n"
+           "Formal: sobrio, sin adornos.\n"
+           "Académico: claro y didáctico, con rótulos de apoyo.\n"
+           "Claude (Haiku) edita cada short en segundo plano al acabar el "
+           "lote, con la cuenta que tengas iniciada en `claude`."),
+    ),
 }
 
 
@@ -204,6 +219,7 @@ class PanelOpciones(QWidget):
     pasos_cambiados = Signal()
     crear_shorts = Signal()
     publicar_shorts = Signal()
+    editar_shorts = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -443,6 +459,27 @@ class PanelOpciones(QWidget):
         self.combo_encuadre_shorts.setCurrentIndex(
             self.combo_encuadre_shorts.findData("cara")
         )
+        self.check_editar_claude = QCheckBox(_("Editar con Claude"))
+        self.combo_estilo_shorts = QComboBox()
+        for etiqueta, valor in ETIQUETA_ESTILO.items():
+            self.combo_estilo_shorts.addItem(_(etiqueta), valor)
+        self._claude_disponible = claude_disponible()
+        sin_claude = _("Necesita Claude Code instalado y con la sesión iniciada "
+                       "(comando claude).")
+        if not self._claude_disponible:
+            self.check_editar_claude.setEnabled(False)
+            self.check_editar_claude.setToolTip(sin_claude)
+        # También es el estilo de «Editar shorts ya creados»: no depende de la casilla.
+        self.combo_estilo_shorts.setEnabled(self._claude_disponible)
+        self.boton_editar_shorts = QPushButton(_("Editar shorts ya creados"))
+        self.boton_editar_shorts.setToolTip(
+            sin_claude if not self._claude_disponible else
+            _("Edita con Claude, en el estilo elegido, los shorts que ya tiene el "
+              "vídeo elegido. Usa el encuadre y los subtítulos de este panel. "
+              "Los editados aparecen junto a los originales al cabo de unos "
+              "minutos por short."))
+        self.boton_editar_shorts.setEnabled(False)
+        self.boton_editar_shorts.clicked.connect(self.editar_shorts)
         self.check_shorts_al_procesar = QCheckBox(_("Crear shorts al procesar"))
         self.check_shorts_al_procesar.setToolTip(
             _("Al terminar de procesar cada vídeo, saca sus mejores trozos de "
@@ -463,10 +500,14 @@ class PanelOpciones(QWidget):
         form_shorts.addRow(self.check_shorts_subtitulos)
         form_shorts.addRow(
             self._etiqueta(_("Encuadre:"), "combo_encuadre_shorts"), self.combo_encuadre_shorts)
+        form_shorts.addRow(self.check_editar_claude)
+        form_shorts.addRow(
+            self._etiqueta(_("Estilo:"), "combo_estilo_shorts"), self.combo_estilo_shorts)
         form_shorts.addRow(self.check_shorts_al_procesar)
         # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
         form_shorts.addRow("", self.boton_crear_shorts)
         form_shorts.addRow("", self.boton_publicar_shorts)
+        form_shorts.addRow("", self.boton_editar_shorts)
         self.check_shorts_al_procesar.toggled.connect(self._actualizar_cabecera_shorts)
 
         for seccion in self.secciones.values():
@@ -571,6 +612,10 @@ class PanelOpciones(QWidget):
     def _marcar_cabecera(self, clave: str, casilla: QCheckBox) -> None:
         marca = MARCA_ACTIVO if casilla.isChecked() else ""
         self.secciones[clave].cabecera.setText(marca + self._titulos[clave])
+
+    def hay_claude(self) -> bool:
+        """Si se encontró el comando `claude` al crear el panel."""
+        return self._claude_disponible
 
     def _actualizar_cabecera_shorts(self, *args) -> None:
         self._marcar_cabecera("shorts", self.check_shorts_al_procesar)
@@ -727,6 +772,8 @@ class PanelOpciones(QWidget):
             "shorts_subtitulos": self.check_shorts_subtitulos.isChecked(),
             "shorts_encuadre": self.combo_encuadre_shorts.currentData(),
             "shorts_al_procesar": self.check_shorts_al_procesar.isChecked(),
+            "shorts_editar": self.check_editar_claude.isChecked(),
+            "shorts_estilo": self.combo_estilo_shorts.currentData(),
         }
 
     def cargar(self, valores: dict) -> None:
@@ -802,6 +849,11 @@ class PanelOpciones(QWidget):
             valores.get("shorts_encuadre", "cara"))
         if indice >= 0:
             self.combo_encuadre_shorts.setCurrentIndex(indice)
+        self.check_editar_claude.setChecked(
+            self._claude_disponible and _como_bool(valores.get("shorts_editar"), False))
+        indice = self.combo_estilo_shorts.findData(valores.get("shorts_estilo", "divertido"))
+        if indice >= 0:
+            self.combo_estilo_shorts.setCurrentIndex(indice)
         # Como el vertical, «al procesar» es ocasional: nunca se restaura.
         self.check_shorts_al_procesar.setChecked(False)
         self._actualizar_pasos()

@@ -28,6 +28,9 @@ servicio salvo que lo publiques o marques **Blog** (ver
   (0,7 GB) y, si quieres el caption SEO, el modelo de lenguaje (6 GB).
 - Conexión a internet durante la instalación (descargas) y la primera vez
   que uses subtítulos. Después funciona sin conexión.
+- Solo para **Editar con Claude** (opcional): Claude Code (`claude`)
+  instalado y con la sesión iniciada con tu propia cuenta. Ninguna otra
+  dependencia nueva.
 - Memoria: 16 GB es suficiente para todo salvo modelos de lenguaje grandes;
   la app te avisa de cuáles caben en tu Mac.
 - Solo para el borrador del blog (**Blog**): el comando `claude`
@@ -343,6 +346,46 @@ cada carpeta pasa a:
 El registro del agente es `~/TSOTS/blog/agente.log`. Un fallo de este paso
 nunca hace fallar el vídeo: se guarda igual, con un aviso.
 
+## Editar shorts con Claude
+
+Al crear shorts puedes pedir que Claude edite cada uno: rótulos,
+contadores, emojis, transiciones, zooms y sonidos, en el estilo que
+elijas. El original queda intacto donde estaba.
+
+- En el panel de Shorts marca **Editar con Claude** y elige el **Estilo**
+  (Divertido / Formal / Académico). Es un único ajuste para todo el lote de
+  shorts que crees. Aparece desactivado (con un aviso al pasar el ratón)
+  cuando no se encuentra el comando `claude`.
+- **Shorts que ya tienes:** elige el vídeo en la cola, el **Estilo** y
+  pulsa **Editar shorts ya creados**. Encola todos los shorts de ese vídeo
+  (con el encuadre y los subtítulos del panel, así que deja los que usaste
+  al crearlos) y empieza a editarlos en el momento; no hace falta marcar
+  **Editar con Claude**. Los que ya esperan en cola no se repiten.
+- Se encola un trabajo por short en `~/TSOTS/edicion/pendientes/`. Cuando
+  termina la cola de procesamiento (y al abrir la app) TSOTS lanza
+  `lanzador/edicion/procesar_pendientes.sh`. Este ejecuta `claude -p
+  --model claude-haiku-5-5` una vez por trabajo, uno tras otro, con un
+  límite de 1200 s por trabajo (`TSOTS_EDICION_LIMITE`). Haiku solo decide
+  los momentos; rótulos, contadores, emojis, transiciones, zooms y sonidos
+  salen de código, y el código renderiza. El resultado se comprueba y se
+  guarda como `NN - título.editado.mp4` junto al original. Un short de
+  112 s tardó unos 2-3 minutos.
+- Los trabajos terminados van a `~/TSOTS/edicion/hechos/`; los fallidos, a
+  `errores/` con un `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
+- **Publicar shorts…** sube el archivo editado si existe y lo marca
+  "(editado)". Sigue habiendo un solo registro de publicación por short.
+- Volver a crear los shorts borra los `.editado.mp4` antiguos. Un trabajo
+  pendiente cuyo original cambió acaba en `errores/` con "origen cambiado".
+- **Reintentar un trabajo fallido:** mueve su carpeta de `errores/` de
+  vuelta a `pendientes/` (conserva `video.mp4`) y reabre la app o termina
+  otro lote.
+- Necesita Claude Code con la sesión iniciada **con la cuenta de quien use
+  TSOTS**. El consumo cuenta contra el plan de esa cuenta. TSOTS nunca lee
+  ni guarda credenciales de Claude.
+- **Desde el chat (opcional):** `ln -s <repo>/lanzador/edicion
+  ~/.claude/skills/editar-short` y pide a Claude Code "edita este vídeo en
+  estilo divertido".
+
 ## Publicar en redes
 
 Desde un vídeo terminado con caption, **Publicar…** lo envía a **TikTok →
@@ -489,6 +532,11 @@ programado. Para cambiar la fecha, cancela y vuelve a programar.
   Comprueba que `claude` tenga la sesión iniciada y el conector
   **claude.ai E2D - Blog**. Una carpeta que sigue en `pendientes/` vuelve
   al agente la próxima vez que abras la app.
+- No aparece un short editado: mira
+  `~/TSOTS/edicion/errores/<carpeta>/motivo.txt` y
+  `~/TSOTS/edicion/agente.log`. Comprueba que `claude` tenga la sesión
+  iniciada. Una carpeta que sigue en `pendientes/` se procesa la próxima
+  vez que termine un lote o abras la app.
 - El **caption** no se genera: comprueba que la app de Ollama esté abierta
   (icono en la barra de menú) y pulsa ↻ junto al selector de modelo. Para
   añadir modelos: `ollama pull nombre` en Terminal y luego ↻.

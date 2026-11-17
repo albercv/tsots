@@ -255,3 +255,15 @@ def test_el_dialogo_de_shorts_cabe_en_la_pantalla_y_publicar_se_ve(qtbot, carpet
     assert dialogo.height() <= 400
     abajo = dialogo.boton_publicar.mapTo(dialogo, QPoint(0, dialogo.boton_publicar.height()))
     assert abajo.y() <= dialogo.height()
+
+
+def test_dialogo_marca_editado(qtbot, carpeta, ajustes, llavero_falso):
+    (carpeta / "01 - Uno.editado.mp4").write_bytes(b"MP4")
+    dialogo = DialogoPublicarShorts(
+        shorts.listar(carpeta), ajustes,
+        fabrica=lambda nombre, clave, datos: ProveedorFalso(),
+        medir=lambda mp4: 70.0, ahora=lambda: AHORA, zona=MADRID)
+    qtbot.addWidget(dialogo)
+    uno, dos, _tres = dialogo.filas
+    assert uno.casilla.text().endswith("(editado)")
+    assert "(editado)" not in dos.casilla.text()

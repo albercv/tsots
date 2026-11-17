@@ -617,7 +617,7 @@ def ficha_con_base(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "convertir_vertical", falso_convertir)
     monkeypatch.setattr(pipeline, "asegurar_servidor", ServidorFalso)
     monkeypatch.setattr(pipeline, "generar_caption", falso_caption)
-    for modulo in (pipeline, reproceso):
+    for modulo in (pipeline, reproceso, shorts):
         monkeypatch.setattr(modulo, "resolucion_video", lambda video: (1920, 1080))
     monkeypatch.setattr(reproceso, "preparar_seguimiento", falso_seguimiento)
     return e
@@ -1047,3 +1047,152 @@ def test_hay_shorts(ficha_con_base):
     e.carpeta.mkdir()
     (e.carpeta / "shorts.json").write_text("{}")
     assert shorts.hay_shorts(e.ficha)
+
+
+# --- Edición: opciones y encolado --------------------------------------------
+
+def test_opciones_editar_y_estilo():
+    o = shorts.OpcionesShorts.de_datos({"editar": True, "estilo": "formal"})
+    assert o.editar is True and o.estilo == "formal"
+    assert shorts.OpcionesShorts.de_datos({}).editar is False
+    with pytest.raises(ValueError, match="estilo"):
+        shorts.OpcionesShorts.de_datos({"estilo": "neon"})
+
+
+@pytest.fixture()
+def dir_edicion(tmp_path, monkeypatch):
+    from videopipeline import edicion
+    ruta = tmp_path / "edicion"
+    monkeypatch.setattr(edicion, "DIR_EDICION", ruta)
+    return ruta
+
+
+def test_crear_sin_editar_no_encola(ficha_con_base, dir_edicion):
+    _crear(ficha_con_base)
+    assert not (dir_edicion / "pendientes").exists()
+
+
+def test_crear_con_editar_encola_un_trabajo_por_short(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e, shorts.OpcionesShorts(editar=True, estilo="formal"))
+    trabajos = sorted((dir_edicion / "pendientes").iterdir())
+    assert len(trabajos) == 2
+    for t in trabajos:
+        datos = _leer_json(t / "trabajo.json")
+        origen = Path(datos["origen"])
+        assert origen.parent == e.carpeta and origen.is_file()
+        assert datos["destino"] == str(origen.with_suffix(".editado.mp4"))
+        assert datos["origen_tam"] == origen.stat().st_size
+        assert datos["origen_mtime"] == origen.stat().st_mtime
+        assert datos["estilo"] == "formal" and datos["encuadre"] == "cara"
+        assert isinstance(datos["zonas"], dict) and datos["zonas"]
+        # con encuadre cara y subtítulos quemados, el zoom no pisa los subtítulos
+        zonas = datos["zonas"]
+        assert zonas["subtitulos"] is not None
+        assert zonas["franja_zoom"][1] <= zonas["subtitulos"][0]
+        assert (t / "video.mp4").is_file()
+        palabras = _leer_json(t / "palabras.json")
+        assert palabras and palabras[0]["inicio"] < 5  # tiempos relativos al short
+
+
+def test_editar_existentes_encola_los_shorts_ya_creados(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)  # sin «Editar con Claude»: nada en cola
+    assert not (dir_edicion / "pendientes").exists()
+    n = shorts.editar_existentes(
+        e.ficha, e.config, shorts.OpcionesShorts(editar=True, estilo="academico"))
+    trabajos = sorted((dir_edicion / "pendientes").iterdir())
+    assert n == len(trabajos) == 2
+    creados = {c["archivo"]: c for c in _leer_json(e.carpeta / "shorts.json")["candidatos"]
+               if c["archivo"]}
+    palabras = reproceso._Pasada(e.ficha, reproceso.Plan([], e.config, []), None)._palabras()
+    for t in trabajos:
+        datos = _leer_json(t / "trabajo.json")
+        origen = Path(datos["origen"])
+        assert origen.parent == e.carpeta and origen.is_file()
+        assert datos["estilo"] == "academico" and datos["encuadre"] == "cara"
+        assert datos["zonas"]["franja_zoom"][1] <= datos["zonas"]["subtitulos"][0]
+        c = creados[origen.name]
+        # las mismas palabras que se quemaron como subtítulos de ese short
+        esperadas = [asdict(p) for p in shorts.tramo_palabras(palabras, c["inicio"], c["fin"])]
+        assert _leer_json(t / "palabras.json") == esperadas
+
+
+def test_editar_existentes_no_repite_los_que_ya_esperan(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    _crear(e)
+    opciones = shorts.OpcionesShorts(editar=True)
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 2
+    assert shorts.editar_existentes(e.ficha, e.config, opciones) == 0  # doble clic
+    assert len(list((dir_edicion / "pendientes").iterdir())) == 2
+
+
+def test_editar_existentes_sin_shorts(ficha_con_base, dir_edicion):
+    e = ficha_con_base
+    with pytest.raises(PasoFallido):
+        shorts.editar_existentes(e.ficha, e.config, shorts.OpcionesShorts(editar=True))
+    assert not (dir_edicion / "pendientes").exists()
+
+
+def test_regenerar_borra_editado_viejo(ficha_con_base):
+    e = ficha_con_base
+    _crear(e)
+    mp4 = sorted(e.carpeta.glob("*.mp4"))[0]
+    editado = mp4.with_suffix(".editado.mp4")
+    tmp = editado.with_name(editado.name + ".tmp")
+    editado.write_bytes(b"E")
+    tmp.write_bytes(b"T")
+    _crear(e)
+    assert not editado.exists() and not tmp.exists()
+
+
+def test_encolar_que_falla_no_rompe_crear(ficha_con_base, dir_edicion, monkeypatch):
+    from videopipeline import edicion
+
+    def explota(*a, **kw):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(edicion, "encolar", explota)
+    resultado = _crear(ficha_con_base, shorts.OpcionesShorts(editar=True))
+    assert resultado.n == 2 and len(list(resultado.carpeta.glob("*.mp4"))) == 2
+
+
+def test_encolar_que_falla_avisa(ficha_con_base, dir_edicion, monkeypatch):
+    from videopipeline import edicion
+    monkeypatch.setattr(edicion, "encolar",
+                        lambda *a, **kw: (_ for _ in ()).throw(RuntimeError("boom")))
+    eventos = []
+    _crear(ficha_con_base, shorts.OpcionesShorts(editar=True), eventos)
+    assert any("boom" in str(e) for e in eventos)
+
+
+def _carpeta_con_corto(tmp_path) -> Path:
+    from videopipeline.caption import escribir_md
+    escribir_md(Caption("SEO", "Cuerpo", ["#t"], ["k"]), tmp_path / "X.md")
+    (tmp_path / "X.mp4").write_bytes(b"MP4")
+    (tmp_path / "shorts.json").write_text(json.dumps({"candidatos": [
+        {"archivo": "X.mp4", "titulo": "T", "inicio": 0.0, "fin": 30.0}]}))
+    return tmp_path
+
+
+def test_listar_prefiere_editado(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    (carpeta / "X.editado.mp4").write_bytes(b"MP4")
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.editado.mp4" and corto.editado is True
+    assert corto.caption.titulo == "SEO"
+
+
+def test_listar_ignora_editado_mas_viejo_que_el_original(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    editado = carpeta / "X.editado.mp4"
+    editado.write_bytes(b"MP4")
+    os.utime(editado, (1, 1))
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.mp4" and corto.editado is False
+
+
+def test_listar_ignora_tmp(tmp_path):
+    carpeta = _carpeta_con_corto(tmp_path)
+    (carpeta / "X.editado.mp4.tmp").write_bytes(b"MP4")
+    (corto,) = shorts.listar(carpeta)
+    assert corto.mp4.name == "X.mp4" and corto.editado is False

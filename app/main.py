@@ -32,6 +32,7 @@ from videopipeline import i18n, shorts
 from videopipeline.caption import Caption, leer_md
 from videopipeline.config import PipelineConfig, modo_equivalente
 from videopipeline.difusion import lanzar_agente
+from videopipeline.edicion import lanzar_agente_edicion
 from videopipeline.ficha import (
     CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
     olvidar, reconocer,
@@ -263,6 +264,7 @@ class VentanaPrincipal(QMainWindow):
         self.panel.pasos_cambiados.connect(self._refrescar_boton)
         self.panel.crear_shorts.connect(self._crear_shorts)
         self.panel.publicar_shorts.connect(self._publicar_shorts)
+        self.panel.editar_shorts.connect(self._editar_shorts_existentes)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -278,6 +280,7 @@ class VentanaPrincipal(QMainWindow):
         self._ajustar_a_pantalla()
         # Carpetas del blog que quedaron de otra sesión, ya con la ventana en marcha.
         QTimer.singleShot(0, lanzar_agente)
+        QTimer.singleShot(0, lanzar_agente_edicion)
 
     def _fijar_alto_pestanas(self) -> None:
         """Alto fijo para la zona de pestañas: el de la previsualización a
@@ -657,6 +660,51 @@ class VentanaPrincipal(QMainWindow):
             dialogo.deleteLater()
         self._recargar_perfil()
 
+    def _editar_shorts_existentes(self) -> None:
+        """Botón «Editar shorts ya creados»: encola con Claude los shorts del
+        vídeo elegido, con el estilo, el encuadre y los subtítulos del panel,
+        y arranca el agente sin esperar a que acabe ninguna cola."""
+        indices = self.vista_cola.selectedIndexes()
+        if self._procesando or not indices:
+            return
+        trabajo = self.modelo_cola.trabajo(indices[0].row())
+        ficha = self._ficha_de(trabajo)
+        carpeta = self._carpeta_shorts_de(trabajo)
+        if ficha is None or carpeta is None:
+            QMessageBox.warning(self, _("Editar con Claude"),
+                                _("El vídeo elegido no tiene shorts en su carpeta."))
+            return
+        valores = self._guardar_panel()
+        elegidos = self.panel.valores_shorts()
+        n = len(shorts.listar(carpeta)) or len(list(carpeta.glob("*.mp4")))
+        respuesta = QMessageBox.question(
+            self, _("Editar con Claude"),
+            _('Se editarán con Claude los shorts de "{nombre}" ({n}) en estilo '
+              '{estilo}. Cada short es una ejecución de Claude en tu cuenta. '
+              '¿Seguir?').format(nombre=trabajo.ruta.name, n=n,
+                                 estilo=self.panel.combo_estilo_shorts.currentText()),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if respuesta != QMessageBox.StandardButton.Yes:
+            return
+        opciones = shorts.OpcionesShorts(
+            elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
+            editar=True, estilo=elegidos["shorts_estilo"])
+        try:
+            encolados = shorts.editar_existentes(
+                ficha, self._config_de(trabajo, valores), opciones)
+        except Exception as error:  # noqa: BLE001 — se le cuenta al usuario
+            QMessageBox.warning(self, _("Editar con Claude"), str(error))
+            return
+        lanzar_agente_edicion()
+        QMessageBox.information(
+            self, _("Editar con Claude"),
+            _("{n} shorts en cola. Cada editado aparece junto a su original al "
+              "cabo de unos minutos, y «Publicar shorts…» lo usará.").format(n=encolados)
+            if encolados else
+            _("Esos shorts ya estaban en cola para editarse."))
+
     def _abrir_redes(self) -> None:
         """Botón de la barra inferior: sin `checked` ni callback."""
         self._configurar_redes()
@@ -789,6 +837,8 @@ class VentanaPrincipal(QMainWindow):
             "ficha": ficha_id,
             "subtitulos": valores["shorts_subtitulos"],
             "encuadre": valores["shorts_encuadre"],
+            "editar": valores["shorts_editar"],
+            "estilo": valores["shorts_estilo"],
         }
 
     def _crear_shorts(self) -> None:
@@ -960,6 +1010,7 @@ class VentanaPrincipal(QMainWindow):
             if self.modelo_cola.trabajo(fila).estado == EstadoTrabajo.PROCESANDO:
                 self.modelo_cola.actualizar(fila, estado=EstadoTrabajo.ESPERA)
         self._refrescar_boton()
+        lanzar_agente_edicion()
 
     def _refrescar_boton(self, *args) -> None:
         if self._procesando:
@@ -984,10 +1035,11 @@ class VentanaPrincipal(QMainWindow):
             and self.vista_cola.selectionModel().hasSelection()
         )
         indices = self.vista_cola.selectedIndexes()
-        self.panel.boton_publicar_shorts.setEnabled(
-            bool(indices) and self._carpeta_shorts_de(
-                self.modelo_cola.trabajo(indices[0].row())) is not None
-        )
+        con_shorts = bool(indices) and self._carpeta_shorts_de(
+            self.modelo_cola.trabajo(indices[0].row())) is not None
+        self.panel.boton_publicar_shorts.setEnabled(con_shorts)
+        self.panel.boton_editar_shorts.setEnabled(
+            con_shorts and not self._procesando and self.panel.hay_claude())
 
     # --- idioma ---
 
