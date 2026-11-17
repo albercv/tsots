@@ -78,13 +78,28 @@ líneas. `contador`: `texto` es una sola cadena de 22 caracteres como mucho.
 ## Modo interactivo
 
 Solo si una persona te lo pide en el chat. Tienes un vídeo suelto (y quizá un
-`.srt`).
+`.srt`). Si no sabes el estilo (divertido, formal, académico → `divertido`,
+`formal`, `academico`) o el encuadre (`cara`, `difuminado`, `central`),
+pregúntaselo.
 
-1. Crea una carpeta de trabajo junto al vídeo con una copia o enlace
-   `video.mp4` y un `trabajo.json`. Si no sabes el encuadre o el estilo
-   (divertido, formal, académico), pregúntaselo a la persona.
-   `origen` es el vídeo y `destino` es `<nombre>.editado.mp4` junto a él.
-2. Sigue los mismos pasos que en el modo trabajo, pero ejecuta
-   `renderizar --borrador` (720p).
-3. Enseña la vista previa a la persona. Solo renderiza el vídeo final (sin
-   `--borrador`) cuando lo apruebe.
+Dónde está todo: esta carpeta es `<repo>/lanzador/edicion`, así que el
+repositorio `<repo>` está dos niveles por encima de este `SKILL.md` (si lo lees
+por el enlace `~/.claude/skills/editar-short`, resuelve el enlace). El Python es
+`<repo>/.venv-clearvoice/bin/python` y todos los comandos se ejecutan con
+`PYTHONPATH=<repo>`. Abajo, `PY` significa
+`PYTHONPATH=<repo> <repo>/.venv-clearvoice/bin/python`.
+
+1. Crea la carpeta de trabajo (junto al vídeo, `<nombre>.edicion/`) y el
+   contexto. Imprime la ruta del trabajo, que es `<trabajo>` en adelante:
+   `PY -m videopipeline.edicion.preparar --video <vídeo.mp4> --estilo <estilo> --encuadre <encuadre> [--srt <subs.srt>]`
+   Si el vídeo no es vertical (1080x1920), dilo: hay que verticalizarlo antes.
+2. Lee `<trabajo>/contexto.md`, escribe `<trabajo>/plan.json` y valídalo con
+   `PY -m videopipeline.edicion.validar_plan <trabajo>` hasta que imprima `OK`
+   (mismas reglas que en el modo trabajo).
+3. `PY -m videopipeline.edicion.renderizar <trabajo> --borrador` (720p) y
+   `PY -m videopipeline.edicion.verificar <trabajo>`. Enseña a la persona el
+   vídeo borrador y `<trabajo>/verificacion.png`.
+4. Ajusta `plan.json` con lo que pida y repite el paso 3. Solo cuando la
+   persona lo apruebe, renderiza el final (sin `--borrador`).
+5. Para entregarlo: `PY -m videopipeline.edicion.entregar <trabajo>`. Deja
+   `<nombre>.editado.mp4` junto al vídeo original y no toca el original.

@@ -87,6 +87,17 @@ def test_origen_cambiado(tmp_path, video_vertical):
     assert not (origen.parent / f"{NOMBRE}.editado.mp4").exists()
 
 
+def test_origen_cambiado_antes_de_claude_no_lo_llama(tmp_path, video_vertical):
+    edi, origen = _trabajo(tmp_path, video_vertical)
+    os.utime(origen, (1, 1))
+    r = _ejecutar(tmp_path, edi, "cp video.mp4 salida.mp4\n")
+    assert r.returncode == 0, r.stderr
+    error = edi / "errores" / NOMBRE
+    assert "origen cambiado" in (error / "motivo.txt").read_text()
+    assert not (error / "args.bin").exists() and not (error / "video.mp4").exists()
+    assert not (origen.parent / f"{NOMBRE}.editado.mp4").exists()
+
+
 def test_tiempo_agotado(tmp_path, video_vertical):
     edi, _ = _trabajo(tmp_path, video_vertical)
     inicio = time.monotonic()

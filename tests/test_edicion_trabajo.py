@@ -101,6 +101,21 @@ def test_origen_cambiado(tmp_path, video_vertical):
     assert not (tmp_path / "Episodio ¿20?.editado.mp4").exists()
 
 
+def test_origen_ausente(tmp_path, video_vertical):
+    t = _listo(tmp_path, video_vertical)
+    (tmp_path / "Episodio ¿20?.mp4").unlink()
+    assert "origen cambiado" in entregar(t)
+    assert not (tmp_path / "Episodio ¿20?.editado.mp4").exists()
+
+
+def test_solo_origen(tmp_path, video_vertical, capsys):
+    t = _trabajo(tmp_path, video_vertical)  # sin salida.mp4: solo mira el original
+    assert ent.main(["--solo-origen", str(t)]) == 0
+    os.utime(tmp_path / "Episodio ¿20?.mp4", (1, 1))
+    assert ent.main(["--solo-origen", str(t)]) == 1
+    assert "origen cambiado" in capsys.readouterr().out
+
+
 def test_sin_salida(tmp_path, video_vertical):
     assert "salida.mp4" in entregar(_trabajo(tmp_path, video_vertical))
 
@@ -156,3 +171,23 @@ def test_destino_sin_sufijo_editado(tmp_path, video_vertical):
     _cambiar_destino(t, tmp_path / "otro.mp4")
     assert ".editado.mp4" in entregar(t)
     assert not (tmp_path / "otro.mp4").exists()
+
+
+def test_preparar_desde_un_video_suelto(tmp_path, video_vertical, monkeypatch, capsys):
+    from videopipeline.edicion import preparar as prep
+    monkeypatch.setattr(subtitles, "transcribir",
+                        lambda v, i, m, prompt=None: [Palabra("ey", 0, 0.2)])
+    video = tmp_path / "Mi vídeo.mp4"
+    shutil.copy(video_vertical, video)
+    assert prep.main(["--video", str(video), "--estilo", "formal", "--encuadre", "cara"]) == 0
+    t = tmp_path / "Mi vídeo.edicion"
+    assert capsys.readouterr().out.strip() == str(t)
+    datos = json.loads((t / "trabajo.json").read_text("utf-8"))
+    assert datos["origen"] == str(video.resolve())
+    assert datos["destino"] == str(video.resolve().with_name("Mi vídeo.editado.mp4"))
+    assert datos["origen_tam"] == video.stat().st_size
+    assert (datos["estilo"], datos["idioma"], datos["resolucion"]) == ("formal", "es", [1080, 1920])
+    assert datos["zonas"]["subtitulos"] is not None and datos["zonas"]["titulo"] is not None
+    assert (t / "video.mp4").is_file() and (t / "contexto.md").is_file()
+    assert "0.00 ey" in (t / "contexto.md").read_text("utf-8")
+    assert prep.main(["--video", str(video), "--estilo", "nada"]) == 1

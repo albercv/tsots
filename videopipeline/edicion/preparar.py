@@ -1,12 +1,14 @@
 """Escribe contexto.md: lo que Haiku lee para decidir los momentos del short."""
+import argparse
 import json
 import math
+import shutil
 import sys
 from pathlib import Path
 
 from videopipeline import subtitles
-from videopipeline.config import PipelineConfig
-from videopipeline.edicion import estilos
+from videopipeline.config import ENCUADRES, PipelineConfig
+from videopipeline.edicion import estilos, zonas as zonas_edicion
 from videopipeline.edicion.componer import _duracion
 from videopipeline.subtitles import Palabra
 
@@ -26,6 +28,34 @@ def _frases(palabras: list[Palabra]) -> list[str]:
         dur = p.fin - g[0].inicio
         abierta = not (dur >= 8 or (dur >= 3 and p.texto.rstrip().endswith((".", "?", "!", ","))))
     return [f"[{g[0].inicio:.2f}-{g[-1].fin:.2f}] {' '.join(p.texto for p in g)}" for g in grupos]
+
+
+def crear_trabajo(video: Path, estilo: str, encuadre: str, srt: Path | None = None,
+                  trabajo: Path | None = None) -> Path:
+    """Modo interactivo: la carpeta de trabajo de un vídeo suelto (con su trabajo.json)."""
+    from videopipeline.difusion import _enlazar_o_copiar
+    from videopipeline.steps import resolucion_video
+    video = Path(video).resolve()
+    estilos.cargar(estilo)  # valida el id
+    if encuadre not in ENCUADRES:
+        raise ValueError(f"Encuadre desconocido: {encuadre!r}")
+    trabajo = Path(trabajo) if trabajo else video.with_name(f"{video.stem}.edicion")
+    trabajo.mkdir(parents=True, exist_ok=True)
+    if not (trabajo / "video.mp4").exists():
+        _enlazar_o_copiar(video, trabajo / "video.mp4")
+    if srt:
+        shutil.copy2(srt, trabajo / "subs.srt")
+    info = video.stat()
+    zonas = zonas_edicion.calcular(PipelineConfig(video=video, subtitulos=True), encuadre,
+                                   resolucion_video(video), con_titulo=True)
+    (trabajo / "trabajo.json").write_text(json.dumps({
+        "version": 1, "origen": str(video),
+        "destino": str(video.with_name(f"{video.stem}.editado.mp4")),
+        "origen_tam": info.st_size, "origen_mtime": info.st_mtime,
+        "estilo": estilo, "idioma": "es", "resolucion": [1080, 1920],
+        "encuadre": encuadre, "zonas": zonas,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    return trabajo
 
 
 def preparar(trabajo: Path) -> Path:
@@ -70,11 +100,30 @@ def preparar(trabajo: Path) -> Path:
 
 def main(args: list[str]) -> int:
     try:
-        print(preparar(Path(args[0])))
+        ap = argparse.ArgumentParser(prog="preparar")
+        ap.add_argument("trabajo", nargs="?")
+        ap.add_argument("--video")
+        ap.add_argument("--estilo", default="divertido")
+        ap.add_argument("--encuadre", default="cara")
+        ap.add_argument("--srt")
+        ap.add_argument("--trabajo", dest="carpeta")
+        a = ap.parse_args(args)
+        if a.video:
+            trabajo = crear_trabajo(Path(a.video), a.estilo, a.encuadre,
+                                    Path(a.srt) if a.srt else None,
+                                    Path(a.carpeta) if a.carpeta else None)
+            preparar(trabajo)
+            print(trabajo)
+        elif a.trabajo:
+            print(preparar(Path(a.trabajo)))
+        else:
+            raise ValueError("falta la carpeta del trabajo o --video")
         return 0
     except Exception as e:  # noqa: BLE001 - mensaje de una línea para el agente
         print(f"No se pudo preparar el contexto: {e}")
         return 1
+    except SystemExit:  # argparse ya imprimió su error
+        return 2
 
 
 if __name__ == "__main__":

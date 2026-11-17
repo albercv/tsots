@@ -13,6 +13,17 @@ TOLERANCIA_DURACION = 0.25
 TOLERANCIA_MTIME = 0.001
 
 
+def origen_cambiado(datos: dict) -> str | None:
+    """Motivo si el original ya no es el que se cortó (ausente o modificado)."""
+    origen = Path(datos["origen"])
+    if not origen.exists():
+        return "origen cambiado: el original ya no existe"
+    st = origen.stat()
+    if st.st_size != datos["origen_tam"] or abs(st.st_mtime - datos["origen_mtime"]) > TOLERANCIA_MTIME:
+        return "origen cambiado: el original se modificó durante la edición"
+    return None
+
+
 def _comprobar(trabajo: Path, datos: dict) -> str | None:
     salida = trabajo / "salida.mp4"
     if not salida.exists():
@@ -28,13 +39,7 @@ def _comprobar(trabajo: Path, datos: dict) -> str | None:
     d_sal, d_vid = float(_duracion(salida)), float(_duracion(trabajo / "video.mp4"))
     if abs(d_sal - d_vid) > TOLERANCIA_DURACION:
         return f"La duración no cuadra: salida {d_sal:.2f} s, vídeo {d_vid:.2f} s"
-    origen = Path(datos["origen"])
-    if not origen.exists():
-        return "origen cambiado: el original ya no existe"
-    st = origen.stat()
-    if st.st_size != datos["origen_tam"] or abs(st.st_mtime - datos["origen_mtime"]) > TOLERANCIA_MTIME:
-        return "origen cambiado: el original se modificó durante la edición"
-    return None
+    return origen_cambiado(datos)
 
 
 def entregar(trabajo: Path) -> str | None:
@@ -77,6 +82,11 @@ def entregar(trabajo: Path) -> str | None:
 
 def main(args: list[str]) -> int:
     try:
+        if args[0] == "--solo-origen":  # antes de gastar claude en un trabajo ya caducado
+            motivo = origen_cambiado(json.loads((Path(args[1]) / "trabajo.json").read_text("utf-8")))
+            if motivo:
+                print(motivo)
+            return 1 if motivo else 0
         motivo = entregar(Path(args[0]))
         if motivo:
             print(motivo)

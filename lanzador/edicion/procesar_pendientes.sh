@@ -78,6 +78,13 @@ while [ "$nuevas" = 1 ]; do
             mover errores "error, sin claude"
             continue
         fi
+        # Un original que ya cambió no merece una llamada a claude.
+        if ! motivo="$(cd "$carpeta" && "$PYTHON" -m videopipeline.edicion.entregar --solo-origen "$carpeta" 2>&1)"; then
+            echo "$motivo" > "$carpeta/motivo.txt"
+            rm -f "$carpeta/video.mp4"
+            mover errores "error, $motivo"
+            continue
+        fi
         HERRAMIENTAS="Read,Edit(./plan.json),Bash($PYTHON -m videopipeline.edicion.preparar:*),Bash($PYTHON -m videopipeline.edicion.validar_plan:*),Bash($PYTHON -m videopipeline.edicion.renderizar:*),Bash($PYTHON -m videopipeline.edicion.verificar:*)"
         # perl (viene con macOS) pone el límite de tiempo: alarm sobrevive al exec.
         # Sin los ajustes de usuario, los plugins y hooks personales no se cuelan.

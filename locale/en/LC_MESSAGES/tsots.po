@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 14:18+0100\n"
+"POT-Creation-Date: 2026-11-17 14:43+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1290,6 +1290,10 @@ msgstr "The accounts could not be checked; using the last known result."
 #, python-brace-format
 msgid "No se pudieron descargar los pesos del detector de caras: {error}"
 msgstr "Could not download the face detector weights: {error}"
+
+#, python-brace-format
+msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
+msgstr "Could not queue the shorts for editing with Claude: {error}"
 
 #, python-brace-format
 msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
