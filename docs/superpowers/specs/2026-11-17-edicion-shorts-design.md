@@ -182,15 +182,17 @@ carpeta `TSOTS_EDICION_LIMITE` (por defecto 1200 s).
 
 Por cada trabajo:
 1. Ejecuta `claude -p --model claude-haiku-5-5` con:
-   - prompt = contenido de `SKILL.md` de la skill + "Trabajo: <ruta>"
+   - prompt = contenido de `SKILL.md` de la skill (sin el frontmatter; el
+     prompt empieza con una línea de texto plano) + "Trabajo: <ruta>"
      (inline, como el blog con `instrucciones.md`; no depende de que el
      modo `-p` descubra skills);
-   - `--allowedTools` limitado a: `Read`, `Write` del `plan.json` del
-     trabajo, y `Bash(<.venv-clearvoice/bin/python> -m videopipeline.edicion.<x>:*)`
-     para `preparar`, `validar_plan`, `renderizar` y `verificar` (como el
-     blog con `videopipeline.blog_subida`);
-   - `--disallowedTools` para todo lo demás que pueda escribir fuera del
-     trabajo (mismo criterio que el blog: las prohibidas ganan).
+   - `--allowedTools`: `Read`, `Edit(./plan.json)` (el cwd es la carpeta del
+     trabajo; Claude Code aplica los permisos de escritura de archivos con
+     reglas `Edit`, y una sola `/` inicial es relativa a la raíz de los
+     ajustes) y cuatro `Bash(<python> -m videopipeline.edicion.<x>:*)` para
+     `preparar`, `validar_plan`, `renderizar` y `verificar`;
+   - `--disallowedTools "NotebookEdit,WebFetch,WebSearch"` (sin `Edit`
+     a secas: bloquearía la escritura de `plan.json`).
 2. **El script, no Haiku, decide el éxito.** Comprueba:
    - existe `<trabajo>/salida.mp4`;
    - `ffprobe`: vídeo 1080x1920 y audio presentes, duración = la del
@@ -198,8 +200,8 @@ Por cada trabajo:
    - el original no ha cambiado (`origen_tam` y `origen_mtime`) y sigue
      existiendo.
 3. Éxito: copia `salida.mp4` a `<destino>.tmp` en la carpeta del episodio y
-   la renombra a `destino` (atómico); borra `video.mp4` y `salida.mp4` del
-   trabajo; mueve la carpeta a `hechos/` con `resultado.json`
+   la renombra a `destino` (atómico); borra `video.mp4`, `salida.mp4` y `tmp/` del
+   trabajo (`tmp/` también se borra al mover a `errores/`); mueve la carpeta a `hechos/` con `resultado.json`
    (`{destino, estilo, duracion, fecha}`).
 4. Fallo: mueve a `errores/` con `motivo.txt` (motivo + final de
    `claude.log`). El short original queda como estaba.

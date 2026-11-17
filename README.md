@@ -28,6 +28,8 @@ you publish it or tick **Blog** (see
   (0.7 GB) and, if you want the SEO caption, the language model (6 GB).
 - Internet during installation (downloads) and the first time you use
   subtitles. After that it works offline.
+- Only for **Edit with Claude** (optional): Claude Code (`claude`) installed
+  and logged in with your own account. No other new dependency.
 - Memory: 16 GB is enough for everything except large language models;
   the app tells you which ones fit on your Mac.
 - Only for the blog draft (**Blog**): the
@@ -344,6 +346,41 @@ then moves to:
 The agent's log is `~/TSOTS/blog/agente.log`. A failure in this step
 never stops the video: it is saved anyway, with a warning.
 
+## Edit shorts with Claude
+
+When you create shorts you can have Claude edit each one: on-screen labels,
+counters, emojis, transitions, zooms and sounds, in the style you choose.
+The untouched original stays where it is.
+
+- In the Shorts panel tick **Edit with Claude** and pick a **Style**
+  (Funny / Formal / Academic). It is one setting for the whole batch of
+  shorts you create. It is disabled (hover for the reason) when the
+  `claude` command is not found.
+- One job per short is queued in `~/TSOTS/edicion/pendientes/`. When the
+  processing queue ends (and when the app opens) TSOTS launches
+  `lanzador/edicion/procesar_pendientes.sh`. It runs `claude -p --model
+  claude-haiku-5-5` once per job, one after another, with a 1200 s limit
+  per job (`TSOTS_EDICION_LIMITE`). Haiku only decides the moments; labels,
+  counters, emojis, transitions, zooms and sounds come from code, and the
+  code renders. The result is checked and saved as
+  `NN - title.editado.mp4` next to the original. A 112 s short took about
+  2-3 minutes.
+- Finished jobs go to `~/TSOTS/edicion/hechos/`; failed ones to
+  `errores/` with a `motivo.txt`. Log: `~/TSOTS/edicion/agente.log`.
+- **Publish shorts…** uploads the edited file when it exists and marks it
+  "(editado)". There is still one publication record per short.
+- Creating the shorts again deletes the old `.editado.mp4` files. A pending
+  job whose original changed ends in `errores/` with "origen cambiado".
+- **Retry a failed job:** move its folder from `errores/` back to
+  `pendientes/` (it keeps `video.mp4`), then reopen the app or finish
+  another batch.
+- Needs Claude Code logged in **with the account of the person using
+  TSOTS**. The usage counts against that account's plan. TSOTS never reads
+  or stores Claude credentials.
+- **From the chat (optional):** `ln -s <repo>/lanzador/edicion
+  ~/.claude/skills/editar-short`, then ask Claude Code "edita este vídeo en
+  estilo divertido".
+
 ## Publish to social networks
 
 From a finished video with a caption, **Publish…** sends it to **TikTok →
@@ -489,6 +526,11 @@ scheduled. To change the time, cancel and schedule again.
   `~/TSOTS/blog/agente.log`. Check that `claude` is logged in and has the
   **claude.ai E2D - Blog** connector. A folder still in `pendientes/` is
   sent to the agent again the next time you open the app.
+- An edited short does not appear: look in
+  `~/TSOTS/edicion/errores/<folder>/motivo.txt` and in
+  `~/TSOTS/edicion/agente.log`. Check that `claude` is logged in. A folder
+  still in `pendientes/` is processed the next time a batch ends or you
+  open the app.
 - The **caption** is not generated: check that the Ollama app is open
   (menu bar icon) and press ↻ next to the model selector. To add models:
   `ollama pull name` in Terminal, then ↻.
