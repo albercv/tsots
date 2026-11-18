@@ -124,9 +124,9 @@ def obtener(buscar: str, usados: set[int], carpeta: Path, clave: str | None = No
         return None
 
 
-def _decodificar(clip: Path, ancho: int, alto: int, dur: float, fps: int):
-    """Frames RGB del clip llenando `ancho`×`alto`; en bucle si es más corto que `dur`."""
-    cmd = [FFMPEG, "-v", "error", "-stream_loop", "-1", "-i", str(clip), "-t", f"{dur:.3f}",
+def _decodificar(clip: Path, ancho: int, alto: int, dur: float, fps: int, inicio: float = 0.0):
+    """Frames RGB del clip (desde `inicio` s) llenando `ancho`×`alto`; en bucle si es más corto que `dur`."""
+    cmd = [FFMPEG, "-v", "error", "-stream_loop", "-1", "-ss", f"{inicio:.3f}", "-i", str(clip), "-t", f"{dur:.3f}",
            "-r", str(fps), "-vf",
            f"scale={ancho}:{alto}:force_original_aspect_ratio=increase,crop={ancho}:{alto}",
            "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
