@@ -180,6 +180,9 @@ class DialogoPublicarShorts(DialogoPublicar):
                 any(b for _t, b in partes))
 
     def _refrescar(self, *args) -> None:
+        primero = next((f.corto.mp4 for f in self._elegidas()), None)
+        if primero is not None and primero != self._portada_de and not self.publicando:
+            self._calcular_portada(primero)  # la vista previa sigue al primero marcado
         bloqueos = self._refrescar_plataformas()
         listo, _motivo = self._listo()
         bloqueado = False
