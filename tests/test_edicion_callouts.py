@@ -1,6 +1,7 @@
 """Señalar y lupa: seguimiento del texto por OCR (simulado) y dibujo de los callouts."""
 import subprocess
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -90,10 +91,10 @@ def test_frames_lupa_no_tapa_subtitulos(video):
     assert f.getchannel("A").crop((0, 1500, 1080, 1700)).getextrema() == (0, 0)  # banda de subtítulos limpia
     assert f.getchannel("A").crop((0, 960, 1080, 1400)).getbbox()  # tarjeta en la mitad opuesta (inferior)
     assert f.getchannel("A").crop((0, 0, 1080, 200)).getextrema() == (0, 0)
-    inferior = f.crop((0, 960, 1080, 1400))
+    inferior = np.asarray(f.crop((0, 960, 1080, 1400))).reshape(-1, 4)
     # el recorte ampliado es texto blanco sobre negro dentro de la tarjeta
-    assert any(p[:3] == (255, 255, 255) and p[3] == 255 for p in inferior.getdata())
-    assert any(p[:3] == (0, 0, 0) and p[3] == 255 for p in inferior.getdata())
+    assert ((inferior == (255, 255, 255, 255)).all(1)).any()
+    assert ((inferior == (0, 0, 0, 255)).all(1)).any()
 
 
 def test_lupa_trazo_no_cruza_la_caja(video):
