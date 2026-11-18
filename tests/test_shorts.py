@@ -295,6 +295,15 @@ def test_elegir_empate_gana_el_mas_largo():
     assert b.descarte == "solapa"
 
 
+def test_elegir_reemplazo_entre_tramos_libera_el_tramo_del_sustituido():
+    a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))  # tramo 0
+    b = _nota(700, 870, 2.8, 0.9, frases=(11, 13))  # tramo 1, más largo: sustituye a `a`
+    c = _nota(200, 270, 2.5, 0.9, frases=(50, 51))  # tramo 0, debe entrar en la 1.ª vuelta
+    d = _nota(1300, 1370, 2.2, 0.9, frases=(90, 91))  # tramo 2
+    assert shorts.elegir([a, b, c, d], maximo=2, duracion=3000) == [b, c]
+    assert (a.descarte, d.descarte) == ("solapa", "sobra")
+
+
 def test_elegir_segunda_vuelta_rellena():
     a = _nota(100, 170, 3.5, 0.9)
     b = _nota(200, 270, 3.0, 0.9)

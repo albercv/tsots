@@ -321,11 +321,14 @@ def elegir(candidatos: list[Candidato], maximo: int,
         c.descarte = "solapa"
         return False
 
-    cubiertos: set[int] = set()
+    def tramo(c: Candidato) -> int:
+        return int(c.inicio // (MINUTOS_TRAMO * 60))
+
     for c in pasan:
-        tramo = int(c.inicio // (MINUTOS_TRAMO * 60))
-        if tramo not in cubiertos and colocar(c):
-            cubiertos.add(tramo)
+        # Recalculado cada vez: un reemplazo puede dejar sin short el tramo del
+        # sustituido.
+        if tramo(c) not in {tramo(e) for e in elegidos}:
+            colocar(c)
     elegidos.sort(key=lambda c: orden[id(c)])
     for c in elegidos[maximo:]:
         c.descarte = "sobra"
