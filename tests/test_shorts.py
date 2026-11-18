@@ -218,9 +218,9 @@ def test_elegir_umbrales_orden_solapes_y_maximo():
     mejor = _nota(200, 270, 3.5, 0.9)
     solapa = _nota(250, 320, 3.0, 0.8, frases=(202, 203))  # comparte la 202
     segundo = _nota(400, 470, 2.5, 0.8)
-    de_mas = _nota(600, 670, 2.0, 0.7)
+    de_mas = _nota(500, 570, 2.0, 0.7)
     todos = [flojo, no_solo, solapa, de_mas, segundo, mejor]
-    elegidos = shorts.elegir(todos, maximo=2)
+    elegidos = shorts.elegir(todos, maximo=2, duracion=3000)
     assert elegidos == [mejor, segundo]
     assert [c.descarte for c in (flojo, no_solo, mejor, solapa, segundo, de_mas)] == [
         "flojo", "no_se_entiende_solo", "", "solapa", "", "sobra",
@@ -231,7 +231,7 @@ def test_elegir_desempata_por_independiente_y_luego_inicio():
     a = _nota(0, 70, 3.0, 0.6)
     b = _nota(100, 170, 3.0, 0.9)
     c = _nota(200, 270, 3.0, 0.9)
-    assert shorts.elegir([a, c, b], maximo=3) == [b, c, a]
+    assert shorts.elegir([a, c, b], maximo=3, duracion=3000) == [b, c, a]
 
 
 def test_elegir_deja_tocarse_los_extremos_y_ignora_los_ya_descartados():
@@ -239,7 +239,7 @@ def test_elegir_deja_tocarse_los_extremos_y_ignora_los_ya_descartados():
     b = _nota(70, 140, 2.5, 0.9)  # empieza donde acaba `a`: no se pisan
     ya = _nota(0, 70, 4.0, 1.0)
     ya.descarte = "duracion"
-    assert shorts.elegir([ya, a, b], maximo=5) == [a, b]
+    assert shorts.elegir([ya, a, b], maximo=5, duracion=3000) == [a, b]
     assert ya.descarte == "duracion"
 
 
@@ -257,14 +257,49 @@ def test_elegir_frases_contiguas_no_se_solapan():
     assert a.fin > b.inicio
     a.interes, a.independiente = 3.0, 0.9
     b.interes, b.independiente = 2.5, 0.9
-    assert shorts.elegir([a, b], maximo=2) == [a, b]
+    assert shorts.elegir([a, b], maximo=2, duracion=3000) == [a, b]
     assert (a.descarte, b.descarte) == ("", "")
 
 
 def test_elegir_sin_notas_no_pasa():
     sin_notas = shorts.Candidato(1, 2, "t", "m", inicio=0.0, fin=70.0)
-    assert shorts.elegir([sin_notas], maximo=3) == []
+    assert shorts.elegir([sin_notas], maximo=3, duracion=3000) == []
     assert sin_notas.descarte == "flojo"
+
+
+def test_elegir_reparte_por_tramos():
+    buenos = [_nota(120 + 100 * k, 190 + 100 * k, 3.5 - 0.1 * k, 0.9)
+              for k in range(4)]
+    lejano = _nota(2100, 2170, 2.0, 0.9)
+    elegidos = shorts.elegir(buenos + [lejano], maximo=2, duracion=3000)
+    assert elegidos == [buenos[0], lejano]
+    assert [c.descarte for c in buenos[1:]] == ["sobra"] * 3
+
+
+def test_elegir_primera_vuelta_recorta_a_maximo():
+    a = _nota(100, 170, 3.5, 0.9)
+    b = _nota(700, 770, 3.0, 0.9)
+    c = _nota(1300, 1370, 2.5, 0.9)
+    assert shorts.elegir([c, b, a], maximo=2, duracion=3000) == [a, b]
+    assert c.descarte == "sobra"
+
+
+def test_elegir_empate_gana_el_mas_largo():
+    a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))
+    b = _nota(100, 270, 2.8, 0.9, frases=(11, 13))
+    assert shorts.elegir([a, b], maximo=2, duracion=3000) == [b]
+    assert a.descarte == "solapa"
+    a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))
+    b = _nota(100, 270, 2.6, 0.9, frases=(11, 13))
+    assert shorts.elegir([a, b], maximo=2, duracion=3000) == [a]
+    assert b.descarte == "solapa"
+
+
+def test_elegir_segunda_vuelta_rellena():
+    a = _nota(100, 170, 3.5, 0.9)
+    b = _nota(200, 270, 3.0, 0.9)
+    c = _nota(700, 770, 2.5, 0.9)
+    assert shorts.elegir([a, b, c], maximo=3, duracion=3000) == [a, b, c]
 
 
 def test_nombre_archivo_limpia_el_titulo():

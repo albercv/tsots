@@ -277,12 +277,24 @@ def candidatos_de_temas(
     return candidatos, largos
 
 
-def elegir(candidatos: list[Candidato], maximo: int) -> list[Candidato]:
-    """Los mejores candidatos puntuados, sin solapes y como mucho `maximo`.
+MINUTOS_TRAMO = 10
+EMPATE_INTERES = 0.3  # diferencia de nota en la que gana el short más largo
 
-    Marca en `descarte` el motivo de los que no entran y devuelve los elegidos
-    de mejor a peor. Un candidato sin nota no pasa. Se solapan los que
-    comparten alguna frase, no los que solo se tocan por el margen del corte.
+
+def _se_solapan(a: Candidato, b: Candidato) -> bool:
+    return a.frase_inicio <= b.frase_fin and b.frase_inicio <= a.frase_fin
+
+
+def elegir(candidatos: list[Candidato], maximo: int,
+           duracion: float) -> list[Candidato]:
+    """Los mejores candidatos puntuados, repartidos por el vídeo y sin solapes.
+
+    Primera vuelta: el mejor de cada tramo de `MINUTOS_TRAMO` minutos; segunda,
+    el resto por nota hasta `maximo`. Entre dos que se solapan con casi la misma
+    nota gana el más largo. Marca en `descarte` el motivo de los que no entran
+    y devuelve los elegidos de mejor a peor. Un candidato sin nota no pasa. Se
+    solapan los que comparten alguna frase, no los que solo se tocan por el
+    margen del corte.
     """
     vivos = [c for c in candidatos if not c.descarte]
     for c in vivos:
@@ -292,15 +304,40 @@ def elegir(candidatos: list[Candidato], maximo: int) -> list[Candidato]:
             c.descarte = "no_se_entiende_solo"
     pasan = [c for c in vivos if not c.descarte]
     pasan.sort(key=lambda c: (-c.interes, -c.independiente, c.inicio))
+    orden = {id(c): k for k, c in enumerate(pasan)}
     elegidos: list[Candidato] = []
+
+    def colocar(c: Candidato) -> bool:
+        choques = [e for e in elegidos if _se_solapan(c, e)]
+        if not choques:
+            elegidos.append(c)
+            return True
+        e = choques[0]
+        if (len(choques) == 1 and e.interes - c.interes <= EMPATE_INTERES
+                and c.fin - c.inicio > e.fin - e.inicio):
+            elegidos[elegidos.index(e)] = c
+            e.descarte = "solapa"
+            return True
+        c.descarte = "solapa"
+        return False
+
+    cubiertos: set[int] = set()
     for c in pasan:
-        if any(c.frase_inicio <= e.frase_fin and e.frase_inicio <= c.frase_fin
-               for e in elegidos):
-            c.descarte = "solapa"
-        elif len(elegidos) >= maximo:
+        tramo = int(c.inicio // (MINUTOS_TRAMO * 60))
+        if tramo not in cubiertos and colocar(c):
+            cubiertos.add(tramo)
+    elegidos.sort(key=lambda c: orden[id(c)])
+    for c in elegidos[maximo:]:
+        c.descarte = "sobra"
+    del elegidos[maximo:]
+    for c in pasan:
+        if c.descarte or c in elegidos:
+            continue
+        if len(elegidos) >= maximo:
             c.descarte = "sobra"
         else:
-            elegidos.append(c)
+            colocar(c)
+    elegidos.sort(key=lambda c: orden[id(c)])
     return elegidos
 
 
@@ -897,7 +934,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         juez = puntuar(candidatos, frases, config.modelo_caption,
                        on_aviso=lambda texto: _avisar(on_progress, texto),
                        on_percent=avance(2, _("Puntuando los trozos")))
-        elegidos = elegir(candidatos, maximo)
+        elegidos = elegir(candidatos, maximo, duracion)
         # Todo short lleva su título quemado, con o sin el de inicio del panel:
         # el del modelo sobre su trozo o, si falla, el del candidato.
         titulado = avance(2, _("Generando título")) if elegidos else None
