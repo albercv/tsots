@@ -515,3 +515,10 @@ Ver `2026-11-17-editar-video-suelto-design.md`. Añade la edición del propio
 final de un vídeo cuando es vertical 1080×1920 (no solo de sus shorts): el
 botón «Editar con Claude…» y la casilla «Editar con Claude» al procesar lo
 cubren, el resultado es `<final>.editado.mp4` y «Publicar…» sube el editado.
+
+## 13. Ampliación: recursos explicativos (2026-11-18)
+
+Ver `2026-11-18-recursos-explicativos-design.md`. Añade cinco tipos de momento
+(`senalar`, `lupa`, `broll`, `icono`, `dato`), la lectura de pantalla con
+Vision, el B-roll gratuito de Pexels y las `Sugerencia:` del validador; la
+skill elige el mejor recurso para cada momento con una tabla de decisión.

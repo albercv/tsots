@@ -389,6 +389,25 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   validando, montando el vídeo, revisando) y el tiempo que falta, estimado
   con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
   editaron y cuántos fallaron; al pasar el ratón por la fila, cuáles.
+- **Recursos explicativos:** además de rótulos y contadores, Claude puede
+  señalar un texto que ya sale en pantalla (círculo, flecha o subrayado),
+  ampliar un texto pequeño en una tarjeta con lupa, tapar la imagen o ponerse
+  en una ventana con B-roll gratuito de Pixabay (modo «tapa» a pantalla completa
+  si no hay nada escrito en pantalla, modo «ventana» si lo hay), añadir iconos
+  para ideas abstractas y tarjetas de dato para los números que oye. Elige el
+  mejor para cada momento.
+  - **Clave de Pixabay (gratis):** para el B-roll, pulsa el botón **Pixabay…**
+    de los ajustes y pega tu clave (inicia sesión y cópiala en
+    https://pixabay.com/api/docs/). El contenido de Pixabay es de uso gratuito,
+    comercial incluido; los créditos quedan en `broll.json`. Sin ella, el
+    B-roll simplemente no se usa.
+  - **Lectura de pantalla:** necesita `pyobjc-framework-Vision` (macOS, ya en
+    `requirements.txt`). Si actualizas desde una versión anterior, vuelve a
+    ejecutar `instalar.command` (o `pip install -r requirements.txt` en el
+    entorno de la app, `.venv-clearvoice`) para instalarlo. Sin él no se lee la
+    pantalla y Claude no puede señalar textos ni ampliarlos con la lupa.
+  - **Créditos del B-roll:** los clips usados se guardan en el `broll.json`
+    del trabajo.
 - **Música de fondo:** mete pistas libres de derechos en
   `~/TSOTS/musica/divertido/`, `formal/` y `academico/` (mp3, wav, m4a,
   aac, flac u ogg). Cada short coge la siguiente pista de su estilo por

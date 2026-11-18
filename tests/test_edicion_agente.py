@@ -180,3 +180,26 @@ def test_claude_disponible(tmp_path, monkeypatch):
 
 def test_la_app_lanza_este_script():
     assert os.access(SCRIPT, os.X_OK) and (SCRIPT.parent / "SKILL.md").is_file()
+
+
+def _skill():
+    return (RAIZ / "lanzador" / "edicion" / "SKILL.md").read_text("utf-8")
+
+
+def test_skill_tiene_tabla_de_decision():
+    s = _skill()
+    for x in ("senalar", "lupa", "broll", "icono", "dato", "## En pantalla", "## Números dichos",
+              "## Iconos", "Sugerencia", "## Elegir el recurso"):
+        assert x in s, x
+
+
+def test_skill_formato_valida(tmp_path):
+    import re
+    from videopipeline.edicion import plan
+    bloque = re.search(r"## Formato de plan.json\s+```json\n(.*?)```", _skill(), re.S).group(1)
+    ruta = tmp_path / "plan.json"
+    ruta.write_text(bloque, "utf-8")
+    p = plan.leer(ruta)
+    tipos = {m.tipo for m in p.momentos}
+    assert tipos <= set(plan.TIPOS)
+    assert {"senalar", "lupa", "broll", "icono", "dato"} <= tipos

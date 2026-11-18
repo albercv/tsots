@@ -1,13 +1,13 @@
 """CLI: python -m videopipeline.edicion.validar_plan <trabajo>
 
-Imprime OK y escribe plan.validado.json, o un error por línea (exit 1).
+Imprime OK (más sugerencias no bloqueantes) y escribe plan.validado.json, o un error por línea (exit 1).
 """
 import json
 import subprocess
 import sys
 from pathlib import Path
 
-from videopipeline.edicion import estilos, plan as P
+from videopipeline.edicion import broll, estilos, pantalla, plan as P
 from videopipeline.subtitles import Palabra
 
 FFPROBE = "/opt/homebrew/opt/ffmpeg-full/bin/ffprobe"
@@ -27,8 +27,10 @@ def main(argv: list[str]) -> int:
         plan = P.leer(d / "plan.json")
         palabras = [Palabra(**p) for p in json.loads((d / "palabras.json").read_text("utf-8"))]
         tj = json.loads((d / "trabajo.json").read_text("utf-8"))
+        leida = pantalla.cargar(d / "pantalla.json") if (d / "pantalla.json").exists() else None
         nuevo, errs = P.validar(plan, palabras, tj["zonas"], estilos.cargar(tj["estilo"]),
-                                _duracion(d / "video.mp4"))
+                                _duracion(d / "video.mp4"),
+                                leida, broll.hay_clave())
     except (ValueError, OSError, KeyError, subprocess.CalledProcessError) as e:
         print(f"Error: {e}")
         return 1
@@ -36,7 +38,7 @@ def main(argv: list[str]) -> int:
         print("\n".join(errs))
         return 1
     P.guardar(nuevo, salida)
-    print("OK")
+    print("\n".join(["OK", *P.sugerencias(nuevo, leida)]))
     return 0
 
 

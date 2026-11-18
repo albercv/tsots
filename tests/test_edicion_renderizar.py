@@ -163,3 +163,185 @@ def test_sfx_formal_tics_alternos_audibles():
     F = estilos.cargar("formal")
     s = der([M("etiqueta", 1, texto=["A"]), M("etiqueta", 4, texto=["B"])], estilo=F)
     assert [e.tipo for e in s.sfx] == ["tick", "tick2"]
+
+
+# ---- tipos nuevos: señalar, lupa, B-roll, icono, dato ----
+import pytest  # noqa: E402
+
+from videopipeline.edicion import broll, callouts, graficos, pantalla  # noqa: E402
+from videopipeline.edicion import renderizar as rmod  # noqa: E402
+
+DET = pantalla.Deteccion("Factura", (100, 700, 300, 60), 0.9)
+LECTURA = [pantalla.Muestra(t, (DET,)) for t in (1.0, 5.0)]
+
+
+def der2(momentos, estilo=D, pant=LECTURA, dur=20.0):
+    return derivar(Plan(momentos, None), ZONAS, estilo, dur, pant)
+
+
+def test_derivar_tipos_nuevos():
+    s = der2([M("senalar", 1.0, pantalla="Factura", forma="flecha"), M("lupa", 5.0, pantalla="Factura"),
+              M("broll", 9.0, buscar="person typing"), M("icono", 13.0, icono="casa"),
+              M("dato", 16.0, valor=40, texto=["DE LOS CASOS"], unidad="%")])
+    p = {x.clase: x for x in s.piezas}
+    assert p["senalar"].params == {"pantalla": "Factura", "forma": "flecha", "caja": DET}
+    assert p["lupa"].params == {"pantalla": "Factura", "caja": DET}
+    assert p["senalar"].dur == DURACION["senalar"] and p["lupa"].t == 5.0
+    assert p["broll"].params == {"buscar": "person typing", "modo": "tapa"}  # sin texto en pantalla
+    assert p["icono"].params == {"icono": "casa", "cx": 540, "cy": 330, "tam": 220}
+    assert p["dato"].params == {"valor": 40, "texto": "DE LOS CASOS", "unidad": "%"}
+
+
+def test_derivar_omite_senalar_sin_lectura():
+    for pant in (None, []):
+        assert der2([M("senalar", 1.0, pantalla="Factura", forma="circulo")], pant=pant).piezas == []
+
+
+def test_broll_modo_ventana_si_hay_texto(monkeypatch):
+    monkeypatch.setattr(rmod.ocr, "modo_broll", lambda m, t, d: "ventana")
+    assert der2([M("broll", 2.0, buscar="a b")]).piezas[0].params["modo"] == "ventana"
+
+
+def test_broll_ventana_evita_el_texto():
+    pant = [pantalla.Muestra(2.0, (pantalla.Deteccion("Grupo", (100, 300, 300, 60), 0.9),)),
+            pantalla.Muestra(3.0, (pantalla.Deteccion("Empresas", (100, 500, 300, 80), 0.9),)),
+            pantalla.Muestra(9.0, (pantalla.Deteccion("Fuera", (100, 900, 300, 80), 0.9),))]
+    p = der2([M("broll", 2.0, buscar="a b")], pant=pant).piezas[0]
+    assert p.params["modo"] == "ventana" and p.params["evitar"] == (300, 580)
+
+
+def test_icono_lateral_con_etiqueta():
+    s = der2([M("etiqueta", 2, texto=["A"]), M("icono", 3, icono="casa")])
+    i = [x for x in s.piezas if x.clase == "icono"][0]
+    assert (i.params["cx"], i.params["tam"]) == (950, 170)
+
+
+def test_icono_lateral_con_dato_o_lupa():
+    for otro in (M("dato", 10.0, valor=2, texto=["EMPRESAS"]), M("lupa", 10.0, pantalla="Factura")):
+        pant = [pantalla.Muestra(10.0, (DET,))]
+        s = der2([otro, M("icono", 10.5, icono="casa")], pant=pant)
+        i = [x for x in s.piezas if x.clase == "icono"][0]
+        assert (i.params["cx"], i.params["tam"]) == (950, 170), otro.tipo
+
+
+def test_sfx_nuevos_segun_estilo():
+    F = estilos.cargar("formal")
+    ms = [M("senalar", 1.0, pantalla="Factura", forma="circulo")]
+    assert [e.tipo for e in der2(ms, estilo=F).sfx] == ["tick"]
+    assert sfx(der2(ms), "tap")[0].t == 1.08
+    from dataclasses import replace
+    assert der2(ms, estilo=replace(F, sfx={"ding": -9})).sfx == []
+
+
+def _slot_falso(frames, destino, fps):
+    destino.write_bytes(b"x")
+    return destino
+
+
+def test_render_pieza_omite_y_limpia_si_falla(tmp_path, monkeypatch):
+    def rota(*a, **k):
+        raise RuntimeError("ocr")
+    monkeypatch.setattr(callouts, "seguir", rota)
+    d = tmp_path / "s.mov"
+    d.write_bytes(b"parcial")
+    p = rmod.Pieza("senalar", 1.0, 2.0, {"pantalla": "x", "forma": "circulo", "caja": DET})
+    ctx = rmod.RenderCtx(tmp_path / "v.mp4", ZONAS, tmp_path / "b", set(), [], None)
+    assert rmod._render_pieza(p, D, 10, d, ctx) is None and not d.exists()
+
+
+def test_render_pieza_omite_callout_casi_invisible(tmp_path, monkeypatch):
+    caja = (100, 700, 300, 60)
+    monkeypatch.setattr(rmod.rotulos, "render_slot", _slot_falso)
+    ctx = rmod.RenderCtx(tmp_path / "v.mp4", ZONAS, tmp_path / "b", set(), [], None)
+    for visibles, sale in ((5, False), (7, True)):  # a 10 fps: 0.5 s se omite, 0.7 s se pinta
+        monkeypatch.setattr(callouts, "seguir", lambda *a, **k: [caja] * visibles + [None] * (20 - visibles))
+        for clase, q in (("senalar", {"forma": "circulo"}), ("lupa", {})):
+            p = rmod.Pieza(clase, 1.0, 2.0, {"pantalla": "Factura", "caja": DET, **q})
+            monkeypatch.setattr(callouts, "frames_lupa", lambda *a, **k: iter(()))
+            assert (rmod._render_pieza(p, D, 10, tmp_path / "s.mov", ctx) is not None) is sale, (clase, visibles)
+
+
+def test_render_senalar_pasa_la_inclinacion(tmp_path, monkeypatch):
+    det = pantalla.Deteccion("Factura", (100, 700, 300, 60), 0.9, 0.07)
+    vistas = []
+    monkeypatch.setattr(rmod.rotulos, "render_slot", _slot_falso)
+    monkeypatch.setattr(callouts, "seguir", lambda *a, **k: [det.caja] * 20)
+    monkeypatch.setattr(callouts, "frames_senalar", lambda *a, **k: vistas.append(a) or iter(()))
+    p = rmod.Pieza("senalar", 1.0, 2.0, {"pantalla": "Factura", "caja": det, "forma": "subrayado"})
+    rmod._render_pieza(p, D, 10, tmp_path / "s.mov", rmod.RenderCtx(tmp_path / "v.mp4", ZONAS, tmp_path, set(), []))
+    assert vistas and vistas[0][-1] == 0.07
+
+
+@pytest.fixture
+def clip_mp4(tmp_path):
+    ruta = tmp_path / "clip.mp4"
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
+                    "testsrc2=size=320x568:rate=10:duration=1", "-pix_fmt", "yuv420p", str(ruta)],
+                   check=True)
+    return ruta
+
+
+def test_renderizar_con_broll_y_creditos(tmp_path, video_vertical, clip_mp4, monkeypatch):
+    monkeypatch.setattr(broll, "obtener",
+                        lambda buscar, usados, carpeta, clave=None, **k: broll.Clip(clip_mp4, "Ana", "https://p/1", 1))
+    t = _trabajo(tmp_path, video_vertical, [{"tipo": "broll", "t": 0.5, "buscar": "person typing"}])
+    assert renderizar(t, borrador=True).exists()
+    assert json.loads((t / "broll.json").read_text("utf-8")) == [
+        {"autor": "Ana", "url": "https://p/1", "buscar": "person typing", "t": 0.5}]
+
+
+def test_renderizar_omite_broll_si_pixabay_falla(tmp_path, video_vertical, monkeypatch):
+    monkeypatch.setattr(broll, "obtener", lambda *a, **k: None)
+    t = _trabajo(tmp_path, video_vertical, [{"tipo": "broll", "t": 0.5, "buscar": "person typing"}])
+    (t / "broll.json").write_text("[]")  # resto de un render anterior
+    assert renderizar(t, borrador=True).exists() and not (t / "broll.json").exists()
+
+
+def test_renderizar_omite_pieza_si_falla(tmp_path, video_vertical, clip_mp4, monkeypatch):
+    intentos = []
+
+    def rota(*a, **k):
+        intentos.append(1)
+        raise RuntimeError("vision")
+    monkeypatch.setattr(callouts, "seguir", rota)
+    monkeypatch.setattr(broll, "obtener",
+                        lambda buscar, usados, carpeta, clave=None, **k: broll.Clip(clip_mp4, "Ana", "u", 1))
+    monkeypatch.setattr(broll, "frames_broll", lambda *a, **k: iter(()))  # cero fotogramas
+    capturados = []
+    pista = rmod.sonidos.pista
+    monkeypatch.setattr(rmod.sonidos, "pista", lambda ev, *a, **k: (capturados.extend(ev), pista(ev, *a, **k))[1])
+    t = _trabajo(tmp_path, video_vertical, [
+        {"tipo": "senalar", "t": 1.0, "pantalla": "Factura", "forma": "circulo"},
+        {"tipo": "broll", "t": 0.5, "buscar": "person typing"}])
+    (t / "pantalla.json").write_text(json.dumps({"version": 1, "muestras": [
+        {"t": 1.0, "detecciones": [{"texto": "Factura", "caja": [100, 700, 300, 60], "confianza": 0.9}]}]}))
+    assert renderizar(t, borrador=True).exists()
+    assert intentos  # el seguimiento se intentó de verdad
+    assert not list((t / "tmp").glob("slot_*.mov")) and not (t / "broll.json").exists()
+    # sin imagen, sin sonido: solo queda el boom de inicio
+    assert [e.tipo for e in capturados] == ["boom"]
+
+
+def _crop(salida, seg, tmp_path, nombre):
+    png = tmp_path / nombre
+    subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", str(seg), "-i", str(salida), "-frames:v", "1",
+                    "-vf", "crop=720:300:0:100", str(png)], check=True)
+    from PIL import Image, ImageChops
+    return Image.open(png).convert("RGB"), ImageChops
+
+
+def test_renderizar_icono_y_dato(tmp_path, video_vertical):
+    base = renderizar(_trabajo(tmp_path, video_vertical, []), borrador=True)
+    ref, ch = _crop(base, 1.5, tmp_path, "ref.png")
+    t2 = tmp_path / "t2"
+    t2.mkdir()
+    (t2 / "video.mp4").symlink_to(video_vertical)
+    (t2 / "trabajo.json").write_text(json.dumps({"estilo": "divertido", "zonas": ZONAS}))
+    (t2 / "plan.validado.json").write_text(json.dumps({"momentos": [
+        {"tipo": "icono", "t": 1.0, "icono": "casa"},
+        {"tipo": "dato", "t": 2.2, "valor": 40, "texto": ["DE LOS CASOS"], "unidad": "%"}]}))
+    sal = renderizar(t2, borrador=True)
+    for seg, n in ((1.5, "i.png"), (3.2, "d.png")):
+        img, _ = _crop(sal, seg, tmp_path, n)
+        r0, _ = _crop(base, seg, tmp_path, "r" + n)
+        assert ch.difference(img, r0).getbbox() is not None

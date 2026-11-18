@@ -1,6 +1,6 @@
 ---
 name: editar-short
-description: Decide los momentos (etiquetas, emojis, contadores, golpes, zooms) de un short ya cortado con subtítulos quemados y deja el plan en plan.json.
+description: Decide los momentos (etiquetas, emojis, contadores, golpes, zooms, flechas, lupas, B-roll, iconos, datos) de un short ya cortado con subtítulos quemados y deja el plan en plan.json.
 ---
 
 # Editar un short
@@ -21,15 +21,21 @@ Los comandos se escriben **exactamente así**, copiados tal cual: `./tsots`, el
 paso y un punto. Sin `cd`, sin rutas, sin comillas y sin variables delante;
 cualquier otra forma pide un permiso que nadie puede dar y el trabajo se pierde.
 
+`./tsots preparar .` y `./tsots renderizar .` pueden tardar varios minutos:
+ejecútalos con la herramienta Bash poniendo `timeout` a 600000 y espera a que
+terminen. No los lances en segundo plano.
+
 1. Ejecuta `./tsots preparar .` y lee con Read el fichero `<trabajo>/contexto.md`.
 2. Escribe con Write el fichero `<trabajo>/plan.json`. Formato abajo.
 3. Ejecuta `./tsots validar_plan .`. Si no imprime `OK`, corrige `plan.json`
    según cada línea de error y vuelve a ejecutarlo. Como mucho 3 intentos; si
-   sigue fallando, para.
+   sigue fallando, para. Si imprime `OK` seguido de líneas `Sugerencia:`,
+   aplica las que tengan sentido y vuelve a validar una vez.
 4. Ejecuta `./tsots renderizar .`.
 5. Ejecuta `./tsots verificar .` y lee con Read `<trabajo>/verificacion.png`.
    Si en algún fotograma ves texto cortado, un gráfico sobre los subtítulos o
-   sobre el título, o falta un elemento: corrige `plan.json` y repite los
+   sobre el título, o falta un elemento, o la flecha o la lupa no señalan el
+   texto correcto, o el B-roll no tiene que ver con lo que se dice: corrige `plan.json` y repite los
    pasos 3 a 5 **una sola vez**.
 6. Para. No ejecutes nada más ni toques ningún otro fichero.
 
@@ -47,6 +53,11 @@ Si un comando te pide aprobación o se deniega, no busques otra forma: para.
     {"t": 53.36, "palabra": "llama",    "tipo": "error"},
     {"t": 56.60, "palabra": "negocio",  "tipo": "contador", "lista": 1, "num": 1, "texto": "NEGOCIO"},
     {"t": 24.30, "tipo": "transicion"},
+    {"t": 40.10, "palabra": "Revisión", "tipo": "senalar", "pantalla": "Revisión", "forma": "flecha"},
+    {"t": 44.00, "palabra": "factura", "tipo": "lupa",     "pantalla": "Factura 2024"},
+    {"t": 48.50, "palabra": "oficina", "tipo": "broll",    "buscar": "busy open plan office"},
+    {"t": 54.66, "palabra": "documentos", "tipo": "icono", "icono": "documento"},
+    {"t": 30.20, "palabra": "años",    "tipo": "dato",     "valor": 10, "texto": "AÑOS DE CASOS"},
     {"t0": 15.26, "t1": 19.0, "tipo": "zoom"}
   ],
   "final": {"texto": ["REVISA · PLANIFICA", "REGLAS CLARAS"], "check": true}
@@ -65,7 +76,39 @@ líneas. `contador`: `texto` es una sola cadena de 22 caracteres como mucho.
 | golpe | El chiste principal. Máximo 2. |
 | error | Una negación rotunda («no es…», «nunca»). |
 | transicion | Un cambio de tema. Entre 3 y 5 por vídeo. |
+| senalar | Lo dicho sale escrito en pantalla (`## En pantalla`): `pantalla` es ese texto (o un trozo corto) y `forma` es `circulo` (por defecto), `flecha` o `subrayado`. Dura 2 s. |
+| lupa | Un texto corto de la pantalla (hasta 4 palabras), o el más importante del tramo: `pantalla` es ese texto o un trozo corto. Dura 2,6 s y ocupa la zona superior como una etiqueta. |
+| broll | Algo concreto que se nombra y no se ve: `buscar` son de 2 a 6 palabras en inglés, concretas y visuales. Dura 2,5 s. Solo si `B-roll: disponible`. |
+| icono | Un concepto abstracto con icono en `## Iconos`: `icono` es su nombre exacto. Dura 1,6 s. |
+| dato | Un número dicho (`## Números dichos`): `valor` numérico, `texto` de 22 caracteres como mucho y `unidad` `"%"` si se dice «por ciento». Dura 2,4 s. |
 | zoom | Una frase enfática. Dura de 2 a 5 s (`t1` − `t0`) y nunca se solapa con otro zoom. Sin `palabra`. |
+
+## Elegir el recurso
+
+Para cada momento, elige el primer recurso que encaje, en este orden:
+
+1. Lo dicho sale en pantalla (`## En pantalla`) → `lupa` si es un texto corto
+   (hasta 4 palabras) o lo más importante del tramo; si es una línea larga,
+   `senalar`.
+2. Se dice un número relevante → `dato`.
+3. Se nombra algo concreto que no se ve (un objeto, un lugar, una acción) →
+   `broll`, con la búsqueda en inglés, concreta y visual.
+4. Un concepto abstracto con icono en el catálogo (`## Iconos`) → `icono`.
+5. Una frase clave → `etiqueta`; una enumeración → `contador`.
+6. Solo un chiste o una imagen dicha → `emoji`, `golpe`, `error`.
+
+- `senalar` y `lupa` solo con textos de `## En pantalla`, visibles en ese
+  segundo, y nunca durante un `zoom`. `pantalla` es el texto exacto que sale
+  entre « » en `## En pantalla` o un trozo corto de él (1 a 4 palabras
+  seguidas), copiado tal cual. Una línea larga no cabe en la `lupa`: usa un
+  trozo corto o `senalar`.
+- `dato` solo con números de `## Números dichos`, a menos de 1,5 s de `t`.
+- `broll` como mucho 1 cada 15 s de vídeo, y no puede coincidir con ningún
+  otro momento visual (sí con una `transicion`). Las búsquedas, en inglés,
+  concretas y visuales («hands typing on laptop», no «productividad»).
+- Variedad: no pongas 3 momentos seguidos del mismo tipo.
+- Si en `## Estilo` pone `B-roll: no disponible` o `lectura de pantalla: no`,
+  no uses esos tipos (`broll`; `senalar` y `lupa`).
 
 ## Reglas
 
