@@ -399,9 +399,11 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   - **Clave de Pexels (gratis):** para el B-roll, pulsa el botón **Pexels…**
     de los ajustes y pega tu clave (créala en https://www.pexels.com/api/).
     Sin ella, el B-roll simplemente no se usa.
-  - **Lectura de pantalla:** necesita `pyobjc-framework-Vision` (ya está en
-    `requirements.txt`, macOS). Sin él, los avisos de señalar y lupa quedan
-    desactivados.
+  - **Lectura de pantalla:** necesita `pyobjc-framework-Vision` (macOS, ya en
+    `requirements.txt`). Si actualizas desde una versión anterior, vuelve a
+    ejecutar `instalar.command` (o `pip install -r requirements.txt` en el
+    entorno de la app, `.venv-clearvoice`) para instalarlo. Sin él no se lee la
+    pantalla y Claude no puede señalar textos ni ampliarlos con la lupa.
   - **Créditos del B-roll:** los clips usados se guardan en el `broll.json`
     del trabajo.
 - **Música de fondo:** mete pistas libres de derechos en

@@ -399,9 +399,11 @@ sounds, in the style you choose. The untouched original stays where it is.
   - **Pexels key (free):** for B-roll, click the **Pexels…** button in the
     settings and paste your key (create it at https://www.pexels.com/api/).
     Without it, B-roll is simply not used.
-  - **Screen reading** needs `pyobjc-framework-Vision` (already in
-    `requirements.txt`, macOS). Without it, the pointing and magnifier
-    callouts are simply off.
+  - **Screen reading** needs `pyobjc-framework-Vision` (macOS, already in
+    `requirements.txt`). If you are updating from an earlier version, run
+    `instalar.command` again (or `pip install -r requirements.txt` in the
+    app's environment, `.venv-clearvoice`) to install it. Without it the
+    screen is not read and Claude cannot point at text or magnify it.
   - **B-roll credits:** the clips used are saved in the job's `broll.json`.
 - **Background music:** put royalty-free tracks in
   `~/TSOTS/musica/divertido/`, `formal/` and `academico/` (mp3, wav, m4a,
