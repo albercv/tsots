@@ -18,8 +18,9 @@ from videopipeline.edicion.rotulos import _ease_out_cubic
 from videopipeline.edicion.texto import normalizar
 
 W, H = 1080, 1920
-SALTO_MAX = 0.25 * W      # px entre lecturas: más es «otro texto»
+SALTO_MAX = 0.25 * W      # px entre lecturas seguidas (cada 2 fotogramas): más es «otro texto»
 HUECO_MAX = 0.3           # s sin lectura antes de darlo por perdido
+VISIBLE_MIN = 0.6         # s: si se pierde antes, la pieza se omite (sería un parpadeo)
 GROSOR = 8
 FUNDIDO = 0.2             # s
 ENTRADA = 0.3             # s que tarda en trazarse la forma
@@ -32,33 +33,52 @@ def _centro(c: Caja) -> tuple[float, float]:
     return c[0] + c[2] / 2, c[1] + c[3] / 2
 
 
+def _dist(a: Caja, b: Caja) -> tuple[float, float]:
+    (ax, ay), (bx, by) = _centro(a), _centro(b)
+    return abs(ax - bx), abs(ay - by)
+
+
 def seguir(video: Path, texto: str, t: float, dur: float, fps: int, inicial, zonas: dict) -> list[Caja | None]:
-    """Una caja por fotograma del tramo; `None` desde que el texto salta o deja de verse."""
+    """Una caja por fotograma del tramo; `None` desde que el texto deja de verse.
+
+    OCR cada 2 fotogramas, el primero incluido. La caja de pantalla.json (`inicial`) es de
+    otra muestra y la cámara se mueve: solo elige entre candidatos hasta la primera lectura.
+    Valen las líneas que contienen el texto sin ser mucho más largas que aquella en la que
+    se leyó («Grupo» no es el «grupo» de «Empresas del grupo»), antes las iguales. Un
+    candidato que salta más de SALTO_MAX por lectura perdida cuenta como no leído y, tras
+    HUECO_MAX s sin lectura, se da por perdido."""
     n = round(dur * fps)
     obj = normalizar(texto)
-    lecturas = {0: inicial.caja}  # índice de fotograma -> caja leída
+    largo = 1.5 * len(normalizar(inicial.texto))  # el OCR corta las líneas largas en sitios distintos
+    exacto = normalizar(inicial.texto) == obj
+    lecturas: dict[int, Caja] = {}  # índice de fotograma -> caja leída
     perdido = n
     for i, img in enumerate(_decodificar(video, W, H, dur, fps, t)):
-        if i >= n or i == 0 or i % 2:
-            continue
-        previa_i = max(lecturas)
-        previa = lecturas[previa_i]
-        cands = [d.caja for d in pantalla.leer_fotograma(pantalla.enmascarar(img, zonas, t + i / fps))
-                 if obj and obj in normalizar(d.texto)]
-        if cands:
-            caja = min(cands, key=lambda c: abs(_centro(c)[0] - _centro(previa)[0]) + abs(_centro(c)[1] - _centro(previa)[1]))
-            if abs(_centro(caja)[0] - _centro(previa)[0]) <= SALTO_MAX and abs(_centro(caja)[1] - _centro(previa)[1]) <= SALTO_MAX:
-                lecturas[i] = caja
-                continue
-            perdido = previa_i + 1  # salta a otra parte: no es el mismo texto
+        if i >= n:
             break
-        if (i - previa_i) / fps > HUECO_MAX:
-            perdido = previa_i + 1
+        if i % 2:
+            continue
+        dets = [d for d in pantalla.leer_fotograma(pantalla.enmascarar(img, zonas, t + i / fps))
+                if obj and obj in normalizar(d.texto) and len(normalizar(d.texto)) <= largo]
+        exactas = [d for d in dets if normalizar(d.texto) == obj]
+        previa = max(lecturas, default=None)
+        ref = inicial.caja if previa is None else lecturas[previa]
+        cands = [d.caja for d in exactas or dets]
+        if exacto and previa is not None:  # la misma palabra en otro sitio de la interfaz tiene otro tamaño
+            cands = [c for c in cands if 0.7 <= c[2] / max(1, ref[2]) <= 1.4]
+        caja = min(cands, key=lambda c: sum(_dist(c, ref)), default=None)
+        # con la cámara en mano el texto barre la pantalla: el salto admitido crece con el hueco
+        if caja and (previa is None or max(_dist(caja, ref)) <= SALTO_MAX * (i - previa) / 2):
+            lecturas[i] = caja
+        elif (i - (previa or 0)) / fps > HUECO_MAX:
+            perdido = 0 if previa is None else previa + 1
             break
     claves = sorted(lecturas)
+    if not claves:
+        return [None] * n
     interp = []
     for i in range(min(n, perdido)):
-        a = max(k for k in claves if k <= i)
+        a = max((k for k in claves if k <= i), default=claves[0])
         b = min((k for k in claves if k >= i), default=a)
         f = 0 if a == b else (i - a) / (b - a)
         interp.append(tuple(lecturas[a][j] + f * (lecturas[b][j] - lecturas[a][j]) for j in range(4)))

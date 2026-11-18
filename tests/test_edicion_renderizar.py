@@ -249,6 +249,18 @@ def test_render_pieza_omite_y_limpia_si_falla(tmp_path, monkeypatch):
     assert rmod._render_pieza(p, D, 10, d, ctx) is None and not d.exists()
 
 
+def test_render_pieza_omite_callout_casi_invisible(tmp_path, monkeypatch):
+    caja = (100, 700, 300, 60)
+    monkeypatch.setattr(rmod.rotulos, "render_slot", _slot_falso)
+    ctx = rmod.RenderCtx(tmp_path / "v.mp4", ZONAS, tmp_path / "b", set(), [], None)
+    for visibles, sale in ((5, False), (7, True)):  # a 10 fps: 0.5 s se omite, 0.7 s se pinta
+        monkeypatch.setattr(callouts, "seguir", lambda *a, **k: [caja] * visibles + [None] * (20 - visibles))
+        for clase, q in (("senalar", {"forma": "circulo"}), ("lupa", {})):
+            p = rmod.Pieza(clase, 1.0, 2.0, {"pantalla": "Factura", "caja": DET, **q})
+            monkeypatch.setattr(callouts, "frames_lupa", lambda *a, **k: iter(()))
+            assert (rmod._render_pieza(p, D, 10, tmp_path / "s.mov", ctx) is not None) is sale, (clase, visibles)
+
+
 @pytest.fixture
 def clip_mp4(tmp_path):
     ruta = tmp_path / "clip.mp4"

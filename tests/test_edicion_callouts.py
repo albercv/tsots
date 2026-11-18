@@ -115,3 +115,58 @@ def test_senalar_respeta_banda_de_subtitulos():
     for forma in ("circulo", "flecha", "subrayado"):
         for f in callouts.frames_senalar([caja] * 8, forma, PALETA, FPS, ZONAS, 0.0):
             assert f.getchannel("A").crop((0, 1500, 1080, 1700)).getextrema() == (0, 0)
+
+
+def test_seguir_caja_inicial_desplazada(video, monkeypatch):
+    # la muestra de pantalla.json es de otro instante: la cámara movió el texto ~300 px
+    monkeypatch.setattr(pantalla, "leer_fotograma", _leer_real)
+    ini = _inicial(video)
+    cacheada = Deteccion(ini.texto, (ini.caja[0] + 300, ini.caja[1] + 40, *ini.caja[2:]), 0.9)
+    cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, cacheada, ZONAS)
+    assert None not in cajas
+    assert all(abs(c[0] - (ini.caja[0] + 3 * i)) < 10 for i, c in enumerate(cajas))
+
+
+def test_seguir_prefiere_la_linea_exacta(video, monkeypatch):
+    otra = Deteccion("Empresas de la revisión", (600, 1000, 400, 80), 0.95)
+    monkeypatch.setattr(pantalla, "leer_fotograma", lambda img: [*_leer_real(img), otra])
+    ini = _inicial(video)
+    cerca_de_otra = Deteccion("Revisión", (560, 980, 300, 80), 0.9)
+    cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, cerca_de_otra, ZONAS)
+    assert None not in cajas
+    assert all(abs(c[0] - (ini.caja[0] + 3 * i)) < 10 for i, c in enumerate(cajas))
+
+
+def test_seguir_un_candidato_lejano_no_corta(video, monkeypatch):
+    llamadas = []
+
+    def leer(imagen):
+        llamadas.append(1)
+        d = _leer_real(imagen)[0]
+        return [Deteccion(d.texto, (d.caja[0] + 600, *d.caja[1:]), 0.9)] if len(llamadas) == 4 else [d]
+
+    monkeypatch.setattr(pantalla, "leer_fotograma", leer)
+    cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, _inicial(video), ZONAS)
+    assert None not in cajas and all(c[0] < 300 for c in cajas)
+
+
+def test_seguir_tras_un_barrido_no_salta_a_otra_igual(video, monkeypatch):
+    # la cámara barre: un fotograma sin lectura, el texto aparece 400 px más allá y en el
+    # sitio de antes queda la misma palabra en pequeño (otro elemento de la interfaz)
+    llamadas = []
+
+    def leer(imagen):
+        llamadas.append(1)
+        d = _leer_real(imagen)[0]
+        if len(llamadas) <= 3:
+            return [d]
+        if len(llamadas) == 4:
+            return []
+        x, y, w, h = d.caja
+        return [Deteccion(d.texto, (x + 400, y, w, h), 0.9), Deteccion(d.texto, (x, y, w // 2, h // 2), 0.9)]
+
+    monkeypatch.setattr(pantalla, "leer_fotograma", leer)
+    ini = _inicial(video)
+    cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, ini, ZONAS)
+    assert None not in cajas
+    assert all(c[0] > ini.caja[0] + 300 and c[2] > ini.caja[2] * 0.8 for c in cajas[11:])

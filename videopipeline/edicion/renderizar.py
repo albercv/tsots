@@ -187,12 +187,15 @@ class RenderCtx:
 
 def _render_nueva(p: Pieza, estilo: Estilo, fps: int, destino: Path, ctx: RenderCtx) -> Path | None:
     q = p.params
-    if p.clase == "senalar":
+    if p.clase in ("senalar", "lupa"):
         cajas = callouts.seguir(ctx.video, q["pantalla"], p.t, p.dur, fps, q["caja"], ctx.zonas)
-        fr = callouts.frames_senalar(cajas, q["forma"], estilo.paleta, fps, ctx.zonas, p.t)
-    elif p.clase == "lupa":
-        cajas = callouts.seguir(ctx.video, q["pantalla"], p.t, p.dur, fps, q["caja"], ctx.zonas)
-        fr = callouts.frames_lupa(ctx.video, cajas, p.t, p.dur, ctx.zonas, estilo.paleta, fps)
+        if sum(c is not None for c in cajas) < callouts.VISIBLE_MIN * fps:
+            log.warning("Pieza %s en t=%.1f omitida: el texto se pierde enseguida", p.clase, p.t)
+            return None
+        if p.clase == "senalar":
+            fr = callouts.frames_senalar(cajas, q["forma"], estilo.paleta, fps, ctx.zonas, p.t)
+        else:
+            fr = callouts.frames_lupa(ctx.video, cajas, p.t, p.dur, ctx.zonas, estilo.paleta, fps)
     elif p.clase == "broll":
         clip = broll.obtener(q["buscar"], ctx.usados, ctx.carpeta_broll, ctx.clave)
         if clip is None:
