@@ -267,6 +267,21 @@ def test_elegir_empate_gana_el_mas_largo():
     assert b.descarte == "solapa"
 
 
+def test_elegir_primera_vuelta_el_mas_largo_gana_en_su_tramo():
+    a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))
+    b = _nota(100, 270, 2.8, 0.9, frases=(11, 13))
+    assert shorts.elegir([a, b], maximo=1, duracion=3000) == [b]
+    assert (a.descarte, b.descarte) == ("solapa", "")
+
+
+def test_elegir_cadena_de_reemplazos_no_se_aleja_del_mejor():
+    a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))
+    b = _nota(100, 220, 2.8, 0.9, frases=(11, 13))
+    c = _nota(100, 270, 2.6, 0.9, frases=(12, 14))
+    assert shorts.elegir([a, b, c], maximo=1, duracion=3000) == [b]
+    assert (a.descarte, c.descarte) == ("solapa", "solapa")
+
+
 def test_elegir_reemplazo_entre_tramos_libera_el_tramo_del_sustituido():
     a = _nota(100, 170, 3.0, 0.9, frases=(10, 12))  # tramo 0
     b = _nota(700, 870, 2.8, 0.9, frases=(11, 13))  # tramo 1, más largo: sustituye a `a`
@@ -367,6 +382,7 @@ def test_nota_chat_temperatura_cero(monkeypatch):
     llamadas = _chat_falso(monkeypatch, {"independiente": "no", "interes": 7})
     assert shorts.nota_chat("el fragmento", "gemma4:12b-mlx") == (0.0, 4.0)
     assert llamadas[0]["temperatura"] == 0
+    assert llamadas[0]["keep_alive"] == shorts.KEEP_ALIVE_SHORTS
     assert llamadas[0]["modelo"] == "gemma4:12b-mlx"
     assert llamadas[0]["esquema"] is shorts.ESQUEMA_JUEZ
     sistema, usuario = llamadas[0]["mensajes"]
@@ -1517,10 +1533,25 @@ def test_fragmentos_k_por_subventana(monkeypatch):
     avances = []
     assert shorts.fragmentos(tema, frases, 1500.0, "m", avances.append) == []
     assert len(llamadas) == 3
-    assert all("hasta 3" in l["mensajes"][0]["content"] or "hasta 1" in l["mensajes"][0]["content"]
-               for l in llamadas)
+    assert ["hasta 3" in l["mensajes"][0]["content"] for l in llamadas] == [True, True, False]
+    assert "hasta 1" in llamadas[2]["mensajes"][0]["content"]
     assert all(l["keep_alive"] == shorts.KEEP_ALIVE_SHORTS for l in llamadas)
     assert avances[-1] == 100.0
+
+
+def test_fragmentos_progreso_relativo_al_tema(monkeypatch):
+    tema, frases = _tema_largo(150, 10, inicio_frase=31)  # frases 31-150: 20 min
+    _chat_falso(monkeypatch, {"candidatos": []})
+    avances = []
+    shorts.fragmentos(tema, frases, 1500.0, "m", avances.append)
+    assert avances == [50.0, 100.0]
+
+
+def test_fragmentos_resto_corto_se_pliega_a_la_subventana(monkeypatch):
+    tema, frases = _tema_largo(63, 10)  # 630 s: 600 s + 30 s
+    llamadas = _chat_falso(monkeypatch, {"candidatos": []})
+    shorts.fragmentos(tema, frases, 630.0, "m")
+    assert len(llamadas) == 1
 
 
 def test_fragmentos_fuera_del_tema_se_descarta(monkeypatch):

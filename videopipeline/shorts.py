@@ -279,6 +279,9 @@ def elegir(candidatos: list[Candidato], maximo: int,
     pasan.sort(key=lambda c: (-c.interes, -c.independiente, c.inicio))
     orden = {id(c): k for k, c in enumerate(pasan)}
     elegidos: list[Candidato] = []
+    # Mejor interés de la cadena de reemplazos, para que no se aleje de él más
+    # de EMPATE_INTERES.
+    techo: dict[int, float] = {}
 
     def colocar(c: Candidato) -> bool:
         choques = [e for e in elegidos if _se_solapan(c, e)]
@@ -286,9 +289,11 @@ def elegir(candidatos: list[Candidato], maximo: int,
             elegidos.append(c)
             return True
         e = choques[0]
-        if (len(choques) == 1 and e.interes - c.interes <= EMPATE_INTERES
+        alto = techo.get(id(e), e.interes)
+        if (len(choques) == 1 and alto - c.interes <= EMPATE_INTERES + 1e-9
                 and c.fin - c.inicio > e.fin - e.inicio):
-            elegidos[elegidos.index(e)] = c
+            elegidos[next(k for k, x in enumerate(elegidos) if x is e)] = c
+            techo[id(c)] = alto
             e.descarte = "solapa"
             return True
         c.descarte = "solapa"
@@ -300,14 +305,16 @@ def elegir(candidatos: list[Candidato], maximo: int,
     for c in pasan:
         # Recalculado cada vez: un reemplazo puede dejar sin short el tramo del
         # sustituido.
-        if tramo(c) not in {tramo(e) for e in elegidos}:
+        # También puede retar a un elegido de su tramo con el que se solape.
+        if (tramo(c) not in {tramo(e) for e in elegidos}
+                or any(tramo(e) == tramo(c) and _se_solapan(c, e) for e in elegidos)):
             colocar(c)
     elegidos.sort(key=lambda c: orden[id(c)])
     for c in elegidos[maximo:]:
         c.descarte = "sobra"
     del elegidos[maximo:]
     for c in pasan:
-        if c.descarte or c in elegidos:
+        if c.descarte or any(c is e for e in elegidos):
             continue
         if len(elegidos) >= maximo:
             c.descarte = "sobra"
@@ -560,6 +567,8 @@ def fragmentos(tema: Tema, frases: list[Frase], duracion: float, modelo: str,
     desde = tema.frase_inicio - 1
     while desde < fin_tema:
         hasta = min(ventana(frases, desde), fin_tema)
+        if hasta < fin_tema and frases[fin_tema - 1].fin - frases[hasta].inicio < DURACION_MIN:
+            hasta = fin_tema  # un resto corto no da para un short: va con esta subventana
         dura = frases[hasta - 1].fin - frases[desde].inicio
         k = min(MAX_FRAGMENTOS_LLAMADA, max(1, int(dura // 180)))
         mensajes = construir_mensajes_fragmentos(frases, desde, hasta, k, tema.inicio)
@@ -588,7 +597,8 @@ def fragmentos(tema: Tema, frases: list[Frase], duracion: float, modelo: str,
             log.warning("Subventana %d-%d de «%s» omitida: %s",
                         desde + 1, hasta, tema.titulo, e)
         if on_percent is not None:
-            on_percent(100.0 * hasta / fin_tema)
+            on_percent(100.0 * (hasta - tema.frase_inicio + 1)
+                       / (fin_tema - tema.frase_inicio + 1))
         desde = hasta
     return salida
 
@@ -618,6 +628,7 @@ def nota_chat(texto: str, modelo: str) -> tuple[float, float]:
          {"role": "user", "content": "Fragmento:\n" + texto}],
         ESQUEMA_JUEZ,
         temperatura=0,
+        keep_alive=KEEP_ALIVE_SHORTS,
     )
     try:
         return (1.0 if datos["independiente"] == "si" else 0.0,
