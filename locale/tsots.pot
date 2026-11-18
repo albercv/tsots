@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 10:46+0100\n"
+"POT-Creation-Date: 2026-11-18 11:43+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -353,7 +353,7 @@ msgstr ""
 msgid "Claude: {n} en cola · empieza al terminar la cola o al abrir la app"
 msgstr ""
 
-msgid "Clave de Pexels"
+msgid "Clave de Pixabay"
 msgstr ""
 
 #, python-brace-format
@@ -911,7 +911,7 @@ msgstr ""
 msgid "Generando título"
 msgstr ""
 
-msgid "Guarda la clave gratuita de Pexels que usa «Editar con Claude» para añadir B-roll."
+msgid "Guarda la clave gratuita de Pixabay que usa «Editar con Claude» para añadir B-roll."
 msgstr ""
 
 msgid "Guardada"
@@ -990,7 +990,7 @@ msgstr ""
 msgid "La carpeta del blog está lista, pero no se pudo arrancar el agente del blog: comprueba que existe y es ejecutable lanzador/blog/procesar_pendientes.sh. Se reintentará al abrir la app."
 msgstr ""
 
-msgid "La clave de Pexels es gratis: créala en <a href=\"https://www.pexels.com/api/\">https://www.pexels.com/api/</a>. Se guarda en el Llavero de macOS y sirve para el B-roll (vídeos de apoyo) de «Editar con Claude»."
+msgid "La clave de Pixabay es gratis: inicia sesión y cópiala en <a href=\"https://pixabay.com/api/docs/\">https://pixabay.com/api/docs/</a>. Se guarda en el Llavero de macOS y sirve para el B-roll (vídeos de apoyo) de «Editar con Claude»."
 msgstr ""
 
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
@@ -1529,7 +1529,7 @@ msgstr ""
 msgid "Pasos ya hechos"
 msgstr ""
 
-msgid "Pega aquí la clave de Pexels"
+msgid "Pega aquí la clave de Pixabay"
 msgstr ""
 
 msgid "Pega la API key para guardarla"
@@ -1549,16 +1549,16 @@ msgstr ""
 msgid "Personas y blogs"
 msgstr ""
 
-msgid "Pexels"
-msgstr ""
-
-msgid "Pexels no aceptó esa clave (o no hay conexión). No se ha guardado nada."
-msgstr ""
-
-msgid "Pexels…"
-msgstr ""
-
 msgid "Pipeline completo"
+msgstr ""
+
+msgid "Pixabay"
+msgstr ""
+
+msgid "Pixabay no aceptó esa clave (o no hay conexión). No se ha guardado nada."
+msgstr ""
+
+msgid "Pixabay…"
 msgstr ""
 
 msgid "Plataformas (en este orden)"

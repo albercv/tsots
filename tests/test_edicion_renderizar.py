@@ -290,7 +290,7 @@ def test_renderizar_con_broll_y_creditos(tmp_path, video_vertical, clip_mp4, mon
         {"autor": "Ana", "url": "https://p/1", "buscar": "person typing", "t": 0.5}]
 
 
-def test_renderizar_omite_broll_si_pexels_falla(tmp_path, video_vertical, monkeypatch):
+def test_renderizar_omite_broll_si_pixabay_falla(tmp_path, video_vertical, monkeypatch):
     monkeypatch.setattr(broll, "obtener", lambda *a, **k: None)
     t = _trabajo(tmp_path, video_vertical, [{"tipo": "broll", "t": 0.5, "buscar": "person typing"}])
     (t / "broll.json").write_text("[]")  # resto de un render anterior

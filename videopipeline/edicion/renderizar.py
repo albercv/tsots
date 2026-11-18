@@ -114,9 +114,7 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
             modo = ocr.modo_broll(pantalla or [], t, broll.DURACION)
             extra = {}
             if modo == "ventana":  # franja vertical del texto que se ve en el tramo
-                ys = [(d.caja[1], d.caja[1] + d.caja[3]) for s in pantalla or [] if t <= s.t <= t + broll.DURACION
-                      for d in s.detecciones]
-                extra["evitar"] = (min(a for a, _ in ys), max(b for _, b in ys)) if ys else None
+                extra["evitar"] = ocr.franja_texto(pantalla or [], t, broll.DURACION)
             if pieza("broll", t, DURACION["broll"], buscar=m.buscar, modo=modo, **extra):
                 sonido_nuevo("broll", t)
         elif m.tipo == "dato":

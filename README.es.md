@@ -392,13 +392,15 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
 - **Recursos explicativos:** además de rótulos y contadores, Claude puede
   señalar un texto que ya sale en pantalla (círculo, flecha o subrayado),
   ampliar un texto pequeño en una tarjeta con lupa, tapar la imagen o ponerse
-  en una ventana con B-roll gratuito de Pexels (modo «tapa» a pantalla completa
+  en una ventana con B-roll gratuito de Pixabay (modo «tapa» a pantalla completa
   si no hay nada escrito en pantalla, modo «ventana» si lo hay), añadir iconos
   para ideas abstractas y tarjetas de dato para los números que oye. Elige el
   mejor para cada momento.
-  - **Clave de Pexels (gratis):** para el B-roll, pulsa el botón **Pexels…**
-    de los ajustes y pega tu clave (créala en https://www.pexels.com/api/).
-    Sin ella, el B-roll simplemente no se usa.
+  - **Clave de Pixabay (gratis):** para el B-roll, pulsa el botón **Pixabay…**
+    de los ajustes y pega tu clave (inicia sesión y cópiala en
+    https://pixabay.com/api/docs/). El contenido de Pixabay es de uso gratuito,
+    comercial incluido; los créditos quedan en `broll.json`. Sin ella, el
+    B-roll simplemente no se usa.
   - **Lectura de pantalla:** necesita `pyobjc-framework-Vision` (macOS, ya en
     `requirements.txt`). Si actualizas desde una versión anterior, vuelve a
     ejecutar `instalar.command` (o `pip install -r requirements.txt` en el

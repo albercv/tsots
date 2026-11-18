@@ -259,10 +259,16 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
                             "el señalado no caería sobre el texto; muévelo fuera de los zooms")
         elif m.tipo == "broll":
             if not broll_disponible:
-                errs.append(f"{etq}: no hay clave de Pexels configurada; quita el B-roll")
+                errs.append(f"{etq}: no hay clave de Pixabay configurada; quita el B-roll")
             elif (not m.buscar or not 2 <= len(m.buscar.split()) <= 6 or not _BUSCAR.match(m.buscar)):
                 errs.append(f"{etq}: 'buscar' debe ser una búsqueda de 2 a 6 palabras en inglés (solo letras latinas), "
                             "p. ej. \"person typing laptop\"")
+            elif pantalla and pant.modo_broll(pantalla, m.t, broll.DURACION) == "ventana":
+                try:  # la misma comprobación de hueco que usa el dibujo de la ventana
+                    broll.hueco_ventana(zonas, m.t, pant.franja_texto(pantalla, m.t, broll.DURACION))
+                except ValueError:
+                    errs.append(f"{etq}: en t={m.t:g} hay texto en casi toda la pantalla y el B-roll la taparía; "
+                                "ponlo cuando salga la persona hablando o quítalo")
         elif m.tipo == "icono":
             if not m.icono or not graficos.icono_disponible(m.icono):
                 errs.append(f"{etq}: el icono {m.icono!r} no está disponible; parecidos: "

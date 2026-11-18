@@ -106,7 +106,7 @@ def preparar(trabajo: Path) -> Path:
         f"- máximo: como mucho {maximo} momentos en este vídeo (sin contar zoom); duración {dur:.2f} s",
         f"- emojis: {'sí' if 'emoji' in estilo.tipos else 'no'}",
         f"- lectura de pantalla: {'no' if muestras is None else 'sí'}",
-        "- B-roll: " + ("disponible" if broll.hay_clave() else "no disponible (falta la clave de Pexels)"),
+        "- B-roll: " + ("disponible" if broll.hay_clave() else "no disponible (falta la clave de Pixabay)"),
         "", "## Zonas",
         f"- zoom: {'posible' if zoom else 'no disponible'}",
         f"- gráficos permitidos desde el segundo {desde:g}",

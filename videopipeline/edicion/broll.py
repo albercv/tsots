@@ -1,4 +1,4 @@
-"""B-roll gratuito de Pexels: clave en el Llavero, búsqueda con caché y dibujo.
+"""B-roll gratuito de Pixabay: clave en el Llavero, búsqueda con caché y dibujo.
 
 Modos: «tapa» cubre todo lo que hay sobre los subtítulos; «ventana» es una
 tarjeta redondeada en el hueco sin texto de la zona de gráficos. La clave nunca
@@ -19,12 +19,13 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from videopipeline.edicion.componer import FFMPEG
 
 log = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)  # a INFO registra la URL completa, con la clave
 
-SERVICIO = "tsots-pexels"
+SERVICIO = "tsots-pixabay"
 CUENTA = "api-key"
 DURACION = 2.5  # s mínimos de un clip útil
 SECURITY = "/usr/bin/security"
-URL_BUSQUEDA = "https://api.pexels.com/videos/search"
+URL_BUSQUEDA = "https://pixabay.com/api/videos/"
 W, H = 1080, 1920
 VENTANA_ANCHO, VENTANA_ALTO = 860, 540  # tarjeta apaisada: deja ver la demo
 VENTANA_MIN, MARGEN_VENTANA = 240, 24   # px: más baja no se distingue; separación del texto
@@ -62,8 +63,7 @@ def hay_clave() -> bool:
 def probar_clave(clave: str, cliente: httpx.Client | None = None) -> bool:
     try:
         c = cliente or httpx.Client()
-        r = c.get(URL_BUSQUEDA, params={"query": "nature", "per_page": 1},
-                  headers={"Authorization": clave}, timeout=10)
+        r = c.get(URL_BUSQUEDA, params={"key": clave, "q": "nature", "per_page": 3}, timeout=10)
         return r.status_code == 200
     except Exception:
         return False
@@ -73,22 +73,32 @@ def _slug(buscar: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", buscar.lower()).strip("-")[:60] or "q"
 
 
-def _candidatos(videos: list) -> list[dict]:
-    """Vídeos de ≥ DURACION s con su mejor fichero mp4 (el de más alto ≤ 1920)."""
+def _version(v: dict) -> dict | None:
+    """La versión más grande con ambos lados ≤ 1920 (si ninguna, la más pequeña)."""
+    vs = [x for x in (v.get("videos") or {}).values() if x.get("url") and (x.get("width") or 0) > 0
+          and (x.get("height") or 0) > 0]
+    ok = [x for x in vs if x["width"] <= 1920 and x["height"] <= 1920]
+    if ok:
+        return max(ok, key=lambda x: x["width"] * x["height"])
+    return min(vs, key=lambda x: x["width"] * x["height"]) if vs else None
+
+
+def _candidatos(hits: list) -> list[dict]:
+    """Vídeos de ≥ DURACION s con su versión elegida; los verticales primero, luego el orden de la API."""
     sal = []
-    for v in videos:
-        mp4 = [f for f in v.get("video_files", [])
-               if f.get("file_type") == "video/mp4" and 0 < (f.get("height") or 0) <= 1920]
-        if v.get("duration", 0) >= DURACION and mp4:
-            mejor = max(mp4, key=lambda f: f["height"])
-            sal.append({"id": v["id"], "autor": v.get("user", {}).get("name", ""),
-                        "url": v.get("url", ""), "link": mejor["link"]})
-    return sal
+    for v in hits:
+        ver = _version(v)
+        if v.get("duration", 0) >= DURACION and ver:
+            sal.append({"id": v["id"], "autor": v.get("user", ""), "url": v.get("pageURL", ""),
+                        "link": ver["url"], "vertical": ver["height"] > ver["width"]})
+    return sorted(sal, key=lambda x: not x["vertical"])  # sort estable
 
 
 def obtener(buscar: str, usados: set[int], carpeta: Path, clave: str | None = None,
             cliente: httpx.Client | None = None) -> Clip | None:
-    """Primer clip vertical largo no usado para `buscar`; `None` ante cualquier fallo."""
+    """Primer clip largo no usado para `buscar` (verticales antes); `None` ante cualquier fallo.
+
+    La clave va en la URL de la petición: no se registran URLs ni mensajes de httpx."""
     try:
         carpeta.mkdir(parents=True, exist_ok=True)
         indice = carpeta / f"{_slug(buscar)}.json"
@@ -98,15 +108,15 @@ def obtener(buscar: str, usados: set[int], carpeta: Path, clave: str | None = No
         else:
             clave = clave or leer_clave()
             if not clave:
-                log.warning("B-roll: sin clave de Pexels")
+                log.warning("B-roll: sin clave de Pixabay")
                 return None
-            r = c.get(URL_BUSQUEDA, headers={"Authorization": clave}, timeout=10,
-                      params={"query": buscar, "orientation": "portrait", "size": "medium",
-                              "per_page": 15})
+            r = c.get(URL_BUSQUEDA, timeout=10,
+                      params={"key": clave, "q": buscar, "per_page": 20, "safesearch": "true",
+                              "video_type": "film"})
             if r.status_code != 200:
-                log.warning("B-roll: Pexels respondió %s", r.status_code)
+                log.warning("B-roll: Pixabay respondió %s", r.status_code)
                 return None
-            cands = _candidatos(r.json().get("videos", []))
+            cands = _candidatos(r.json().get("hits", []))
             if cands:
                 indice.write_text(json.dumps(cands))
         cand = next((x for x in cands if x["id"] not in usados), None)
@@ -146,6 +156,22 @@ def _fundido(ts: float, dur: float) -> float:
     return max(0.0, min(1.0, ts / 0.2, (dur - ts) / 0.2))
 
 
+def hueco_ventana(zonas: dict, t: float, evitar: tuple[int, int] | None) -> tuple[int, int, int]:
+    """(y0, y1, alto) del mayor hueco libre para la ventana y el alto que le cabe.
+
+    Entre el título (si se ve en `t`) y `graficos_hasta`, sin la franja `evitar`.
+    Sin hueco para VENTANA_MIN px, ValueError."""
+    tit = zonas.get("titulo")
+    arriba, abajo = (tit["y"][1] if tit and t < tit["hasta"] else 120), zonas["graficos_hasta"]
+    huecos = [(arriba, abajo)] if not evitar else [(arriba, min(abajo, evitar[0])),
+                                                   (max(arriba, evitar[1]), abajo)]
+    h0, h1 = max(huecos, key=lambda h: h[1] - h[0])
+    alto = min(VENTANA_ALTO, h1 - h0 - 2 * MARGEN_VENTANA)
+    if alto < VENTANA_MIN:
+        raise ValueError("no hay hueco libre de texto para la ventana del B-roll")
+    return h0, h1, alto
+
+
 def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: int,
                  evitar: tuple[int, int] | None = None, t: float = 0.0):
     """Fotogramas RGBA 1080×1920 del B-roll («tapa» o «ventana»), con fundido de 0.2 s.
@@ -157,14 +183,7 @@ def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: in
     if modo == "tapa":
         ancho, alto, x0, y0 = W, (sub[0] if sub else H), 0, 0
     else:
-        tit = zonas.get("titulo")
-        arriba, abajo = (tit["y"][1] if tit and t < tit["hasta"] else 120), zonas["graficos_hasta"]
-        huecos = [(arriba, abajo)] if not evitar else [(arriba, min(abajo, evitar[0])),
-                                                       (max(arriba, evitar[1]), abajo)]
-        h0, h1 = max(huecos, key=lambda h: h[1] - h[0])
-        alto = min(VENTANA_ALTO, h1 - h0 - 2 * MARGEN_VENTANA)
-        if alto < VENTANA_MIN:
-            raise ValueError("no hay hueco libre de texto para la ventana del B-roll")
+        h0, h1, alto = hueco_ventana(zonas, t, evitar)
         ancho = round(alto * VENTANA_ANCHO / VENTANA_ALTO)  # apaisada, también si se encoge
         x0, y0 = (W - ancho) // 2, (h0 + h1 - alto) // 2
         mascara = Image.new("L", (ancho, alto), 0)

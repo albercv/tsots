@@ -1,4 +1,4 @@
-"""B-roll de Pexels: búsqueda, caché, llavero y dibujo (sin red real)."""
+"""B-roll de Pixabay: búsqueda, caché, llavero y dibujo (sin red real)."""
 import json
 import logging
 import subprocess
@@ -13,10 +13,15 @@ from videopipeline.edicion.estilos import Paleta
 PALETA = Paleta((255, 200, 0), (0, 0, 0, 200), (255, 255, 255), ("x", 40))
 
 
-def _video(id, dur, alturas=(1280,), autor="Ana"):
-    return {"id": id, "duration": dur, "user": {"name": autor}, "url": f"https://pexels.com/v/{id}",
-            "video_files": [{"link": f"https://cdn/{id}-{h}.mp4", "width": 720, "height": h,
-                             "file_type": "video/mp4"} for h in alturas]}
+def _rend(w, h, n):
+    return {"url": f"https://cdn.pixabay.com/v/{n}.mp4", "width": w, "height": h, "size": 1000}
+
+
+def _video(id, dur, vers=None, autor="Ana"):
+    """`vers`: {nombre: (ancho, alto)}; por defecto apaisado 1920 y 3840."""
+    vers = vers or {"large": (1920, 1080), "medium": (1280, 720), "small": (640, 360)}
+    return {"id": id, "duration": dur, "user": autor, "pageURL": f"https://pixabay.com/videos/{id}/",
+            "videos": {k: _rend(w, h, f"{id}-{k}") for k, (w, h) in vers.items()}}
 
 
 @pytest.fixture
@@ -32,22 +37,38 @@ def _cliente(videos=None, estado=200, peticiones=None, mp4=b"MP4"):
     def handler(req):
         if peticiones is not None:
             peticiones.append(str(req.url))
-        if req.url.host == "api.pexels.com":
+        if req.url.host == "pixabay.com":
             if estado != 200:
                 return httpx.Response(estado)
-            return httpx.Response(200, json={"videos": videos or []})
+            return httpx.Response(200, json={"totalHits": len(videos or []), "hits": videos or []})
         return httpx.Response(200, content=mp4)
     return httpx.Client(transport=httpx.MockTransport(handler))
 
 
-def test_obtener_elige_vertical_largo_no_usado(tmp_path):
-    videos = [_video(1, 1.5), _video(2, 10), _video(3, 8, (720, 1920, 2560))]
+def test_obtener_elige_largo_no_usado_y_credita(tmp_path):
+    videos = [_video(1, 1.5), _video(2, 10), _video(3, 8)]
     pet = []
     clip = broll.obtener("gatos", {2}, tmp_path, "K", cliente=_cliente(videos, peticiones=pet))
-    assert clip.id == 3 and clip.autor == "Ana" and clip.url == "https://pexels.com/v/3"
+    assert clip.id == 3 and clip.autor == "Ana" and clip.url == "https://pixabay.com/videos/3/"
     assert clip.archivo == tmp_path / "3.mp4" and clip.archivo.read_bytes() == b"MP4"
-    assert any("3-1920.mp4" in p for p in pet)
-    assert any("orientation=portrait" in p for p in pet)
+    assert any("3-large.mp4" in p for p in pet)
+    q = httpx.URL(pet[0]).params
+    assert (q["q"], q["per_page"], q["safesearch"], q["video_type"]) == ("gatos", "20", "true", "film")
+
+
+def test_obtener_pixabay_prefiere_vertical_y_version_1920(tmp_path):
+    horiz = _video(1, 10, {"large": (3840, 2160), "medium": (1920, 1080)})
+    vert = _video(2, 10, {"large": (2160, 3840), "medium": (1080, 1920), "small": (540, 960)})
+    pet = []
+    clip = broll.obtener("x", set(), tmp_path, "K", cliente=_cliente([horiz, vert], peticiones=pet))
+    assert clip.id == 2 and any("2-medium.mp4" in p for p in pet)  # vertical y la mayor ≤ 1920
+    pet.clear()
+    clip = broll.obtener("y", set(), tmp_path, "K", cliente=_cliente([horiz], peticiones=pet))
+    assert clip.id == 1 and any("1-medium.mp4" in p for p in pet)  # 3840 no, 1920 sí
+    solo_grande = _video(5, 10, {"large": (3840, 2160), "medium": (2560, 1440)})
+    pet.clear()
+    broll.obtener("z", set(), tmp_path, "K", cliente=_cliente([solo_grande], peticiones=pet))
+    assert any("5-medium.mp4" in p for p in pet)  # ninguna cabe: la más pequeña
 
 
 def test_obtener_usa_cache(tmp_path):
@@ -70,29 +91,52 @@ def test_obtener_falla_suave(tmp_path, caso):
     assert broll.obtener("x", set(), tmp_path, "K", cliente=c) is None
 
 
-def test_clave_no_sale_en_logs(tmp_path, caplog):
+@pytest.mark.parametrize("caso", ["401", "429", "timeout", "ok"])
+def test_clave_no_sale_en_logs_ni_cache(tmp_path, caplog, caso):
     caplog.set_level(logging.DEBUG)
-    assert broll.obtener("x", set(), tmp_path, "SECRETA123", cliente=_cliente(estado=401)) is None
-    assert "SECRETA123" not in caplog.text and "401" in caplog.text
-    assert all("SECRETA123" not in p.read_text(errors="ignore") for p in tmp_path.iterdir())
+
+    def h(req):
+        if req.url.host == "pixabay.com":
+            assert req.url.params["key"] == "SECRETA123"  # va en la URL
+        else:
+            assert "key" not in req.url.params  # la descarga del CDN no lleva la clave
+        if caso == "timeout":
+            raise httpx.ReadTimeout("fallo en " + str(req.url))  # la excepción lleva la URL
+        if caso != "ok":
+            return httpx.Response(int(caso))
+        if req.url.host == "pixabay.com":
+            return httpx.Response(200, json={"hits": [_video(1, 10)]})
+        return httpx.Response(200, content=b"MP4")
+    c = httpx.Client(transport=httpx.MockTransport(h))
+    r = broll.obtener("x", set(), tmp_path, "SECRETA123", cliente=c)
+    assert (r is not None) == (caso == "ok")
+    assert "SECRETA123" not in caplog.text and "pixabay.com" not in caplog.text
+    if caso.isdigit():
+        assert caso in caplog.text
+    assert all("SECRETA123" not in p.read_text(errors="ignore") for p in tmp_path.iterdir()
+               if p.suffix == ".json")
+    assert all("key=" not in p.read_text(errors="ignore") for p in tmp_path.iterdir() if p.suffix == ".json")
 
 
 def test_leer_clave_usa_security(llavero_falso):
     assert broll.leer_clave() is None and not broll.hay_clave()
-    llavero_falso.elementos[("tsots-pexels", "api-key")] = "abc"
+    llavero_falso.elementos[("tsots-pixabay", "api-key")] = "abc"
     assert broll.leer_clave() == "abc" and broll.hay_clave()
     assert llavero_falso.llamadas[-2][0][1:] == [
-        "find-generic-password", "-s", "tsots-pexels", "-a", "api-key", "-w"]
+        "find-generic-password", "-s", "tsots-pixabay", "-a", "api-key", "-w"]
     assert "-w" not in llavero_falso.llamadas[-1][0]
 
 
 def test_servicio_coincide_con_app():
     from app import credenciales
-    assert broll.SERVICIO == credenciales.servicio("pexels") and broll.CUENTA == credenciales.CUENTA
+    assert broll.SERVICIO == credenciales.servicio("pixabay") and broll.CUENTA == credenciales.CUENTA
 
 
 def test_probar_clave():
-    assert broll.probar_clave("K", cliente=_cliente([])) is True
+    pet = []
+    assert broll.probar_clave("K", cliente=_cliente([], peticiones=pet)) is True
+    q = httpx.URL(pet[0]).params
+    assert (q["q"], q["per_page"]) == ("nature", "3")
     assert broll.probar_clave("K", cliente=_cliente(estado=401)) is False
 
 
@@ -143,3 +187,9 @@ def test_frames_ventana_bajo_el_titulo(clip_mp4):
 def test_frames_ventana_sin_sitio_falla(clip_mp4):
     with pytest.raises(ValueError):
         list(broll.frames_broll(clip_mp4, "ventana", 1.0, Z_CENTRAL, PALETA, 10, evitar=(184, 850)))
+
+
+def test_hueco_ventana_comparte_calculo():
+    assert broll.hueco_ventana(Z_CENTRAL, 0.0, None)[2] == broll.VENTANA_ALTO
+    with pytest.raises(ValueError):
+        broll.hueco_ventana(Z_CENTRAL, 0.0, (184, 850))

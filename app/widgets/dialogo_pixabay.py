@@ -18,11 +18,11 @@ from videopipeline.i18n import _
 from .. import credenciales
 from ..cuentas import COLOR_AVISO, COLOR_OK
 
-PROVEEDOR = "pexels"
+PROVEEDOR = "pixabay"
 
 
-class DialogoPexels(QDialog):
-    """Clave gratuita de Pexels para el B-roll de «Editar con Claude».
+class DialogoPixabay(QDialog):
+    """Clave gratuita de Pixabay para el B-roll de «Editar con Claude».
 
     La clave va directa al Llavero y nunca se muestra ni se lee de vuelta:
     solo se comprueba si existe. La prueba es una búsqueda con timeout, en
@@ -32,12 +32,12 @@ class DialogoPexels(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle(_("Clave de Pexels"))
+        self.setWindowTitle(_("Clave de Pixabay"))
         self.setMinimumWidth(460)
         raiz = QVBoxLayout(self)
         ayuda = QLabel(_(
-            "La clave de Pexels es gratis: créala en "
-            '<a href="https://www.pexels.com/api/">https://www.pexels.com/api/</a>. '
+            "La clave de Pixabay es gratis: inicia sesión y cópiala en "
+            '<a href="https://pixabay.com/api/docs/">https://pixabay.com/api/docs/</a>. '
             "Se guarda en el Llavero de macOS y sirve para el B-roll "
             "(vídeos de apoyo) de «Editar con Claude»."))
         ayuda.setWordWrap(True)
@@ -47,7 +47,7 @@ class DialogoPexels(QDialog):
 
         self.campo_clave = QLineEdit()
         self.campo_clave.setEchoMode(QLineEdit.EchoMode.Password)
-        self.campo_clave.setPlaceholderText(_("Pega aquí la clave de Pexels"))
+        self.campo_clave.setPlaceholderText(_("Pega aquí la clave de Pixabay"))
         raiz.addWidget(self.campo_clave)
         self.estado = QLabel()
         raiz.addWidget(self.estado)
@@ -85,8 +85,8 @@ class DialogoPexels(QDialog):
             finally:
                 QGuiApplication.restoreOverrideCursor()
             if not buena:
-                QMessageBox.warning(self, _("Pexels"), _(
-                    "Pexels no aceptó esa clave (o no hay conexión). "
+                QMessageBox.warning(self, _("Pixabay"), _(
+                    "Pixabay no aceptó esa clave (o no hay conexión). "
                     "No se ha guardado nada."))
                 return
             credenciales.guardar(PROVEEDOR, clave)

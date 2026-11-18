@@ -220,7 +220,7 @@ class PanelOpciones(QWidget):
     crear_shorts = Signal()
     publicar_shorts = Signal()
     editar_con_claude = Signal()
-    configurar_pexels = Signal()
+    configurar_pixabay = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -476,18 +476,18 @@ class PanelOpciones(QWidget):
                   "verticales al procesarlos."))
         # También es el estilo de «Editar con Claude…»: no depende de la casilla.
         self.combo_estilo_shorts.setEnabled(self._claude_disponible)
-        self.boton_pexels = QPushButton(_("Pexels…"))
-        self.boton_pexels.setToolTip(
+        self.boton_pixabay = QPushButton(_("Pixabay…"))
+        self.boton_pixabay.setToolTip(
             sin_claude if not self._claude_disponible else
-            _("Guarda la clave gratuita de Pexels que usa «Editar con Claude» "
+            _("Guarda la clave gratuita de Pixabay que usa «Editar con Claude» "
               "para añadir B-roll."))
-        self.boton_pexels.setEnabled(self._claude_disponible)
-        self.boton_pexels.clicked.connect(self.configurar_pexels)
+        self.boton_pixabay.setEnabled(self._claude_disponible)
+        self.boton_pixabay.clicked.connect(self.configurar_pixabay)
         fila_estilo = QWidget()
         lay_estilo = QHBoxLayout(fila_estilo)
         lay_estilo.setContentsMargins(0, 0, 0, 0)
         lay_estilo.addWidget(self.combo_estilo_shorts, 1)
-        lay_estilo.addWidget(self.boton_pexels)
+        lay_estilo.addWidget(self.boton_pixabay)
         self.boton_editar_con_claude = QPushButton(_("Editar con Claude…"))
         self.boton_editar_con_claude.setToolTip(
             sin_claude if not self._claude_disponible else

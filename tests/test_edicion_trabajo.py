@@ -94,9 +94,9 @@ def test_contexto_sin_ocr(tmp_path, video_vertical):
     assert "## Números dichos\n- ninguno" in txt
 
 
-def test_contexto_sin_clave_pexels(tmp_path, video_vertical):
+def test_contexto_sin_clave_pixabay(tmp_path, video_vertical):
     txt = preparar(_trabajo(tmp_path, video_vertical)).read_text("utf-8")
-    assert "- B-roll: no disponible (falta la clave de Pexels)" in txt
+    assert "- B-roll: no disponible (falta la clave de Pixabay)" in txt
 
 
 def test_preparar_no_repite_ocr(tmp_path, video_vertical, monkeypatch):

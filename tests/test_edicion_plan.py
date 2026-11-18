@@ -209,6 +209,16 @@ def test_broll_requiere_clave_y_busqueda():
         assert val2([b(malo)])[1], malo
 
 
+def test_broll_ventana_sin_hueco_es_error():
+    b = Momento("broll", t=31.76, palabra="melón", buscar="person typing")
+    llena = [Muestra(t / 2, (Deteccion("Pantalla llena", (100, 130, 800, 460), 0.98),)) for t in range(0, 130)]
+    errs = val2([b], pantalla=llena)[1]
+    assert len(errs) == 1 and "casi toda la pantalla" in errs[0] and "t=31.76" in errs[0]
+    assert val2([b])[1] == []  # texto con hueco: ventana
+    assert val2([b], pantalla=[])[1] == []  # sin texto: tapa
+    assert val2([b], pantalla=None)[1] == []
+
+
 def test_broll_maximo_por_duracion():
     ms = [Momento("broll", t=t, palabra=p, buscar="person typing") for t, p in ((1.0, "hola"), (20.0, "diez"), (31.76, "melón"))]
     assert any("B-roll" in e for e in val2(ms, dur=30.0)[1])

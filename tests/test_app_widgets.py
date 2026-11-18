@@ -1203,68 +1203,68 @@ def test_panel_cada_valor_tiene_icono_de_ayuda(qtbot):
     assert not panel.campo_umbral.isEnabled() and icono.isEnabled()
 
 
-def _dialogo_pexels(qtbot, monkeypatch, prueba):
-    from app.widgets import dialogo_pexels
-    from app.widgets.dialogo_pexels import DialogoPexels
+def _dialogo_pixabay(qtbot, monkeypatch, prueba):
+    from app.widgets import dialogo_pixabay
+    from app.widgets.dialogo_pixabay import DialogoPixabay
 
-    monkeypatch.setattr(dialogo_pexels.broll, "probar_clave", prueba)
+    monkeypatch.setattr(dialogo_pixabay.broll, "probar_clave", prueba)
     avisos = []
-    monkeypatch.setattr(dialogo_pexels.QMessageBox, "warning",
+    monkeypatch.setattr(dialogo_pixabay.QMessageBox, "warning",
                         lambda *a, **k: avisos.append(a[2]))
-    dialogo = DialogoPexels()
+    dialogo = DialogoPixabay()
     qtbot.addWidget(dialogo)
     return dialogo, avisos
 
 
-def test_dialogo_pexels_guarda_si_la_prueba_va_bien(qtbot, monkeypatch, llavero_falso):
+def test_dialogo_pixabay_guarda_si_la_prueba_va_bien(qtbot, monkeypatch, llavero_falso):
     from app import credenciales
 
-    dialogo, avisos = _dialogo_pexels(qtbot, monkeypatch, lambda clave: clave == "buena")
-    assert credenciales.hay_clave("pexels") is False
+    dialogo, avisos = _dialogo_pixabay(qtbot, monkeypatch, lambda clave: clave == "buena")
+    assert credenciales.hay_clave("pixabay") is False
     dialogo.campo_clave.setText("mala")
     dialogo.boton_guardar.click()
-    assert credenciales.hay_clave("pexels") is False and len(avisos) == 1
+    assert credenciales.hay_clave("pixabay") is False and len(avisos) == 1
     dialogo.campo_clave.setText("buena")
     dialogo.boton_guardar.click()
-    assert credenciales.hay_clave("pexels") is True and len(avisos) == 1
+    assert credenciales.hay_clave("pixabay") is True and len(avisos) == 1
 
 
-def test_dialogo_pexels_clave_con_caracteres_invalidos(qtbot, monkeypatch, llavero_falso):
+def test_dialogo_pixabay_clave_con_caracteres_invalidos(qtbot, monkeypatch, llavero_falso):
     from app import credenciales
 
-    dialogo, avisos = _dialogo_pexels(qtbot, monkeypatch, lambda clave: True)
+    dialogo, avisos = _dialogo_pixabay(qtbot, monkeypatch, lambda clave: True)
     dialogo.campo_clave.setText('con "comillas"')
     dialogo.boton_guardar.click()
-    assert credenciales.hay_clave("pexels") is False and len(avisos) == 1
+    assert credenciales.hay_clave("pixabay") is False and len(avisos) == 1
 
 
-def test_dialogo_pexels_borra(qtbot, monkeypatch, llavero_falso):
+def test_dialogo_pixabay_borra(qtbot, monkeypatch, llavero_falso):
     from app import credenciales
 
-    credenciales.guardar("pexels", "abc123")
-    dialogo, _avisos = _dialogo_pexels(qtbot, monkeypatch, lambda clave: True)
+    credenciales.guardar("pixabay", "abc123")
+    dialogo, _avisos = _dialogo_pixabay(qtbot, monkeypatch, lambda clave: True)
     assert dialogo.boton_borrar.isEnabled()
     dialogo.boton_borrar.click()
-    assert credenciales.hay_clave("pexels") is False
+    assert credenciales.hay_clave("pixabay") is False
     assert not dialogo.boton_borrar.isEnabled()
 
 
-def test_dialogo_pexels_no_muestra_la_clave(qtbot, monkeypatch, llavero_falso):
-    dialogo, _avisos = _dialogo_pexels(qtbot, monkeypatch, lambda clave: True)
+def test_dialogo_pixabay_no_muestra_la_clave(qtbot, monkeypatch, llavero_falso):
+    dialogo, _avisos = _dialogo_pixabay(qtbot, monkeypatch, lambda clave: True)
     dialogo.campo_clave.setText("secreta123")
     dialogo.boton_guardar.click()
     assert dialogo.campo_clave.text() == ""
     assert "secreta123" not in dialogo.estado.text()
 
 
-def test_boton_pexels_en_panel(qtbot, monkeypatch):
+def test_boton_pixabay_en_panel(qtbot, monkeypatch):
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: True)
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    assert panel.boton_pexels.isEnabled()
-    with qtbot.waitSignal(panel.configurar_pexels):
-        panel.boton_pexels.click()
+    assert panel.boton_pixabay.isEnabled()
+    with qtbot.waitSignal(panel.configurar_pixabay):
+        panel.boton_pixabay.click()
     monkeypatch.setattr("app.widgets.panel_opciones.claude_disponible", lambda: False)
     otro = PanelOpciones()
     qtbot.addWidget(otro)
-    assert not otro.boton_pexels.isEnabled()
+    assert not otro.boton_pixabay.isEnabled()

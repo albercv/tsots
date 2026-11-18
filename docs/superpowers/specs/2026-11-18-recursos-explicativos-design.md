@@ -181,7 +181,7 @@ antes y los nuevos.
   margen), la amplía ×2 y la pinta en una tarjeta con borde redondeado y sombra,
   en la mitad vertical opuesta al texto y siempre por encima de
   `graficos_hasta`; un trazo une la tarjeta con la caja original.
-- **`broll`**: `GET https://api.pexels.com/videos/search` (`orientation=portrait`,
+- **`broll`** *(proveedor sustituido por Pixabay, ver 9)*: `GET https://api.pexels.com/videos/search` (`orientation=portrait`,
   la clave en la cabecera `Authorization`). Elige de forma determinista el primer
   resultado con al menos 2.5 s que no se haya usado ya en el vídeo, el fichero
   de menos de 1920 px de alto más grande, y lo descarga al trabajo. Sin sonido.
@@ -209,7 +209,7 @@ antes y los nuevos.
 - Todo sigue siendo un overlay RGBA 1080×1920 → `render_slot` → compositor sin
   cambios.
 
-### 4.5 Clave de Pexels
+### 4.5 Clave de Pexels *(sustituida por Pixabay, ver 9)*
 
 - Botón «Pexels…» en el panel de shorts, junto al estilo de «Editar con Claude»,
   que abre un diálogo para pegar, comprobar (una búsqueda de prueba) y borrar la
@@ -308,3 +308,25 @@ tipo, y leer las `Sugerencia:` del validador.
 - Animaciones exactas de cada pieza y sus efectos de sonido.
 - Dónde va el lector de la clave en el motor y el texto del diálogo de Pexels.
 - Cómo instalar `pyobjc` para quien actualice (README y aviso si falta).
+
+## 9. Cambio: Pixabay en lugar de Pexels (2026-11-18)
+
+**Motivo:** Pexels ha pausado la entrega de claves de API nuevas; el usuario ya
+tiene una clave de Pixabay. El B-roll usa solo Pixabay (sin Pexels ni carpeta
+local). Sustituye a lo dicho sobre Pexels en 4.4 y 4.5; el resto (caché,
+«tapa»/«ventana», créditos, integración en el render) no cambia.
+
+- Búsqueda: `GET https://pixabay.com/api/videos/` con `key`, `q`, `per_page=20`,
+  `safesearch=true`, `video_type=film`. La clave va en la URL, así que nunca se
+  registran URLs ni `str(excepción)` de httpx (se silencia el logger `httpx`) y
+  la caché no guarda la petición.
+- Elección determinista: clips con ≥ 2.5 s no usados; primero los verticales,
+  luego el orden de la API. De cada uno, la versión más grande con ancho y alto
+  ≤ 1920 (si ninguna, la más pequeña). Pixabay casi solo da apaisado: se recorta
+  para llenar. Crédito: `user` y `pageURL`.
+- Llavero: servicio `tsots-pixabay`, cuenta `api-key`; botón «Pixabay…» y diálogo
+  con enlace a https://pixabay.com/api/docs/. Licencia de Pixabay: uso gratuito,
+  comercial incluido.
+- Validación nueva: un `broll` en modo «ventana» sin hueco libre suficiente para
+  la tarjeta (misma función `broll.hueco_ventana` que usa el dibujo) es error del
+  plan: ponerlo cuando salga la persona hablando o quitarlo.

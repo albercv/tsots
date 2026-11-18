@@ -168,6 +168,12 @@ def modo_broll(muestras: list[Muestra], t: float, dur: float = 2.5) -> str:
     return "ventana" if hay_texto(muestras, t, t + dur) else "tapa"
 
 
+def franja_texto(muestras: list[Muestra], t: float, dur: float) -> tuple[int, int] | None:
+    """(y0, y1) que ocupa todo el texto detectado entre t y t+dur, o None si no hay."""
+    ys = [(d.caja[1], d.caja[1] + d.caja[3]) for s in muestras if t <= s.t <= t + dur for d in s.detecciones]
+    return (min(a for a, _ in ys), max(b for _, b in ys)) if ys else None
+
+
 def recortar(d: Deteccion, texto: str) -> Deteccion:
     """La detección con la caja reducida al fragmento `texto` de su línea.
 
