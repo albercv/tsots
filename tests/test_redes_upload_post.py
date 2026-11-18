@@ -1123,6 +1123,14 @@ def test_ajustes_tiktok_consulta_y_respuesta():
     assert peticion.url.params["profile"] == "mi_perfil"
 
 
+@pytest.mark.parametrize("campo, esperado", [
+    ("duet_disabled", AjustesTikTok((), duos_off=True)),
+    ("stitch_disabled", AjustesTikTok((), stitch_off=True))])
+def test_ajustes_tiktok_cada_interaccion_va_a_su_campo(campo, esperado):
+    cuerpo = {"privacy_level_options": [], campo: True}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == esperado
+
+
 def test_ajustes_tiktok_duracion_invalida_es_none():
     cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": "600",
               "stitch_disabled": "yes"}
@@ -1135,7 +1143,8 @@ def test_ajustes_tiktok_duracion_invalida_es_none():
 def test_ajustes_tiktok_pide_reconectar(codigo, cuerpo):
     with pytest.raises(ErrorConsulta) as error:
         _proveedor(Servidor(_responder_json(cuerpo, codigo))).ajustes_tiktok()
-    assert "Reconecta TikTok" in str(error.value)
+    assert "Reconecta tu cuenta de TikTok" in str(error.value)
+    assert "ubicaciones" not in str(error.value)
     assert CLAVE not in str(error.value)
 
 

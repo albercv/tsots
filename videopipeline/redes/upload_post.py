@@ -565,7 +565,7 @@ class ProveedorUploadPost:
         cuerpo = self._consultar(
             "lugares de TikTok", URL_LUGARES_TIKTOK + f"?profile={{perfil}}&q={consulta}",
             URL_LUGARES_TIKTOK, {"profile": self._perfil, "q": consulta},
-            registrar_cuerpo=False)
+            registrar_cuerpo=False, ubicacion=True)
         lista = self._buscar(cuerpo, "locations")
         if not isinstance(lista, list):
             raise ErrorConsulta(_(
@@ -647,7 +647,7 @@ class ProveedorUploadPost:
 
     def _consultar(self, que: str, plantilla: str, url: str,
                    parametros: dict | None = None, registrar_cuerpo: bool = True,
-                   pide_perfil: bool = True) -> Any:
+                   pide_perfil: bool = True, ubicacion: bool = False) -> Any:
         """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
         motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
         if not self._clave:
@@ -670,7 +670,7 @@ class ProveedorUploadPost:
                  (diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)") if registrar_cuerpo
                  or respuesta.status_code >= 400 else "(no se registra: datos de la cuenta)")
         if respuesta.status_code >= 400:
-            raise ErrorConsulta(self._mensaje_http(respuesta))
+            raise ErrorConsulta(self._mensaje_http(respuesta, ubicacion=ubicacion))
         cuerpo = self._json(respuesta)
         if not isinstance(cuerpo, (dict, list)):
             raise ErrorConsulta(self._limpiar(_(
@@ -968,7 +968,7 @@ class ProveedorUploadPost:
             return None
 
     def _mensaje_http(self, respuesta: httpx.Response,
-                      plataforma: Plataforma | None = None) -> str:
+                      plataforma: Plataforma | None = None, ubicacion: bool = False) -> str:
         codigo = respuesta.status_code
         cuerpo = self._json(respuesta)
         if isinstance(cuerpo, dict):
@@ -987,9 +987,9 @@ class ProveedorUploadPost:
                 "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."))
         if ("tiktok_reconnect_required" in detalle
                 or (isinstance(cuerpo, dict) and cuerpo.get("reauth_required") is True)):
-            return self._limpiar(_(
-                "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.").format(
-                servicio=NOMBRE))
+            return self._limpiar((_(
+                "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.") if ubicacion
+                else _("Reconecta tu cuenta de TikTok en {servicio}.")).format(servicio=NOMBRE))
         if codigo == 401:
             base = _("La API key no es válida o ha caducado (401). Revísala en Redes…")
         elif codigo == 403:

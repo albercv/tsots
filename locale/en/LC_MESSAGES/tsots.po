@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:07+0100\n"
+"POT-Creation-Date: 2026-11-18 17:10+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1793,6 +1793,10 @@ msgstr "What to do: {solucion}"
 #, python-brace-format
 msgid "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones."
 msgstr "Reconnect TikTok in {servicio} to tag locations."
+
+#, python-brace-format
+msgid "Reconecta tu cuenta de TikTok en {servicio}."
+msgstr "Reconnect your TikTok account in {servicio}."
 
 msgid "Recortando silencios"
 msgstr "Cutting silences"
