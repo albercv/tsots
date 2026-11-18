@@ -29,6 +29,10 @@ def test_central_sin_franja():
     assert z["franja_zoom"] is None
 
 
+def test_titulo_al_23_por_ciento():
+    assert calcular(_cfg(), "difuminado", FUENTE, True)["titulo"]["y"][0] == 442
+
+
 def test_sin_titulo():
     assert calcular(_cfg(), "difuminado", FUENTE, False)["titulo"] is None
 

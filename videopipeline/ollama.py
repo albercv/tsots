@@ -190,6 +190,7 @@ def chat_json(
     url: str = URL,
     timeout: float = 300.0,
     temperatura: float = 0.7,
+    keep_alive: int | str = 0,
 ) -> dict:
     """POST /api/chat con salida forzada a `esquema`. Devuelve el JSON parseado."""
     respuesta = _post_json("/api/chat", {
@@ -198,10 +199,10 @@ def chat_json(
         "stream": False,
         "format": esquema,
         "think": False,
-        # Descargar el modelo nada más responder: si no, Ollama lo retiene
+        # Por defecto se descarga nada más responder: si no, Ollama lo retiene
         # 5 min y el siguiente vídeo de la cola limpia audio y transcribe con
-        # esos GB ocupados.
-        "keep_alive": 0,
+        # esos GB ocupados. Quien encadena llamadas lo mantiene y llama a `descargar`.
+        "keep_alive": keep_alive,
         "options": {"temperature": temperatura, "num_ctx": 16384},
     }, modelo, url, timeout)
     try:
@@ -219,6 +220,15 @@ def chat_json(
             _("La respuesta del modelo no es JSON válido"),
             detalle=str(contenido)[:2000],
         ) from None
+
+
+def descargar(modelo: str, url: str = URL) -> None:
+    """Descarga el modelo de memoria. Es higiene: cualquier error se ignora."""
+    try:
+        _post_json("/api/generate", {"model": modelo, "keep_alive": 0},
+                   modelo, url, 10.0)
+    except PasoFallido:
+        pass
 
 
 def systemone(

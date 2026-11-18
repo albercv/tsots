@@ -185,6 +185,12 @@ def _revisar_dato(m, etq, numeros_) -> list[str]:
     return errs
 
 
+def titulo_solapa_zoom(zonas: dict) -> bool:
+    """El título grabado cae dentro de la franja de zoom: el recorte lo movería."""
+    return bool(zonas.get("titulo") and zonas.get("franja_zoom")
+                and zonas["titulo"]["y"][1] > zonas["franja_zoom"][0])
+
+
 def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
             duracion: float, pantalla: list | None = None,
             broll_disponible: bool = False) -> tuple[Plan, list[str]]:
@@ -215,6 +221,9 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
                 errs.append(f"{etq}: el zoom dura {m.t1 - m.t0:.2f} s; debe durar entre 1 y 6 s")
             if zonas.get("franja_zoom") is None:
                 errs.append(f"{etq}: este vídeo no tiene franja de zoom disponible; quita el zoom")
+            elif m.t0 is not None and hasta is not None and m.t0 < hasta and titulo_solapa_zoom(zonas):
+                errs.append(f"{etq}: el título del vídeo ocupa la franja de zoom hasta {hasta:g} s; "
+                            f"el zoom debe empezar en {hasta:g} s o más tarde")
             continue
         if not 0 <= m.t <= duracion:
             errs.append(f"{etq}: t={m.t} fuera del vídeo; debe estar entre 0 y {duracion:g} s")

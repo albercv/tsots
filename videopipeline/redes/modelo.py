@@ -65,6 +65,13 @@ ETIQUETAS_TIKTOK = {
     ModoTikTok.BORRADOR: N_("Borrador (lo terminas en la app)"),
     ModoTikTok.PUBLICO: N_("Público"),
 }
+# Quién puede ver un TikTok publicado directamente (valor del servicio → texto).
+PRIVACIDADES_TIKTOK = {
+    "PUBLIC_TO_EVERYONE": N_("Todo el mundo"),
+    "FOLLOWER_OF_CREATOR": N_("Seguidores"),
+    "MUTUAL_FOLLOW_FRIENDS": N_("Amigos"),
+    "SELF_ONLY": N_("Solo yo"),
+}
 ETIQUETAS_INSTAGRAM = {
     ModoInstagram.PRUEBA: N_("Reel de prueba (a seguidores si funciona)"),
     ModoInstagram.NORMAL: N_("Reel normal"),
@@ -141,6 +148,17 @@ class Ciudad(Enum):
     def de_clave(cls, clave: str) -> Ciudad | None:
         """La ciudad guardada en ajustes por su clave (`MADRID`), o None."""
         return cls.__members__.get(clave or "")
+
+
+@dataclass(frozen=True)
+class AjustesTikTok:
+    """Lo que la cuenta de TikTok permite al publicar: privacidades, duración
+    máxima (`None`: no se sabe) y si desactiva comentarios, dúos o stitch."""
+    privacidades: tuple[str, ...]
+    max_segundos: int | None = None
+    comentarios_off: bool = False
+    duos_off: bool = False
+    stitch_off: bool = False
 
 
 @dataclass(frozen=True)
@@ -235,6 +253,9 @@ class Publicacion:
     texto_linkedin: str = ""
     # X sube estas fotos en lugar del vídeo (un vídeo que X no admite).
     fotos_x: tuple[Path, ...] = ()
+    # Instante (s) del fotograma de portada, y miniatura JPEG (YouTube).
+    portada: float | None = None
+    miniatura: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -249,6 +270,16 @@ class Opciones:
     ubicacion: Ubicacion = Ubicacion()
     # Fecha y hora (con zona horaria) en que debe salir; `None`: ahora.
     programada: datetime | None = None
+    # TikTok directo: privacidad elegida (clave de PRIVACIDADES_TIKTOK; vacío:
+    # sin elegir) y casillas de interacción y de divulgación comercial.
+    tiktok_privacidad: str = ""
+    tiktok_comentarios: bool = False
+    tiktok_duos: bool = False
+    tiktok_stitch: bool = False
+    tu_marca: bool = False
+    contenido_de_marca: bool = False
+    # Idioma del vídeo («es», «en»; otro valor o vacío: no se declara).
+    idioma: str = ""
 
 
 @dataclass(frozen=True)

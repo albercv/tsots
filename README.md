@@ -135,8 +135,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      after the video next to its outputs, each with its own caption
      (`.md`, if the SEO caption is on). **Create shorts when processing**
      does it at the end of every run. Doing it again replaces only the
-     shorts the app made. If the `tev1:0.8b` model is not installed in
-     Ollama, the caption model scores them instead (slower).
+     shorts the app made. At most one short every 10 minutes, built from
+     whole topics found across the entire video. If the `tev1:0.8b`
+     model is not installed in Ollama, the caption model scores them
+     instead (slower). To try only the selection, without cutting
+     anything: `python -m videopipeline.shorts_prueba <card> <output.json>`.
    - **Terms…**: your brands and proper names, one per line, so Whisper
      spells them right in the subtitles and the caption. After `=`, the
      ways Whisper gets them wrong; they are fixed automatically:
@@ -508,7 +511,7 @@ What each mode does:
 | Platform | Mode | Result |
 |---|---|---|
 | TikTok | **Draft** (default) | The video lands in your TikTok drafts; you finish and publish it in the app. |
-| TikTok | **Public** | Published straight away, visible to everyone. |
+| TikTok | **Public** | Published directly with the privacy you choose (everyone, followers, friends or only you). |
 | YouTube | **Public Short** | Published as a public Short in the category chosen in Networks… (People & Blogs by default). |
 | Instagram | **Trial reel** (default) | Shown to non-followers first; Instagram shares it with your followers only if it performs. |
 | Instagram | **Regular reel** | A normal reel, also shown in your feed. |
@@ -574,6 +577,18 @@ FB, LI) and the title. Click a label to see each network with its **Cancel**
 button (and **Cancel all**). Cancelling asks for confirmation; if the video
 was scheduled from TSOTS, Publish stops warning that it is already
 scheduled. To change the time, cancel and schedule again.
+
+**What TSOTS declares for you, and what you choose.** On your behalf,
+TSOTS tells YouTube that the video is not made for kids and the language
+it was processed in, and tells TikTok, YouTube, Instagram, X and Facebook that it is not AI-generated.
+On each direct TikTok post you choose who can see it, comments, duets,
+stitch and commercial content; none of that is remembered. If TikTok does
+not let the account post at that moment, the error arrives on upload. Music
+you put in `~/TSOTS/musica` must be licensed for social networks (the music
+TSOTS synthesizes is fine). The paid-partnership label on Instagram and
+Facebook is set in their app. The YouTube thumbnail needs a verified
+channel. The cover is the sharpest frame of the first 5 seconds, where the
+title shows.
 
 ## If something goes wrong
 

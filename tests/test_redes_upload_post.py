@@ -13,6 +13,7 @@ import pytest
 
 from videopipeline.redes import publicador, upload_post
 from videopipeline.redes.modelo import (
+    AjustesTikTok,
     Ciudad,
     Cuenta,
     Lugar,
@@ -119,7 +120,8 @@ def test_tiktok_borrador_campos_cabecera_y_video(video):
 def test_tiktok_publico(video):
     servidor = Servidor(_ok_sync)
     _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
-                                  Opciones(tiktok_modo=ModoTikTok.PUBLICO))
+                                  Opciones(tiktok_modo=ModoTikTok.PUBLICO,
+                                           tiktok_privacidad="PUBLIC_TO_EVERYONE"))
     campos = servidor.formularios[0]
     assert campos["post_mode"] == ["DIRECT_POST"]
     assert campos["privacy_level"] == ["PUBLIC_TO_EVERYONE"]
@@ -1104,6 +1106,58 @@ def test_lugares_tiktok_errores(codigo, cuerpo):
     assert str(error.value) and CLAVE not in str(error.value)
 
 
+def test_ajustes_tiktok_consulta_y_respuesta():
+    cuerpo = {"success": True, "comment_disabled": True, "duet_disabled": False,
+              "max_video_post_duration_sec": 600,
+              "privacy_level_options": ["SELF_ONLY", "FOLLOWER_OF_CREATOR",
+                                        "MUTUAL_FOLLOW_FRIENDS", "RARO"]}
+    servidor = Servidor(_responder_json(cuerpo))
+    ajustes = _proveedor(servidor).ajustes_tiktok()
+    # Orden de PRIVACIDADES_TIKTOK y sin el valor desconocido.
+    assert ajustes == AjustesTikTok(
+        ("FOLLOWER_OF_CREATOR", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"), 600,
+        comentarios_off=True)
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert peticion.url.path == "/api/uploadposts/tiktok/settings"
+    assert peticion.url.params["profile"] == "mi_perfil"
+
+
+@pytest.mark.parametrize("campo, esperado", [
+    ("duet_disabled", AjustesTikTok((), duos_off=True)),
+    ("stitch_disabled", AjustesTikTok((), stitch_off=True))])
+def test_ajustes_tiktok_cada_interaccion_va_a_su_campo(campo, esperado):
+    cuerpo = {"privacy_level_options": [], campo: True}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == esperado
+
+
+def test_ajustes_tiktok_duracion_invalida_es_none():
+    cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": "600",
+              "stitch_disabled": "yes"}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok(())
+
+
+@pytest.mark.parametrize("codigo, cuerpo", [
+    (400, {"error_code": "tiktok_reconnect_required", "message": "x"}),
+    (409, {"reauth_required": True, "message": "x"})])
+def test_ajustes_tiktok_pide_reconectar(codigo, cuerpo):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, codigo))).ajustes_tiktok()
+    assert "Reconecta tu cuenta de TikTok" in str(error.value)
+    assert "ubicaciones" not in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+def test_ajustes_tiktok_error_502_y_sin_red():
+    with pytest.raises(ErrorConsulta):
+        _proveedor(Servidor(_responder_json({"error": "TikTok"}, 502))).ajustes_tiktok()
+
+    def sin_red(request, _servidor):
+        raise httpx.ConnectError("sin red", request=request)
+    with pytest.raises(ErrorConsulta):
+        _proveedor(Servidor(sin_red)).ajustes_tiktok()
+
+
 @pytest.mark.parametrize("capacidades, esperado", [
     (["video", "location"], True),
     ({"video": True, "location": True}, True),
@@ -1433,3 +1487,109 @@ def test_x_con_una_foto_ausente_no_envia(tmp_path):
     pub = replace(_pub(tmp_path / "v.mp4"), fotos_x=(tmp_path / "falta.png",))
     r = _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
     assert not r.ok and "falta.png" in r.error and servidor.peticiones == []
+
+
+# --- cumplimiento: campos nuevos de cada red ---
+
+def _directo(**extra) -> Opciones:
+    return Opciones(tiktok_modo=ModoTikTok.PUBLICO, tiktok_privacidad="SELF_ONLY", **extra)
+
+
+def test_tiktok_directo_privacidad_y_casillas_sin_marcar(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(), "p")
+    assert datos["privacy_level"] == "SELF_ONLY"
+    assert [datos[c] for c in ("disable_comment", "disable_duet", "disable_stitch")] == ["true"] * 3
+    assert "disclose_commercial" not in datos
+
+
+def test_tiktok_directo_comentarios_marcados(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(tiktok_comentarios=True), "p")
+    assert datos["disable_comment"] == "false"
+    assert datos["disable_duet"] == "true"
+
+
+def test_tiktok_directo_tu_marca(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(tu_marca=True), "p")
+    assert (datos["disclose_commercial"], datos["your_brand"], datos["branded_content"]) == (
+        "true", "true", "false")
+
+
+def test_tiktok_directo_portada(video):
+    pub = replace(_pub(video), portada=1.5)
+    assert upload_post.campos(Plataforma.TIKTOK, pub, _directo(), "p")["cover_timestamp"] == "1500"
+
+
+def test_tiktok_borrador_no_manda_campos_de_directo(video):
+    pub = replace(_pub(video), portada=1.5)
+    op = Opciones(tiktok_privacidad="SELF_ONLY", tu_marca=True, contenido_de_marca=True)
+    datos = upload_post.campos(Plataforma.TIKTOK, pub, op, "p")
+    assert not {"privacy_level", "disable_comment", "disable_duet", "disable_stitch",
+                "disclose_commercial", "cover_timestamp"} & set(datos)
+
+
+@pytest.mark.parametrize("idioma, esperado", [
+    ("es", ("es", "es-ES")), ("en", ("en", "en-US")), ("auto", None), ("", None)])
+def test_youtube_idioma(video, idioma, esperado):
+    datos = upload_post.campos(Plataforma.YOUTUBE, _pub(video), Opciones(idioma=idioma), "p")
+    assert datos["selfDeclaredMadeForKids"] == "false"
+    if esperado:
+        assert (datos["defaultLanguage"], datos["defaultAudioLanguage"]) == esperado
+    else:
+        assert not {"defaultLanguage", "defaultAudioLanguage"} & set(datos)
+
+
+def test_youtube_publicidad_solo_con_contenido_de_marca(video):
+    assert "hasPaidProductPlacement" not in upload_post.campos(
+        Plataforma.YOUTUBE, _pub(video), Opciones(tu_marca=True), "p")
+    assert upload_post.campos(Plataforma.YOUTUBE, _pub(video), Opciones(contenido_de_marca=True),
+                              "p")["hasPaidProductPlacement"] == "true"
+
+
+def test_instagram_portada(video):
+    pub = replace(_pub(video), portada=2.0)
+    assert upload_post.campos(Plataforma.INSTAGRAM, pub, Opciones(), "p")["thumb_offset"] == "2000"
+
+
+def test_x_colaboracion_pagada_solo_con_contenido_de_marca(video):
+    assert "x_paid_partnership" not in upload_post.campos(
+        Plataforma.X, _pub(video), Opciones(tu_marca=True), "p")
+    assert upload_post.campos(Plataforma.X, _pub(video), Opciones(contenido_de_marca=True),
+                              "p")["x_paid_partnership"] == "true"
+
+
+def test_publicar_youtube_envia_la_miniatura_y_tiktok_no(video, tmp_path):
+    mini = tmp_path / "mini.jpg"
+    mini.write_bytes(b"JPG")
+    pub = replace(_pub(video), miniatura=mini)
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.YOUTUBE, pub, Opciones())
+    assert servidor.ficheros[0]["thumbnail"] == ("mini.jpg", b"JPG")
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.TIKTOK, pub, Opciones())
+    assert "thumbnail" not in servidor.ficheros[0]
+
+
+def test_publicar_tiktok_directo_sin_privacidad_no_envia(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
+                                      Opciones(tiktok_modo=ModoTikTok.PUBLICO))
+    assert not r.ok and r.error == "Elige quién puede verlo en TikTok"
+    assert servidor.peticiones == []
+
+
+def test_publicar_tiktok_marca_con_solo_yo_no_envia(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(
+        Plataforma.TIKTOK, _pub(video),
+        Opciones(tiktok_modo=ModoTikTok.PUBLICO, tiktok_privacidad="SELF_ONLY",
+                 contenido_de_marca=True))
+    assert not r.ok and r.error == "El contenido de marca no puede ser privado"
+    assert servidor.peticiones == []
+
+
+def test_ajustes_tiktok_duracion_float_positivo_se_acepta():
+    cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": 600.0}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok((), 600)
+    for malo in (True, 0, -1.5):
+        cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": malo}
+        assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok(())

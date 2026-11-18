@@ -132,7 +132,7 @@ def test_consultas_fallidas_lanzan_error_consulta_sin_la_clave(nombre, responder
     peticiones: list = []
     p = registro_proveedores.crear(nombre, CLAVE, AJUSTES,
                                    http=_cliente(responder, peticiones))
-    for consulta in (p.cuentas, p.perfiles, p.paginas_facebook, lambda: p.lugares_tiktok("Madrid"),
+    for consulta in (p.cuentas, p.perfiles, p.paginas_facebook, lambda: p.lugares_tiktok("Madrid"), p.ajustes_tiktok,
                      p.programadas, lambda: p.cancelar("ref-1")):
         with pytest.raises(ErrorConsulta) as error:
             consulta()
@@ -173,6 +173,7 @@ PERMITIDAS = {
     ("videopipeline/redes/proveedor.py",
      'PROVEEDORES: dict[str, str] = {"upload_post": "videopipeline.redes.upload_post"}'),
     ("videopipeline/redes/proveedor.py", 'PROVEEDOR_POR_DEFECTO = "upload_post"'),
+    ("videopipeline/redes/modelo.py", '"PUBLIC_TO_EVERYONE": N_("Todo el mundo"),'),
 }
 
 

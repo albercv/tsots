@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from videopipeline.redes.modelo import (
+    PRIVACIDADES_TIKTOK,
+    AjustesTikTok,
     Cuenta,
     Lugar,
     Opciones,
@@ -27,19 +29,22 @@ class ProveedorFalso:
     `pendientes`, lo que devuelve `programadas()` (o una excepción), y
     `al_cancelar`, una excepción que lanza `cancelar()`. Se anotan en
     `consultas`, no en `llamadas`. `perfiles_cuenta` es lo que devuelve
-    `perfiles()` (o una excepción)."""
+    `perfiles()` (o una excepción); `ajustes_tiktok`, lo de `ajustes_tiktok()`
+    (o una excepción; por defecto, las cuatro privacidades y sin límites)."""
 
     nombre = "Falso"
 
     def __init__(self, respuestas=None, estados=None, cuentas_conectadas=None,
                  paginas=None, lugares=None, pendientes=None, al_cancelar=None,
-                 perfiles_cuenta=None):
+                 perfiles_cuenta=None, ajustes_tiktok=None):
         self.respuestas = dict(respuestas or {})
         self.estados = {p: list(v) for p, v in (estados or {}).items()}
         self.cuentas_conectadas = (todas_conectadas() if cuentas_conectadas is None
                                    else cuentas_conectadas)
         self.paginas = [Pagina("111", "Mi página")] if paginas is None else paginas
         self.lugares = [Lugar("v2_madrid", "Madrid")] if lugares is None else lugares
+        self.ajustes_tiktok_ = (AjustesTikTok(privacidades=tuple(PRIVACIDADES_TIKTOK))
+                                if ajustes_tiktok is None else ajustes_tiktok)
         self.pendientes: list[Programada] | BaseException = (
             [] if pendientes is None else pendientes)
         self.al_cancelar = al_cancelar
@@ -70,6 +75,12 @@ class ProveedorFalso:
         if isinstance(self.lugares, BaseException):
             raise self.lugares
         return list(self.lugares)
+
+    def ajustes_tiktok(self):
+        self.consultas.append("ajustes_tiktok")
+        if isinstance(self.ajustes_tiktok_, BaseException):
+            raise self.ajustes_tiktok_
+        return self.ajustes_tiktok_
 
     def programadas(self):
         self.consultas.append("programadas")
