@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import logging
 import platform as plataforma_sistema
+import tempfile
 from dataclasses import replace
 from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
@@ -37,7 +38,7 @@ from videopipeline import linkedin
 from videopipeline.caption import Caption
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes import diario, limites, publicador, registro
+from videopipeline.redes import diario, limites, portada_video, publicador, registro
 from videopipeline.redes.modelo import (
     ETIQUETAS_FACEBOOK,
     ETIQUETAS_INSTAGRAM,
@@ -188,13 +189,15 @@ class HiloPublicacion(QThread):
             self.progreso.emit(plataforma.value, estado.value, resultado)
 
         try:
-            resultados = publicador.publicar(
-                self._proveedor, self._publicacion, self._opciones, self._plataformas,
-                progreso=avisar,
-                nombre_proveedor=self._nombre_proveedor,
-                cancelado=self.isInterruptionRequested,
-                **({"ahora": self._ahora} if self._ahora else {}),
-            )
+            with tempfile.TemporaryDirectory() as tmp:  # el envío lee la miniatura
+                self._publicacion = portada_video.con_portada(self._publicacion, Path(tmp))
+                resultados = publicador.publicar(
+                    self._proveedor, self._publicacion, self._opciones, self._plataformas,
+                    progreso=avisar,
+                    nombre_proveedor=self._nombre_proveedor,
+                    cancelado=self.isInterruptionRequested,
+                    **({"ahora": self._ahora} if self._ahora else {}),
+                )
         except BaseException as e:  # publicador aísla los fallos; esto es el último seguro
             log.exception("Fallo inesperado en el hilo de publicación")
             resultados = dict(vistos)
