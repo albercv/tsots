@@ -1468,3 +1468,62 @@ def test_segmentar_temperatura_y_keep_alive(monkeypatch):
     for llamada in llamadas:
         assert llamada["temperatura"] == shorts.TEMPERATURA_TEMAS
         assert llamada["keep_alive"] == shorts.KEEP_ALIVE_SHORTS
+
+
+def _temas_de(n: int, sigue: bool, ini: int = 1) -> list[shorts.Tema]:
+    """`n` temas de una frase cada uno; `sigue` marca los que siguen al anterior."""
+    return [shorts.Tema(ini + k, ini + k, f"t{k + 1}", sigue and k > 0)
+            for k in range(n)]
+
+
+def _rangos(cs) -> list[tuple[int, int]]:
+    return [(c.frase_inicio, c.frase_fin) for c in cs]
+
+
+def test_bloques_agrupa_por_sigue():
+    t = [shorts.Tema(1, 1, "a", False), shorts.Tema(2, 2, "b", True),
+         shorts.Tema(3, 3, "c", False), shorts.Tema(4, 4, "d", True),
+         shorts.Tema(5, 5, "e", True)]
+    assert [[x.titulo for x in b] for b in shorts.bloques(t)] == [["a", "b"], ["c", "d", "e"]]
+
+
+def test_candidatos_tema_entero_en_rango():
+    frases = _frases_de(3, 120.0)
+    cs, largos = shorts.candidatos_de_temas(_temas_de(1, False), frases, 360.0)
+    assert largos == []
+    (c,) = cs
+    esperado = shorts.validar({"candidatos": [_cand(1, 1)]}, frases, 360.0)[0]
+    assert (c.origen, c.titulo, c.motivo, c.descarte) == ("tema", "t1", "", "")
+    assert (c.inicio, c.fin) == (esperado.inicio, esperado.fin)
+
+
+def test_candidatos_tramo_mas_largo_que_cabe():
+    frases = _frases_de(5, 40.0)
+    cs, largos = shorts.candidatos_de_temas(_temas_de(5, True), frases, 200.0)
+    assert largos == []
+    assert _rangos(cs) == [(1, 4), (2, 5), (3, 5), (4, 5)]
+    assert {c.origen for c in cs} == {"tramo"}
+    assert all(c.descarte == "" for c in cs)
+
+
+def test_candidatos_tramo_no_cruza_bloques():
+    frases = _frases_de(3, 40.0)
+    cs, _ = shorts.candidatos_de_temas(_temas_de(3, False), frases, 120.0)
+    assert _rangos(cs) == [(1, 1), (2, 2), (3, 3)]
+    assert {c.descarte for c in cs} == {"tema_corto"}
+    assert all((c.inicio, c.fin) == (0.0, 0.0) for c in cs)
+
+
+def test_candidatos_tema_largo_va_a_fragmentos():
+    frases = _frases_de(1, 400.0)
+    cs, largos = shorts.candidatos_de_temas(_temas_de(1, False), frases, 400.0)
+    assert cs == []
+    assert [t.titulo for t in largos] == ["t1"]
+
+
+def test_candidatos_limite_179_y_60_valen():
+    for seg in (60.0, 179.0):
+        cs, _ = shorts.candidatos_de_temas(_temas_de(1, False), _frases_de(1, seg), 300.0)
+        assert [(c.origen, c.descarte) for c in cs] == [("tema", "")]
+    cs, _ = shorts.candidatos_de_temas(_temas_de(1, False), _frases_de(1, 59.9), 300.0)
+    assert [c.descarte for c in cs] == ["tema_corto"]

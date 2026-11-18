@@ -60,7 +60,7 @@ _NO_VALIDOS_EN_NOMBRE = re.compile(r'[/\\:*?"<>|\x00-\x1f\x7f-\x9f]')
 # Por qué se descarta un candidato (`Candidato.descarte`; "" = sigue en pie).
 DESCARTES = (
     "fuera_de_rango", "duracion", "repetido", "flojo", "no_se_entiende_solo",
-    "solapa", "sobra",
+    "solapa", "sobra", "tema_corto",
 )
 
 
@@ -104,6 +104,7 @@ class Candidato:
     descarte: str = ""
     archivo: str = ""  # nombre del .mp4 si salió
     titulo_video: str = ""  # el título quemado en el short, si salió
+    origen: str = ""  # "tema" | "tramo" | "fragmento"; "" en shorts.json v1
 
 
 def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
@@ -218,6 +219,62 @@ def validar(datos: dict, frases: list[Frase], duracion: float) -> list[Candidato
             c.inicio = min(primera.inicio, max(primera.inicio - MARGEN_CORTE, anterior))
             c.fin = max(ultima.fin, min(ultima.fin + MARGEN_CORTE, siguiente))
     return candidatos
+
+
+def bloques(temas: list[Tema]) -> list[list[Tema]]:
+    """Agrupa temas consecutivos mientras el siguiente siga al anterior."""
+    grupos: list[list[Tema]] = []
+    for t in temas:
+        if grupos and t.sigue_al_anterior:
+            grupos[-1].append(t)
+        else:
+            grupos.append([t])
+    return grupos
+
+
+def candidatos_de_temas(
+    temas: list[Tema], frases: list[Frase], duracion: float,
+) -> tuple[list[Candidato], list[Tema]]:
+    """Candidatos de temas enteros y de tramos de temas seguidos.
+
+    Devuelve `(candidatos, temas_largos)`; los temas de más de DURACION_MAX
+    quedan para trocearlos aparte.
+    """
+    def largo(ini: int, fin: int) -> float:
+        return frases[fin - 1].fin - frases[ini - 1].inicio
+
+    entradas: list[dict] = []
+    largos: list[Tema] = []
+    cubiertos: set[int] = set()  # id() de los temas dentro de algún tramo
+    for t in temas:
+        d = largo(t.frase_inicio, t.frase_fin)
+        if d > DURACION_MAX:
+            largos.append(t)
+        elif d >= DURACION_MIN:
+            entradas.append({"frase_inicio": t.frase_inicio,
+                             "frase_fin": t.frase_fin, "titulo": t.titulo})
+    for bloque in bloques(temas):
+        for i, t in enumerate(bloque):
+            mejor = None
+            for j in range(i + 1, len(bloque)):
+                if DURACION_MIN <= largo(t.frase_inicio, bloque[j].frase_fin) <= DURACION_MAX:
+                    mejor = j
+            if mejor is not None:
+                entradas.append({"frase_inicio": t.frase_inicio,
+                                 "frase_fin": bloque[mejor].frase_fin,
+                                 "titulo": t.titulo})
+                cubiertos.update(id(x) for x in bloque[i:mejor + 1])
+    candidatos = validar({"candidatos": entradas}, frases, duracion)
+    for c in candidatos:
+        tema = any(t.frase_inicio == c.frase_inicio and t.frase_fin == c.frase_fin
+                   for t in temas)
+        c.origen = "tema" if tema else "tramo"
+    for t in temas:
+        if id(t) not in cubiertos and largo(t.frase_inicio, t.frase_fin) < DURACION_MIN:
+            candidatos.append(Candidato(t.frase_inicio, t.frase_fin, t.titulo, "",
+                                        descarte="tema_corto", origen="tema"))
+    candidatos.sort(key=lambda c: (c.frase_inicio, c.frase_fin))
+    return candidatos, largos
 
 
 def elegir(candidatos: list[Candidato], maximo: int) -> list[Candidato]:
