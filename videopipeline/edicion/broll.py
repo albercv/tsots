@@ -19,7 +19,7 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 from videopipeline.edicion.componer import FFMPEG
 
 log = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)  # a INFO registra la URL completa, con la clave
+logging.getLogger("httpx").setLevel(logging.WARNING)  # httpx registra la URL completa, que lleva la clave: no subir su nivel
 
 SERVICIO = "tsots-pixabay"
 CUENTA = "api-key"

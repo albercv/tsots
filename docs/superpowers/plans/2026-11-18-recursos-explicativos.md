@@ -1,5 +1,7 @@
 # Recursos explicativos (señalar, lupa, B-roll, iconos, datos) — Implementation Plan
 
+> El proveedor de B-roll pasó de Pexels a Pixabay (ver spec §9); las menciones a Pexels de este plan son históricas.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Que Haiku pueda señalar texto de la pantalla (círculo/flecha/subrayado y lupa), meter B-roll gratuito de Pexels (tapa o ventana según el contenido), iconos vectoriales y datos animados, y elija el mejor recurso entre los de antes y los nuevos.

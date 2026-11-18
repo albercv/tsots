@@ -306,7 +306,7 @@ tipo, y leer las `Sugerencia:` del validador.
 - Catálogo de iconos (unos 40 nombres en español → glifo) y qué fichero de
   fuente incluir (la variante estática más ligera de Material Symbols).
 - Animaciones exactas de cada pieza y sus efectos de sonido.
-- Dónde va el lector de la clave en el motor y el texto del diálogo de Pexels.
+- Dónde va el lector de la clave en el motor y el texto del diálogo de Pixabay.
 - Cómo instalar `pyobjc` para quien actualice (README y aviso si falta).
 
 ## 9. Cambio: Pixabay en lugar de Pexels (2026-11-18)
