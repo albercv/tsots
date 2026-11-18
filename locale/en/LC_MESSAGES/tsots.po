@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:03+0100\n"
+"POT-Creation-Date: 2026-11-18 17:07+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1868,6 +1868,9 @@ msgstr "Unexpected response from the service: it does not include the scheduled 
 
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr "Unexpected response from the service: it does not include the Facebook Pages."
+
+msgid "Respuesta inesperada del servicio: no trae los ajustes de TikTok."
+msgstr "Unexpected response from the service: it does not include the TikTok settings."
 
 msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
 msgstr "Unexpected response from the service: it does not include the TikTok places."

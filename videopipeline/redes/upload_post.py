@@ -96,6 +96,7 @@ import httpx
 from ..i18n import N_, _
 from . import diario
 from .modelo import (
+    AjustesTikTok,
     Cuenta,
     Lugar,
     ModoFacebook,
@@ -103,6 +104,7 @@ from .modelo import (
     ModoTikTok,
     Opciones,
     Pagina,
+    PRIVACIDADES_TIKTOK,
     Plataforma,
     Programada,
     Publicacion,
@@ -127,6 +129,7 @@ URL_ESTADO = f"{URL_API}/uploadposts/status"
 URL_USUARIOS = f"{URL_API}/uploadposts/users"
 URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
 URL_LUGARES_TIKTOK = f"{URL_API}/uploadposts/tiktok/locations"
+URL_AJUSTES_TIKTOK = f"{URL_API}/uploadposts/tiktok/settings"
 URL_PROGRAMADAS = f"{URL_API}/uploadposts/schedule"
 MAX_BUSQUEDA_LUGAR = 100
 # Las consultas de cuentas y páginas se hacen al abrir los diálogos: si el
@@ -536,6 +539,23 @@ class ProveedorUploadPost:
         log.info("Páginas de Facebook: %s",
                  ", ".join(p.visible for p in paginas) or "(ninguna)")
         return paginas
+
+    def ajustes_tiktok(self) -> AjustesTikTok:
+        cuerpo = self._consultar(
+            "ajustes de TikTok", URL_AJUSTES_TIKTOK + "?profile={perfil}",
+            URL_AJUSTES_TIKTOK, {"profile": self._perfil})
+        opciones = self._buscar(cuerpo, "privacy_level_options")
+        if not isinstance(opciones, list):
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae los ajustes de TikTok."))
+        segundos = self._buscar(cuerpo, "max_video_post_duration_sec")
+        valido = isinstance(segundos, int) and not isinstance(segundos, bool) and segundos > 0
+        return AjustesTikTok(
+            tuple(k for k in PRIVACIDADES_TIKTOK if k in opciones),
+            segundos if valido else None,
+            self._buscar(cuerpo, "comment_disabled") is True,
+            self._buscar(cuerpo, "duet_disabled") is True,
+            self._buscar(cuerpo, "stitch_disabled") is True)
 
     def lugares_tiktok(self, texto: str) -> list[Lugar]:
         consulta = (texto or "").strip()[:MAX_BUSQUEDA_LUGAR]
@@ -965,7 +985,8 @@ class ProveedorUploadPost:
         if "scheduled_post_in_progress" in detalle:
             return self._limpiar(_(
                 "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."))
-        if "tiktok_reconnect_required" in detalle:
+        if ("tiktok_reconnect_required" in detalle
+                or (isinstance(cuerpo, dict) and cuerpo.get("reauth_required") is True)):
             return self._limpiar(_(
                 "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.").format(
                 servicio=NOMBRE))

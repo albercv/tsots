@@ -151,6 +151,17 @@ class Ciudad(Enum):
 
 
 @dataclass(frozen=True)
+class AjustesTikTok:
+    """Lo que la cuenta de TikTok permite al publicar: privacidades, duración
+    máxima (`None`: no se sabe) y si desactiva comentarios, dúos o stitch."""
+    privacidades: tuple[str, ...]
+    max_segundos: int | None = None
+    comentarios_off: bool = False
+    duos_off: bool = False
+    stitch_off: bool = False
+
+
+@dataclass(frozen=True)
 class Lugar:
     """Lugar de TikTok, tal como lo devuelve la búsqueda del proveedor. Su
     `id` solo vale para la cuenta con que se buscó: es privado, no se

@@ -21,6 +21,7 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..i18n import _
 from .modelo import (
+    AjustesTikTok,
     Cuenta,
     Lugar,
     Opciones,
@@ -72,6 +73,11 @@ class Proveedor(Protocol):
     def lugares_tiktok(self, texto: str) -> list[Lugar]:
         """Lugares de TikTok que coinciden con `texto`, para etiquetar la
         ubicación. Lanza `ErrorConsulta`."""
+        ...
+
+    def ajustes_tiktok(self) -> AjustesTikTok:
+        """Privacidades, duración máxima e interacciones que permite la cuenta
+        de TikTok. Solo lanza `ErrorConsulta`."""
         ...
 
     def programadas(self) -> list[Programada]:

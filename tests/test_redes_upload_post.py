@@ -13,6 +13,7 @@ import pytest
 
 from videopipeline.redes import publicador, upload_post
 from videopipeline.redes.modelo import (
+    AjustesTikTok,
     Ciudad,
     Cuenta,
     Lugar,
@@ -1103,6 +1104,49 @@ def test_lugares_tiktok_errores(codigo, cuerpo):
     with pytest.raises(ErrorConsulta) as error:
         _proveedor(Servidor(_responder_json(cuerpo, codigo))).lugares_tiktok("Madrid")
     assert str(error.value) and CLAVE not in str(error.value)
+
+
+def test_ajustes_tiktok_consulta_y_respuesta():
+    cuerpo = {"success": True, "comment_disabled": True, "duet_disabled": False,
+              "max_video_post_duration_sec": 600,
+              "privacy_level_options": ["SELF_ONLY", "FOLLOWER_OF_CREATOR",
+                                        "MUTUAL_FOLLOW_FRIENDS", "RARO"]}
+    servidor = Servidor(_responder_json(cuerpo))
+    ajustes = _proveedor(servidor).ajustes_tiktok()
+    # Orden de PRIVACIDADES_TIKTOK y sin el valor desconocido.
+    assert ajustes == AjustesTikTok(
+        ("FOLLOWER_OF_CREATOR", "MUTUAL_FOLLOW_FRIENDS", "SELF_ONLY"), 600,
+        comentarios_off=True)
+    peticion = servidor.peticiones[0]
+    assert peticion.method == "GET"
+    assert peticion.url.path == "/api/uploadposts/tiktok/settings"
+    assert peticion.url.params["profile"] == "mi_perfil"
+
+
+def test_ajustes_tiktok_duracion_invalida_es_none():
+    cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": "600",
+              "stitch_disabled": "yes"}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok(())
+
+
+@pytest.mark.parametrize("codigo, cuerpo", [
+    (400, {"error_code": "tiktok_reconnect_required", "message": "x"}),
+    (409, {"reauth_required": True, "message": "x"})])
+def test_ajustes_tiktok_pide_reconectar(codigo, cuerpo):
+    with pytest.raises(ErrorConsulta) as error:
+        _proveedor(Servidor(_responder_json(cuerpo, codigo))).ajustes_tiktok()
+    assert "Reconecta TikTok" in str(error.value)
+    assert CLAVE not in str(error.value)
+
+
+def test_ajustes_tiktok_error_502_y_sin_red():
+    with pytest.raises(ErrorConsulta):
+        _proveedor(Servidor(_responder_json({"error": "TikTok"}, 502))).ajustes_tiktok()
+
+    def sin_red(request, _servidor):
+        raise httpx.ConnectError("sin red", request=request)
+    with pytest.raises(ErrorConsulta):
+        _proveedor(Servidor(sin_red)).ajustes_tiktok()
 
 
 @pytest.mark.parametrize("capacidades, esperado", [
