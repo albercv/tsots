@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 11:43+0100\n"
+"POT-Creation-Date: 2026-11-18 17:03+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -192,6 +192,9 @@ msgstr ""
 
 msgid "Amarillo"
 msgstr "Yellow"
+
+msgid "Amigos"
+msgstr "Friends"
 
 msgid "Aplicar a todos los vídeos"
 msgstr "Apply to all videos"
@@ -711,6 +714,9 @@ msgstr "Choose videos"
 
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr "Choose a finished video with a caption in the queue."
+
+msgid "Elige quién puede verlo en TikTok"
+msgstr "Choose who can view it on TikTok"
 
 msgid "Elige una hora al menos 15 minutos después de ahora."
 msgstr "Pick a time at least 15 minutes from now."
@@ -1963,6 +1969,9 @@ msgstr "You can schedule up to one year ahead."
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr "Used for every post. In Publish you can change it for a single video."
 
+msgid "Seguidores"
+msgstr "Followers"
+
 msgid "Seguir la cara (4:3)"
 msgstr "Follow the face (4:3)"
 
@@ -2069,6 +2078,9 @@ msgstr "System"
 msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
 msgstr "Only for this video. Change the usual one in Networks…."
 
+msgid "Solo yo"
+msgstr "Only me"
+
 #, python-brace-format
 msgid "Subiendo a {plataforma} ({n} de {total})…"
 msgstr "Uploading to {plataforma} ({n} of {total})…"
@@ -2141,6 +2153,9 @@ msgstr "Texts"
 #, python-brace-format
 msgid "TikTok no encuentra «{texto}»."
 msgstr "TikTok can't find “{texto}”."
+
+msgid "Todo el mundo"
+msgstr "Everyone"
 
 msgid "Transcribiendo"
 msgstr "Transcribing"

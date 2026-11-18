@@ -119,7 +119,8 @@ def test_tiktok_borrador_campos_cabecera_y_video(video):
 def test_tiktok_publico(video):
     servidor = Servidor(_ok_sync)
     _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
-                                  Opciones(tiktok_modo=ModoTikTok.PUBLICO))
+                                  Opciones(tiktok_modo=ModoTikTok.PUBLICO,
+                                           tiktok_privacidad="PUBLIC_TO_EVERYONE"))
     campos = servidor.formularios[0]
     assert campos["post_mode"] == ["DIRECT_POST"]
     assert campos["privacy_level"] == ["PUBLIC_TO_EVERYONE"]
@@ -1433,3 +1434,91 @@ def test_x_con_una_foto_ausente_no_envia(tmp_path):
     pub = replace(_pub(tmp_path / "v.mp4"), fotos_x=(tmp_path / "falta.png",))
     r = _proveedor(servidor).publicar(Plataforma.X, pub, Opciones())
     assert not r.ok and "falta.png" in r.error and servidor.peticiones == []
+
+
+# --- cumplimiento: campos nuevos de cada red ---
+
+def _directo(**extra) -> Opciones:
+    return Opciones(tiktok_modo=ModoTikTok.PUBLICO, tiktok_privacidad="SELF_ONLY", **extra)
+
+
+def test_tiktok_directo_privacidad_y_casillas_sin_marcar(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(), "p")
+    assert datos["privacy_level"] == "SELF_ONLY"
+    assert [datos[c] for c in ("disable_comment", "disable_duet", "disable_stitch")] == ["true"] * 3
+    assert "disclose_commercial" not in datos
+
+
+def test_tiktok_directo_comentarios_marcados(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(tiktok_comentarios=True), "p")
+    assert datos["disable_comment"] == "false"
+    assert datos["disable_duet"] == "true"
+
+
+def test_tiktok_directo_tu_marca(video):
+    datos = upload_post.campos(Plataforma.TIKTOK, _pub(video), _directo(tu_marca=True), "p")
+    assert (datos["disclose_commercial"], datos["your_brand"], datos["branded_content"]) == (
+        "true", "true", "false")
+
+
+def test_tiktok_directo_portada(video):
+    pub = replace(_pub(video), portada=1.5)
+    assert upload_post.campos(Plataforma.TIKTOK, pub, _directo(), "p")["cover_timestamp"] == "1500"
+
+
+def test_tiktok_borrador_no_manda_campos_de_directo(video):
+    pub = replace(_pub(video), portada=1.5)
+    op = Opciones(tiktok_privacidad="SELF_ONLY", tu_marca=True, contenido_de_marca=True)
+    datos = upload_post.campos(Plataforma.TIKTOK, pub, op, "p")
+    assert not {"privacy_level", "disable_comment", "disable_duet", "disable_stitch",
+                "disclose_commercial", "cover_timestamp"} & set(datos)
+
+
+@pytest.mark.parametrize("idioma, esperado", [
+    ("es", ("es", "es-ES")), ("en", ("en", "en-US")), ("auto", None), ("", None)])
+def test_youtube_idioma(video, idioma, esperado):
+    datos = upload_post.campos(Plataforma.YOUTUBE, _pub(video), Opciones(idioma=idioma), "p")
+    assert datos["selfDeclaredMadeForKids"] == "false"
+    if esperado:
+        assert (datos["defaultLanguage"], datos["defaultAudioLanguage"]) == esperado
+    else:
+        assert not {"defaultLanguage", "defaultAudioLanguage"} & set(datos)
+
+
+def test_youtube_publicidad_solo_con_contenido_de_marca(video):
+    assert "hasPaidProductPlacement" not in upload_post.campos(
+        Plataforma.YOUTUBE, _pub(video), Opciones(tu_marca=True), "p")
+    assert upload_post.campos(Plataforma.YOUTUBE, _pub(video), Opciones(contenido_de_marca=True),
+                              "p")["hasPaidProductPlacement"] == "true"
+
+
+def test_instagram_portada(video):
+    pub = replace(_pub(video), portada=2.0)
+    assert upload_post.campos(Plataforma.INSTAGRAM, pub, Opciones(), "p")["thumb_offset"] == "2000"
+
+
+def test_x_colaboracion_pagada_solo_con_contenido_de_marca(video):
+    assert "x_paid_partnership" not in upload_post.campos(
+        Plataforma.X, _pub(video), Opciones(tu_marca=True), "p")
+    assert upload_post.campos(Plataforma.X, _pub(video), Opciones(contenido_de_marca=True),
+                              "p")["x_paid_partnership"] == "true"
+
+
+def test_publicar_youtube_envia_la_miniatura_y_tiktok_no(video, tmp_path):
+    mini = tmp_path / "mini.jpg"
+    mini.write_bytes(b"JPG")
+    pub = replace(_pub(video), miniatura=mini)
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.YOUTUBE, pub, Opciones())
+    assert servidor.ficheros[0]["thumbnail"] == ("mini.jpg", b"JPG")
+    servidor = Servidor(_ok_sync)
+    _proveedor(servidor).publicar(Plataforma.TIKTOK, pub, Opciones())
+    assert "thumbnail" not in servidor.ficheros[0]
+
+
+def test_publicar_tiktok_directo_sin_privacidad_no_envia(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(Plataforma.TIKTOK, _pub(video),
+                                      Opciones(tiktok_modo=ModoTikTok.PUBLICO))
+    assert not r.ok and r.error == "Elige quién puede verlo en TikTok"
+    assert servidor.peticiones == []

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 11:43+0100\n"
+"POT-Creation-Date: 2026-11-18 17:03+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -192,6 +192,9 @@ msgid ""
 msgstr ""
 
 msgid "Amarillo"
+msgstr ""
+
+msgid "Amigos"
 msgstr ""
 
 msgid "Aplicar a todos los vídeos"
@@ -692,6 +695,9 @@ msgid "Elegir vídeos"
 msgstr ""
 
 msgid "Elige en la cola un vídeo terminado que tenga caption."
+msgstr ""
+
+msgid "Elige quién puede verlo en TikTok"
 msgstr ""
 
 msgid "Elige una hora al menos 15 minutos después de ahora."
@@ -1903,6 +1909,9 @@ msgstr ""
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
 msgstr ""
 
+msgid "Seguidores"
+msgstr ""
+
 msgid "Seguir la cara (4:3)"
 msgstr ""
 
@@ -2009,6 +2018,9 @@ msgstr ""
 msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
 msgstr ""
 
+msgid "Solo yo"
+msgstr ""
+
 #, python-brace-format
 msgid "Subiendo a {plataforma} ({n} de {total})…"
 msgstr ""
@@ -2080,6 +2092,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "TikTok no encuentra «{texto}»."
+msgstr ""
+
+msgid "Todo el mundo"
 msgstr ""
 
 msgid "Transcribiendo"

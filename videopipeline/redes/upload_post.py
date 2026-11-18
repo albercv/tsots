@@ -202,6 +202,10 @@ def tiempos(tamano: int) -> httpx.Timeout:
                          write=escritura, pool=ESPERA_CONEXION)
 
 
+# Idioma de la app → (defaultLanguage, defaultAudioLanguage) de YouTube.
+_IDIOMAS_YOUTUBE = {"es": ("es", "es-ES"), "en": ("en", "en-US")}
+
+
 def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
            perfil: str, pagina_facebook: str = "") -> dict[str, str | list[str]]:
     """Campos del formulario multipart (sin el vídeo) para una plataforma."""
@@ -220,10 +224,21 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
     texto = texto_para(plataforma, publicacion, x_premium=opciones.x_premium)
     if plataforma == Plataforma.TIKTOK:
         datos["tiktok_title"] = texto
+        # Marcas de IA en false: TSOTS no genera personas, voces ni escenas realistas.
         datos["is_aigc"] = "false"
         if opciones.tiktok_modo == ModoTikTok.PUBLICO:
             datos["post_mode"] = "DIRECT_POST"
-            datos["privacy_level"] = "PUBLIC_TO_EVERYONE"
+            datos["privacy_level"] = opciones.tiktok_privacidad
+            for campo, marcada in (("disable_comment", opciones.tiktok_comentarios),
+                                   ("disable_duet", opciones.tiktok_duos),
+                                   ("disable_stitch", opciones.tiktok_stitch)):
+                datos[campo] = "false" if marcada else "true"
+            if opciones.tu_marca or opciones.contenido_de_marca:
+                datos["disclose_commercial"] = "true"
+                datos["your_brand"] = "true" if opciones.tu_marca else "false"
+                datos["branded_content"] = "true" if opciones.contenido_de_marca else "false"
+            if publicacion.portada is not None:
+                datos["cover_timestamp"] = str(round(publicacion.portada * 1000))
         else:
             datos["post_mode"] = "MEDIA_UPLOAD"
         lugar = opciones.ubicacion.tiktok
@@ -239,10 +254,18 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         datos["categoryId"] = opciones.youtube_categoria or "22"
         datos["privacyStatus"] = "public"
         datos["containsSyntheticMedia"] = "false"
+        datos["selfDeclaredMadeForKids"] = "false"
+        for campo, valor in zip(("defaultLanguage", "defaultAudioLanguage"),
+                                _IDIOMAS_YOUTUBE.get(opciones.idioma, ())):
+            datos[campo] = valor
+        if opciones.contenido_de_marca:
+            datos["hasPaidProductPlacement"] = "true"
     elif plataforma == Plataforma.INSTAGRAM:
         datos["instagram_title"] = texto
         datos["media_type"] = "REELS"
         datos["is_ai_generated"] = "false"
+        if publicacion.portada is not None:
+            datos["thumb_offset"] = str(round(publicacion.portada * 1000))
         if opciones.instagram_modo == ModoInstagram.NORMAL:
             datos["share_mode"] = "CUSTOM"
             datos["share_to_feed"] = "true"
@@ -256,6 +279,8 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         largo = opciones.x_premium and longitud_x(texto) > MAX_TEXTO_X
         datos["x_long_text_as_post"] = "true" if largo else "false"
         datos["made_with_ai"] = "false"
+        if opciones.contenido_de_marca:
+            datos["x_paid_partnership"] = "true"
         if id_x_valido(opciones.ubicacion.x_id):
             datos["geo_place_id"] = opciones.ubicacion.x_id.strip()
     elif plataforma == Plataforma.FACEBOOK:
@@ -342,6 +367,9 @@ class ProveedorUploadPost:
         con_fotos = linkedin or bool(fotos)
         archivos = [Path(f) for f in fotos] if con_fotos else [Path(publicacion.video)]
         video = archivos[0] if archivos else Path(publicacion.video)
+        if (plataforma == Plataforma.TIKTOK and opciones.tiktok_modo == ModoTikTok.PUBLICO
+                and not opciones.tiktok_privacidad):
+            return self._error(plataforma, _("Elige quién puede verlo en TikTok"))
         if not self._clave:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
         if not self._perfil:
@@ -383,6 +411,11 @@ class ProveedorUploadPost:
                 else:
                     files = {"video": (video.name, pila.enter_context(video.open("rb")),
                                        "video/mp4")}
+                    miniatura = publicacion.miniatura
+                    if plataforma == Plataforma.YOUTUBE and miniatura and Path(miniatura).is_file():
+                        files["thumbnail"] = (Path(miniatura).name,
+                                              pila.enter_context(Path(miniatura).open("rb")),
+                                              "image/jpeg")
                 return http.post(url, headers=self._cabeceras(), data=datos, files=files,
                                  timeout=limites)
 

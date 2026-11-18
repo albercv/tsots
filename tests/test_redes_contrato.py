@@ -173,6 +173,7 @@ PERMITIDAS = {
     ("videopipeline/redes/proveedor.py",
      'PROVEEDORES: dict[str, str] = {"upload_post": "videopipeline.redes.upload_post"}'),
     ("videopipeline/redes/proveedor.py", 'PROVEEDOR_POR_DEFECTO = "upload_post"'),
+    ("videopipeline/redes/modelo.py", '"PUBLIC_TO_EVERYONE": N_("Todo el mundo"),'),
 }
 
 
