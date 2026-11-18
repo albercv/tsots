@@ -130,8 +130,10 @@ def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict, t: float, i
             if forma == "circulo":
                 m = 18
                 dib.arc([x - m, y - m, x + w + m, y + h + m], -90, -90 + 360 * p, fill=color, width=GROSOR)
-            elif forma == "subrayado":  # con la línea inclinada, el borde de la caja no es la base
-                y0 = y + h + GROSOR // 2 - max(0.0, inclinacion) * w  # pegado: con interlineado justo, más abajo pisa la línea siguiente
+            elif forma == "subrayado":
+                # sobre la línea base (con la línea inclinada no es el borde de la caja) y pegado:
+                # con el interlineado justo, más abajo pisa la línea siguiente
+                y0 = y + h + GROSOR // 2 - max(0.0, inclinacion) * w
                 dib.line([x, y0, x + w * p, y0 + inclinacion * w * p], fill=color, width=GROSOR)
             else:  # flecha: viaja entera en diagonal desde arriba-izquierda hasta tocar el borde superior de la caja
                 px, py = x + w * 0.35 - 200 * (1 - p), y - 10 - 240 * (1 - p)

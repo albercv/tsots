@@ -1,8 +1,8 @@
 """B-roll gratuito de Pexels: clave en el Llavero, búsqueda con caché y dibujo.
 
 Modos: «tapa» cubre todo lo que hay sobre los subtítulos; «ventana» es una
-tarjeta redondeada en el hueco sin texto de la zona de gráficos. La clave nunca se escribe en caché ni
-en logs.
+tarjeta redondeada en el hueco sin texto de la zona de gráficos. La clave nunca
+se escribe en caché ni en logs.
 """
 from __future__ import annotations
 
@@ -159,7 +159,8 @@ def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: in
     else:
         tit = zonas.get("titulo")
         arriba, abajo = (tit["y"][1] if tit and t < tit["hasta"] else 120), zonas["graficos_hasta"]
-        huecos = [(arriba, abajo)] if not evitar else [(arriba, min(abajo, evitar[0])), (max(arriba, evitar[1]), abajo)]
+        huecos = [(arriba, abajo)] if not evitar else [(arriba, min(abajo, evitar[0])),
+                                                       (max(arriba, evitar[1]), abajo)]
         h0, h1 = max(huecos, key=lambda h: h[1] - h[0])
         alto = min(VENTANA_ALTO, h1 - h0 - 2 * MARGEN_VENTANA)
         if alto < VENTANA_MIN:
