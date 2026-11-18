@@ -81,34 +81,6 @@ def test_maximo_shorts():
     assert [shorts.maximo_shorts(d) for d in (179, 180, 599, 1199, 1800, 7860)] == [0, 1, 1, 1, 3, 13]
 
 
-def test_partes_una_sola_hasta_20_minutos():
-    frases = _frases_de(120, 10)  # justo 20 minutos
-    assert shorts.partes(frases) == [(0, 120)]
-    assert shorts.partes([]) == []
-
-
-def test_partes_largas_se_solapan():
-    frases = _frases_de(360, 10)  # 60 minutos
-    partes = shorts.partes(frases)
-    assert len(partes) > 1
-    for desde, hasta in partes:
-        assert frases[hasta - 1].fin - frases[desde].inicio <= 20 * 60
-    assert frases[partes[1][0]].inicio == 17 * 60
-    assert partes[0][1] > partes[1][0]  # se solapan
-    assert partes[-1][1] == len(frases)
-    # Sin huecos: cada parte empieza antes de que acabe la anterior.
-    assert all(b[0] < a[1] for a, b in zip(partes, partes[1:]))
-
-
-def test_partes_contienen_cualquier_trozo_valido():
-    frases = _frases_de(300, 10)  # 50 minutos
-    partes = shorts.partes(frases)
-    seguidas = int(shorts.DURACION_MAX // 10)  # 17 frases = 170 s
-    for ini in range(len(frases) - seguidas + 1):
-        fin = ini + seguidas
-        assert any(desde <= ini and fin <= hasta for desde, hasta in partes), ini
-
-
 def test_validar_descarta_rango_duracion_y_repetidos():
     frases = _frases_de(10, 10)
     datos = {"candidatos": [
@@ -352,69 +324,12 @@ def _tev1(si: float, score: float) -> dict:
     }
 
 
-def test_construir_mensajes_numera_globalmente():
-    frases = _frases_de(10, 10)
-    sistema, usuario = shorts.construir_mensajes(frases, 5, 8, 4)
-    assert sistema["role"] == "system"
-    assert "hasta 4 fragmentos" in sistema["content"]
-    assert usuario["role"] == "user"
-    assert usuario["content"].split("\n") == [
-        "Transcripción:",
-        f"[6] 50s-60s: {frases[5].texto}",
-        f"[7] 60s-70s: {frases[6].texto}",
-        f"[8] 70s-80s: {frases[7].texto}",
-    ]
-
-
 def test_esquema_candidatos_exige_todos_los_campos():
     item = shorts.ESQUEMA_CANDIDATOS["properties"]["candidatos"]["items"]
     assert shorts.ESQUEMA_CANDIDATOS["required"] == ["candidatos"]
     assert sorted(item["required"]) == ["frase_fin", "frase_inicio", "motivo", "titulo"]
     assert item["properties"]["frase_inicio"]["type"] == "integer"
     assert item["properties"]["titulo"]["type"] == "string"
-
-
-def test_buscar_candidatos_una_parte_pide_el_doble_del_maximo(monkeypatch):
-    frases = _frases_de(54, 10)  # 9 minutos
-    llamadas = _chat_falso(monkeypatch, {"candidatos": [_cand(1, 8)]})
-    porcentajes = []
-    candidatos = shorts.buscar_candidatos(
-        frases, 540.0, 3, "gemma4:12b-mlx", porcentajes.append)
-    assert len(llamadas) == 1
-    assert llamadas[0]["modelo"] == "gemma4:12b-mlx"
-    assert llamadas[0]["esquema"] is shorts.ESQUEMA_CANDIDATOS
-    assert "hasta 6 fragmentos" in llamadas[0]["mensajes"][0]["content"]
-    assert [(c.frase_inicio, c.frase_fin, c.descarte) for c in candidatos] == [(1, 8, "")]
-    assert porcentajes == [100.0]
-
-
-def test_buscar_candidatos_sin_frases_no_llama_al_modelo(monkeypatch):
-    llamadas = _chat_falso(monkeypatch, {"candidatos": []})
-    assert shorts.buscar_candidatos([], 0.0, 0, "gemma4:12b-mlx") == []
-    assert llamadas == []
-
-
-def test_buscar_candidatos_partes_y_repetidos(monkeypatch):
-    frases = _frases_de(270, 10)  # 45 minutos: tres partes
-    trozo = _cand(110, 117)  # cae en la zona que comparten las partes 1 y 2
-    llamadas = _chat_falso(monkeypatch, [
-        {"candidatos": [trozo]}, {"candidatos": [trozo]}, {"candidatos": []},
-    ])
-    porcentajes = []
-    candidatos = shorts.buscar_candidatos(
-        frases, 2700.0, 4, "gemma4:12b-mlx", porcentajes.append)
-    assert len(llamadas) == len(shorts.partes(frases)) == 3
-    # Cada parte numera sus frases con los números globales.
-    primeras = [m["mensajes"][1]["content"].split("\n")[1] for m in llamadas]
-    assert [p.split("]")[0] for p in primeras] == ["[1", "[103", "[205"]
-    assert [c.descarte for c in candidatos] == ["", "repetido"]
-    assert porcentajes == pytest.approx([100 / 3, 200 / 3, 100.0])
-
-
-def test_buscar_candidatos_basura_del_modelo_no_rompe(monkeypatch):
-    _chat_falso(monkeypatch, {"candidatos": [_cand(0, 3), _cand("x", 9), "?"]})
-    candidatos = shorts.buscar_candidatos(_frases_de(54, 10), 540.0, 3, "m")
-    assert [c.descarte for c in candidatos] == ["fuera_de_rango"]
 
 
 def test_nota_tev1_lee_probabilidad_y_score(monkeypatch):
@@ -655,8 +570,16 @@ def ficha_con_base(tmp_path, monkeypatch):
 
     monkeypatch.setattr(shorts, "duracion_video", lambda video: 1200.0)
     monkeypatch.setattr(shorts, "asegurar_servidor", ServidorFalso)
-    monkeypatch.setattr(shorts, "chat_json",
-                        lambda *a, **kw: {"candidatos": PROPUESTOS})
+    def falso_chat(modelo, mensajes, esquema, **kw):
+        if esquema is shorts.ESQUEMA_TEMAS:  # un solo tema, de 400 s
+            return {"temas": [{"frase_inicio": 1, "titulo": "Charla",
+                               "sigue_al_anterior": False}]}
+        if len(mensajes) > 2:  # la corrección de una duración mala: sin cambios
+            return {"candidatos": []}
+        return {"candidatos": PROPUESTOS}
+
+    monkeypatch.setattr(shorts, "chat_json", falso_chat)
+    monkeypatch.setattr(shorts, "descargar", lambda modelo: None)
     monkeypatch.setattr(shorts, "systemone", falso_tev1)
     monkeypatch.setattr(shorts, "generar_titulo", falso_titulo)
     monkeypatch.setattr(pipeline, "convertir_vertical", falso_convertir)
@@ -699,7 +622,9 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
         archivos + ["shorts.json"])
     datos = _leer_json(e.carpeta / "shorts.json")
     assert (datos["version"], datos["ficha"], datos["video"], datos["juez"],
-            datos["maximo"]) == (1, "f1", "charla", "tev1:0.8b", 2)
+            datos["maximo"]) == (2, "f1", "charla", "tev1:0.8b", 2)
+    assert [t["titulo"] for t in datos["temas"]] == ["Charla"]
+    assert {c["origen"] for c in datos["candidatos"]} == {"fragmento"}
     assert datos["archivos"] == archivos
     assert [(c["titulo"], c["descarte"], c["archivo"]) for c in datos["candidatos"]] == [
         ("El mejor trozo", "", MEJOR + ".mp4"), ("El segundo", "", SEGUNDO + ".mp4"),
@@ -712,9 +637,9 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
     assert (cargar("f1").artefactos[SEGUIMIENTO].clave
             == clave_seguimiento(LINEA))
     etiquetas = [ev["label"] for ev in eventos if "step" in ev]
-    propias = etiquetas[etiquetas.index("Buscando trozos para shorts"):]
+    propias = etiquetas[etiquetas.index("Buscando temas"):]
     assert list(dict.fromkeys(propias)) == [
-        "Buscando trozos para shorts", "Puntuando los trozos",
+        "Buscando temas", "Buscando los mejores momentos", "Puntuando los trozos",
         "Generando título", "Creando short 1 de 2", "Creando short 2 de 2"]
     assert [ev["warning"] for ev in eventos if "warning" in ev] == []
 
@@ -1634,3 +1559,76 @@ def test_fragmentos_respuesta_invalida_salta_la_subventana(monkeypatch):
     tema, frases = _tema_largo(30, 10)
     _chat_falso(monkeypatch, {"x": 1})
     assert shorts.fragmentos(tema, frases, 300.0, "m") == []
+
+
+# --- seleccionar --------------------------------------------------------------
+
+def _selec_falsa(monkeypatch, temas, candidatos, notas=(0.9, 3.0)):
+    """`chat_json` por esquema, `systemone` con una nota fija y `descargar` anotado."""
+    descargados = []
+    monkeypatch.setattr(shorts, "descargar", descargados.append)
+    monkeypatch.setattr(shorts, "systemone", lambda *a, **kw: _tev1(*notas))
+
+    def chat(modelo, mensajes, esquema, **kw):
+        if esquema is shorts.ESQUEMA_TEMAS:
+            return temas() if callable(temas) else temas
+        return candidatos
+
+    monkeypatch.setattr(shorts, "chat_json", chat)
+    return descargados
+
+
+def test_seleccionar_flujo_completo(monkeypatch):
+    frases = _frases_de(120, 10)  # 20 minutos
+    # Temas: 1-8 (80 s, tema), 9-14 (60 s) y 15-20 (60 s) seguidos (tramo), 21-60 largo.
+    temas = {"temas": [
+        {"frase_inicio": 1, "titulo": "uno", "sigue_al_anterior": False},
+        {"frase_inicio": 9, "titulo": "dos", "sigue_al_anterior": False},
+        {"frase_inicio": 15, "titulo": "tres", "sigue_al_anterior": True},
+        {"frase_inicio": 21, "titulo": "largo", "sigue_al_anterior": False},
+        {"frase_inicio": 61, "titulo": "otro", "sigue_al_anterior": False},
+    ]}
+    descargados = _selec_falsa(monkeypatch, temas, {"candidatos": [
+        _cand(21, 30, titulo="Dentro"), _cand(21, 30, titulo="Igual")]})
+    sel = shorts.seleccionar(frases, 1200.0, "m", on_aviso=lambda t: None)
+    assert [t.titulo for t in sel.temas] == ["uno", "dos", "tres", "largo", "otro"]
+    origenes = {c.origen for c in sel.candidatos}
+    assert {"tema", "tramo", "fragmento"} <= origenes
+    assert "repetido" in [c.descarte for c in sel.candidatos if c.titulo == "Igual"]
+    assert sel.juez == shorts.JUEZ
+    assert 1 <= len(sel.elegidos) <= shorts.maximo_shorts(1200.0)
+    assert all(c.interes == 3.0 for c in sel.elegidos)
+    assert sel.elegidos and not any(
+        shorts._se_solapan(a, b) for a in sel.elegidos for b in sel.elegidos if a is not b)
+    assert descargados == ["m"]
+
+
+def test_seleccionar_descarga_aunque_falle(monkeypatch):
+    descargados = _selec_falsa(monkeypatch, {"temas": "no"}, {"candidatos": []})
+    with pytest.raises(PasoFallido):
+        shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
+    assert descargados == ["m"]
+
+
+def test_seleccionar_todos_cortos_sin_candidatos(monkeypatch):
+    temas = {"temas": [{"frase_inicio": i, "titulo": f"t{i}", "sigue_al_anterior": False}
+                       for i in range(1, 60, 3)]}  # temas de 30 s sin seguir
+    _selec_falsa(monkeypatch, temas, {"candidatos": []})
+    sel = shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
+    assert sel.elegidos == []
+    assert {c.descarte for c in sel.candidatos} == {"tema_corto"}
+
+
+def test_listar_lee_shorts_json_v1(tmp_path):
+    carpeta = tmp_path / "shorts"
+    carpeta.mkdir()
+    (carpeta / "01 - Uno.mp4").write_bytes(b"x")
+    (carpeta / "shorts.json").write_text(json.dumps({
+        "version": 1, "ficha": "f1", "video": "v", "juez": "tev1:0.8b",
+        "maximo": 1, "archivos": ["01 - Uno.mp4"],
+        "candidatos": [{"frase_inicio": 1, "frase_fin": 9, "titulo": "Uno",
+                        "motivo": "", "inicio": 10.0, "fin": 100.0,
+                        "archivo": "01 - Uno.mp4"}]}), encoding="utf-8")
+    assert [(c.mp4.name, c.duracion) for c in shorts.listar(carpeta)] == [
+        ("01 - Uno.mp4", 90.0)]
+    assert shorts._anteriores(carpeta, "f1") == ["01 - Uno.mp4"]
