@@ -170,3 +170,19 @@ def test_seguir_tras_un_barrido_no_salta_a_otra_igual(video, monkeypatch):
     cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, ini, ZONAS)
     assert None not in cajas
     assert all(c[0] > ini.caja[0] + 300 and c[2] > ini.caja[2] * 0.8 for c in cajas[11:])
+
+
+def test_subrayado_sigue_la_inclinacion():
+    caja = (100, 400, 800, 120)  # línea base de (100, 456) a (900, 520): baja 0.08 px por px
+    f = list(callouts.frames_senalar([caja] * 15, "subrayado", PALETA, FPS, ZONAS, 0.0, inclinacion=0.08))[6]
+    filas = lambda x: [y for y in range(300, 700) if f.getpixel((x, y))[3] > 200]
+    assert filas(120) and 454 <= min(filas(120)) and max(filas(120)) <= 470  # pegado a la base, no más abajo
+    assert filas(880) and 512 <= min(filas(880)) and max(filas(880)) <= 532
+    plano = list(callouts.frames_senalar([caja] * 15, "subrayado", PALETA, FPS, ZONAS, 0.0))[6]
+    assert plano.getpixel((120, 524))[3] > 200 and plano.getpixel((880, 524))[3] > 200
+
+
+def test_lupa_no_encoge_el_texto(video):
+    with pytest.raises(ValueError):
+        list(callouts.frames_lupa(video, [(60, Y + 10, 700, 70)] * 12, 0.0, 1.2, ZONAS, PALETA, FPS))
+    assert callouts.cabe_en_lupa((0, 0, 400, 60)) and not callouts.cabe_en_lupa((0, 0, 700, 60))

@@ -261,6 +261,17 @@ def test_render_pieza_omite_callout_casi_invisible(tmp_path, monkeypatch):
             assert (rmod._render_pieza(p, D, 10, tmp_path / "s.mov", ctx) is not None) is sale, (clase, visibles)
 
 
+def test_render_senalar_pasa_la_inclinacion(tmp_path, monkeypatch):
+    det = pantalla.Deteccion("Factura", (100, 700, 300, 60), 0.9, 0.07)
+    vistas = []
+    monkeypatch.setattr(rmod.rotulos, "render_slot", _slot_falso)
+    monkeypatch.setattr(callouts, "seguir", lambda *a, **k: [det.caja] * 20)
+    monkeypatch.setattr(callouts, "frames_senalar", lambda *a, **k: vistas.append(a) or iter(()))
+    p = rmod.Pieza("senalar", 1.0, 2.0, {"pantalla": "Factura", "caja": det, "forma": "subrayado"})
+    rmod._render_pieza(p, D, 10, tmp_path / "s.mov", rmod.RenderCtx(tmp_path / "v.mp4", ZONAS, tmp_path, set(), []))
+    assert vistas and vistas[0][-1] == 0.07
+
+
 @pytest.fixture
 def clip_mp4(tmp_path):
     ruta = tmp_path / "clip.mp4"

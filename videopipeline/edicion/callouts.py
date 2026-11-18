@@ -25,6 +25,7 @@ GROSOR = 8
 FUNDIDO = 0.2             # s
 ENTRADA = 0.3             # s que tarda en trazarse la forma
 MARGEN_LUPA, ZOOM, ANCHO_LUPA_MAX = 0.3, 2, 900
+ZOOM_MIN = 1.2            # una lupa que no amplía al menos esto se omite (mejor señalar)
 BORDE, RADIO = 6, 28
 Caja = tuple[int, int, int, int]
 
@@ -63,7 +64,7 @@ def seguir(video: Path, texto: str, t: float, dur: float, fps: int, inicial, zon
         exactas = [d for d in dets if normalizar(d.texto) == obj]
         previa = max(lecturas, default=None)
         ref = inicial.caja if previa is None else lecturas[previa]
-        cands = [d.caja for d in exactas or dets]
+        cands = [pantalla.recortar(d, texto).caja for d in exactas or dets]
         if exacto and previa is not None:  # la misma palabra en otro sitio de la interfaz tiene otro tamaño
             cands = [c for c in cands if 0.7 <= c[2] / max(1, ref[2]) <= 1.4]
         caja = min(cands, key=lambda c: sum(_dist(c, ref)), default=None)
@@ -114,8 +115,10 @@ def _ultima(cajas: list, i: int) -> Caja | None:
     return next((c for c in reversed(cajas[:i + 1]) if c is not None), None)
 
 
-def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict, t: float):
-    """Fotogramas RGBA con círculo, flecha o subrayado sobre la caja."""
+def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict, t: float, inclinacion: float = 0.0):
+    """Fotogramas RGBA con círculo, flecha o subrayado sobre la caja.
+
+    El subrayado sigue la línea base del texto, que baja `inclinacion` px por px de ancho."""
     color = (*paleta.acento, 255)
     for i in range(len(cajas)):
         img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
@@ -127,8 +130,9 @@ def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict, t: float):
             if forma == "circulo":
                 m = 18
                 dib.arc([x - m, y - m, x + w + m, y + h + m], -90, -90 + 360 * p, fill=color, width=GROSOR)
-            elif forma == "subrayado":
-                dib.line([x, y + h + 12, x + w * p, y + h + 12], fill=color, width=GROSOR)
+            elif forma == "subrayado":  # con la línea inclinada, el borde de la caja no es la base
+                y0 = y + h + GROSOR // 2 - max(0.0, inclinacion) * w  # pegado: con interlineado justo, más abajo pisa la línea siguiente
+                dib.line([x, y0, x + w * p, y0 + inclinacion * w * p], fill=color, width=GROSOR)
             else:  # flecha: viaja entera en diagonal desde arriba-izquierda hasta tocar el borde superior de la caja
                 px, py = x + w * 0.35 - 200 * (1 - p), y - 10 - 240 * (1 - p)
                 dib.line([px - 140, py - 171, px - 14, py - 20], fill=color, width=GROSOR)
@@ -153,8 +157,23 @@ def _tarjeta(recorte: Image.Image, color) -> Image.Image:
     return base
 
 
+def _recorte(caja: Caja) -> Caja:
+    """Zona de la lupa (izq, arr, der, aba): la caja con margen, dentro del fotograma."""
+    x, y, w, h = caja
+    mx, my = w * MARGEN_LUPA, h * MARGEN_LUPA
+    return max(0, round(x - mx)), max(0, round(y - my)), min(W, round(x + w + mx)), min(H, round(y + h + my))
+
+
+def cabe_en_lupa(caja: Caja) -> bool:
+    """Si la lupa puede ampliar ese texto al menos ZOOM_MIN (lo que limita es el ancho)."""
+    izq, _, der, _ = _recorte(caja)
+    return ANCHO_LUPA_MAX / max(1, der - izq) >= ZOOM_MIN
+
+
 def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, fps: int):
-    """Fotogramas RGBA con una tarjeta del texto ampliado, unida a su caja por un trazo."""
+    """Fotogramas RGBA con una tarjeta del texto ampliado, unida a su caja por un trazo.
+
+    ValueError si no amplía al menos ZOOM_MIN: la pieza se omite."""
     color = (*paleta.acento, 255)
     tit = zonas.get("titulo")
     # arriba: bajo el título si se ve en algún momento del tramo (fijo, para que la tarjeta no salte)
@@ -170,6 +189,13 @@ def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, f
         if hueco_fin - hueco_ini < 150:  # mitad opuesta sin sitio: el lado de la caja con más espacio
             encima, debajo = (y_min, y0 - 20), (y0 + h0 + 20, y_max)
             hueco_ini, hueco_fin = max((encima, debajo), key=lambda r: r[1] - r[0])
+
+    def aumento(r: Caja) -> float:
+        return min(ZOOM, ANCHO_LUPA_MAX / max(1, r[2] - r[0]),
+                   (hueco_fin - hueco_ini - 2 * BORDE - 40) / max(1, r[3] - r[1]))
+
+    if primera and aumento(_recorte(primera)) < ZOOM_MIN:
+        raise ValueError("el texto es demasiado grande para la lupa")
     frames = _decodificar(video, W, H, dur, fps, t)
     rgb = None
     for i in range(len(cajas)):
@@ -178,11 +204,8 @@ def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, f
         caja = _ultima(cajas, i)
         if caja and rgb:
             x, y, w, h = caja
-            mx, my = w * MARGEN_LUPA, h * MARGEN_LUPA
-            izq, arr = max(0, round(x - mx)), max(0, round(y - my))
-            der, aba = min(W, round(x + w + mx)), min(H, round(y + h + my))
-            k = min(ZOOM, ANCHO_LUPA_MAX / max(1, der - izq))
-            k = min(k, (hueco_fin - hueco_ini - 2 * BORDE - 40) / max(1, aba - arr))
+            izq, arr, der, aba = r = _recorte(caja)
+            k = aumento(r)
             recorte = rgb.crop((izq, arr, der, aba)).resize(
                 (max(1, round((der - izq) * k)), max(1, round((aba - arr) * k))), Image.LANCZOS)
             tarjeta = _tarjeta(recorte, color)

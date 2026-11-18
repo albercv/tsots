@@ -193,7 +193,8 @@ def _render_nueva(p: Pieza, estilo: Estilo, fps: int, destino: Path, ctx: Render
             log.warning("Pieza %s en t=%.1f omitida: el texto se pierde enseguida", p.clase, p.t)
             return None
         if p.clase == "senalar":
-            fr = callouts.frames_senalar(cajas, q["forma"], estilo.paleta, fps, ctx.zonas, p.t)
+            fr = callouts.frames_senalar(cajas, q["forma"], estilo.paleta, fps, ctx.zonas, p.t,
+                                         q["caja"].inclinacion)
         else:
             fr = callouts.frames_lupa(ctx.video, cajas, p.t, p.dur, ctx.zonas, estilo.paleta, fps)
     elif p.clase == "broll":

@@ -140,3 +140,54 @@ def test_coincidencias_sin_duplicados_seguidos():
     cs = pantalla.coincidencias(m, [Palabra("fichas", 30.5, 30.8), Palabra("fichas", 31.6, 31.9),
                                     Palabra("revisión", 32.5, 32.9)])
     assert [(c.palabra, c.t_palabra) for c in cs] == [("fichas", 30.5), ("revision", 32.5)]
+
+
+def test_recortar_al_fragmento():
+    d = Deteccion("La póliza vigente de Residencial", (100, 500, 640, 40), 0.9)
+    r = pantalla.recortar(d, "Residencial")
+    assert r.texto == d.texto and r.caja[1:4:2] == (500, 40)
+    assert 450 < r.caja[0] < 520 and 200 < r.caja[2] < 300
+    assert pantalla.recortar(d, "la poliza vigente de residencial") == d
+
+
+def test_recortar_linea_inclinada():
+    # línea base que baja 0.1 px por px: 800 px de ancho y 120 de caja = 40 de letra + 80 de bajada
+    baja = Deteccion("aaaa bbbb", (0, 100, 800, 120), 0.9, 0.1)
+    assert pantalla.recortar(baja, "bbbb").caja == (400, 140, 400, 80)
+    assert pantalla.recortar(baja, "aaaa").caja == (0, 100, 400, 80)
+    sube = Deteccion("aaaa bbbb", (0, 100, 800, 120), 0.9, -0.1)
+    assert pantalla.recortar(sube, "aaaa").caja == (0, 140, 400, 80)
+
+
+def test_buscar_devuelve_la_caja_del_fragmento():
+    m = _muestras(10, 12, [_det("Revisión de las fichas de la empresa", (100, 800, 800, 80))])
+    d = pantalla.buscar(m, "fichas", 10.5)
+    assert d.texto == "Revisión de las fichas de la empresa" and d.caja[2] < 250
+
+
+def test_analizar_guarda_la_inclinacion(tmp_path, monkeypatch):
+    monkeypatch.setattr(pantalla, "_fotogramas", lambda v: ((i / 2, Image.new("RGB", (1080, 1920))) for i in range(2)))
+    monkeypatch.setattr(pantalla, "leer_fotograma", lambda img: [Deteccion("Hola", (1, 2, 3, 4), 0.9, 0.05)])
+    destino = tmp_path / "pantalla.json"
+    assert pantalla.cargar(destino) == [] and pantalla.analizar(tmp_path / "v.mp4", ZONAS, destino) == pantalla.cargar(destino)
+
+
+def test_analizar_falla_si_no_se_puede_decodificar(tmp_path, monkeypatch):
+    monkeypatch.setattr(pantalla, "leer_fotograma", lambda img: [])
+    malo = tmp_path / "video.mp4"
+    malo.write_bytes(b"esto no es un video" * 100)
+    destino = tmp_path / "pantalla.json"
+    with pytest.raises(RuntimeError):
+        pantalla.analizar(malo, ZONAS, destino)
+    assert not destino.exists()
+
+
+def test_ocr_real_inclinacion():
+    pytest.importorskip("Vision")
+    capa = Image.new("RGBA", (1000, 300), (255, 255, 255, 0))
+    fuente = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 80)
+    ImageDraw.Draw(capa).text((20, 100), "Documentos importantes", fill="black", font=fuente)
+    img = Image.new("RGB", (1080, 1920), "white")
+    img.paste(capa.rotate(-6, expand=True), (0, 700), capa.rotate(-6, expand=True))  # baja hacia la derecha
+    d = next(d for d in pantalla.leer_fotograma(img) if "documentos" in d.texto.lower())
+    assert 0.05 < d.inclinacion < 0.16

@@ -8,7 +8,8 @@ quemados (si no, saldrían como «texto en pantalla») y guarda lo que lee en
      "muestras": [{"t": 41.5,
                    "detecciones": [{"texto": "Revisión",
                                     "caja": [x, y, w, h],      # píxeles en 1080x1920, origen arriba-izquierda
-                                    "confianza": 0.98}]}]}
+                                    "confianza": 0.98,
+                                    "inclinacion": 0.06}]}]}  # px que baja la línea base por px
 
 Las consultas (`hay_texto`, `modo_broll`, `buscar`, `coincidencias`) trabajan sobre
 la lista de `Muestra`. Si el OCR no está disponible, nada de aquí debe romper `preparar`.
@@ -17,7 +18,7 @@ import io
 import json
 import re
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -41,6 +42,7 @@ class Deteccion:
     texto: str
     caja: tuple[int, int, int, int]  # x, y, w, h
     confianza: float
+    inclinacion: float = 0.0  # px que baja la línea base por px de ancho (móvil torcido ante el monitor)
 
 
 @dataclass(frozen=True)
@@ -68,32 +70,35 @@ def ocr_disponible() -> bool:
 
 def leer_fotograma(imagen: Image.Image) -> list[Deteccion]:
     """Una Deteccion por línea reconocida (mejor candidato), cajas en píxeles arriba-izquierda."""
+    import objc
     import Vision
     from Foundation import NSData
 
     buf = io.BytesIO()
     imagen.convert("RGB").save(buf, "PNG")
-    datos = NSData.dataWithBytes_length_(buf.getvalue(), len(buf.getvalue()))
-    peticion = Vision.VNRecognizeTextRequest.alloc().init()
-    peticion.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
-    peticion.setRecognitionLanguages_(["es-ES", "en-US"])
-    peticion.setUsesLanguageCorrection_(True)
-    manejador = Vision.VNImageRequestHandler.alloc().initWithData_options_(datos, None)
-    ok, _ = manejador.performRequests_error_([peticion], None)
-    if not ok:
-        return []
     ancho, alto = imagen.size
     salida = []
-    for obs in peticion.results() or []:
-        cand = obs.topCandidates_(1)
-        if not cand:
-            continue
-        caja = obs.boundingBox()  # normalizada, origen abajo-izquierda
-        x, w = caja.origin.x * ancho, caja.size.width * ancho
-        h = caja.size.height * alto
-        y = (1 - caja.origin.y - caja.size.height) * alto
-        salida.append(Deteccion(str(cand[0].string()), (round(x), round(y), round(w), round(h)),
-                                float(cand[0].confidence())))
+    with objc.autorelease_pool():  # sin él, cada fotograma deja ~1 MB de objetos de Vision vivos
+        datos = NSData.dataWithBytes_length_(buf.getvalue(), len(buf.getvalue()))
+        peticion = Vision.VNRecognizeTextRequest.alloc().init()
+        peticion.setRecognitionLevel_(Vision.VNRequestTextRecognitionLevelAccurate)
+        peticion.setRecognitionLanguages_(["es-ES", "en-US"])
+        peticion.setUsesLanguageCorrection_(True)
+        manejador = Vision.VNImageRequestHandler.alloc().initWithData_options_(datos, None)
+        ok, _ = manejador.performRequests_error_([peticion], None)
+        for obs in (peticion.results() or []) if ok else []:
+            cand = obs.topCandidates_(1)
+            if not cand:
+                continue
+            caja = obs.boundingBox()  # normalizada, origen abajo-izquierda
+            x, w = caja.origin.x * ancho, caja.size.width * ancho
+            h = caja.size.height * alto
+            y = (1 - caja.origin.y - caja.size.height) * alto
+            bi, bd = obs.bottomLeft(), obs.bottomRight()  # la caja va recta; estas esquinas, no
+            dx = (bd.x - bi.x) * ancho
+            incl = (bi.y - bd.y) * alto / dx if dx > 0 else 0.0
+            salida.append(Deteccion(str(cand[0].string()), (round(x), round(y), round(w), round(h)),
+                                    float(cand[0].confidence()), round(incl, 4)))
     return salida
 
 
@@ -112,7 +117,9 @@ def enmascarar(imagen: Image.Image, zonas: dict, t: float) -> Image.Image:
 
 
 def _fotogramas(video: Path):
-    """Genera (t, imagen 1080x1920) a FPS_MUESTREO con ffmpeg."""
+    """Genera (t, imagen 1080x1920) a FPS_MUESTREO con ffmpeg.
+
+    RuntimeError si ffmpeg falla o no da ningún fotograma: así no parece un vídeo sin texto."""
     cmd = [componer.FFMPEG, "-v", "error", "-i", str(video),
            "-vf", f"fps={FPS_MUESTREO},scale={ANCHO}:{ALTO}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
     tam = ANCHO * ALTO * 3
@@ -121,14 +128,16 @@ def _fotogramas(video: Path):
         while len(datos := p.stdout.read(tam)) == tam:
             yield i / FPS_MUESTREO, Image.frombytes("RGB", (ANCHO, ALTO), datos)
             i += 1
+        if p.wait() != 0 or i == 0:
+            raise RuntimeError(f"ffmpeg no pudo leer {Path(video).name} (código {p.returncode}, {i} fotogramas)")
 
 
 def analizar(video: Path, zonas: dict, destino: Path) -> list[Muestra]:
     muestras = [Muestra(t, tuple(leer_fotograma(enmascarar(img, zonas, t))))
                 for t, img in _fotogramas(video)]
     datos = {"version": 1, "muestras": [
-        {"t": m.t, "detecciones": [{"texto": d.texto, "caja": list(d.caja), "confianza": d.confianza}
-                                   for d in m.detecciones]} for m in muestras]}
+        {"t": m.t, "detecciones": [{"texto": d.texto, "caja": list(d.caja), "confianza": d.confianza,
+                                    "inclinacion": d.inclinacion} for d in m.detecciones]} for m in muestras]}
     destino = Path(destino)
     tmp = destino.with_name(destino.name + ".tmp")  # atómico: nunca queda un json a medias
     tmp.write_text(json.dumps(datos, ensure_ascii=False, indent=2), "utf-8")
@@ -140,7 +149,8 @@ def cargar(ruta: Path) -> list[Muestra]:
     try:
         datos = json.loads(Path(ruta).read_text("utf-8"))
         return [Muestra(float(m["t"]), tuple(Deteccion(d["texto"], tuple(int(v) for v in d["caja"]),
-                                                       float(d["confianza"])) for d in m["detecciones"]))
+                                                       float(d["confianza"]), float(d.get("inclinacion", 0.0)))
+                                             for d in m["detecciones"]))
                 for m in datos["muestras"]]
     except Exception:
         return []
@@ -158,13 +168,32 @@ def modo_broll(muestras: list[Muestra], t: float, dur: float = 2.5) -> str:
     return "ventana" if hay_texto(muestras, t, t + dur) else "tapa"
 
 
+def recortar(d: Deteccion, texto: str) -> Deteccion:
+    """La detección con la caja reducida al fragmento `texto` de su línea.
+
+    Vision da una caja por línea: la del fragmento se estima por su posición en el texto
+    normalizado y, si la línea está inclinada, por la altura de la línea base en ese tramo."""
+    linea, frag = normalizar(d.texto), normalizar(texto)
+    i = linea.find(frag)
+    if i < 0 or not frag or len(frag) == len(linea):
+        return d
+    x, y, w, h = d.caja
+    k = d.inclinacion
+    x1, x2 = x + w * i / len(linea), x + w * (i + len(frag)) / len(linea)
+    letra = max(h - abs(k) * w, 0.3 * h)  # alto de la letra, sin lo que baja la línea
+    y1 = y + max(0.0, k) * (x1 - x) + max(0.0, -k) * (x + w - x2)
+    return replace(d, caja=(round(x1), round(y1), round(x2 - x1), round(letra + abs(k) * (x2 - x1))))
+
+
 def buscar(muestras: list[Muestra], texto: str, t: float, margen: float = 0.5) -> Deteccion | None:
-    """La detección más fiable que contiene `texto` (normalizado) en t ± margen."""
+    """La detección más fiable que contiene `texto` (normalizado) en t ± margen, con la caja
+    recortada a ese fragmento."""
     n = normalizar(texto)
     if not n:
         return None
     cands = [d for m in muestras if abs(m.t - t) <= margen for d in m.detecciones if n in normalizar(d.texto)]
-    return max(cands, key=lambda d: d.confianza, default=None)
+    mejor = max(cands, key=lambda d: d.confianza, default=None)
+    return recortar(mejor, texto) if mejor else None
 
 
 def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coincidencia]:
