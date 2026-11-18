@@ -206,7 +206,8 @@ def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coin
     """Palabras dichas mientras ese texto se ve, con la línea que se ve al decirlas.
 
     Solo las que `buscar` acepta en el instante de la palabra: la muestra del tramo más
-    cercana está a CERCA_DICHO s como mucho. Sin repetir seguidas (misma línea y palabra)."""
+    cercana está a CERCA_DICHO s como mucho, y no se lista una dicha tras la última muestra
+    con el texto (el render ya no lo encontraría). Sin repetir seguidas (misma línea y palabra)."""
     huecos = 1.5 / FPS_MUESTREO  # más separación entre muestras = tramo distinto
     # palabras normalizadas de cada línea, una sola vez
     lineas = {id(m): [(d.texto, {normalizar(w) for w in re.split(r"\W+", d.texto)})
@@ -224,7 +225,7 @@ def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coin
                 continue
             if tramo:
                 t_vis, linea = min(tramo, key=lambda x: abs(x[0] - p.inicio))
-                if abs(t_vis - p.inicio) <= CERCA_DICHO:
+                if abs(t_vis - p.inicio) <= CERCA_DICHO and p.inicio <= tramo[-1][0]:
                     res.append(Coincidencia(tramo[0][0], tramo[-1][0], linea, n, p.inicio))
             tramo = [(m.t, vis)] if vis else []
     res.sort(key=lambda c: c.t_palabra)

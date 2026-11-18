@@ -191,3 +191,10 @@ def test_ocr_real_inclinacion():
     img.paste(capa.rotate(-6, expand=True), (0, 700), capa.rotate(-6, expand=True))  # baja hacia la derecha
     d = next(d for d in pantalla.leer_fotograma(img) if "documentos" in d.texto.lower())
     assert 0.05 < d.inclinacion < 0.16
+
+
+def test_coincidencias_no_lista_lo_dicho_tras_desaparecer():
+    m = _linea(40.0, 42.0, "Documentos") + _linea(42.5, 44.0, "")
+    # el texto se ve hasta 42.0: dicha a 42.3 ya no (aunque `buscar` la aceptaría); a 41.0 sí
+    assert pantalla.coincidencias(m, [Palabra("documentos", 42.3, 42.6)]) == []
+    assert len(pantalla.coincidencias(m, [Palabra("documentos", 41.0, 41.4)])) == 1
