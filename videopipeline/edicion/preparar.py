@@ -8,7 +8,7 @@ from pathlib import Path
 
 from videopipeline import subtitles
 from videopipeline.config import ENCUADRES, PipelineConfig
-from videopipeline.edicion import estilos, zonas as zonas_edicion
+from videopipeline.edicion import broll, graficos, numeros, pantalla, estilos, zonas as zonas_edicion
 from videopipeline.edicion.componer import _duracion
 from videopipeline.subtitles import Palabra
 
@@ -28,6 +28,22 @@ def _frases(palabras: list[Palabra]) -> list[str]:
         dur = p.fin - g[0].inicio
         abierta = not (dur >= 8 or (dur >= 3 and p.texto.rstrip().endswith((".", "?", "!", ","))))
     return [f"[{g[0].inicio:.2f}-{g[-1].fin:.2f}] {' '.join(p.texto for p in g)}" for g in grupos]
+
+
+def _leer_pantalla(trabajo: Path, zonas: dict):
+    """Muestras del OCR, o None si no hay lectura. pantalla.json existe solo si el análisis terminó."""
+    ruta = trabajo / "pantalla.json"
+    if not ruta.exists() and pantalla.ocr_disponible():
+        try:
+            pantalla.analizar(trabajo / "video.mp4", zonas, ruta)
+        except Exception as e:  # noqa: BLE001 - el OCR nunca debe romper preparar
+            ruta.unlink(missing_ok=True)
+            print(f"Lectura de pantalla no disponible: {e}")
+    return pantalla.cargar(ruta) if ruta.exists() else None
+
+
+def _num(v: float) -> str:
+    return str(int(v)) if float(v).is_integer() else f"{v:g}"
 
 
 def crear_trabajo(video: Path, estilo: str, encuadre: str, srt: Path | None = None,
@@ -76,6 +92,12 @@ def preparar(trabajo: Path) -> Path:
     maximo = math.ceil(estilo.densidad_max * dur)
     zoom = zonas.get("franja_zoom") is not None and "zoom" in estilo.tipos
     desde = (zonas.get("titulo") or {}).get("hasta", 0) if zonas.get("titulo") else 0
+    muestras = _leer_pantalla(trabajo, datos["zonas"])
+    en_pantalla = ("- no disponible",) if muestras is None else tuple(
+        f"{c.t0:.2f}-{c.t1:.2f} «{c.visible}» (dicha «{c.palabra}» en {c.t_palabra:.2f})"
+        for c in pantalla.coincidencias(muestras, palabras)) or ("- ninguna",)
+    dichos = [f"{t:.2f} {_num(v)} «{pal}»{' %' if pct else ''}"
+              for t, v, pal, pct in numeros.numeros_dichos(palabras)] or ["- ninguno"]
     lineas = [
         "# Contexto del vídeo", "",
         "## Estilo",
@@ -83,6 +105,8 @@ def preparar(trabajo: Path) -> Path:
         f"- tipos permitidos: {', '.join(sorted(estilo.tipos))}",
         f"- máximo: como mucho {maximo} momentos en este vídeo (sin contar zoom); duración {dur:.2f} s",
         f"- emojis: {'sí' if 'emoji' in estilo.tipos else 'no'}",
+        f"- lectura de pantalla: {'no' if muestras is None else 'sí'}",
+        "- B-roll: " + ("disponible" if broll.hay_clave() else "no disponible (falta la clave de Pexels)"),
         "", "## Zonas",
         f"- zoom: {'posible' if zoom else 'no disponible'}",
         f"- gráficos permitidos desde el segundo {desde:g}",
@@ -91,6 +115,8 @@ def preparar(trabajo: Path) -> Path:
     caption = trabajo / "caption.md"
     if caption.exists():
         lineas += ["## Caption", caption.read_text("utf-8").strip(), ""]
+    lineas += ["## En pantalla", *en_pantalla, "", "## Números dichos", *dichos, "",
+               "## Iconos", ", ".join(graficos.ICONOS), ""]
     lineas += ["## Frases", *_frases(palabras), "",
                "## Palabras", *(f"{p.inicio:.2f} {p.texto}" for p in palabras), ""]
     destino = trabajo / "contexto.md"

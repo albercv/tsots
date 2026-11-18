@@ -39,6 +39,7 @@ def test_analizar_escribe_pantalla_json(tmp_path, monkeypatch):
     m = pantalla.analizar(tmp_path / "v.mp4", ZONAS, destino)
     assert [x.t for x in m] == [0.0, 0.5, 1.0, 1.5]
     assert pantalla.cargar(destino) == m
+    assert not destino.with_name("pantalla.json.tmp").exists()
 
 
 def test_cargar_sin_fichero_es_lista_vacia(tmp_path):
@@ -75,14 +76,21 @@ def test_coincidencias_dicho_y_visto():
     assert c[0].visible == "Documentos de la empresa"
 
 
+def test_coincidencias_palabra_entera_no_subcadena():
+    m = _muestras(10.0, 12.0, [_det("Conectar el servidor")])
+    assert pantalla.coincidencias(m, [Palabra("con", 10.5, 10.7), Palabra("tar", 10.8, 10.9)]) == []
+    assert len(pantalla.coincidencias(m, [Palabra("Servidor.", 10.5, 10.9)])) == 1
+
+
 def test_video_sin_texto_no_da_coincidencias():
     m = [Muestra(i / 2, ()) for i in range(20)]
     assert pantalla.coincidencias(m, [Palabra("documentos", 1.0, 1.5)]) == []
 
 
 def test_sin_pyobjc_ocr_no_disponible(monkeypatch):
+    from tests.conftest import OCR_REAL
     monkeypatch.setitem(sys.modules, "Vision", None)  # import → ImportError
-    assert pantalla.ocr_disponible() is False
+    assert OCR_REAL() is False
 
 
 def test_ocr_real_lee_texto():

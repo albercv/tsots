@@ -15,6 +15,7 @@ la lista de `Muestra`. Si el OCR no está disponible, nada de aquí debe romper 
 """
 import io
 import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,7 +32,7 @@ FPS_MUESTREO = 2
 # (1 %: ~20 000 px², una línea de unos 60 px de alto). Se mide sobre el fotograma entero:
 # las bandas tapadas no tienen detecciones, así que no suman.
 UMBRAL_AREA = 0.01
-MIN_LETRAS = 3  # palabras más cortas darían coincidencias por azar
+MIN_LETRAS = 4  # palabras más cortas darían coincidencias por azar
 
 
 @dataclass(frozen=True)
@@ -127,7 +128,10 @@ def analizar(video: Path, zonas: dict, destino: Path) -> list[Muestra]:
     datos = {"version": 1, "muestras": [
         {"t": m.t, "detecciones": [{"texto": d.texto, "caja": list(d.caja), "confianza": d.confianza}
                                    for d in m.detecciones]} for m in muestras]}
-    Path(destino).write_text(json.dumps(datos, ensure_ascii=False, indent=2), "utf-8")
+    destino = Path(destino)
+    tmp = destino.with_name(destino.name + ".tmp")  # atómico: nunca queda un json a medias
+    tmp.write_text(json.dumps(datos, ensure_ascii=False, indent=2), "utf-8")
+    tmp.replace(destino)
     return muestras
 
 
@@ -165,6 +169,9 @@ def buscar(muestras: list[Muestra], texto: str, t: float, margen: float = 0.5) -
 def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coincidencia]:
     """Palabras dichas mientras (o justo antes de que) aparezca ese texto en pantalla."""
     huecos = 1.5 / FPS_MUESTREO  # más separación entre muestras = tramo distinto
+    # palabras normalizadas de cada línea, una sola vez
+    lineas = {id(m): [(d.texto, {normalizar(w) for w in re.split(r"\W+", d.texto)})
+                      for d in m.detecciones] for m in muestras}
     res = []
     for p in palabras:
         n = normalizar(p.texto)
@@ -172,7 +179,7 @@ def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coin
             continue
         tramo: list[tuple[float, str]] = []
         for m in muestras + [None]:
-            vis = next((d.texto for d in m.detecciones if n in normalizar(d.texto)), None) if m else None
+            vis = next((t for t, ws in lineas[id(m)] if n in ws), None) if m else None
             if vis and (not tramo or m.t - tramo[-1][0] <= huecos):
                 tramo.append((m.t, vis))
                 continue

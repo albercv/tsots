@@ -8,6 +8,9 @@ import pytest
 
 from videopipeline import difusion as _difusion
 
+from videopipeline.edicion import pantalla as _pantalla
+
+OCR_REAL = _pantalla.ocr_disponible
 AGENTE_REAL = _difusion.AGENTE  # el valor de producción, antes de la red de seguridad
 
 
@@ -282,3 +285,10 @@ def video_vertical(tmp_path_factory) -> Path:
         check=True,
     )
     return destino
+
+
+@pytest.fixture(autouse=True)
+def sin_ocr_real(monkeypatch):
+    """Red de seguridad: ningún test lanza el OCR real de Vision sobre un vídeo.
+    Los que lo necesitan ponen ocr_disponible a True y sustituyen analizar."""
+    monkeypatch.setattr("videopipeline.edicion.pantalla.ocr_disponible", lambda: False)
