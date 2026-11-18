@@ -208,6 +208,14 @@ def test_icono_lateral_con_etiqueta():
     assert (i.params["cx"], i.params["tam"]) == (950, 170)
 
 
+def test_icono_lateral_con_dato_o_lupa():
+    for otro in (M("dato", 10.0, valor=2, texto=["EMPRESAS"]), M("lupa", 10.0, pantalla="Factura")):
+        pant = [pantalla.Muestra(10.0, (DET,))]
+        s = der2([otro, M("icono", 10.5, icono="casa")], pant=pant)
+        i = [x for x in s.piezas if x.clase == "icono"][0]
+        assert (i.params["cx"], i.params["tam"]) == (950, 170), otro.tipo
+
+
 def test_sfx_nuevos_segun_estilo():
     F = estilos.cargar("formal")
     ms = [M("senalar", 1.0, pantalla="Factura", forma="circulo")]

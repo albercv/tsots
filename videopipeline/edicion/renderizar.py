@@ -123,7 +123,7 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
         if pieza("etiqueta", t, DURACION_FINAL, lineas=_lineas(plan.final["texto"]), grande=True,
                  check=bool(plan.final.get("check"))):
             sonido("ding", t)
-    ocupado = [(p.t, p.t + p.dur) for p in piezas if p.clase in ("etiqueta", "contador")]
+    ocupado = [(p.t, p.t + p.dur) for p in piezas if p.clase in ("etiqueta", "contador", "dato", "lupa")]
     taps = 0
     for m in (m for m in visuales if m.tipo in ("emoji", "icono")):
         fin = min(m.t + DURACION[m.tipo], duracion)
