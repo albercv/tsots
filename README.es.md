@@ -511,7 +511,7 @@ Qué hace cada modo:
 | Plataforma | Modo | Resultado |
 |---|---|---|
 | TikTok | **Borrador** (por defecto) | El vídeo llega a tus borradores de TikTok; lo terminas y publicas en la app. |
-| TikTok | **Público** | Se publica al momento, visible para todos. |
+| TikTok | **Público** | Se publica directamente con la privacidad que elijas (todos, seguidores, amigos o solo tú). |
 | YouTube | **Short público** | Se publica como Short público en la categoría elegida en Redes… (Personas y blogs por defecto). |
 | Instagram | **Reel de prueba** (por defecto) | Se enseña primero a quien no te sigue; Instagram lo comparte con tus seguidores solo si funciona. |
 | Instagram | **Reel normal** | Un reel normal, también en tu feed. |
@@ -579,7 +579,7 @@ programado. Para cambiar la fecha, cancela y vuelve a programar.
 
 **Qué declara TSOTS por ti y qué eliges tú.** En tu nombre, TSOTS dice a
 YouTube que el vídeo no es para niños y el idioma con el que se procesó, y
-dice a todas las redes que no está hecho con IA. En cada publicación
+dice a TikTok, YouTube, Instagram, X y Facebook que no está hecho con IA. En cada publicación
 directa de TikTok eliges quién puede verla, los comentarios, los dúos, el
 stitch y el contenido comercial; nada de eso se recuerda. Si TikTok no
 deja publicar a la cuenta en ese momento, el error llega al subir. La

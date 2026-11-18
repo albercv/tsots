@@ -373,6 +373,10 @@ class ProveedorUploadPost:
         if (plataforma == Plataforma.TIKTOK and opciones.tiktok_modo == ModoTikTok.PUBLICO
                 and not opciones.tiktok_privacidad):
             return self._error(plataforma, _("Elige quién puede verlo en TikTok"))
+        if (plataforma == Plataforma.TIKTOK and opciones.tiktok_modo == ModoTikTok.PUBLICO
+                and opciones.tiktok_privacidad == "SELF_ONLY" and opciones.contenido_de_marca):
+            # Upload-Post lo publicaría como PUBLIC_TO_EVERYONE.
+            return self._error(plataforma, _("El contenido de marca no puede ser privado"))
         if not self._clave:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
         if not self._perfil:
@@ -549,10 +553,10 @@ class ProveedorUploadPost:
             raise ErrorConsulta(_(
                 "Respuesta inesperada del servicio: no trae los ajustes de TikTok."))
         segundos = self._buscar(cuerpo, "max_video_post_duration_sec")
-        valido = isinstance(segundos, int) and not isinstance(segundos, bool) and segundos > 0
+        valido = isinstance(segundos, (int, float)) and not isinstance(segundos, bool) and segundos > 0
         return AjustesTikTok(
             tuple(k for k in PRIVACIDADES_TIKTOK if k in opciones),
-            segundos if valido else None,
+            int(segundos) if valido else None,
             self._buscar(cuerpo, "comment_disabled") is True,
             self._buscar(cuerpo, "duet_disabled") is True,
             self._buscar(cuerpo, "stitch_disabled") is True)

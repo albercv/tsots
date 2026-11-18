@@ -74,3 +74,17 @@ def test_hilo_pasa_portada_al_publicador(video_vertical, qtbot, monkeypatch):
         hilo.start()
     hilo.wait()
     assert capturado["pub"].portada is not None and capturado["existe"]
+
+
+def test_hilo_no_calcula_portada_si_ninguna_red_la_usa(video_vertical, qtbot, monkeypatch):
+    llamadas = []
+    monkeypatch.setattr(dialogo_publicar.portada_video, "con_portada",
+                        lambda pub, tmp: llamadas.append(1) or pub)
+    monkeypatch.setattr(dialogo_publicar.publicador, "publicar", lambda *a, **k: {})
+    pub = Publicacion(video=video_vertical, titulo="t", caption="c")
+    hilo = dialogo_publicar.HiloPublicacion(
+        ProveedorFalso(), pub, Opciones(), [Plataforma.X, Plataforma.LINKEDIN], "falso")
+    with qtbot.waitSignal(hilo.terminado, timeout=20000):
+        hilo.start()
+    hilo.wait()
+    assert llamadas == []

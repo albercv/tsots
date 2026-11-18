@@ -197,7 +197,9 @@ class HiloPublicacion(QThread):
 
         try:
             with tempfile.TemporaryDirectory() as tmp:  # el envío lee la miniatura
-                self._publicacion = portada_video.con_portada(self._publicacion, Path(tmp))
+                if set(self._plataformas) & {Plataforma.TIKTOK, Plataforma.INSTAGRAM,
+                                             Plataforma.YOUTUBE}:
+                    self._publicacion = portada_video.con_portada(self._publicacion, Path(tmp))
                 resultados = publicador.publicar(
                     self._proveedor, self._publicacion, self._opciones, self._plataformas,
                     progreso=avisar,
@@ -1427,6 +1429,13 @@ class DialogoPublicar(QDialog):
 
     def _modo_visible(self, plataforma: Plataforma, opciones: Opciones) -> str:
         if plataforma == Plataforma.TIKTOK:
+            if opciones.tiktok_modo == ModoTikTok.PUBLICO and opciones.tiktok_privacidad:
+                texto = _(PRIVACIDADES_TIKTOK[opciones.tiktok_privacidad])
+                if opciones.contenido_de_marca:
+                    return texto + " · " + _('Se etiquetará como "Colaboración pagada"')
+                if opciones.tu_marca:
+                    return texto + " · " + _('Se etiquetará como "Contenido promocional"')
+                return texto
             return _(ETIQUETAS_TIKTOK[opciones.tiktok_modo])
         if plataforma == Plataforma.INSTAGRAM:
             return _(ETIQUETAS_INSTAGRAM[opciones.instagram_modo])

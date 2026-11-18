@@ -432,3 +432,14 @@ def test_opciones_lleva_el_idioma_recibido(qtbot, video, ajustes):
         fabrica=lambda n, c, d: ProveedorFalso(), medir=lambda v: 30.0)
     qtbot.addWidget(dialogo)
     assert dialogo.opciones().idioma == "en"
+
+
+def test_resumen_tiktok_directo_muestra_privacidad_y_etiqueta(qtbot, video, ajustes):
+    dialogo, _p = _dialogo(qtbot, video, ajustes)
+    _directo(qtbot, dialogo)
+    _elegir(dialogo.combo_privacidad_tiktok, "FOLLOWER_OF_CREATOR")
+    assert "TikTok: Seguidores" in dialogo._resumen()
+    assert "Público" not in dialogo._resumen().split("TikTok:")[1].split("\n")[0]
+    dialogo.casilla_comercial.setChecked(True)
+    dialogo.casilla_tu_marca.setChecked(True)
+    assert 'Seguidores · Se etiquetará como "Contenido promocional"' in dialogo._resumen()

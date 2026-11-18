@@ -1575,3 +1575,21 @@ def test_publicar_tiktok_directo_sin_privacidad_no_envia(video):
                                       Opciones(tiktok_modo=ModoTikTok.PUBLICO))
     assert not r.ok and r.error == "Elige quién puede verlo en TikTok"
     assert servidor.peticiones == []
+
+
+def test_publicar_tiktok_marca_con_solo_yo_no_envia(video):
+    servidor = Servidor(_ok_sync)
+    r = _proveedor(servidor).publicar(
+        Plataforma.TIKTOK, _pub(video),
+        Opciones(tiktok_modo=ModoTikTok.PUBLICO, tiktok_privacidad="SELF_ONLY",
+                 contenido_de_marca=True))
+    assert not r.ok and r.error == "El contenido de marca no puede ser privado"
+    assert servidor.peticiones == []
+
+
+def test_ajustes_tiktok_duracion_float_positivo_se_acepta():
+    cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": 600.0}
+    assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok((), 600)
+    for malo in (True, 0, -1.5):
+        cuerpo = {"privacy_level_options": [], "max_video_post_duration_sec": malo}
+        assert _proveedor(Servidor(_responder_json(cuerpo))).ajustes_tiktok() == AjustesTikTok(())

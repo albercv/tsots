@@ -508,7 +508,7 @@ What each mode does:
 | Platform | Mode | Result |
 |---|---|---|
 | TikTok | **Draft** (default) | The video lands in your TikTok drafts; you finish and publish it in the app. |
-| TikTok | **Public** | Published straight away, visible to everyone. |
+| TikTok | **Public** | Published directly with the privacy you choose (everyone, followers, friends or only you). |
 | YouTube | **Public Short** | Published as a public Short in the category chosen in Networks… (People & Blogs by default). |
 | Instagram | **Trial reel** (default) | Shown to non-followers first; Instagram shares it with your followers only if it performs. |
 | Instagram | **Regular reel** | A normal reel, also shown in your feed. |
@@ -577,7 +577,7 @@ scheduled. To change the time, cancel and schedule again.
 
 **What TSOTS declares for you, and what you choose.** On your behalf,
 TSOTS tells YouTube that the video is not made for kids and the language
-it was processed in, and tells every network that it is not AI-generated.
+it was processed in, and tells TikTok, YouTube, Instagram, X and Facebook that it is not AI-generated.
 On each direct TikTok post you choose who can see it, comments, duets,
 stitch and commercial content; none of that is remembered. If TikTok does
 not let the account post at that moment, the error arrives on upload. Music
