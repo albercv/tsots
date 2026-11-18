@@ -1527,3 +1527,66 @@ def test_candidatos_limite_179_y_60_valen():
         assert [(c.origen, c.descarte) for c in cs] == [("tema", "")]
     cs, _ = shorts.candidatos_de_temas(_temas_de(1, False), _frases_de(1, 59.9), 300.0)
     assert [c.descarte for c in cs] == ["tema_corto"]
+
+
+def _tema_largo(n: int, segundos: float, inicio_frase: int = 1) -> tuple[shorts.Tema, list]:
+    frases = _frases_de(n, segundos)
+    return shorts.Tema(inicio_frase, n, "t", False, frases[inicio_frase - 1].inicio,
+                       frases[-1].fin), frases
+
+
+def test_fragmentos_segundos_relativos_al_tema():
+    frases = _frases_de(100, 10)
+    mensajes = shorts.construir_mensajes_fragmentos(frases, 60, 63, 2, 600.0)
+    assert mensajes[1]["content"].split("\n")[1] == f"[61] 0s-10s: {frases[60].texto}"
+    assert "hasta 2" in mensajes[0]["content"]
+
+
+def test_fragmentos_k_por_subventana(monkeypatch):
+    tema, frases = _tema_largo(150, 10)  # 25 min
+    llamadas = _chat_falso(monkeypatch, {"candidatos": []})
+    avances = []
+    assert shorts.fragmentos(tema, frases, 1500.0, "m", avances.append) == []
+    assert len(llamadas) == 3
+    assert all("hasta 3" in l["mensajes"][0]["content"] or "hasta 1" in l["mensajes"][0]["content"]
+               for l in llamadas)
+    assert all(l["keep_alive"] == shorts.KEEP_ALIVE_SHORTS for l in llamadas)
+    assert avances[-1] == 100.0
+
+
+def test_fragmentos_fuera_del_tema_se_descarta(monkeypatch):
+    tema, frases = _tema_largo(60, 10, inicio_frase=11)  # frases 11-60
+    _chat_falso(monkeypatch, {"candidatos": [_cand(1, 8), _cand(11, 20)]})
+    cs = shorts.fragmentos(tema, frases, 600.0, "m")
+    assert [(c.frase_inicio, c.descarte, c.origen) for c in cs] == [
+        (1, "fuera_de_rango", "fragmento"), (11, "", "fragmento")]
+
+
+def test_fragmentos_corrige_una_vez(monkeypatch):
+    tema, frases = _tema_largo(30, 10)  # 300 s
+    llamadas = _chat_falso(monkeypatch, [
+        {"candidatos": [_cand(1, 22)]},  # 220 s
+        {"candidatos": [_cand(1, 10)]},
+    ])
+    cs = shorts.fragmentos(tema, frases, 300.0, "m")
+    assert [(c.frase_fin, c.descarte) for c in cs] == [(10, "")]
+    corr = llamadas[1]["mensajes"]
+    assert [m["role"] for m in corr] == ["system", "user", "assistant", "user"]
+    assert "hasta 1" in corr[0]["content"] and "1-22 dura 220 s" in corr[3]["content"]
+
+
+def test_fragmentos_correccion_invalida_deja_el_original(monkeypatch):
+    tema, frases = _tema_largo(30, 10)
+    llamadas = _chat_falso(monkeypatch, [
+        {"candidatos": [_cand(1, 22)]}, {"candidatos": [_cand(1, 25)]},
+        {"candidatos": [_cand(1, 10)]},
+    ])
+    cs = shorts.fragmentos(tema, frases, 300.0, "m")
+    assert [(c.frase_fin, c.descarte) for c in cs] == [(22, "duracion")]
+    assert len(llamadas) == 2
+
+
+def test_fragmentos_respuesta_invalida_salta_la_subventana(monkeypatch):
+    tema, frases = _tema_largo(30, 10)
+    _chat_falso(monkeypatch, {"x": 1})
+    assert shorts.fragmentos(tema, frases, 300.0, "m") == []

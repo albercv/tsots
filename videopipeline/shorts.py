@@ -554,6 +554,92 @@ def segmentar(frases: list[Frase], modelo: str,
     return temas
 
 
+MAX_FRAGMENTOS_LLAMADA = 3
+
+_SYSTEM_FRAGMENTOS = (
+    "Eres editor de vídeo para redes. Te doy un trozo de la transcripción de un "
+    "tema largo, en frases numeradas con su segundo de inicio y fin (desde el "
+    "principio del tema). Elige hasta {k} fragmentos autocontenidos de 60 a 179 "
+    "segundos (fin de la última frase menos inicio de la primera) que no se "
+    "solapen entre sí. Que sean los más largos posibles sin dejar la idea a "
+    "medias, con gancho al empezar y un cierre claro al acabar. Cada fragmento "
+    "empieza al inicio de una frase y acaba al final de otra. Para cada uno da: "
+    "frase_inicio y frase_fin (números de frase), un título de 3 a 5 palabras y "
+    "una línea con el motivo, en el idioma de la transcripción. Si no hay ninguno "
+    "bueno, devuelve la lista vacía. Responde solo JSON."
+)
+
+
+def construir_mensajes_fragmentos(frases: list[Frase], desde: int, hasta: int,
+                                  k: int, cero: float) -> list[dict]:
+    """Como `construir_mensajes`, con los segundos relativos a `cero` (inicio del tema)."""
+    lineas = [
+        f"[{i}] {f.inicio - cero:.0f}s-{f.fin - cero:.0f}s: {f.texto}"
+        for i, f in enumerate(frases[desde:hasta], desde + 1)
+    ]
+    return [
+        {"role": "system", "content": _SYSTEM_FRAGMENTOS.format(k=k)},
+        {"role": "user", "content": "Transcripción:\n" + "\n".join(lineas)},
+    ]
+
+
+def fragmentos(tema: Tema, frases: list[Frase], duracion: float, modelo: str,
+               on_percent: Callable[[float], None] | None = None) -> list[Candidato]:
+    """Los mejores fragmentos autocontenidos de un tema de más de DURACION_MAX.
+
+    Una llamada por subventana del tema; lo que se sale del tema queda como
+    `"fuera_de_rango"` y lo de duración mala tiene una sola corrección. Una
+    respuesta inválida salta esa subventana en vez de abortar todo.
+    """
+    fin_tema = tema.frase_fin
+    salida: list[Candidato] = []
+
+    def pedir(mensajes: list[dict]) -> tuple[dict, list[Candidato]]:
+        datos = chat_json(modelo, mensajes, ESQUEMA_CANDIDATOS,
+                          keep_alive=KEEP_ALIVE_SHORTS)
+        cs = validar(datos, frases, duracion)
+        for c in cs:
+            if not (tema.frase_inicio <= c.frase_inicio <= c.frase_fin <= fin_tema):
+                c.descarte = "fuera_de_rango"
+            c.origen = "fragmento"
+        return datos, cs
+
+    desde = tema.frase_inicio - 1
+    while desde < fin_tema:
+        hasta = min(ventana(frases, desde), fin_tema)
+        dura = frases[hasta - 1].fin - frases[desde].inicio
+        k = min(MAX_FRAGMENTOS_LLAMADA, max(1, int(dura // 180)))
+        mensajes = construir_mensajes_fragmentos(frases, desde, hasta, k, tema.inicio)
+        try:
+            datos, cs = pedir(mensajes)
+            for c in cs:
+                if c.descarte != "duracion":
+                    salida.append(c)
+                    continue
+                s = frases[c.frase_fin - 1].fin - frases[c.frase_inicio - 1].inicio
+                correccion = mensajes + [
+                    {"role": "assistant",
+                     "content": json.dumps(datos, ensure_ascii=False)},
+                    {"role": "user", "content": (
+                        f"El fragmento {c.frase_inicio}-{c.frase_fin} dura {s:.0f} s: "
+                        "ajústalo para que dure entre 60 y 179 s sin dejar la idea a medias")},
+                ]
+                correccion[0] = {"role": "system",
+                                 "content": _SYSTEM_FRAGMENTOS.format(k=1)}
+                try:
+                    nuevos = [n for n in pedir(correccion)[1] if not n.descarte]
+                except PasoFallido:
+                    nuevos = []
+                salida.append(nuevos[0] if nuevos else c)
+        except PasoFallido as e:
+            log.warning("Subventana %d-%d de «%s» omitida: %s",
+                        desde + 1, hasta, tema.titulo, e)
+        if on_percent is not None:
+            on_percent(100.0 * hasta / fin_tema)
+        desde = hasta
+    return salida
+
+
 def _respuesta_invalida(juez: str, datos) -> PasoFallido:
     return PasoFallido(
         _("La respuesta de {juez} no es válida").format(juez=juez),
