@@ -33,6 +33,7 @@ FPS_MUESTREO = 2
 # las bandas tapadas no tienen detecciones, así que no suman.
 UMBRAL_AREA = 0.01
 MIN_LETRAS = 4  # palabras más cortas darían coincidencias por azar
+CERCA_DICHO = 0.45  # s entre la palabra y la muestra que la respalda (< el margen de 0.5 de `buscar`)
 
 
 @dataclass(frozen=True)
@@ -167,7 +168,10 @@ def buscar(muestras: list[Muestra], texto: str, t: float, margen: float = 0.5) -
 
 
 def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coincidencia]:
-    """Palabras dichas mientras (o justo antes de que) aparezca ese texto en pantalla."""
+    """Palabras dichas mientras ese texto se ve, con la línea que se ve al decirlas.
+
+    Solo las que `buscar` acepta en el instante de la palabra: la muestra del tramo más
+    cercana está a CERCA_DICHO s como mucho. Sin repetir seguidas (misma línea y palabra)."""
     huecos = 1.5 / FPS_MUESTREO  # más separación entre muestras = tramo distinto
     # palabras normalizadas de cada línea, una sola vez
     lineas = {id(m): [(d.texto, {normalizar(w) for w in re.split(r"\W+", d.texto)})
@@ -183,7 +187,10 @@ def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coin
             if vis and (not tramo or m.t - tramo[-1][0] <= huecos):
                 tramo.append((m.t, vis))
                 continue
-            if tramo and tramo[0][0] - 1.0 <= p.inicio <= tramo[-1][0]:
-                res.append(Coincidencia(tramo[0][0], tramo[-1][0], tramo[0][1], n, p.inicio))
+            if tramo:
+                t_vis, linea = min(tramo, key=lambda x: abs(x[0] - p.inicio))
+                if abs(t_vis - p.inicio) <= CERCA_DICHO:
+                    res.append(Coincidencia(tramo[0][0], tramo[-1][0], linea, n, p.inicio))
             tramo = [(m.t, vis)] if vis else []
-    return sorted(res, key=lambda c: c.t_palabra)
+    res.sort(key=lambda c: c.t_palabra)
+    return [c for a, c in zip([None] + res, res) if not a or (a.visible, a.palabra) != (c.visible, c.palabra)]

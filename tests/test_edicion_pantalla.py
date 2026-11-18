@@ -102,3 +102,41 @@ def test_ocr_real_lee_texto():
     assert any("documentos" in d.texto.lower() for d in dets)
     d = next(d for d in dets if "documentos" in d.texto.lower())
     assert 700 < d.caja[1] < 900 and d.caja[0] < 200  # caja en píxeles, origen arriba-izquierda
+
+
+def _linea(t0, t1, texto, caja=(100, 500, 600, 80)):
+    return [Muestra(t0 + i / 2, (_det(texto, caja),) if texto else ()) for i in range(round((t1 - t0) * 2) + 1)]
+
+
+# El texto se desplaza: la línea cambia dentro del mismo tramo; y hay huecos sin texto.
+DESPLAZA = (_linea(8.0, 9.5, "") + _linea(10.0, 11.5, "Usa odín y dime qué póliza tiene")
+            + _linea(12.0, 14.0, "dime qué póliza tiene Mirador") + _linea(14.5, 19.5, "")
+            + _linea(20.0, 22.0, "Documentos") + _linea(22.5, 24.0, ""))
+DICHAS = [Palabra("póliza", 10.6, 10.9), Palabra("póliza", 13.1, 13.4), Palabra("Mirador", 13.6, 14.0),
+          Palabra("documentos", 19.2, 19.6), Palabra("documentos", 21.0, 21.4)]
+
+
+def test_coincidencias_toma_la_linea_visible_al_decirla():
+    cs = {(c.palabra, c.t_palabra): c.visible for c in pantalla.coincidencias(DESPLAZA, DICHAS)}
+    assert cs[("poliza", 10.6)] == "Usa odín y dime qué póliza tiene"
+    assert cs[("poliza", 13.1)] == "dime qué póliza tiene Mirador"
+
+
+def test_coincidencias_no_lista_lo_que_aun_no_se_ve():
+    # «documentos» a 19.2 s: el texto aparece 0.8 s después; el validador lo rechazaría
+    ts = [c.t_palabra for c in pantalla.coincidencias(DESPLAZA, DICHAS) if c.palabra == "documentos"]
+    assert ts == [21.0]
+
+
+def test_coincidencias_las_acepta_el_validador():
+    cs = pantalla.coincidencias(DESPLAZA, DICHAS)
+    assert cs
+    for c in cs:
+        assert pantalla.buscar(DESPLAZA, c.visible, round(c.t_palabra, 2)) is not None, c
+
+
+def test_coincidencias_sin_duplicados_seguidos():
+    m = _linea(30.0, 34.0, "Revisión de fichas")
+    cs = pantalla.coincidencias(m, [Palabra("fichas", 30.5, 30.8), Palabra("fichas", 31.6, 31.9),
+                                    Palabra("revisión", 32.5, 32.9)])
+    assert [(c.palabra, c.t_palabra) for c in cs] == [("fichas", 30.5), ("revision", 32.5)]

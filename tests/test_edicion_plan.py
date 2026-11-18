@@ -293,3 +293,11 @@ def test_cli_sugerencia(tmp_path, capsys):
 def test_densidad_cuenta_nuevos():
     ms = [Momento("icono", t=1.0 + i, palabra="hola", icono="check") for i in range(30)]
     assert any("momentos" in e for e in val2(ms)[1])
+
+
+def test_error_pantalla_lista_coincidencias_cercanas():
+    # una línea con cada palabra dicha, visible justo cuando se dice
+    pant = [Muestra(i / 2, tuple(Deteccion(f"Texto {p.texto.strip(',')}", (100, 800, 400, 80), 0.9)
+                                 for p in PAL2 if -0.25 <= i / 2 - p.inicio <= 1.0)) for i in range(0, 121)]
+    _, errs = val2([Momento("senalar", t=53.36, palabra="llama", pantalla="otra cosa")], pantalla=pant)
+    assert errs and "'llama'" in errs[0] and "'hola'" not in errs[0]

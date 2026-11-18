@@ -135,8 +135,10 @@ def _revisar_lineas(lineas, check, grande, estilo, etq: str) -> list[str]:
     return errs
 
 
-def _coincidencias_txt(muestras, palabras) -> str:
-    cs = pant.coincidencias(muestras, palabras)[:5]
+def _coincidencias_txt(muestras, palabras, t: float) -> str:
+    """Las 5 coincidencias más cercanas a t, en orden temporal."""
+    cs = sorted(sorted(pant.coincidencias(muestras, palabras), key=lambda c: abs(c.t_palabra - t))[:5],
+                key=lambda c: c.t_palabra)
     if not cs:
         return "ahora mismo no hay ninguna coincidencia entre lo dicho y lo visible"
     return "; ".join(f"{c.visible!r} visible en {c.t0:.1f}-{c.t1:.1f} s (palabra {c.palabra!r} en t={c.t_palabra:.2f})"
@@ -152,7 +154,7 @@ def _revisar_pantalla(m, etq, pantalla, palabras) -> list[str]:
         return [f"{etq}: forma {m.forma!r} no válida; permitidas: {', '.join(FORMAS)}"]
     if pant.buscar(pantalla, m.pantalla, m.t) is None:
         return [f"{etq}: el texto {m.pantalla!r} no está visible en pantalla en t={m.t:g} (±0.5 s); "
-                f"coincidencias disponibles: {_coincidencias_txt(pantalla, palabras)}"]
+                f"coincidencias disponibles: {_coincidencias_txt(pantalla, palabras, m.t)}"]
     return []
 
 
