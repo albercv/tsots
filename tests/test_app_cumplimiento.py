@@ -191,6 +191,22 @@ def test_tiktok_duracion_mayor_que_la_cuenta_desmarca(qtbot, video, ajustes):
     assert casilla.isEnabled() and casilla.isChecked()
 
 
+def test_tiktok_permisos_se_vuelven_a_pedir_al_cerrar_redes(qtbot, video, ajustes):
+    proveedor = ProveedorFalso(ajustes_tiktok=ErrorConsulta(
+        "Reconecta tu cuenta de TikTok en Upload-Post."))
+    dialogo, _p = _dialogo(qtbot, video, ajustes, proveedor)
+    _directo(qtbot, dialogo)
+    assert not dialogo.boton_publicar.isEnabled()
+    # Reconecta TikTok (otra cuenta, mismo perfil) y vuelve de Redes….
+    proveedor.ajustes_tiktok_ = AjustesTikTok(privacidades=("SELF_ONLY",), duos_off=True)
+    dialogo.refrescar_servicio()
+    _esperar(qtbot)
+    assert proveedor.consultas.count("ajustes_tiktok") == 2
+    assert _textos(dialogo.combo_privacidad_tiktok) == [ELIGE, "Solo yo"]
+    assert not dialogo.casilla_duos_tiktok.isEnabled()
+    assert dialogo.estados[T].text() == "Elige quién puede verlo en TikTok"
+
+
 def test_contenido_de_marca_vacia_solo_yo(qtbot, video, ajustes):
     dialogo, _p = _dialogo(qtbot, video, ajustes)
     _directo(qtbot, dialogo)
@@ -382,3 +398,29 @@ def test_publicar_shorts_aplica_las_elecciones_a_cada_short(
              o.tu_marca, o.contenido_de_marca) for _n, _p, _pub, o in tiktok} == {
         ("MUTUAL_FOLLOW_FRIENDS", False, True, False, True, False)}
     assert all(c[2].portada == 1.5 for c in publicadas)
+
+
+def test_publicar_shorts_quita_tiktok_del_short_mas_largo_que_la_cuenta(
+        qtbot, carpeta, ajustes, monkeypatch):
+    ajustes.plataformas_redes = [T, Y]
+    proveedor = ProveedorFalso(ajustes_tiktok=AjustesTikTok(
+        privacidades=tuple(PRIVACIDADES_TIKTOK), max_segundos=60))
+    duraciones = {"01 - Uno.mp4": 40.0, "02 - Dos.mp4": 90.0}
+    dialogo = DialogoPublicarShorts(
+        shorts.listar(carpeta), ajustes, fabrica=lambda nombre, clave, datos: proveedor,
+        medir=lambda mp4: duraciones[Path(mp4).name],
+        ahora=lambda: datetime(2026, 11, 1, 22, 40, tzinfo=MADRID), zona=MADRID)
+    qtbot.addWidget(dialogo)
+    _esperar(qtbot)
+    _directo(qtbot, dialogo)
+    _elegir(dialogo.combo_privacidad_tiktok, "SELF_ONLY")
+    uno, dos = dialogo.filas
+    assert uno.estado.text() == ""
+    assert dos.estado.text() == (
+        "Este vídeo dura más de lo que tu cuenta de TikTok permite publicar (1:00)")
+    assert dialogo.boton_publicar.isEnabled()  # al 2.º le queda YouTube
+    _confirmar(monkeypatch)
+    with qtbot.waitSignal(dialogo.publicacion_terminada, timeout=10000):
+        dialogo.boton_publicar.click()
+    assert [(c[1], c[2].video.name) for c in proveedor.llamadas if c[0] == "publicar"] == [
+        (T, "01 - Uno.mp4"), (Y, "01 - Uno.mp4"), (Y, "02 - Dos.mp4")]

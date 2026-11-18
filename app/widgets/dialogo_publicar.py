@@ -919,10 +919,8 @@ class DialogoPublicar(QDialog):
                 bloqueo = _("Cargando los permisos de TikTok…")
             elif permisos.max_segundos and self.duracion is None:
                 bloqueo = _("Comprobando la duración del vídeo…")
-            elif permisos.max_segundos and self.duracion > permisos.max_segundos:
-                return False, "", _("Este vídeo dura más de lo que tu cuenta de TikTok permite "
-                                    "publicar ({limite})").format(
-                    limite=limites.duracion_legible(permisos.max_segundos)), COLOR_AVISO
+            elif motivo_tiktok := self._motivo_duracion_tiktok(self.duracion):
+                return False, "", motivo_tiktok, COLOR_AVISO
             elif not self.combo_privacidad_tiktok.currentData():
                 bloqueo = _("Elige quién puede verlo en TikTok")
         if plataforma == Plataforma.X and not self.ajustes.x_premium:
@@ -963,6 +961,16 @@ class DialogoPublicar(QDialog):
         if aviso_x:
             texto, color = " · ".join(filter(None, (aviso_x, texto))), color or COLOR_SECUNDARIO
         return True, bloqueo, texto, color
+
+    def _motivo_duracion_tiktok(self, duracion: float | None) -> str:
+        """Por qué TikTok en directo no admite un vídeo tan largo en esta
+        cuenta, o "" si lo admite (o aún no se sabe)."""
+        permisos = self._ajustes_tiktok
+        if not (self._tiktok_directo() and permisos is not None and permisos.max_segundos
+                and duracion and duracion > permisos.max_segundos):
+            return ""
+        return _("Este vídeo dura más de lo que tu cuenta de TikTok permite publicar "
+                 "({limite})").format(limite=limites.duracion_legible(permisos.max_segundos))
 
     def _refrescar_plataformas(self) -> list[str]:
         """Aplica el estado de cada fila, del bloque de TikTok y del contenido
@@ -1062,6 +1070,8 @@ class DialogoPublicar(QDialog):
         self._ubicacion_global = Ubicacion(self.ajustes.ciudad)
         self._refrescar_ubicacion()
         self._consultar_cuentas()
+        # La cuenta de TikTok pudo reconectarse o cambiar: se vuelven a pedir sus permisos.
+        self._ajustes_tiktok_de = None
         self._refrescar()
 
     def _al_elegir_perfil(self, perfil: str) -> None:

@@ -138,19 +138,24 @@ class DialogoPublicarShorts(DialogoPublicar):
         self._refrescar()
 
     def _plataformas_de(self, fila: Fila) -> tuple[list[Plataforma], str]:
-        """Las plataformas marcadas que admite este short, y por qué se quita X."""
-        plataformas, motivo = self.plataformas(), ""
+        """Las plataformas marcadas que admite este short, y por qué se quitan
+        X o TikTok (directo)."""
+        plataformas, motivos = self.plataformas(), []
+        duracion = (self._duraciones or {}).get(fila.corto.mp4)
         if Plataforma.X in plataformas:
             try:
                 tamano = fila.corto.mp4.stat().st_size
             except OSError:
                 tamano = None
-            motivo = limites.motivo_no_admite_x(
-                (self._duraciones or {}).get(fila.corto.mp4), tamano,
-                self.ajustes.x_premium)
+            motivo = limites.motivo_no_admite_x(duracion, tamano, self.ajustes.x_premium)
             if motivo:
                 plataformas.remove(Plataforma.X)
-        return plataformas, motivo
+                motivos.append(motivo)
+        motivo = self._motivo_duracion_tiktok(duracion)
+        if Plataforma.TIKTOK in plataformas and motivo:
+            plataformas.remove(Plataforma.TIKTOK)
+            motivos.append(motivo)
+        return plataformas, " · ".join(motivos)
 
     # --- estado ---
 
@@ -163,13 +168,13 @@ class DialogoPublicarShorts(DialogoPublicar):
 
     def _nota(self, fila: Fila) -> tuple[str, str, bool]:
         """(texto, color, bloquea) de un short marcado."""
-        plataformas, motivo_x = self._plataformas_de(fila)
+        plataformas, motivo_quitadas = self._plataformas_de(fila)
         partes: list[tuple[str, bool]] = []
         motivo_fecha = self._motivo_de(self._fecha_de(fila.campo))
         if motivo_fecha:
             partes.append((motivo_fecha, True))
-        if motivo_x:
-            partes.append((motivo_x if plataformas else motivo_x + " " + _(
+        if motivo_quitadas:
+            partes.append((motivo_quitadas if plataformas else motivo_quitadas + " " + _(
                 "No queda ninguna plataforma para este short."), not plataformas))
         previas = [p.nombre for p in ORDEN if p in registro.ultimas(fila.corto.mp4)
                    and p in plataformas]
