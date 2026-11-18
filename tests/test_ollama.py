@@ -127,6 +127,23 @@ def test_chat_json_temperatura_por_defecto_y_fijada(servidor_falso):
     assert _Falso.peticiones[1][1]["options"]["temperature"] == 0
 
 
+def test_chat_json_pasa_keep_alive(servidor_falso):
+    _Falso.respuestas["/api/chat"] = (
+        200, {"message": {"role": "assistant", "content": "{}"}}
+    )
+    ollama.chat_json("m", [], {}, url=servidor_falso, keep_alive="5m")
+    assert _Falso.peticiones[0][1]["keep_alive"] == "5m"
+
+
+def test_descargar_pide_keep_alive_cero_y_no_lanza(servidor_falso):
+    _Falso.respuestas["/api/generate"] = (200, {"done": True})
+    ollama.descargar("m", url=servidor_falso)
+    assert _Falso.peticiones == [("/api/generate", {"model": "m", "keep_alive": 0})]
+    _Falso.respuestas["/api/generate"] = (500, {"error": "x"})
+    ollama.descargar("m", url=servidor_falso)
+    ollama.descargar("m", url="http://127.0.0.1:1")
+
+
 def test_systemone_envia_formato_y_devuelve_answers(servidor_falso):
     _Falso.respuestas["/v1/systemone"] = (200, {"answers": {"interes": 3, "ok": True}})
     preguntas = {"interes": {"type": "number"}, "ok": {"type": "boolean"}}
