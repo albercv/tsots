@@ -259,19 +259,28 @@ def test_renderizar_omite_broll_si_pexels_falla(tmp_path, video_vertical, monkey
 
 
 def test_renderizar_omite_pieza_si_falla(tmp_path, video_vertical, clip_mp4, monkeypatch):
+    intentos = []
+
     def rota(*a, **k):
+        intentos.append(1)
         raise RuntimeError("vision")
     monkeypatch.setattr(callouts, "seguir", rota)
     monkeypatch.setattr(broll, "obtener",
                         lambda buscar, usados, carpeta, clave=None, **k: broll.Clip(clip_mp4, "Ana", "u", 1))
     monkeypatch.setattr(broll, "frames_broll", lambda *a, **k: iter(()))  # cero fotogramas
+    capturados = []
+    pista = rmod.sonidos.pista
+    monkeypatch.setattr(rmod.sonidos, "pista", lambda ev, *a, **k: (capturados.extend(ev), pista(ev, *a, **k))[1])
     t = _trabajo(tmp_path, video_vertical, [
         {"tipo": "senalar", "t": 1.0, "pantalla": "Factura", "forma": "circulo"},
         {"tipo": "broll", "t": 0.5, "buscar": "person typing"}])
-    (t / "pantalla.json").write_text(json.dumps(
-        [{"t": 1.0, "detecciones": [{"texto": "Factura", "caja": [100, 700, 300, 60], "confianza": 0.9}]}]))
+    (t / "pantalla.json").write_text(json.dumps({"version": 1, "muestras": [
+        {"t": 1.0, "detecciones": [{"texto": "Factura", "caja": [100, 700, 300, 60], "confianza": 0.9}]}]}))
     assert renderizar(t, borrador=True).exists()
+    assert intentos  # el seguimiento se intentó de verdad
     assert not list((t / "tmp").glob("slot_*.mov")) and not (t / "broll.json").exists()
+    # sin imagen, sin sonido: solo queda el boom de inicio
+    assert [e.tipo for e in capturados] == ["boom"]
 
 
 def _crop(salida, seg, tmp_path, nombre):

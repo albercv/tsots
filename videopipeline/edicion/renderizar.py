@@ -35,6 +35,7 @@ class Pieza:
     t: float
     dur: float
     params: dict
+    sfx: EventoSfx | None = None  # sonido propio: se descarta si la pieza se omite
 
 
 @dataclass
@@ -71,6 +72,7 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
             # pop/pluck piden num y tap pide freq (los sintetizadores los exigen)
             sonido(primero, t + 0.08, **{"pop": {"num": 1}, "pluck": {"num": 1},
                                           "tap": {"freq": FREQS_TAP[0]}}.get(primero, {}))
+            piezas[-1].sfx = sfx[-1]  # la pieza recién añadida
 
     sonido("boom", 0.05)
     visuales = sorted((m for m in plan.momentos if m.tipo != "zoom"), key=lambda m: m.t)
@@ -260,11 +262,14 @@ def renderizar(trabajo: Path, borrador: bool = False) -> Path:
     tmp.mkdir()
     fps = _fps_overlay(video)
     ctx = RenderCtx(video, zonas, trabajo / "broll", set(), [], broll.leer_clave())
-    overlays = []
+    overlays, omitidos = [], []
     for i, p in enumerate(specs.piezas):
         ruta = _render_pieza(p, estilo, fps, tmp / f"slot_{i:02d}.mov", ctx)
         if ruta is not None:
             overlays.append(Overlay(ruta, p.t, p.dur))
+        elif p.sfx is not None:
+            omitidos.append(p.sfx)
+    specs.sfx = [e for e in specs.sfx if not any(e is o for o in omitidos)]  # sin imagen, sin sonido
     creditos = trabajo / "broll.json"
     if ctx.creditos:
         creditos.write_text(json.dumps(ctx.creditos, ensure_ascii=False, indent=2), "utf-8")
