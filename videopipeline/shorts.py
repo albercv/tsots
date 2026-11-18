@@ -46,6 +46,7 @@ PAUSA_FRASE = 1.0  # s de silencio que cierran una frase sin puntuación
 MAX_PALABRAS_FRASE = 60
 MARGEN_CORTE = 0.25  # s de aire antes y después del trozo
 MINUTOS_PARTE = 20
+KEEP_ALIVE_SHORTS = "5m"  # el modelo sigue cargado entre las llamadas de un vídeo
 MINUTOS_SOLAPE = 3  # > DURACION_MAX: un trozo cortado cabe entero en otra parte
 MAX_NOMBRE = 60
 JUEZ = "tev1:0.8b"
@@ -116,7 +117,8 @@ def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
 
 
 def maximo_shorts(duracion: float) -> int:
-    return int(duracion // 180)
+    # Uno por cada 10 minutos, y al menos uno si el vídeo da para un short.
+    return 0 if duracion < 180 else max(1, int(duracion // 600))
 
 
 def partes(frases: list[Frase]) -> list[tuple[int, int]]:

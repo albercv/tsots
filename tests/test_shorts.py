@@ -78,7 +78,7 @@ def test_trocear_frases_vacio():
 
 
 def test_maximo_shorts():
-    assert [shorts.maximo_shorts(d) for d in (179, 180, 350, 1800)] == [0, 1, 1, 10]
+    assert [shorts.maximo_shorts(d) for d in (179, 180, 599, 1199, 1800, 7860)] == [0, 1, 1, 1, 3, 13]
 
 
 def test_partes_una_sola_hasta_20_minutos():
@@ -609,7 +609,7 @@ def ficha_con_base(tmp_path, monkeypatch):
         si, score = e.notas.get(texto.split()[0], (0.9, 1.0))
         return _tev1(si, score)
 
-    monkeypatch.setattr(shorts, "duracion_video", lambda video: 400.0)
+    monkeypatch.setattr(shorts, "duracion_video", lambda video: 1200.0)
     monkeypatch.setattr(shorts, "asegurar_servidor", ServidorFalso)
     monkeypatch.setattr(shorts, "chat_json",
                         lambda *a, **kw: {"candidatos": PROPUESTOS})
