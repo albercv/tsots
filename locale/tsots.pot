@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 15:44+0100\n"
+"POT-Creation-Date: 2026-11-18 19:14+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -183,6 +183,14 @@ msgstr ""
 msgid "Al publicar"
 msgstr ""
 
+#, python-brace-format
+msgid "Al publicar, aceptas la {marca} y la {musica} de TikTok"
+msgstr ""
+
+#, python-brace-format
+msgid "Al publicar, aceptas la {musica} de TikTok"
+msgstr ""
+
 msgid "Al terminar de procesar cada vídeo, saca sus mejores trozos de 1 a 3 minutos en vertical."
 msgstr ""
 
@@ -192,6 +200,9 @@ msgid ""
 msgstr ""
 
 msgid "Amarillo"
+msgstr ""
+
+msgid "Amigos"
 msgstr ""
 
 msgid "Aplicar a todos los vídeos"
@@ -220,6 +231,9 @@ msgid "Automático: el lugar que se llame «{nombre}»"
 msgstr ""
 
 msgid "Aviso"
+msgstr ""
+
+msgid "Añade la etiqueta de colaboración pagada desde la app de Instagram o Facebook"
 msgstr ""
 
 msgid "Añade otro fotograma del vídeo u otra imagen. También puedes arrastrar imágenes aquí."
@@ -315,6 +329,9 @@ msgstr ""
 msgid "Caption:"
 msgstr ""
 
+msgid "Cargando los permisos de TikTok…"
+msgstr ""
+
 msgid "Carpeta de salida"
 msgstr ""
 
@@ -406,10 +423,19 @@ msgstr ""
 msgid "Conectada"
 msgstr ""
 
+msgid "Confirmación de uso de música"
+msgstr ""
+
 msgid "Consejos y estilo"
 msgstr ""
 
 msgid "Consultando…"
+msgstr ""
+
+msgid "Contenido comercial"
+msgstr ""
+
+msgid "Contenido de marca: una marca te paga o te da algo"
 msgstr ""
 
 msgid "Contexto de marca"
@@ -482,6 +508,9 @@ msgid ""
 msgstr ""
 
 msgid "Deportes"
+msgstr ""
+
+msgid "Desactivado en tu cuenta de TikTok"
 msgstr ""
 
 msgid "Descargando detector de caras"
@@ -575,6 +604,9 @@ msgid "Ejecuta `ollama serve` en una terminal para ver el error, o abre la app d
 msgstr ""
 
 msgid "El caption SEO se genera con un modelo local servido por Ollama y no se encuentra el ejecutable `ollama` en PATH."
+msgstr ""
+
+msgid "El contenido de marca no puede ser privado"
 msgstr ""
 
 msgid "El disco donde se escriben los temporales o la salida está lleno. Los intermedios (WAV 48 kHz + MP4 remuxado) ocupan varias veces el tamaño del vídeo original."
@@ -697,6 +729,12 @@ msgstr ""
 msgid "Elige en la cola un vídeo terminado que tenga caption."
 msgstr ""
 
+msgid "Elige quién puede verlo en TikTok"
+msgstr ""
+
+msgid "Elige quién puede verlo…"
+msgstr ""
+
 msgid "Elige una hora al menos 15 minutos después de ahora."
 msgstr ""
 
@@ -764,6 +802,10 @@ msgid "Error inesperado al consultar lo programado ({tipo})."
 msgstr ""
 
 #, python-brace-format
+msgid "Error inesperado al consultar los permisos de TikTok ({tipo})."
+msgstr ""
+
+#, python-brace-format
 msgid "Error {codigo} del servicio."
 msgstr ""
 
@@ -799,6 +841,10 @@ msgid "Esperando a que el servicio termine: {lista}…"
 msgstr ""
 
 msgid "Esperando confirmación…"
+msgstr ""
+
+#, python-brace-format
+msgid "Este vídeo dura más de lo que tu cuenta de TikTok permite publicar ({limite})"
 msgstr ""
 
 msgid "Este vídeo no tiene post de LinkedIn: activa «LinkedIn» y procésalo."
@@ -967,6 +1013,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Imágenes ({extensiones})"
+msgstr ""
+
+msgid "Indica si promocionas algo tuyo, de un tercero o ambos"
 msgstr ""
 
 msgid "Jue"
@@ -1190,6 +1239,9 @@ msgid "Modelo:"
 msgstr ""
 
 msgid "Muestra en el Finder el registro de esta publicación"
+msgstr ""
+
+msgid "Márcalo en la app de TikTok"
 msgstr ""
 
 msgid "Más lento: analiza el vídeo."
@@ -1552,6 +1604,15 @@ msgstr ""
 msgid "Perfiles en el servicio: {lista}."
 msgstr ""
 
+msgid "Permitir comentarios"
+msgstr ""
+
+msgid "Permitir dúos"
+msgstr ""
+
+msgid "Permitir stitch"
+msgstr ""
+
 msgid "Personas y blogs"
 msgstr ""
 
@@ -1570,7 +1631,13 @@ msgstr ""
 msgid "Plataformas (en este orden)"
 msgstr ""
 
+msgid "Política de contenido de marca"
+msgstr ""
+
 msgid "Por confirmar"
+msgstr ""
+
+msgid "Portada del vídeo"
 msgstr ""
 
 msgid "Posición vertical"
@@ -1748,6 +1815,10 @@ msgstr ""
 msgid "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones."
 msgstr ""
 
+#, python-brace-format
+msgid "Reconecta tu cuenta de TikTok en {servicio}."
+msgstr ""
+
 msgid "Recortando silencios"
 msgstr ""
 
@@ -1820,6 +1891,9 @@ msgstr ""
 msgid "Respuesta inesperada del servicio: no trae las páginas de Facebook."
 msgstr ""
 
+msgid "Respuesta inesperada del servicio: no trae los ajustes de TikTok."
+msgstr ""
+
 msgid "Respuesta inesperada del servicio: no trae los lugares de TikTok."
 msgstr ""
 
@@ -1877,6 +1951,12 @@ msgstr ""
 msgid "Se etiqueta en: {redes}."
 msgstr ""
 
+msgid "Se etiquetará como \"Colaboración pagada\""
+msgstr ""
+
+msgid "Se etiquetará como \"Contenido promocional\""
+msgstr ""
+
 #, python-brace-format
 msgid ""
 "Se programará «{titulo}» en:\n"
@@ -1897,6 +1977,10 @@ msgid "Se publica un post con fotos."
 msgstr ""
 
 #, python-brace-format
+msgid "Se publicará en: {cuenta}"
+msgstr ""
+
+#, python-brace-format
 msgid ""
 "Se publicará «{titulo}» en:\n"
 "\n"
@@ -1907,6 +1991,9 @@ msgid "Se puede programar como mucho a un año vista."
 msgstr ""
 
 msgid "Se usa en todas las publicaciones. En Publicar puedes cambiarla para un solo vídeo."
+msgstr ""
+
+msgid "Seguidores"
 msgstr ""
 
 msgid "Seguir la cara (4:3)"
@@ -2015,6 +2102,9 @@ msgstr ""
 msgid "Solo para este vídeo. La de siempre se cambia en Redes…."
 msgstr ""
 
+msgid "Solo yo"
+msgstr ""
+
 #, python-brace-format
 msgid "Subiendo a {plataforma} ({n} de {total})…"
 msgstr ""
@@ -2088,10 +2178,19 @@ msgstr ""
 msgid "TikTok no encuentra «{texto}»."
 msgstr ""
 
+msgid "TikTok puede tardar unos minutos en mostrarlo"
+msgstr ""
+
+msgid "Todo el mundo"
+msgstr ""
+
 msgid "Transcribiendo"
 msgstr ""
 
 msgid "Tres a cinco palabras clave arriba durante los 5 primeros segundos, escritas por el modelo del caption (Ollama) a partir de la transcripción."
+msgstr ""
+
+msgid "Tu marca: promocionas algo tuyo"
 msgstr ""
 
 msgid "Términos"

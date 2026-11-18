@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import logging
 import platform as plataforma_sistema
+import tempfile
 from dataclasses import replace
 from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Callable
 from zoneinfo import ZoneInfo
 
 from PySide6.QtCore import QDateTime, QProcess, Qt, QThread, QTimeZone, Signal
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -37,12 +39,14 @@ from videopipeline import linkedin
 from videopipeline.caption import Caption
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes import diario, limites, publicador, registro
+from videopipeline.redes import diario, limites, portada_video, publicador, registro
 from videopipeline.redes.modelo import (
     ETIQUETAS_FACEBOOK,
     ETIQUETAS_INSTAGRAM,
     ETIQUETAS_TIKTOK,
     ORDEN,
+    PRIVACIDADES_TIKTOK,
+    AjustesTikTok,
     Cuenta,
     ModoFacebook,
     ModoInstagram,
@@ -79,6 +83,10 @@ medir_duracion = duracion_video
 # tiempo, y el servicio rechaza una fecha pasada o a más de un año.
 MARGEN_MINIMO = timedelta(minutes=15)
 MAXIMO = timedelta(days=365)
+
+# Lo que se acepta al publicar en TikTok en directo.
+URL_MUSICA_TIKTOK = "https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
+URL_MARCA_TIKTOK = "https://www.tiktok.com/legal/page/global/bc-policy/en"
 
 
 def zona_local() -> tzinfo:
@@ -188,13 +196,17 @@ class HiloPublicacion(QThread):
             self.progreso.emit(plataforma.value, estado.value, resultado)
 
         try:
-            resultados = publicador.publicar(
-                self._proveedor, self._publicacion, self._opciones, self._plataformas,
-                progreso=avisar,
-                nombre_proveedor=self._nombre_proveedor,
-                cancelado=self.isInterruptionRequested,
-                **({"ahora": self._ahora} if self._ahora else {}),
-            )
+            with tempfile.TemporaryDirectory() as tmp:  # el envío lee la miniatura
+                if set(self._plataformas) & {Plataforma.TIKTOK, Plataforma.INSTAGRAM,
+                                             Plataforma.YOUTUBE}:
+                    self._publicacion = portada_video.con_portada(self._publicacion, Path(tmp))
+                resultados = publicador.publicar(
+                    self._proveedor, self._publicacion, self._opciones, self._plataformas,
+                    progreso=avisar,
+                    nombre_proveedor=self._nombre_proveedor,
+                    cancelado=self.isInterruptionRequested,
+                    **({"ahora": self._ahora} if self._ahora else {}),
+                )
         except BaseException as e:  # publicador aísla los fallos; esto es el último seguro
             log.exception("Fallo inesperado en el hilo de publicación")
             resultados = dict(vistos)
@@ -219,7 +231,7 @@ class DialogoPublicar(QDialog):
                  llavero=credenciales, fabrica: Fabrica | None = None,
                  medir: Callable[[Path], float] | None = None,
                  ahora: Callable[[], datetime] | None = None, zona: tzinfo | None = None, perfil: str = "",
-                 parent=None):
+                 idioma: str = "", parent=None):
         super().__init__(parent)
         self.video = Path(video)
         self._zona = zona or zona_local()
@@ -248,6 +260,17 @@ class DialogoPublicar(QDialog):
         self._fecha_cuentas = ""
         self._error_cuentas = ""
         self._consulta_n = 0
+        # Lo que la cuenta de TikTok permite en directo (`None` mientras se
+        # consulta), el motivo si no se pudo saber y de qué (servicio, perfil)
+        # se pidió (`None`: hay que pedirlo).
+        self._ajustes_tiktok: AjustesTikTok | None = None
+        self._error_ajustes_tiktok = ""
+        self._ajustes_tiktok_de: tuple[str, str] | None = None
+        self._ajustes_tiktok_n = 0
+        # Vídeo de la vista previa de la portada.
+        self._portada_de: Path | None = None
+        self._portada_n = 0
+        self._idioma = idioma
         # Lo que el usuario quiere marcado; las casillas deshabilitadas
         # (cuenta no conectada, vídeo largo para X…) se desmarcan sin olvidarlo.
         self._deseadas: set[Plataforma] = set(ajustes.plataformas_redes)
@@ -388,6 +411,65 @@ class DialogoPublicar(QDialog):
             rejilla.addWidget(estado, fila, 2)
         raiz.addWidget(grupo_plataformas)
 
+        # TikTok en directo: lo que TikTok exige mostrar antes de publicar.
+        # Nada de esto se recuerda entre publicaciones.
+        self.grupo_tiktok = QGroupBox(Plataforma.TIKTOK.nombre)
+        caja_tiktok = QVBoxLayout(self.grupo_tiktok)
+        self.etiqueta_cuenta_tiktok = QLabel()
+        self.etiqueta_cuenta_tiktok.setTextFormat(Qt.TextFormat.PlainText)
+        caja_tiktok.addWidget(self.etiqueta_cuenta_tiktok)
+        self.combo_privacidad_tiktok = QComboBox()
+        self._poner_privacidades(())
+        caja_tiktok.addWidget(self.combo_privacidad_tiktok, 0, Qt.AlignmentFlag.AlignLeft)
+        fila_interacciones = QHBoxLayout()
+        self.casilla_comentarios_tiktok = QCheckBox(_("Permitir comentarios"))
+        self.casilla_duos_tiktok = QCheckBox(_("Permitir dúos"))
+        self.casilla_stitch_tiktok = QCheckBox(_("Permitir stitch"))
+        for casilla in (self.casilla_comentarios_tiktok, self.casilla_duos_tiktok,
+                        self.casilla_stitch_tiktok):
+            fila_interacciones.addWidget(casilla)
+        fila_interacciones.addStretch(1)
+        caja_tiktok.addLayout(fila_interacciones)
+        self.etiqueta_consentimiento_tiktok = QLabel()
+        self.etiqueta_consentimiento_tiktok.setWordWrap(True)
+        self.etiqueta_consentimiento_tiktok.setOpenExternalLinks(True)
+        caja_tiktok.addWidget(self.etiqueta_consentimiento_tiktok)
+        self.grupo_tiktok.hide()
+
+        # Contenido comercial, para todas las redes.
+        self.bloque_comercial = QWidget()
+        caja_comercial = QVBoxLayout(self.bloque_comercial)
+        caja_comercial.setContentsMargins(0, 0, 0, 0)
+        self.casilla_comercial = QCheckBox(_("Contenido comercial"))
+        self.casilla_tu_marca = QCheckBox(_("Tu marca: promocionas algo tuyo"))
+        self.casilla_de_marca = QCheckBox(_("Contenido de marca: una marca te paga o te da algo"))
+        fila_comercial = QHBoxLayout()
+        fila_comercial.addSpacing(20)
+        for casilla in (self.casilla_tu_marca, self.casilla_de_marca):
+            casilla.setEnabled(False)
+            fila_comercial.addWidget(casilla)
+        fila_comercial.addStretch(1)
+        self.etiqueta_comercial = QLabel()
+        self.etiqueta_comercial.setWordWrap(True)
+        self.etiqueta_comercial.hide()
+        caja_comercial.addWidget(self.casilla_comercial)
+        caja_comercial.addLayout(fila_comercial)
+        caja_comercial.addWidget(self.etiqueta_comercial)
+
+        self.vista_portada = QLabel()
+        self.vista_portada.setFixedSize(90, 160)
+        self.vista_portada.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.vista_portada.setToolTip(_("Portada del vídeo"))
+        self.vista_portada.hide()
+        fila_cumplimiento = QHBoxLayout()
+        columna = QVBoxLayout()
+        columna.addWidget(self.grupo_tiktok)
+        columna.addWidget(self.bloque_comercial)
+        columna.addStretch(1)
+        fila_cumplimiento.addLayout(columna, 1)
+        fila_cumplimiento.addWidget(self.vista_portada, 0, Qt.AlignmentFlag.AlignTop)
+        raiz.addLayout(fila_cumplimiento)
+
         fila_ubicacion = QHBoxLayout()
         fila_ubicacion.addWidget(QLabel(_("Ubicación:")))
         self.etiqueta_ubicacion = QLabel()
@@ -491,10 +573,16 @@ class DialogoPublicar(QDialog):
         self.tira_x.cambiada.connect(self._refrescar)
         self.radio_programar.toggled.connect(self._refrescar)
         self.campo_fecha.dateTimeChanged.connect(self._refrescar)
+        self.combo_tiktok.currentIndexChanged.connect(self._refrescar)
+        self.combo_privacidad_tiktok.currentIndexChanged.connect(self._refrescar)
+        self.casilla_comercial.toggled.connect(self._al_cambiar_comercial)
+        self.casilla_de_marca.toggled.connect(self._al_cambiar_comercial)
+        self.casilla_tu_marca.toggled.connect(self._refrescar)
         self._rellenar_x()
         self.refrescar_servicio()
         self._refrescar_aviso()
         self._medir_video()
+        self._calcular_portada(self.video)
         self.ajustar_a_la_pantalla()
 
     def ajustar_a_la_pantalla(self) -> None:
@@ -520,6 +608,7 @@ class DialogoPublicar(QDialog):
         return [p for p in ORDEN if self.casillas[p].isChecked()]
 
     def opciones(self) -> Opciones:
+        comercial = self.casilla_comercial.isChecked()
         return Opciones(
             tiktok_modo=ModoTikTok(self.combo_tiktok.currentData()),
             instagram_modo=ModoInstagram(self.combo_instagram.currentData()),
@@ -528,7 +617,17 @@ class DialogoPublicar(QDialog):
             facebook_modo=ModoFacebook(self.combo_facebook.currentData()),
             ubicacion=self.ubicacion(),
             programada=self.programada(),
+            tiktok_privacidad=self.combo_privacidad_tiktok.currentData() or "",
+            tiktok_comentarios=self.casilla_comentarios_tiktok.isChecked(),
+            tiktok_duos=self.casilla_duos_tiktok.isChecked(),
+            tiktok_stitch=self.casilla_stitch_tiktok.isChecked(),
+            tu_marca=comercial and self.casilla_tu_marca.isChecked(),
+            contenido_de_marca=comercial and self.casilla_de_marca.isChecked(),
+            idioma=self._idioma,
         )
+
+    def _tiktok_directo(self) -> bool:
+        return self.combo_tiktok.currentData() == ModoTikTok.PUBLICO.value
 
     @staticmethod
     def _nuevo_campo_fecha(inicio: datetime) -> QDateTimeEdit:
@@ -693,6 +792,100 @@ class DialogoPublicar(QDialog):
         self._refrescar_etiqueta_servicio()
         self._refrescar()
 
+    def _consultar_ajustes_tiktok(self) -> None:
+        """Pide lo que la cuenta de TikTok permite en directo cuando TikTok
+        queda marcado en modo directo, una vez por cuenta; tras un error, otra
+        vez al volver a elegirlo."""
+        if Plataforma.TIKTOK not in self._deseadas or not self._tiktok_directo():
+            if self._error_ajustes_tiktok:
+                self._ajustes_tiktok_de = None
+            return
+        cuenta = (self.ajustes.proveedor_redes, self.ajustes.perfil_redes)
+        if cuenta == self._ajustes_tiktok_de or not self._listo()[0]:
+            return
+        self._ajustes_tiktok_de = cuenta
+        self._ajustes_tiktok_n += 1
+        self._ajustes_tiktok, self._error_ajustes_tiktok = None, ""
+        self._poner_privacidades(())
+        numero, llavero, fabrica = self._ajustes_tiktok_n, self.llavero, self.fabrica
+        datos = self.ajustes.ajustes_proveedor()
+        segundo_plano.en_segundo_plano(
+            lambda: (numero, *consulta_cuentas.ajustes_tiktok(llavero, fabrica, cuenta[0], datos)),
+            self._al_consultar_ajustes_tiktok, "tsots-tiktok")
+
+    def _al_consultar_ajustes_tiktok(self, resultado) -> None:
+        if isinstance(resultado, BaseException):  # `ajustes_tiktok` no lanza; por si acaso
+            resultado = (self._ajustes_tiktok_n, None, type(resultado).__name__)
+        numero, permisos, error = resultado
+        if numero != self._ajustes_tiktok_n:
+            return  # llegó tarde: ya hay otra consulta en marcha
+        self._ajustes_tiktok, self._error_ajustes_tiktok = permisos, error
+        if permisos is not None:
+            self._poner_privacidades(permisos.privacidades)
+            for casilla, apagada in ((self.casilla_comentarios_tiktok, permisos.comentarios_off),
+                                     (self.casilla_duos_tiktok, permisos.duos_off),
+                                     (self.casilla_stitch_tiktok, permisos.stitch_off)):
+                if apagada:
+                    casilla.setChecked(False)
+                casilla.setEnabled(not apagada)
+                casilla.setToolTip(_("Desactivado en tu cuenta de TikTok") if apagada else "")
+        self._refrescar()
+
+    def _poner_privacidades(self, privacidades: tuple[str, ...]) -> None:
+        """Las privacidades de la cuenta, tras «Elige…»: no hay ninguna por defecto."""
+        combo = self.combo_privacidad_tiktok
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(_("Elige quién puede verlo…"), "")
+        for valor in privacidades:
+            combo.addItem(_(PRIVACIDADES_TIKTOK[valor]), valor)
+        combo.blockSignals(False)
+        self._limitar_privacidad()
+
+    def _limitar_privacidad(self) -> None:
+        """El contenido de marca no puede ser privado: sin «Solo yo»."""
+        combo = self.combo_privacidad_tiktok
+        indice = combo.findData("SELF_ONLY")
+        if indice < 0:
+            return
+        de_marca = self.casilla_comercial.isChecked() and self.casilla_de_marca.isChecked()
+        combo.model().item(indice).setEnabled(not de_marca)
+        combo.setItemData(indice, _("El contenido de marca no puede ser privado")
+                          if de_marca else "", Qt.ItemDataRole.ToolTipRole)
+        if de_marca and combo.currentIndex() == indice:
+            combo.setCurrentIndex(0)
+
+    def _al_cambiar_comercial(self, *args) -> None:
+        comercial = self.casilla_comercial.isChecked()
+        self.casilla_tu_marca.setEnabled(comercial)
+        self.casilla_de_marca.setEnabled(comercial)
+        self._limitar_privacidad()
+        self._refrescar()
+
+    def _calcular_portada(self, video: Path) -> None:
+        """Vista previa del fotograma de portada, elegido en segundo plano."""
+        self._portada_de = video
+        self._portada_n += 1
+        numero = self._portada_n
+        segundo_plano.en_segundo_plano(lambda: (numero, portada_video.elegir(video)),
+                                       self._al_calcular_portada, "tsots-portada")
+
+    def _al_calcular_portada(self, resultado) -> None:
+        numero, elegido = resultado  # `elegir` no lanza
+        if numero != self._portada_n:
+            return
+        if elegido is None:
+            self.vista_portada.hide()
+            return
+        fotograma = elegido[1]
+        alto, ancho = fotograma.shape[:2]
+        imagen = QImage(fotograma.data, ancho, alto, fotograma.strides[0],
+                        QImage.Format.Format_BGR888)  # OpenCV da BGR
+        self.vista_portada.setPixmap(QPixmap.fromImage(imagen).scaled(
+            self.vista_portada.size(), Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation))
+        self.vista_portada.show()
+
     # --- estado de cada plataforma ---
 
     def _x_con_fotos(self) -> bool:
@@ -720,6 +913,18 @@ class DialogoPublicar(QDialog):
             texto, color = consulta_cuentas.describir(plataforma, None, servicio)
             return False, "", texto, color
         bloqueo = aviso_x = ""
+        if plataforma == Plataforma.TIKTOK and self._tiktok_directo():
+            permisos = self._ajustes_tiktok
+            if self._error_ajustes_tiktok:
+                bloqueo = self._error_ajustes_tiktok
+            elif permisos is None:
+                bloqueo = _("Cargando los permisos de TikTok…")
+            elif permisos.max_segundos and self.duracion is None:
+                bloqueo = _("Comprobando la duración del vídeo…")
+            elif motivo_tiktok := self._motivo_duracion_tiktok(self.duracion):
+                return False, "", motivo_tiktok, COLOR_AVISO
+            elif not self.combo_privacidad_tiktok.currentData():
+                bloqueo = _("Elige quién puede verlo en TikTok")
         if plataforma == Plataforma.X and not self.ajustes.x_premium:
             if self.duracion is None:
                 return False, "", _("Comprobando la duración del vídeo…"), COLOR_SECUNDARIO
@@ -759,11 +964,22 @@ class DialogoPublicar(QDialog):
             texto, color = " · ".join(filter(None, (aviso_x, texto))), color or COLOR_SECUNDARIO
         return True, bloqueo, texto, color
 
+    def _motivo_duracion_tiktok(self, duracion: float | None) -> str:
+        """Por qué TikTok en directo no admite un vídeo tan largo en esta
+        cuenta, o "" si lo admite (o aún no se sabe)."""
+        permisos = self._ajustes_tiktok
+        if not (self._tiktok_directo() and permisos is not None and permisos.max_segundos
+                and duracion and duracion > permisos.max_segundos):
+            return ""
+        return _("Este vídeo dura más de lo que tu cuenta de TikTok permite publicar "
+                 "({limite})").format(limite=limites.duracion_legible(permisos.max_segundos))
+
     def _refrescar_plataformas(self) -> list[str]:
-        """Aplica el estado de cada fila. Devuelve los motivos que impiden
-        publicar lo marcado."""
+        """Aplica el estado de cada fila, del bloque de TikTok y del contenido
+        comercial. Devuelve los motivos que impiden publicar lo marcado."""
         if self.publicando:
             return []
+        self._consultar_ajustes_tiktok()  # antes: deja el estado en «Cargando…»
         bloqueos: list[str] = []
         self._aplicando = True
         try:
@@ -785,7 +1001,51 @@ class DialogoPublicar(QDialog):
                 etiqueta.setStyleSheet(f"color: {color};" if color else "")
         finally:
             self._aplicando = False
-        return bloqueos
+        motivo_comercial = self._refrescar_cumplimiento()
+        return bloqueos + ([motivo_comercial] if motivo_comercial else [])
+
+    def _refrescar_cumplimiento(self) -> str:
+        """El bloque de TikTok (solo en directo) y los textos del contenido
+        comercial. Devuelve por qué lo comercial impide publicar, o ""."""
+        marcadas = set(self.plataformas())
+        tiktok = Plataforma.TIKTOK in marcadas
+        directo = tiktok and self._tiktok_directo()
+        comercial = self.casilla_comercial.isChecked()
+        tu_marca = comercial and self.casilla_tu_marca.isChecked()
+        de_marca = comercial and self.casilla_de_marca.isChecked()
+        self.grupo_tiktok.setVisible(directo)
+        cuenta = self._cuentas.get(Plataforma.TIKTOK)
+        self.etiqueta_cuenta_tiktok.setText(_("Se publicará en: {cuenta}").format(
+            cuenta=cuenta.visible if cuenta is not None and cuenta.visible else "…"))
+        enlace = '<a href="{url}">{texto}</a>'
+        musica = enlace.format(url=URL_MUSICA_TIKTOK, texto=_("Confirmación de uso de música"))
+        if de_marca:
+            consentimiento = _("Al publicar, aceptas la {marca} y la {musica} de TikTok").format(
+                marca=enlace.format(url=URL_MARCA_TIKTOK,
+                                    texto=_("Política de contenido de marca")),
+                musica=musica)
+        else:
+            consentimiento = _("Al publicar, aceptas la {musica} de TikTok").format(musica=musica)
+        self.etiqueta_consentimiento_tiktok.setText(consentimiento)
+
+        motivo = (_("Indica si promocionas algo tuyo, de un tercero o ambos")
+                  if comercial and not (tu_marca or de_marca) else "")
+        avisos = [motivo] if motivo else []
+        if comercial and tiktok and not directo:
+            avisos.append(_("Márcalo en la app de TikTok"))
+        if de_marca and marcadas & {Plataforma.INSTAGRAM, Plataforma.FACEBOOK}:
+            avisos.append(_("Añade la etiqueta de colaboración pagada desde la app de "
+                            "Instagram o Facebook"))
+        lineas = list(avisos)
+        if directo and de_marca:
+            lineas.insert(0, _('Se etiquetará como "Colaboración pagada"'))
+        elif directo and tu_marca:
+            lineas.insert(0, _('Se etiquetará como "Contenido promocional"'))
+        self.etiqueta_comercial.setText("\n".join(lineas))
+        self.etiqueta_comercial.setStyleSheet(
+            f"color: {COLOR_AVISO if avisos else COLOR_SECUNDARIO};")
+        self.etiqueta_comercial.setVisible(bool(lineas))
+        return motivo
 
     def _listo(self) -> tuple[bool, str]:
         nombre = self.ajustes.proveedor_redes
@@ -812,6 +1072,8 @@ class DialogoPublicar(QDialog):
         self._ubicacion_global = Ubicacion(self.ajustes.ciudad)
         self._refrescar_ubicacion()
         self._consultar_cuentas()
+        # La cuenta de TikTok pudo reconectarse o cambiar: se vuelven a pedir sus permisos.
+        self._ajustes_tiktok_de = None
         self._refrescar()
 
     def _al_elegir_perfil(self, perfil: str) -> None:
@@ -1167,6 +1429,13 @@ class DialogoPublicar(QDialog):
 
     def _modo_visible(self, plataforma: Plataforma, opciones: Opciones) -> str:
         if plataforma == Plataforma.TIKTOK:
+            if opciones.tiktok_modo == ModoTikTok.PUBLICO and opciones.tiktok_privacidad:
+                texto = _(PRIVACIDADES_TIKTOK[opciones.tiktok_privacidad])
+                if opciones.contenido_de_marca:
+                    return texto + " · " + _('Se etiquetará como "Colaboración pagada"')
+                if opciones.tu_marca:
+                    return texto + " · " + _('Se etiquetará como "Contenido promocional"')
+                return texto
             return _(ETIQUETAS_TIKTOK[opciones.tiktok_modo])
         if plataforma == Plataforma.INSTAGRAM:
             return _(ETIQUETAS_INSTAGRAM[opciones.instagram_modo])
@@ -1185,6 +1454,7 @@ class DialogoPublicar(QDialog):
                        self.combo_facebook, self.boton_redes, self.selector_perfil,
                        self.boton_cerrar,
                        self.boton_ubicacion, self.radio_ahora, self.radio_programar,
+                       self.grupo_tiktok, self.bloque_comercial,
                        *self.casillas.values()):
             widget.setEnabled(not bloqueado)
         self.barra.setVisible(bloqueado)
@@ -1236,6 +1506,9 @@ class DialogoPublicar(QDialog):
                 texto = html.escape(_("✓ En borradores: termínalo en Facebook"))
             else:
                 texto = html.escape(_("✓ Publicado"))
+            if (plataforma == Plataforma.TIKTOK
+                    and self._opciones_en_curso.tiktok_modo == ModoTikTok.PUBLICO):
+                texto += " · " + html.escape(_("TikTok puede tardar unos minutos en mostrarlo"))
             return texto, COLOR_OK
         if resultado.pendiente:
             return html.escape("⏳ " + (resultado.error or _("Sigue procesándose"))), COLOR_AVISO

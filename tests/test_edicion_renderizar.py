@@ -345,3 +345,13 @@ def test_renderizar_icono_y_dato(tmp_path, video_vertical):
         img, _ = _crop(sal, seg, tmp_path, n)
         r0, _ = _crop(base, seg, tmp_path, "r" + n)
         assert ch.difference(img, r0).getbbox() is not None
+
+
+def test_zoom_lento_no_empieza_antes_del_titulo_si_solapa_la_franja():
+    z = {**ZONAS, "titulo": {"y": [442, 695], "hasta": 5.0}}
+    s = der([], zonas=z)
+    assert all(zoom.t0 >= 5.0 for zoom in s.zooms)
+    assert Zoom(17, 20, 1, D.zoom_lento) in s.zooms  # el de cierre se mantiene
+    # Con el título encima de la franja (o sin título) el zoom lento sigue igual.
+    for libre in ({**ZONAS, "titulo": {"y": [442, 600], "hasta": 5.0}}, ZONAS):
+        assert Zoom(0, 2.5, 1, D.zoom_lento) in der([], zonas=libre).zooms

@@ -331,3 +331,13 @@ def test_sugerencia_no_con_texto_diminuto_ni_ya_senalado():
     assert P.sugerencias(Plan([et(31.76, texto=("EXTRA",), palabra="melón")]), x) == []
     assert P.sugerencias(Plan([et(31.76, texto=("REVISIÓN",), palabra="melón"), sen()]), PANT) == []
     assert P.sugerencias(Plan([et(31.76, texto=("REVISIÓN",), palabra="melón"), sen(t=50.0)]), PANT)
+
+
+def test_zoom_no_empieza_antes_del_titulo_si_solapa_la_franja():
+    z = {**ZONAS, "titulo": {"y": [442, 695], "hasta": 5.0}}
+    _, errs = val([Momento("zoom", t0=2.0, t1=4.0)], zonas=z)
+    assert errs and "5" in errs[0] and "zoom" in errs[0]
+    assert val([Momento("zoom", t0=5.0, t1=7.0)], zonas=z)[1] == []
+    # Sin solape (encuadre central, titulo por encima de la franja) no hay restricción.
+    z = {**ZONAS, "titulo": {"y": [442, 600], "hasta": 5.0}}
+    assert val([Momento("zoom", t0=2.0, t1=4.0)], zonas=z)[1] == []

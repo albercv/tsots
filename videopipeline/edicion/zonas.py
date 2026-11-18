@@ -1,7 +1,7 @@
 """Zonas de la pantalla vertical (1080x1920) que el plan de edición debe respetar."""
 from videopipeline.config import PipelineConfig
 from videopipeline.subtitles import PRESETS
-from videopipeline.titulo import DURACION, MARGEN_SUPERIOR, TAMANO_VERTICAL
+from videopipeline.titulo import DURACION, MARGEN_SUPERIOR_VERTICAL, TAMANO_VERTICAL
 from videopipeline.vertical import ALTO_VERTICAL, ANCHO_VERTICAL, ancho_ventana_cara
 
 MIN_FRANJA = 200
@@ -37,7 +37,7 @@ def calcular(config: PipelineConfig, encuadre: str, resolucion_fuente: tuple[int
 
     titulo = None
     if con_titulo:
-        y0 = round(MARGEN_SUPERIOR * ALTO_VERTICAL)
+        y0 = round(MARGEN_SUPERIOR_VERTICAL * ALTO_VERTICAL)
         titulo = {"y": [y0, round(y0 + 2.4 * TAMANO_VERTICAL * ALTO_VERTICAL)], "hasta": DURACION}
 
     if contenido[1] > 0:

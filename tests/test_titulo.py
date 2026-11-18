@@ -80,7 +80,7 @@ def test_dos_capas_arriba_centradas():
         "Dialogue: 0,0:00:00.00,0:00:05.00,TituloDorado,")
     assert "\\pos(965,91)" in eventos[0]
     assert eventos[1].startswith("Dialogue: 1,0:00:00.00,0:00:05.00,Titulo,")
-    assert "\\an8\\pos(960,86)\\fad(300,300)" in eventos[1]
+    assert "\\an8\\pos(960,86)\\fad(0,300)" in eventos[1]
     assert _texto(eventos[0]) == _texto(eventos[1]) == "AUDIO LIMPIO YA"
     # Espaciado entre letras: round(76 * ESPACIADO) en ambas capas.
     assert [_estilo(e)[13] for e in estilos] == ["3", "3"]
@@ -89,7 +89,7 @@ def test_dos_capas_arriba_centradas():
 def test_vertical_usa_su_tamano():
     estilos, eventos = lineas_titulo("Audio limpio ya", (1080, 1920))
     assert _estilo(estilos[1])[2] == "106"
-    assert "\\pos(540,154)" in eventos[1]
+    assert "\\an8\\pos(540,442)\\fad(0,300)" in eventos[1]
     assert [_estilo(e)[13] for e in estilos] == ["4", "4"]
 
 

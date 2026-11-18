@@ -68,6 +68,7 @@ TAMANO_HORIZONTAL = 0.07
 TAMANO_VERTICAL = 0.055  # fracción de la altura; vertical si alto > ancho
 ANCHO_UTIL = 0.90
 MARGEN_SUPERIOR = 0.08
+MARGEN_SUPERIOR_VERTICAL = 0.23  # los perfiles de redes recortan el centro 1:1 / 3:4
 # Avance de cada glifo de Titan One por punto de Fontsize de libass (medido), por ancho.
 _ANCHOS = {c: ancho for ancho, cs in {
     0.20: " ", 0.23: "'", 0.26: ".,:;", 0.29: "!¡", 0.31: "I", 0.32: "Í", 0.36: "J",
@@ -112,7 +113,8 @@ def lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
     dorado = round(fs * BORDE_DORADO)
     d = max(1, round(fs * DESPLAZAMIENTO))
     espaciado = round(fs * ESPACIADO)
-    x, y = ancho // 2, round(alto * MARGEN_SUPERIOR)
+    x = ancho // 2
+    y = round(alto * (MARGEN_SUPERIOR_VERTICAL if alto > ancho else MARGEN_SUPERIOR))
 
     estilos = [
         f"Style: TituloDorado,{FUENTE},{fs},{DORADO},&H00FFFFFF,{DORADO},"
@@ -121,7 +123,7 @@ def lineas_titulo(texto: str, resolucion: tuple[int, int], inicio: float = 0.0,
         f"&H00000000,0,0,0,0,100,100,{espaciado},0,1,{borde},0,8,0,0,0,1",
     ]
     tiempos = f"{_tiempo_ass(inicio)},{_tiempo_ass(inicio + duracion)}"
-    fundido = f"\\fad({FUNDIDO_MS},{FUNDIDO_MS})"
+    fundido = f"\\fad(0,{FUNDIDO_MS})"  # entero desde el fotograma 0
     eventos = [
         f"Dialogue: 0,{tiempos},TituloDorado,,0,0,0,,"
         f"{{\\an8\\pos({x + d},{y + d}){fundido}}}{texto}",

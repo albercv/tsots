@@ -16,7 +16,7 @@ from videopipeline.edicion import (broll, callouts, componer, emojis, estilos, g
 from videopipeline.edicion import pantalla as ocr
 from videopipeline.edicion.componer import Overlay, Zoom
 from videopipeline.edicion.estilos import Estilo
-from videopipeline.edicion.plan import DURACION, DURACION_FINAL, Momento, Plan, leer
+from videopipeline.edicion.plan import DURACION, DURACION_FINAL, Momento, Plan, leer, titulo_solapa_zoom
 from videopipeline.edicion.sonidos import EventoSfx
 
 log = logging.getLogger(__name__)
@@ -154,16 +154,18 @@ def _zooms(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> list[Zoo
             alto = 1 + (estilo.zoom_max - 1) / 2 if alto == estilo.zoom_max else estilo.zoom_max
     punch = list(zooms)
     zl = estilo.zoom_lento
+    # Si el título solapa la franja de zoom, el recorte movería el título ya grabado: sin zoom antes de que acabe.
+    desde = zonas["titulo"]["hasta"] if titulo_solapa_zoom(zonas) else 0
     if zl > 0 and duracion > 2.5:
         tiempos = [m.t0 if m.tipo == "zoom" else m.t for m in plan.momentos]
         h = min([5.0, duracion] + [t for t in tiempos if t >= 2.5])
         # un zoom de golpe dentro de la entrada+mantenido: se omiten (zooms solapados son ambiguos)
-        if not any(z.t0 < max(2.5, h) for z in punch):
+        if not desde and not any(z.t0 < max(2.5, h) for z in punch):
             zooms.append(Zoom(0, 2.5, 1, zl))
             if h > 2.5:
                 zooms.append(Zoom(2.5, h, zl, zl))
         ini = duracion - 3
-        if ini >= max(2.5, h) and not any(z.t1 > ini for z in punch):
+        if ini >= max(2.5, h, desde) and not any(z.t1 > ini for z in punch):
             zooms.append(Zoom(ini, duracion, 1, zl))
     return zooms
 

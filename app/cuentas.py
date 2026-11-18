@@ -10,7 +10,7 @@ from typing import Callable
 
 from videopipeline.i18n import _
 from videopipeline.redes import proveedor as proveedores
-from videopipeline.redes.modelo import Cuenta, Lugar, Pagina, Plataforma, Programada
+from videopipeline.redes.modelo import AjustesTikTok, Cuenta, Lugar, Pagina, Plataforma, Programada
 
 from . import credenciales
 
@@ -77,6 +77,22 @@ def buscar_lugares(llavero, fabrica: Fabrica, nombre: str, datos: dict, texto: s
         return None, str(e)
     except Exception as e:
         return None, _("Error inesperado al buscar el lugar ({tipo}).").format(
+            tipo=type(e).__name__)
+
+
+def ajustes_tiktok(llavero, fabrica: Fabrica, nombre: str,
+                   datos: dict) -> tuple[AjustesTikTok | None, str]:
+    """Lo que la cuenta de TikTok permite al publicar: `(ajustes, "")` o
+    `(None, motivo)`. Para fuera del hilo de la interfaz: nunca lanza."""
+    servicio, error = _servicio(llavero, fabrica, nombre, datos, None)
+    if servicio is None:
+        return None, error
+    try:
+        return servicio.ajustes_tiktok(), ""
+    except proveedores.ErrorConsulta as e:
+        return None, str(e)
+    except Exception as e:
+        return None, _("Error inesperado al consultar los permisos de TikTok ({tipo}).").format(
             tipo=type(e).__name__)
 
 

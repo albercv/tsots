@@ -96,6 +96,7 @@ import httpx
 from ..i18n import N_, _
 from . import diario
 from .modelo import (
+    AjustesTikTok,
     Cuenta,
     Lugar,
     ModoFacebook,
@@ -103,6 +104,7 @@ from .modelo import (
     ModoTikTok,
     Opciones,
     Pagina,
+    PRIVACIDADES_TIKTOK,
     Plataforma,
     Programada,
     Publicacion,
@@ -127,6 +129,7 @@ URL_ESTADO = f"{URL_API}/uploadposts/status"
 URL_USUARIOS = f"{URL_API}/uploadposts/users"
 URL_PAGINAS_FACEBOOK = f"{URL_API}/uploadposts/facebook/pages"
 URL_LUGARES_TIKTOK = f"{URL_API}/uploadposts/tiktok/locations"
+URL_AJUSTES_TIKTOK = f"{URL_API}/uploadposts/tiktok/settings"
 URL_PROGRAMADAS = f"{URL_API}/uploadposts/schedule"
 MAX_BUSQUEDA_LUGAR = 100
 # Las consultas de cuentas y páginas se hacen al abrir los diálogos: si el
@@ -202,6 +205,10 @@ def tiempos(tamano: int) -> httpx.Timeout:
                          write=escritura, pool=ESPERA_CONEXION)
 
 
+# Idioma de la app → (defaultLanguage, defaultAudioLanguage) de YouTube.
+_IDIOMAS_YOUTUBE = {"es": ("es", "es-ES"), "en": ("en", "en-US")}
+
+
 def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
            perfil: str, pagina_facebook: str = "") -> dict[str, str | list[str]]:
     """Campos del formulario multipart (sin el vídeo) para una plataforma."""
@@ -220,10 +227,21 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
     texto = texto_para(plataforma, publicacion, x_premium=opciones.x_premium)
     if plataforma == Plataforma.TIKTOK:
         datos["tiktok_title"] = texto
+        # Marcas de IA en false: TSOTS no genera personas, voces ni escenas realistas.
         datos["is_aigc"] = "false"
         if opciones.tiktok_modo == ModoTikTok.PUBLICO:
             datos["post_mode"] = "DIRECT_POST"
-            datos["privacy_level"] = "PUBLIC_TO_EVERYONE"
+            datos["privacy_level"] = opciones.tiktok_privacidad
+            for campo, marcada in (("disable_comment", opciones.tiktok_comentarios),
+                                   ("disable_duet", opciones.tiktok_duos),
+                                   ("disable_stitch", opciones.tiktok_stitch)):
+                datos[campo] = "false" if marcada else "true"
+            if opciones.tu_marca or opciones.contenido_de_marca:
+                datos["disclose_commercial"] = "true"
+                datos["your_brand"] = "true" if opciones.tu_marca else "false"
+                datos["branded_content"] = "true" if opciones.contenido_de_marca else "false"
+            if publicacion.portada is not None:
+                datos["cover_timestamp"] = str(round(publicacion.portada * 1000))
         else:
             datos["post_mode"] = "MEDIA_UPLOAD"
         lugar = opciones.ubicacion.tiktok
@@ -239,10 +257,18 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         datos["categoryId"] = opciones.youtube_categoria or "22"
         datos["privacyStatus"] = "public"
         datos["containsSyntheticMedia"] = "false"
+        datos["selfDeclaredMadeForKids"] = "false"
+        for campo, valor in zip(("defaultLanguage", "defaultAudioLanguage"),
+                                _IDIOMAS_YOUTUBE.get(opciones.idioma, ())):
+            datos[campo] = valor
+        if opciones.contenido_de_marca:
+            datos["hasPaidProductPlacement"] = "true"
     elif plataforma == Plataforma.INSTAGRAM:
         datos["instagram_title"] = texto
         datos["media_type"] = "REELS"
         datos["is_ai_generated"] = "false"
+        if publicacion.portada is not None:
+            datos["thumb_offset"] = str(round(publicacion.portada * 1000))
         if opciones.instagram_modo == ModoInstagram.NORMAL:
             datos["share_mode"] = "CUSTOM"
             datos["share_to_feed"] = "true"
@@ -256,6 +282,8 @@ def campos(plataforma: Plataforma, publicacion: Publicacion, opciones: Opciones,
         largo = opciones.x_premium and longitud_x(texto) > MAX_TEXTO_X
         datos["x_long_text_as_post"] = "true" if largo else "false"
         datos["made_with_ai"] = "false"
+        if opciones.contenido_de_marca:
+            datos["x_paid_partnership"] = "true"
         if id_x_valido(opciones.ubicacion.x_id):
             datos["geo_place_id"] = opciones.ubicacion.x_id.strip()
     elif plataforma == Plataforma.FACEBOOK:
@@ -342,6 +370,13 @@ class ProveedorUploadPost:
         con_fotos = linkedin or bool(fotos)
         archivos = [Path(f) for f in fotos] if con_fotos else [Path(publicacion.video)]
         video = archivos[0] if archivos else Path(publicacion.video)
+        if (plataforma == Plataforma.TIKTOK and opciones.tiktok_modo == ModoTikTok.PUBLICO
+                and not opciones.tiktok_privacidad):
+            return self._error(plataforma, _("Elige quién puede verlo en TikTok"))
+        if (plataforma == Plataforma.TIKTOK and opciones.tiktok_modo == ModoTikTok.PUBLICO
+                and opciones.tiktok_privacidad == "SELF_ONLY" and opciones.contenido_de_marca):
+            # Upload-Post lo publicaría como PUBLIC_TO_EVERYONE.
+            return self._error(plataforma, _("El contenido de marca no puede ser privado"))
         if not self._clave:
             return self._error(plataforma, _("Falta la API key. Guárdala en Redes…"))
         if not self._perfil:
@@ -383,6 +418,11 @@ class ProveedorUploadPost:
                 else:
                     files = {"video": (video.name, pila.enter_context(video.open("rb")),
                                        "video/mp4")}
+                    miniatura = publicacion.miniatura
+                    if plataforma == Plataforma.YOUTUBE and miniatura and Path(miniatura).is_file():
+                        files["thumbnail"] = (Path(miniatura).name,
+                                              pila.enter_context(Path(miniatura).open("rb")),
+                                              "image/jpeg")
                 return http.post(url, headers=self._cabeceras(), data=datos, files=files,
                                  timeout=limites)
 
@@ -504,6 +544,23 @@ class ProveedorUploadPost:
                  ", ".join(p.visible for p in paginas) or "(ninguna)")
         return paginas
 
+    def ajustes_tiktok(self) -> AjustesTikTok:
+        cuerpo = self._consultar(
+            "ajustes de TikTok", URL_AJUSTES_TIKTOK + "?profile={perfil}",
+            URL_AJUSTES_TIKTOK, {"profile": self._perfil})
+        opciones = self._buscar(cuerpo, "privacy_level_options")
+        if not isinstance(opciones, list):
+            raise ErrorConsulta(_(
+                "Respuesta inesperada del servicio: no trae los ajustes de TikTok."))
+        segundos = self._buscar(cuerpo, "max_video_post_duration_sec")
+        valido = isinstance(segundos, (int, float)) and not isinstance(segundos, bool) and segundos > 0
+        return AjustesTikTok(
+            tuple(k for k in PRIVACIDADES_TIKTOK if k in opciones),
+            int(segundos) if valido else None,
+            self._buscar(cuerpo, "comment_disabled") is True,
+            self._buscar(cuerpo, "duet_disabled") is True,
+            self._buscar(cuerpo, "stitch_disabled") is True)
+
     def lugares_tiktok(self, texto: str) -> list[Lugar]:
         consulta = (texto or "").strip()[:MAX_BUSQUEDA_LUGAR]
         if not consulta:
@@ -512,7 +569,7 @@ class ProveedorUploadPost:
         cuerpo = self._consultar(
             "lugares de TikTok", URL_LUGARES_TIKTOK + f"?profile={{perfil}}&q={consulta}",
             URL_LUGARES_TIKTOK, {"profile": self._perfil, "q": consulta},
-            registrar_cuerpo=False)
+            registrar_cuerpo=False, ubicacion=True)
         lista = self._buscar(cuerpo, "locations")
         if not isinstance(lista, list):
             raise ErrorConsulta(_(
@@ -594,7 +651,7 @@ class ProveedorUploadPost:
 
     def _consultar(self, que: str, plantilla: str, url: str,
                    parametros: dict | None = None, registrar_cuerpo: bool = True,
-                   pide_perfil: bool = True) -> Any:
+                   pide_perfil: bool = True, ubicacion: bool = False) -> Any:
         """GET de consulta (cuentas, páginas). Lanza `ErrorConsulta` con un
         motivo legible. `plantilla` es la URL que va al registro, sin el perfil."""
         if not self._clave:
@@ -617,7 +674,7 @@ class ProveedorUploadPost:
                  (diario.cuerpo(respuesta.text, [self._clave]) or "(vacío)") if registrar_cuerpo
                  or respuesta.status_code >= 400 else "(no se registra: datos de la cuenta)")
         if respuesta.status_code >= 400:
-            raise ErrorConsulta(self._mensaje_http(respuesta))
+            raise ErrorConsulta(self._mensaje_http(respuesta, ubicacion=ubicacion))
         cuerpo = self._json(respuesta)
         if not isinstance(cuerpo, (dict, list)):
             raise ErrorConsulta(self._limpiar(_(
@@ -915,7 +972,7 @@ class ProveedorUploadPost:
             return None
 
     def _mensaje_http(self, respuesta: httpx.Response,
-                      plataforma: Plataforma | None = None) -> str:
+                      plataforma: Plataforma | None = None, ubicacion: bool = False) -> str:
         codigo = respuesta.status_code
         cuerpo = self._json(respuesta)
         if isinstance(cuerpo, dict):
@@ -932,10 +989,11 @@ class ProveedorUploadPost:
         if "scheduled_post_in_progress" in detalle:
             return self._limpiar(_(
                 "Ya se está publicando o sale en menos de un minuto: no se puede cancelar."))
-        if "tiktok_reconnect_required" in detalle:
-            return self._limpiar(_(
-                "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.").format(
-                servicio=NOMBRE))
+        if ("tiktok_reconnect_required" in detalle
+                or (isinstance(cuerpo, dict) and cuerpo.get("reauth_required") is True)):
+            return self._limpiar((_(
+                "Reconecta TikTok en {servicio} para poder etiquetar ubicaciones.") if ubicacion
+                else _("Reconecta tu cuenta de TikTok en {servicio}.")).format(servicio=NOMBRE))
         if codigo == 401:
             base = _("La API key no es válida o ha caducado (401). Revísala en Redes…")
         elif codigo == 403:
