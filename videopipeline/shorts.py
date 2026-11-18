@@ -1,9 +1,9 @@
 """Shorts (1:00-2:59) cortados de un vídeo largo a partir de su transcripción.
 
-Flujo: la transcripción por palabras se trocea en frases numeradas; el LLM
-propone trozos como rangos de frases; el código valida esos rangos (existen,
-duran entre 60 y 179 s, no se repiten), `tev1` (o el modelo del caption) los
-puntúa y se eligen los mejores sin solapes. `crear` corta cada uno de la base
+Flujo: la transcripción por palabras se trocea en frases numeradas; el LLM las
+segmenta en temas; los temas (o tramos de temas seguidos) de 60 a 179 s son
+candidatos y los más largos se trocean en fragmentos; `tev1` (o el modelo del
+caption) los puntúa y se eligen los mejores, repartidos y sin solapes. `crear` corta cada uno de la base
 de la ficha y publica la carpeta.
 """
 from __future__ import annotations
@@ -24,7 +24,7 @@ from .edicion import entregar, estilos
 from .edicion import zonas as zonas_edicion
 from .ficha import HORIZONTAL, TRANSCRIPCION, VERTICAL, Ficha, _escribir_json
 from .i18n import _
-from .ollama import asegurar_servidor, chat_json, systemone
+from .ollama import asegurar_servidor, chat_json, descargar, systemone
 from .pipeline import Progreso, _avisar, _emitir, _fase_caption, _fase_vertical
 from .redes import registro
 from .reproceso import _Pasada, ejecutar
@@ -45,8 +45,9 @@ UMBRAL_INDEPENDIENTE = 0.5
 PAUSA_FRASE = 1.0  # s de silencio que cierran una frase sin puntuación
 MAX_PALABRAS_FRASE = 60
 MARGEN_CORTE = 0.25  # s de aire antes y después del trozo
-MINUTOS_PARTE = 20
-MINUTOS_SOLAPE = 3  # > DURACION_MAX: un trozo cortado cabe entero en otra parte
+MINUTOS_VENTANA = 10  # ventana de la segmentación en temas
+TEMPERATURA_TEMAS = 0.2
+KEEP_ALIVE_SHORTS = "5m"  # el modelo sigue cargado entre las llamadas de un vídeo
 MAX_NOMBRE = 60
 JUEZ = "tev1:0.8b"
 
@@ -57,7 +58,7 @@ _NO_VALIDOS_EN_NOMBRE = re.compile(r'[/\\:*?"<>|\x00-\x1f\x7f-\x9f]')
 # Por qué se descarta un candidato (`Candidato.descarte`; "" = sigue en pie).
 DESCARTES = (
     "fuera_de_rango", "duracion", "repetido", "flojo", "no_se_entiende_solo",
-    "solapa", "sobra",
+    "solapa", "sobra", "tema_corto",
 )
 
 
@@ -79,6 +80,16 @@ class Frase:
 
 
 @dataclass
+class Tema:
+    frase_inicio: int  # de 1 a n, globales, ambas incluidas
+    frase_fin: int
+    titulo: str
+    sigue_al_anterior: bool
+    inicio: float = 0.0  # segundos de las frases, sin margen
+    fin: float = 0.0
+
+
+@dataclass
 class Candidato:
     frase_inicio: int  # de 1 a n, globales
     frase_fin: int
@@ -91,6 +102,7 @@ class Candidato:
     descarte: str = ""
     archivo: str = ""  # nombre del .mp4 si salió
     titulo_video: str = ""  # el título quemado en el short, si salió
+    origen: str = ""  # "tema" | "tramo" | "fragmento"; "" en shorts.json v1
 
 
 def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
@@ -116,32 +128,8 @@ def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
 
 
 def maximo_shorts(duracion: float) -> int:
-    return int(duracion // 180)
-
-
-def partes(frases: list[Frase]) -> list[tuple[int, int]]:
-    """Rangos `[desde, hasta)` de frases de como mucho `MINUTOS_PARTE` minutos.
-
-    Cada parte empieza `MINUTOS_PARTE - MINUTOS_SOLAPE` minutos después de la
-    anterior, para que un trozo cortado por el límite quepa entero en la
-    siguiente.
-    """
-    paso = (MINUTOS_PARTE - MINUTOS_SOLAPE) * 60
-    resultado: list[tuple[int, int]] = []
-    desde = 0
-    while desde < len(frases):
-        limite = frases[desde].inicio + MINUTOS_PARTE * 60
-        hasta = desde + 1  # una parte nunca está vacía
-        while hasta < len(frases) and frases[hasta].fin <= limite:
-            hasta += 1
-        resultado.append((desde, hasta))
-        if hasta == len(frases):
-            break
-        siguiente = frases[desde].inicio + paso
-        desde += 1
-        while desde < len(frases) and frases[desde].inicio < siguiente:
-            desde += 1
-    return resultado
+    # Uno por cada 10 minutos, y al menos uno si el vídeo da para un short.
+    return 0 if duracion < 180 else max(1, int(duracion // 600))
 
 
 def _entero(valor) -> int | None:
@@ -206,12 +194,80 @@ def validar(datos: dict, frases: list[Frase], duracion: float) -> list[Candidato
     return candidatos
 
 
-def elegir(candidatos: list[Candidato], maximo: int) -> list[Candidato]:
-    """Los mejores candidatos puntuados, sin solapes y como mucho `maximo`.
+def bloques(temas: list[Tema]) -> list[list[Tema]]:
+    """Agrupa temas consecutivos mientras el siguiente siga al anterior."""
+    grupos: list[list[Tema]] = []
+    for t in temas:
+        if grupos and t.sigue_al_anterior:
+            grupos[-1].append(t)
+        else:
+            grupos.append([t])
+    return grupos
 
-    Marca en `descarte` el motivo de los que no entran y devuelve los elegidos
-    de mejor a peor. Un candidato sin nota no pasa. Se solapan los que
-    comparten alguna frase, no los que solo se tocan por el margen del corte.
+
+def candidatos_de_temas(
+    temas: list[Tema], frases: list[Frase], duracion: float,
+) -> tuple[list[Candidato], list[Tema]]:
+    """Candidatos de temas enteros y de tramos de temas seguidos.
+
+    Devuelve `(candidatos, temas_largos)`; los temas de más de DURACION_MAX
+    quedan para trocearlos aparte.
+    """
+    def largo(ini: int, fin: int) -> float:
+        return frases[fin - 1].fin - frases[ini - 1].inicio
+
+    entradas: list[dict] = []
+    largos: list[Tema] = []
+    cubiertos: set[int] = set()  # id() de los temas dentro de algún tramo
+    for t in temas:
+        d = largo(t.frase_inicio, t.frase_fin)
+        if d > DURACION_MAX:
+            largos.append(t)
+        elif d >= DURACION_MIN:
+            entradas.append({"frase_inicio": t.frase_inicio,
+                             "frase_fin": t.frase_fin, "titulo": t.titulo})
+    for bloque in bloques(temas):
+        for i, t in enumerate(bloque):
+            mejor = None
+            for j in range(i + 1, len(bloque)):
+                if DURACION_MIN <= largo(t.frase_inicio, bloque[j].frase_fin) <= DURACION_MAX:
+                    mejor = j
+            if mejor is not None:
+                entradas.append({"frase_inicio": t.frase_inicio,
+                                 "frase_fin": bloque[mejor].frase_fin,
+                                 "titulo": t.titulo})
+                cubiertos.update(id(x) for x in bloque[i:mejor + 1])
+    candidatos = validar({"candidatos": entradas}, frases, duracion)
+    for c in candidatos:
+        tema = any(t.frase_inicio == c.frase_inicio and t.frase_fin == c.frase_fin
+                   for t in temas)
+        c.origen = "tema" if tema else "tramo"
+    for t in temas:
+        if id(t) not in cubiertos and largo(t.frase_inicio, t.frase_fin) < DURACION_MIN:
+            candidatos.append(Candidato(t.frase_inicio, t.frase_fin, t.titulo, "",
+                                        descarte="tema_corto", origen="tema"))
+    candidatos.sort(key=lambda c: (c.frase_inicio, c.frase_fin))
+    return candidatos, largos
+
+
+MINUTOS_TRAMO = 10
+EMPATE_INTERES = 0.3  # diferencia de nota en la que gana el short más largo
+
+
+def _se_solapan(a: Candidato, b: Candidato) -> bool:
+    return a.frase_inicio <= b.frase_fin and b.frase_inicio <= a.frase_fin
+
+
+def elegir(candidatos: list[Candidato], maximo: int,
+           duracion: float) -> list[Candidato]:
+    """Los mejores candidatos puntuados, repartidos por el vídeo y sin solapes.
+
+    Primera vuelta: el mejor de cada tramo de `MINUTOS_TRAMO` minutos; segunda,
+    el resto por nota hasta `maximo`. Entre dos que se solapan con casi la misma
+    nota gana el más largo. Marca en `descarte` el motivo de los que no entran
+    y devuelve los elegidos de mejor a peor. Un candidato sin nota no pasa. Se
+    solapan los que comparten alguna frase, no los que solo se tocan por el
+    margen del corte.
     """
     vivos = [c for c in candidatos if not c.descarte]
     for c in vivos:
@@ -221,15 +277,50 @@ def elegir(candidatos: list[Candidato], maximo: int) -> list[Candidato]:
             c.descarte = "no_se_entiende_solo"
     pasan = [c for c in vivos if not c.descarte]
     pasan.sort(key=lambda c: (-c.interes, -c.independiente, c.inicio))
+    orden = {id(c): k for k, c in enumerate(pasan)}
     elegidos: list[Candidato] = []
+    # Mejor interés de la cadena de reemplazos, para que no se aleje de él más
+    # de EMPATE_INTERES.
+    techo: dict[int, float] = {}
+
+    def colocar(c: Candidato) -> bool:
+        choques = [e for e in elegidos if _se_solapan(c, e)]
+        if not choques:
+            elegidos.append(c)
+            return True
+        e = choques[0]
+        alto = techo.get(id(e), e.interes)
+        if (len(choques) == 1 and alto - c.interes <= EMPATE_INTERES + 1e-9
+                and c.fin - c.inicio > e.fin - e.inicio):
+            elegidos[next(k for k, x in enumerate(elegidos) if x is e)] = c
+            techo[id(c)] = alto
+            e.descarte = "solapa"
+            return True
+        c.descarte = "solapa"
+        return False
+
+    def tramo(c: Candidato) -> int:
+        return int(c.inicio // (MINUTOS_TRAMO * 60))
+
     for c in pasan:
-        if any(c.frase_inicio <= e.frase_fin and e.frase_inicio <= c.frase_fin
-               for e in elegidos):
-            c.descarte = "solapa"
-        elif len(elegidos) >= maximo:
+        # Recalculado cada vez: un reemplazo puede dejar sin short el tramo del
+        # sustituido.
+        # También puede retar a un elegido de su tramo con el que se solape.
+        if (tramo(c) not in {tramo(e) for e in elegidos}
+                or any(tramo(e) == tramo(c) and _se_solapan(c, e) for e in elegidos)):
+            colocar(c)
+    elegidos.sort(key=lambda c: orden[id(c)])
+    for c in elegidos[maximo:]:
+        c.descarte = "sobra"
+    del elegidos[maximo:]
+    for c in pasan:
+        if c.descarte or any(c is e for e in elegidos):
+            continue
+        if len(elegidos) >= maximo:
             c.descarte = "sobra"
         else:
-            elegidos.append(c)
+            colocar(c)
+    elegidos.sort(key=lambda c: orden[id(c)])
     return elegidos
 
 
@@ -247,18 +338,6 @@ def tramo_palabras(palabras: list[Palabra], inicio: float, fin: float) -> list[P
         for p in palabras if inicio <= p.inicio and p.fin <= fin
     ]
 
-
-_SYSTEM_CANDIDATOS = (
-    "Eres editor de vídeo para redes. Te doy la transcripción de un vídeo largo "
-    "en frases numeradas con su segundo de inicio y fin. Elige hasta {n} "
-    "fragmentos que funcionen como short independiente: que se entiendan sin el "
-    "resto del vídeo, con gancho al empezar y un cierre claro. Cada fragmento "
-    "empieza al inicio de una frase y acaba al final de otra, y dura entre 60 y "
-    "179 segundos (fin de la última menos inicio de la primera). Para cada uno "
-    "da: frase_inicio y frase_fin (números de frase), un título de 3 a 5 "
-    "palabras y una línea con el motivo, en el idioma de la transcripción. Si no "
-    "hay ninguno bueno, devuelve la lista vacía. Responde solo JSON."
-)
 
 ESQUEMA_CANDIDATOS = {
     "type": "object",
@@ -317,52 +396,211 @@ ESQUEMA_JUEZ = {
 }
 
 
-def construir_mensajes(frases: list[Frase], desde: int, hasta: int, n: int
-                       ) -> list[dict]:
-    """Mensajes para pedir hasta `n` candidatos entre `frases[desde:hasta]`.
+_SYSTEM_TEMAS = (
+    "Eres editor de vídeo. Te doy un trozo de la transcripción de un vídeo largo "
+    "en frases numeradas con su segundo de inicio y fin. Devuelve los temas que "
+    "EMPIEZAN en este texto: para cada uno, frase_inicio (el número de su primera "
+    "frase), un título de 3 a 5 palabras en el idioma de la transcripción y "
+    "sigue_al_anterior. Un tema es un asunto que se puede contar entero. "
+    "sigue_al_anterior es true si es otro punto de la misma conversación que el "
+    "tema anterior y false si cambia de asunto. Responde solo JSON."
+)
 
-    Las frases se numeran con su número global, el que luego se valida.
-    """
+ESQUEMA_TEMAS = {
+    "type": "object",
+    "properties": {
+        "temas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "frase_inicio": {"type": "integer"},
+                    "titulo": {"type": "string"},
+                    "sigue_al_anterior": {"type": "boolean"},
+                },
+                "required": ["frase_inicio", "titulo", "sigue_al_anterior"],
+            },
+        },
+    },
+    "required": ["temas"],
+}
+
+
+def ventana(frases: list[Frase], desde: int) -> int:
+    """`hasta` (exclusivo) de la ventana que empieza en `frases[desde]`: las
+    frases que acaban como mucho `MINUTOS_VENTANA` minutos después. Al menos una."""
+    limite = frases[desde].inicio + MINUTOS_VENTANA * 60
+    hasta = desde + 1
+    while hasta < len(frases) and frases[hasta].fin <= limite:
+        hasta += 1
+    return hasta
+
+
+def construir_mensajes_temas(frases: list[Frase], desde: int, hasta: int
+                             ) -> list[dict]:
     lineas = [
         f"[{i}] {f.inicio:.0f}s-{f.fin:.0f}s: {f.texto}"
         for i, f in enumerate(frases[desde:hasta], desde + 1)
     ]
     return [
-        {"role": "system", "content": _SYSTEM_CANDIDATOS.format(n=n)},
+        {"role": "system", "content": _SYSTEM_TEMAS},
         {"role": "user", "content": "Transcripción:\n" + "\n".join(lineas)},
     ]
 
 
-def buscar_candidatos(
-    frases: list[Frase],
-    duracion: float,
-    maximo: int,
-    modelo: str,
-    on_percent: Callable[[float], None] | None = None,
-) -> list[Candidato]:
-    """Candidatos validados de todas las partes; sin frases, ninguno.
+def validar_temas(datos: dict, desde: int, hasta: int
+                  ) -> list[tuple[int, str, bool]]:
+    """`(frase_inicio, título, sigue_al_anterior)` de los temas válidos, con
+    inicios en `[desde + 1, hasta]`, crecientes y sin repetir."""
+    entradas = datos.get("temas") if isinstance(datos, dict) else None
+    if not isinstance(entradas, list):
+        raise PasoFallido(
+            _("La respuesta del modelo no es válida: faltan los temas"),
+            detalle=json.dumps(datos, ensure_ascii=False, default=str)[:2000],
+        )
+    temas: dict[int, tuple[str, bool]] = {}
+    for entrada in entradas:
+        if not isinstance(entrada, dict):
+            continue
+        ini = _entero(entrada.get("frase_inicio"))
+        if ini is None or not desde + 1 <= ini <= hasta or ini in temas:
+            continue
+        temas[ini] = (" ".join(str(entrada.get("titulo") or "").split()),
+                      entrada.get("sigue_al_anterior") is True)
+    return [(ini, *temas[ini]) for ini in sorted(temas)]
 
-    Una llamada por parte, pidiendo `2 × maximo` repartidos según lo que dura
-    la parte. Un trozo que dos partes proponen igual queda una vez y la otra
-    como `"repetido"`.
+
+def segmentar(frases: list[Frase], modelo: str,
+              on_percent: Callable[[float], None] | None = None) -> list[Tema]:
+    """Los temas del vídeo, en ventanas encadenadas de `MINUTOS_VENTANA` minutos.
+
+    Cada ventana vuelve a mirar desde el inicio del último tema, que puede
+    seguir; lo que dice la ventana posterior manda. Sin frases, ninguno.
     """
-    por_partes = partes(frases)
-    candidatos: list[Candidato] = []
-    vistos: set[tuple[int, int]] = set()
-    for k, (desde, hasta) in enumerate(por_partes, 1):
-        dura = frases[hasta - 1].fin - frases[desde].inicio
-        n = max(2, round(2 * maximo * dura / duracion))
-        datos = chat_json(modelo, construir_mensajes(frases, desde, hasta, n),
-                          ESQUEMA_CANDIDATOS)
-        for c in validar(datos, frases, duracion):
-            if not c.descarte:
-                if (c.frase_inicio, c.frase_fin) in vistos:
-                    c.descarte = "repetido"
-                vistos.add((c.frase_inicio, c.frase_fin))
-            candidatos.append(c)
+    inicios: dict[int, tuple[str, bool]] = {}  # frase global -> (título, sigue)
+    desde = 0
+    while desde < len(frases):
+        hasta = ventana(frases, desde)
+        for intento in (1, 2):
+            try:
+                datos = chat_json(
+                    modelo, construir_mensajes_temas(frases, desde, hasta),
+                    ESQUEMA_TEMAS, temperatura=TEMPERATURA_TEMAS,
+                    keep_alive=KEEP_ALIVE_SHORTS)
+                nuevos = validar_temas(datos, desde, hasta)
+                break
+            except PasoFallido:
+                if intento == 2:
+                    raise
+        for ini, titulo, sigue in nuevos:
+            inicios[ini] = (titulo, sigue)  # la ventana posterior manda
         if on_percent is not None:
-            on_percent(100.0 * k / len(por_partes))
-    return candidatos
+            on_percent(100.0 * hasta / len(frases))
+        if hasta == len(frases):
+            break
+        ultimo = max((i for i in inicios if i <= hasta), default=desde + 1)
+        # Si el último tema empieza en la primera frase de la ventana (más largo
+        # que ella), se sigue por `hasta`: mirar desde su inicio no avanzaría.
+        desde = ultimo - 1 if ultimo - 1 > desde else hasta
+    if frases:
+        inicios.setdefault(1, ("", False))
+    orden = sorted(inicios)
+    temas = []
+    for k, ini in enumerate(orden):
+        fin = orden[k + 1] - 1 if k + 1 < len(orden) else len(frases)
+        titulo, sigue = inicios[ini]
+        temas.append(Tema(ini, fin, titulo, sigue and k > 0,
+                          frases[ini - 1].inicio, frases[fin - 1].fin))
+    return temas
+
+
+MAX_FRAGMENTOS_LLAMADA = 3
+
+_SYSTEM_FRAGMENTOS = (
+    "Eres editor de vídeo para redes. Te doy un trozo de la transcripción de un "
+    "tema largo, en frases numeradas con su segundo de inicio y fin (desde el "
+    "principio del tema). Elige hasta {k} fragmentos autocontenidos de 60 a 179 "
+    "segundos (fin de la última frase menos inicio de la primera) que no se "
+    "solapen entre sí. Que sean los más largos posibles sin dejar la idea a "
+    "medias, con gancho al empezar y un cierre claro al acabar. Cada fragmento "
+    "empieza al inicio de una frase y acaba al final de otra. Para cada uno da: "
+    "frase_inicio y frase_fin (números de frase), un título de 3 a 5 palabras y "
+    "una línea con el motivo, en el idioma de la transcripción. Si no hay ninguno "
+    "bueno, devuelve la lista vacía. Responde solo JSON."
+)
+
+
+def construir_mensajes_fragmentos(frases: list[Frase], desde: int, hasta: int,
+                                  k: int, cero: float) -> list[dict]:
+    """Mensajes de la subventana `frases[desde:hasta]`, con los segundos relativos a `cero` (inicio del tema)."""
+    lineas = [
+        f"[{i}] {f.inicio - cero:.0f}s-{f.fin - cero:.0f}s: {f.texto}"
+        for i, f in enumerate(frases[desde:hasta], desde + 1)
+    ]
+    return [
+        {"role": "system", "content": _SYSTEM_FRAGMENTOS.format(k=k)},
+        {"role": "user", "content": "Transcripción:\n" + "\n".join(lineas)},
+    ]
+
+
+def fragmentos(tema: Tema, frases: list[Frase], duracion: float, modelo: str,
+               on_percent: Callable[[float], None] | None = None) -> list[Candidato]:
+    """Los mejores fragmentos autocontenidos de un tema de más de DURACION_MAX.
+
+    Una llamada por subventana del tema; lo que se sale del tema queda como
+    `"fuera_de_rango"` y lo de duración mala tiene una sola corrección. Una
+    respuesta inválida salta esa subventana en vez de abortar todo.
+    """
+    fin_tema = tema.frase_fin
+    salida: list[Candidato] = []
+
+    def pedir(mensajes: list[dict]) -> tuple[dict, list[Candidato]]:
+        datos = chat_json(modelo, mensajes, ESQUEMA_CANDIDATOS,
+                          keep_alive=KEEP_ALIVE_SHORTS)
+        cs = validar(datos, frases, duracion)
+        for c in cs:
+            if not (tema.frase_inicio <= c.frase_inicio <= c.frase_fin <= fin_tema):
+                c.descarte = "fuera_de_rango"
+            c.origen = "fragmento"
+        return datos, cs
+
+    desde = tema.frase_inicio - 1
+    while desde < fin_tema:
+        hasta = min(ventana(frases, desde), fin_tema)
+        if hasta < fin_tema and frases[fin_tema - 1].fin - frases[hasta].inicio < DURACION_MIN:
+            hasta = fin_tema  # un resto corto no da para un short: va con esta subventana
+        dura = frases[hasta - 1].fin - frases[desde].inicio
+        k = min(MAX_FRAGMENTOS_LLAMADA, max(1, int(dura // 180)))
+        mensajes = construir_mensajes_fragmentos(frases, desde, hasta, k, tema.inicio)
+        try:
+            datos, cs = pedir(mensajes)
+            for c in cs:
+                if c.descarte != "duracion":
+                    salida.append(c)
+                    continue
+                s = frases[c.frase_fin - 1].fin - frases[c.frase_inicio - 1].inicio
+                correccion = mensajes + [
+                    {"role": "assistant",
+                     "content": json.dumps(datos, ensure_ascii=False)},
+                    {"role": "user", "content": (
+                        f"El fragmento {c.frase_inicio}-{c.frase_fin} dura {s:.0f} s: "
+                        "ajústalo para que dure entre 60 y 179 s sin dejar la idea a medias")},
+                ]
+                correccion[0] = {"role": "system",
+                                 "content": _SYSTEM_FRAGMENTOS.format(k=1)}
+                try:
+                    nuevos = [n for n in pedir(correccion)[1] if not n.descarte]
+                except PasoFallido:
+                    nuevos = []
+                salida.append(nuevos[0] if nuevos else c)
+        except PasoFallido as e:
+            log.warning("Subventana %d-%d de «%s» omitida: %s",
+                        desde + 1, hasta, tema.titulo, e)
+        if on_percent is not None:
+            on_percent(100.0 * (hasta - tema.frase_inicio + 1)
+                       / (fin_tema - tema.frase_inicio + 1))
+        desde = hasta
+    return salida
 
 
 def _respuesta_invalida(juez: str, datos) -> PasoFallido:
@@ -390,6 +628,7 @@ def nota_chat(texto: str, modelo: str) -> tuple[float, float]:
          {"role": "user", "content": "Fragmento:\n" + texto}],
         ESQUEMA_JUEZ,
         temperatura=0,
+        keep_alive=KEEP_ALIVE_SHORTS,
     )
     try:
         return (1.0 if datos["independiente"] == "si" else 0.0,
@@ -435,6 +674,55 @@ def puntuar(
             detalle=str(error),
         ) from error
     return modelo
+
+
+@dataclass
+class Seleccion:
+    temas: list[Tema]
+    candidatos: list[Candidato]
+    elegidos: list[Candidato]
+    juez: str
+
+
+def seleccionar(
+    frases: list[Frase], duracion: float, modelo: str,
+    on_aviso: Callable[[str], None],
+    avance_temas: Callable[[float], None] | None = None,
+    avance_momentos: Callable[[float], None] | None = None,
+    avance_notas: Callable[[float], None] | None = None,
+) -> Seleccion:
+    """Temas, candidatos, notas y elegidos de un vídeo; descarga el modelo al acabar."""
+    try:
+        temas = segmentar(frases, modelo, avance_temas)
+        candidatos, largos = candidatos_de_temas(temas, frases, duracion)
+        for k, tema in enumerate(largos):
+            def parcial(p: float, k: int = k) -> None:
+                if avance_momentos is not None:
+                    avance_momentos(100.0 * (k + p / 100) / len(largos))
+            candidatos += fragmentos(tema, frases, duracion, modelo, parcial)
+        vistos: set[tuple[int, int]] = set()
+        for c in candidatos:
+            if c.descarte:
+                continue
+            if (c.frase_inicio, c.frase_fin) in vistos:
+                c.descarte = "repetido"
+            vistos.add((c.frase_inicio, c.frase_fin))
+        juez = puntuar(candidatos, frases, modelo, on_aviso, avance_notas)
+        elegidos = elegir(candidatos, maximo_shorts(duracion), duracion)
+    finally:
+        descargar(modelo)
+    return Seleccion(temas, candidatos, elegidos, juez)
+
+
+def datos_seleccion(sel: Seleccion) -> dict:
+    """Lo de `shorts.json` que describe la selección (sin ficha ni archivos)."""
+    return {
+        "juez": sel.juez,
+        "temas": [asdict(t) for t in sel.temas],
+        # Los elegidos en orden y luego los demás, con su descarte.
+        "candidatos": [asdict(c) for c in
+                       sel.elegidos + [c for c in sel.candidatos if c.descarte]],
+    }
 
 
 # --- Generar y publicar la carpeta ------------------------------------------
@@ -610,19 +898,20 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
     frases = trocear_frases(palabras)
     total = 2 + maximo
 
-    def avance(paso: int, etiqueta: str) -> Callable[[float], None]:
-        _emitir(on_progress, paso, total, etiqueta)
+    def avance(paso: int, etiqueta: str, ahora: bool = True) -> Callable[[float], None]:
+        if ahora:  # los demás anuncian su etiqueta con el primer porcentaje
+            _emitir(on_progress, paso, total, etiqueta)
         return lambda p: _emitir(on_progress, paso, total, etiqueta, p)
 
     servidor = asegurar_servidor()
     try:
-        candidatos = buscar_candidatos(
-            frases, duracion, maximo, config.modelo_caption,
-            avance(1, _("Buscando trozos para shorts")))
-        juez = puntuar(candidatos, frases, config.modelo_caption,
-                       on_aviso=lambda texto: _avisar(on_progress, texto),
-                       on_percent=avance(2, _("Puntuando los trozos")))
-        elegidos = elegir(candidatos, maximo)
+        seleccion = seleccionar(
+            frases, duracion, config.modelo_caption,
+            on_aviso=lambda texto: _avisar(on_progress, texto),
+            avance_temas=avance(1, _("Buscando temas")),
+            avance_momentos=avance(1, _("Buscando los mejores momentos"), False),
+            avance_notas=avance(2, _("Puntuando los trozos"), False))
+        elegidos = seleccion.elegidos
         # Todo short lleva su título quemado, con o sin el de inicio del panel:
         # el del modelo sobre su trozo o, si falla, el del candidato.
         titulado = avance(2, _("Generando título")) if elegidos else None
@@ -697,12 +986,9 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         nuevos = [stem + sufijo for stem in nombres for sufijo in _SUFIJOS
                   if (tmp / (stem + sufijo)).is_file()]
         datos = {
-            "version": 1, "ficha": ficha.id, "video": nombre, "juez": juez,
-            "maximo": maximo,
+            "version": 2, "ficha": ficha.id, "video": nombre, "maximo": maximo,
             "archivos": anteriores + [n for n in nuevos if n not in anteriores],
-            # Los elegidos en orden y luego los demás, con su descarte.
-            "candidatos": [asdict(c) for c in
-                           elegidos + [c for c in candidatos if c.descarte]],
+            **datos_seleccion(seleccion),
         }
         _escribir_json(carpeta / "shorts.json", datos)
         for anterior in anteriores:

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:26+0100\n"
+"POT-Creation-Date: 2026-11-18 19:14+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -267,10 +267,13 @@ msgstr ""
 msgid "Borrar"
 msgstr ""
 
+msgid "Buscando los mejores momentos"
+msgstr ""
+
 msgid "Buscando perfiles…"
 msgstr ""
 
-msgid "Buscando trozos para shorts"
+msgid "Buscando temas"
 msgstr ""
 
 msgid "Buscando…"
@@ -1071,6 +1074,9 @@ msgid "La respuesta del modelo no es válida: faltan campos o tipos incorrectos"
 msgstr ""
 
 msgid "La respuesta del modelo no es válida: faltan los candidatos"
+msgstr ""
+
+msgid "La respuesta del modelo no es válida: faltan los temas"
 msgstr ""
 
 msgid "La respuesta del modelo no trae un título"

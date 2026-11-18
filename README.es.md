@@ -140,9 +140,11 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      el nombre del vídeo junto a sus salidas, cada uno con su propio
      caption (`.md`, si el caption SEO está activo). **Crear shorts al
      procesar** lo hace al final de cada procesado. Volver a crearlos
-     sustituye solo los shorts que hizo la app. Si el modelo `tev1:0.8b` no
+     sustituye solo los shorts que hizo la app. Uno cada 10 minutos como
+     mucho, temas completos de todo el vídeo. Si el modelo `tev1:0.8b` no
      está instalado en Ollama, los puntúa el modelo del caption (más
-     despacio).
+     despacio). Para probar solo la selección, sin cortar nada:
+     `python -m videopipeline.shorts_prueba <ficha> <salida.json>`.
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que
      Whisper los escriba bien en los subtítulos y el caption. Después de
      `=`, las formas en que Whisper se equivoca; se corrigen solas:

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 17:26+0100\n"
+"POT-Creation-Date: 2026-11-18 19:14+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -272,11 +272,14 @@ msgstr "Draft (finish it in the app)"
 msgid "Borrar"
 msgstr "Delete"
 
+msgid "Buscando los mejores momentos"
+msgstr "Finding the best moments"
+
 msgid "Buscando perfiles…"
 msgstr "Looking for profiles…"
 
-msgid "Buscando trozos para shorts"
-msgstr "Looking for clips for shorts"
+msgid "Buscando temas"
+msgstr "Finding topics"
 
 msgid "Buscando…"
 msgstr "Searching…"
@@ -1105,6 +1108,9 @@ msgstr "The model's response is not valid: missing fields or wrong types"
 
 msgid "La respuesta del modelo no es válida: faltan los candidatos"
 msgstr "The model's response is not valid: the candidates are missing"
+
+msgid "La respuesta del modelo no es válida: faltan los temas"
+msgstr "The model's response is not valid: the topics are missing"
 
 msgid "La respuesta del modelo no trae un título"
 msgstr "The model's response has no title"
@@ -2663,6 +2669,9 @@ msgstr "📅 Scheduled for {fecha}"
 
 #~ msgid "Al publicar, por defecto"
 #~ msgstr "Defaults when publishing"
+
+#~ msgid "Buscando trozos para shorts"
+#~ msgstr "Looking for clips for shorts"
 
 #~ msgid "Ciudad o lugar, p. ej. Madrid"
 #~ msgstr "City or place, e.g. Madrid"

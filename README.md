@@ -135,8 +135,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      after the video next to its outputs, each with its own caption
      (`.md`, if the SEO caption is on). **Create shorts when processing**
      does it at the end of every run. Doing it again replaces only the
-     shorts the app made. If the `tev1:0.8b` model is not installed in
-     Ollama, the caption model scores them instead (slower).
+     shorts the app made. At most one short every 10 minutes, built from
+     whole topics found across the entire video. If the `tev1:0.8b`
+     model is not installed in Ollama, the caption model scores them
+     instead (slower). To try only the selection, without cutting
+     anything: `python -m videopipeline.shorts_prueba <card> <output.json>`.
    - **Terms…**: your brands and proper names, one per line, so Whisper
      spells them right in the subtitles and the caption. After `=`, the
      ways Whisper gets them wrong; they are fixed automatically:
