@@ -389,6 +389,21 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   validando, montando el vídeo, revisando) y el tiempo que falta, estimado
   con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
   editaron y cuántos fallaron; al pasar el ratón por la fila, cuáles.
+- **Recursos explicativos:** además de rótulos y contadores, Claude puede
+  señalar un texto que ya sale en pantalla (círculo, flecha o subrayado),
+  ampliar un texto pequeño en una tarjeta con lupa, tapar la imagen o ponerse
+  en una ventana con B-roll gratuito de Pexels (modo «tapa» a pantalla completa
+  si no hay nada escrito en pantalla, modo «ventana» si lo hay), añadir iconos
+  para ideas abstractas y tarjetas de dato para los números que oye. Elige el
+  mejor para cada momento.
+  - **Clave de Pexels (gratis):** para el B-roll, pulsa el botón **Pexels…**
+    de los ajustes y pega tu clave (créala en https://www.pexels.com/api/).
+    Sin ella, el B-roll simplemente no se usa.
+  - **Lectura de pantalla:** necesita `pyobjc-framework-Vision` (ya está en
+    `requirements.txt`, macOS). Sin él, los avisos de señalar y lupa quedan
+    desactivados.
+  - **Créditos del B-roll:** los clips usados se guardan en el `broll.json`
+    del trabajo.
 - **Música de fondo:** mete pistas libres de derechos en
   `~/TSOTS/musica/divertido/`, `formal/` y `academico/` (mp3, wav, m4a,
   aac, flac u ogg). Cada short coge la siguiente pista de su estilo por

@@ -390,6 +390,19 @@ sounds, in the style you choose. The untouched original stays where it is.
   decides, validating, rendering, checking) and the estimated time left,
   based on how long the finished ones took. When the batch ends it shows how
   many were edited and how many failed; hover the row to see which.
+- **Explanatory visuals:** besides labels and counters, Claude can point at
+  text that already shows on screen (a circle, arrow or underline), blow up a
+  small piece of text in a magnifier card, cover or sit beside the footage
+  with free Pexels B-roll (full-screen "cover" mode when nothing is written
+  on screen, "window" mode otherwise), add icons for abstract ideas and show
+  data cards for numbers it hears. It picks the best one for each moment.
+  - **Pexels key (free):** for B-roll, click the **Pexels…** button in the
+    settings and paste your key (create it at https://www.pexels.com/api/).
+    Without it, B-roll is simply not used.
+  - **Screen reading** needs `pyobjc-framework-Vision` (already in
+    `requirements.txt`, macOS). Without it, the pointing and magnifier
+    callouts are simply off.
+  - **B-roll credits:** the clips used are saved in the job's `broll.json`.
 - **Background music:** put royalty-free tracks in
   `~/TSOTS/musica/divertido/`, `formal/` and `academico/` (mp3, wav, m4a,
   aac, flac or ogg). Each short takes the next track of its style in turn, so
