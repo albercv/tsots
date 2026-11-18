@@ -1,7 +1,7 @@
 """B-roll gratuito de Pexels: clave en el Llavero, búsqueda con caché y dibujo.
 
 Modos: «tapa» cubre todo lo que hay sobre los subtítulos; «ventana» es una
-tarjeta redondeada en la zona superior. La clave nunca se escribe en caché ni
+tarjeta redondeada en el hueco sin texto de la zona de gráficos. La clave nunca se escribe en caché ni
 en logs.
 """
 from __future__ import annotations
@@ -26,6 +26,8 @@ DURACION = 2.5  # s mínimos de un clip útil
 SECURITY = "/usr/bin/security"
 URL_BUSQUEDA = "https://api.pexels.com/videos/search"
 W, H = 1080, 1920
+VENTANA_ANCHO, VENTANA_ALTO = 860, 540  # tarjeta apaisada: deja ver la demo
+VENTANA_MIN, MARGEN_VENTANA = 240, 24   # px: más baja no se distingue; separación del texto
 
 
 @dataclass(frozen=True)
@@ -144,14 +146,26 @@ def _fundido(ts: float, dur: float) -> float:
     return max(0.0, min(1.0, ts / 0.2, (dur - ts) / 0.2))
 
 
-def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: int):
-    """Fotogramas RGBA 1080×1920 del B-roll («tapa» o «ventana»), con fundido de 0.2 s."""
+def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: int,
+                 evitar: tuple[int, int] | None = None, t: float = 0.0):
+    """Fotogramas RGBA 1080×1920 del B-roll («tapa» o «ventana»), con fundido de 0.2 s.
+
+    La ventana va en el hueco libre más grande entre el título (si se ve en `t`) y
+    `graficos_hasta`, sin pisar la franja vertical `evitar` (el texto en pantalla).
+    Sin hueco para VENTANA_MIN px, ValueError: la pieza se omite."""
     sub = zonas.get("subtitulos")
     if modo == "tapa":
         ancho, alto, x0, y0 = W, (sub[0] if sub else H), 0, 0
     else:
-        ancho, x0, y0 = 860, (W - 860) // 2, 140
-        alto = max(200, min(1400, zonas["graficos_hasta"] - y0 - 30))
+        tit = zonas.get("titulo")
+        arriba, abajo = (tit["y"][1] if tit and t < tit["hasta"] else 120), zonas["graficos_hasta"]
+        huecos = [(arriba, abajo)] if not evitar else [(arriba, min(abajo, evitar[0])), (max(arriba, evitar[1]), abajo)]
+        h0, h1 = max(huecos, key=lambda h: h[1] - h[0])
+        alto = min(VENTANA_ALTO, h1 - h0 - 2 * MARGEN_VENTANA)
+        if alto < VENTANA_MIN:
+            raise ValueError("no hay hueco libre de texto para la ventana del B-roll")
+        ancho = round(alto * VENTANA_ANCHO / VENTANA_ALTO)  # apaisada, también si se encoge
+        x0, y0 = (W - ancho) // 2, (h0 + h1 - alto) // 2
         mascara = Image.new("L", (ancho, alto), 0)
         ImageDraw.Draw(mascara).rounded_rectangle([0, 0, ancho - 1, alto - 1], radius=36, fill=255)
         sombra = Image.new("L", (W, H), 0)

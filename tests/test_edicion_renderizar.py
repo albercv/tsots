@@ -202,6 +202,14 @@ def test_broll_modo_ventana_si_hay_texto(monkeypatch):
     assert der2([M("broll", 2.0, buscar="a b")]).piezas[0].params["modo"] == "ventana"
 
 
+def test_broll_ventana_evita_el_texto():
+    pant = [pantalla.Muestra(2.0, (pantalla.Deteccion("Grupo", (100, 300, 300, 60), 0.9),)),
+            pantalla.Muestra(3.0, (pantalla.Deteccion("Empresas", (100, 500, 300, 80), 0.9),)),
+            pantalla.Muestra(9.0, (pantalla.Deteccion("Fuera", (100, 900, 300, 80), 0.9),))]
+    p = der2([M("broll", 2.0, buscar="a b")], pant=pant).piezas[0]
+    assert p.params["modo"] == "ventana" and p.params["evitar"] == (300, 580)
+
+
 def test_icono_lateral_con_etiqueta():
     s = der2([M("etiqueta", 2, texto=["A"]), M("icono", 3, icono="casa")])
     i = [x for x in s.piezas if x.clase == "icono"][0]

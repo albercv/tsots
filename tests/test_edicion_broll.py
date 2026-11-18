@@ -108,10 +108,38 @@ def test_frames_tapa_respeta_subtitulos(clip_mp4):
     assert entera[5].getpixel((540, 1900))[3] == 255
 
 
+def _tarjeta(frame):
+    """(y0, y1, alto) de la parte opaca de la ventana (sin la sombra)."""
+    caja = frame.getchannel("A").point(lambda v: 255 if v > 200 else 0).getbbox()
+    return caja[1], caja[3], caja[3] - caja[1]
+
+
+Z_CENTRAL = {"subtitulos": [1269, 1440], "titulo": None, "graficos_hasta": 1068}
+
+
 def test_frames_ventana_en_zona_superior(clip_mp4):
-    z = {"subtitulos": [1269, 1440], "graficos_hasta": 900}
-    m = list(broll.frames_broll(clip_mp4, "ventana", 1.0, z, PALETA, 10))[5]
-    assert m.getpixel((540, 400))[3] == 255
-    assert m.getpixel((5, 400))[3] == 0 and m.getpixel((540, 1000))[3] == 0
-    assert m.getpixel((540, 100))[3] == 0
-    assert m.getpixel((540, 869))[3] == 255 and m.getpixel((540, 905))[3] < 60  # tarjeta acaba en 870
+    m = list(broll.frames_broll(clip_mp4, "ventana", 1.0, Z_CENTRAL, PALETA, 10))[5]
+    y0, y1, alto = _tarjeta(m)
+    assert 120 <= y0 and y1 <= 1068 and alto <= broll.VENTANA_ALTO
+    assert m.getpixel((5, 400))[3] == 0 and m.getpixel((540, 100))[3] == 0
+
+
+@pytest.mark.parametrize("evitar", [(184, 700), (700, 1000), (300, 400), (1100, 1200)])
+def test_frames_ventana_no_tapa_el_texto(clip_mp4, evitar):
+    m = list(broll.frames_broll(clip_mp4, "ventana", 1.0, Z_CENTRAL, PALETA, 10, evitar=evitar))[5]
+    y0, y1, alto = _tarjeta(m)
+    assert y1 <= evitar[0] or y0 >= evitar[1], (y0, y1)  # nunca sobre el texto
+    assert 120 <= y0 and y1 <= 1068 and 0 < alto <= broll.VENTANA_ALTO
+
+
+def test_frames_ventana_bajo_el_titulo(clip_mp4):
+    z = {**Z_CENTRAL, "titulo": {"y": [154, 407], "hasta": 5.0}}
+    y0, _, _ = _tarjeta(list(broll.frames_broll(clip_mp4, "ventana", 1.0, z, PALETA, 10, t=4.0))[5])
+    assert y0 >= 407
+    y0, _, _ = _tarjeta(list(broll.frames_broll(clip_mp4, "ventana", 1.0, z, PALETA, 10, t=6.0))[5])
+    assert y0 < 407
+
+
+def test_frames_ventana_sin_sitio_falla(clip_mp4):
+    with pytest.raises(ValueError):
+        list(broll.frames_broll(clip_mp4, "ventana", 1.0, Z_CENTRAL, PALETA, 10, evitar=(184, 850)))

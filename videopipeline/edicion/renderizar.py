@@ -111,8 +111,13 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
                 if pieza(m.tipo, t, DURACION[m.tipo], pantalla=m.pantalla, caja=caja, **extra):
                     sonido_nuevo(m.tipo, t)
         elif m.tipo == "broll":
-            if pieza("broll", t, DURACION["broll"], buscar=m.buscar,
-                     modo=ocr.modo_broll(pantalla or [], t, broll.DURACION)):
+            modo = ocr.modo_broll(pantalla or [], t, broll.DURACION)
+            extra = {}
+            if modo == "ventana":  # franja vertical del texto que se ve en el tramo
+                ys = [(d.caja[1], d.caja[1] + d.caja[3]) for s in pantalla or [] if t <= s.t <= t + broll.DURACION
+                      for d in s.detecciones]
+                extra["evitar"] = (min(a for a, _ in ys), max(b for _, b in ys)) if ys else None
+            if pieza("broll", t, DURACION["broll"], buscar=m.buscar, modo=modo, **extra):
                 sonido_nuevo("broll", t)
         elif m.tipo == "dato":
             if pieza("dato", t, DURACION["dato"], valor=m.valor, texto=_lineas(m.texto)[0],
@@ -192,7 +197,8 @@ def _render_nueva(p: Pieza, estilo: Estilo, fps: int, destino: Path, ctx: Render
         clip = broll.obtener(q["buscar"], ctx.usados, ctx.carpeta_broll, ctx.clave)
         if clip is None:
             return None
-        fr = broll.frames_broll(clip.archivo, q["modo"], p.dur, ctx.zonas, estilo.paleta, fps)
+        fr = broll.frames_broll(clip.archivo, q["modo"], p.dur, ctx.zonas, estilo.paleta, fps,
+                                q.get("evitar"), p.t)
         ruta = rotulos.render_slot(fr, destino, fps)  # el crédito solo cuenta si se renderizó
         ctx.usados.add(clip.id)
         ctx.creditos.append({"autor": clip.autor, "url": clip.url, "buscar": q["buscar"], "t": p.t})
