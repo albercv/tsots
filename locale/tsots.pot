@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 19:28+0100\n"
+"POT-Creation-Date: 2026-11-18 10:46+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -250,6 +250,9 @@ msgstr ""
 msgid "Borrador (lo terminas en la app)"
 msgstr ""
 
+msgid "Borrar"
+msgstr ""
+
 msgid "Buscando perfiles…"
 msgstr ""
 
@@ -350,6 +353,9 @@ msgstr ""
 msgid "Claude: {n} en cola · empieza al terminar la cola o al abrir la app"
 msgstr ""
 
+msgid "Clave de Pexels"
+msgstr ""
+
 #, python-brace-format
 msgid "ClearVoice no generó el audio limpio: {salida}"
 msgstr ""
@@ -373,6 +379,9 @@ msgid "Comprobando…"
 msgstr ""
 
 msgid "Comprobar conexión"
+msgstr ""
+
+msgid "Comprobar y guardar"
 msgstr ""
 
 msgid "Comprueba que el vídeo se reproduce en QuickTime. Si es un intermedio en audio_procesado/, bórralo y vuelve a procesar."
@@ -902,6 +911,12 @@ msgstr ""
 msgid "Generando título"
 msgstr ""
 
+msgid "Guarda la clave gratuita de Pexels que usa «Editar con Claude» para añadir B-roll."
+msgstr ""
+
+msgid "Guardada"
+msgstr ""
+
 msgid "Guardando el vídeo"
 msgstr ""
 
@@ -973,6 +988,9 @@ msgid "La app reencoda el vídeo con h264_videotoolbox y reintenta automáticame
 msgstr ""
 
 msgid "La carpeta del blog está lista, pero no se pudo arrancar el agente del blog: comprueba que existe y es ejecutable lanzador/blog/procesar_pendientes.sh. Se reintentará al abrir la app."
+msgstr ""
+
+msgid "La clave de Pexels es gratis: créala en <a href=\"https://www.pexels.com/api/\">https://www.pexels.com/api/</a>. Se guarda en el Llavero de macOS y sirve para el B-roll (vídeos de apoyo) de «Editar con Claude»."
 msgstr ""
 
 msgid "La clave tiene espacios, comillas u otros caracteres no válidos."
@@ -1511,6 +1529,9 @@ msgstr ""
 msgid "Pasos ya hechos"
 msgstr ""
 
+msgid "Pega aquí la clave de Pexels"
+msgstr ""
+
 msgid "Pega la API key para guardarla"
 msgstr ""
 
@@ -1526,6 +1547,15 @@ msgid "Perfiles en el servicio: {lista}."
 msgstr ""
 
 msgid "Personas y blogs"
+msgstr ""
+
+msgid "Pexels"
+msgstr ""
+
+msgid "Pexels no aceptó esa clave (o no hay conexión). No se ha guardado nada."
+msgstr ""
+
+msgid "Pexels…"
 msgstr ""
 
 msgid "Pipeline completo"
@@ -1932,6 +1962,9 @@ msgstr ""
 
 #, python-brace-format
 msgid "Sin Premium: vídeos de hasta {duracion} y {tamano} MB, posts de {caracteres} caracteres."
+msgstr ""
+
+msgid "Sin clave"
 msgstr ""
 
 msgid "Sin clave guardada"
