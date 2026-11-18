@@ -49,6 +49,81 @@ def test_contexto_tiene_palabras_y_reglas(tmp_path, video_vertical):
     assert "## Caption\nmi caption" in preparar(t).read_text("utf-8")
 
 
+def _con_ocr(monkeypatch, llamadas=None):
+    from videopipeline.edicion import pantalla
+    from videopipeline.edicion.pantalla import Deteccion, Muestra
+
+    def analizar(video, zonas, destino):
+        if llamadas is not None:
+            llamadas.append(destino)
+        m = [Muestra(0.5 * i, (Deteccion("Documentos de la empresa", (0, 500, 600, 80), 0.9),))
+             for i in range(3, 9)]
+        destino.write_text(json.dumps({"version": 1, "muestras": [
+            {"t": x.t, "detecciones": [{"texto": d.texto, "caja": list(d.caja), "confianza": d.confianza}
+                                       for d in x.detecciones]} for x in m]}))
+        return m
+
+    monkeypatch.setattr(pantalla, "ocr_disponible", lambda: True)
+    monkeypatch.setattr(pantalla, "analizar", analizar)
+
+
+def _pals(t, *extra):
+    (t / "palabras.json").write_text(json.dumps([
+        {"texto": "documentos", "inicio": 1.9, "fin": 2.3},
+        {"texto": "diez", "inicio": 3.2, "fin": 3.4}, *extra]))
+
+
+def test_contexto_con_pantalla_numeros_iconos_y_broll(tmp_path, video_vertical, monkeypatch, llavero_falso):
+    from videopipeline.edicion import broll
+    _con_ocr(monkeypatch)
+    monkeypatch.setattr(broll, "hay_clave", lambda: True)
+    t = _trabajo(tmp_path, video_vertical)
+    _pals(t, {"texto": "veinte", "inicio": 4.0, "fin": 4.2}, {"texto": "por", "inicio": 4.3, "fin": 4.4},
+          {"texto": "ciento", "inicio": 4.4, "fin": 4.6})
+    txt = preparar(t).read_text("utf-8")
+    assert "- lectura de pantalla: sí" in txt and "- B-roll: disponible" in txt
+    assert "## En pantalla\n1.50-4.00 «Documentos de la empresa» (dicha «documentos» en 1.90)" in txt
+    assert "3.20 10 «diez»" in txt and "4.00 20 «veinte» %" in txt
+    assert "## Iconos\n" in txt and txt.index("## Iconos") < txt.index("## Frases")
+
+
+def test_contexto_sin_ocr(tmp_path, video_vertical):
+    t = _trabajo(tmp_path, video_vertical)
+    txt = preparar(t).read_text("utf-8")
+    assert "- lectura de pantalla: no" in txt and "## En pantalla\n- no disponible" in txt
+    assert "## Números dichos\n- ninguno" in txt
+
+
+def test_contexto_sin_clave_pixabay(tmp_path, video_vertical):
+    txt = preparar(_trabajo(tmp_path, video_vertical)).read_text("utf-8")
+    assert "- B-roll: no disponible (falta la clave de Pixabay)" in txt
+
+
+def test_preparar_no_repite_ocr(tmp_path, video_vertical, monkeypatch):
+    llamadas = []
+    _con_ocr(monkeypatch, llamadas)
+    t = _trabajo(tmp_path, video_vertical)
+    _pals(t)
+    preparar(t)
+    txt = preparar(t).read_text("utf-8")
+    assert len(llamadas) == 1 and "- lectura de pantalla: sí" in txt
+    assert "1.50-4.00 «Documentos de la empresa»" in txt  # leído del json cacheado
+
+
+def test_ocr_que_falla_no_rompe_preparar(tmp_path, video_vertical, monkeypatch):
+    from videopipeline.edicion import pantalla
+    _con_ocr(monkeypatch)
+
+    def roto(video, zonas, destino):
+        destino.write_text("{")
+        raise RuntimeError("vision")
+
+    monkeypatch.setattr(pantalla, "analizar", roto)
+    t = _trabajo(tmp_path, video_vertical)
+    txt = preparar(t).read_text("utf-8")
+    assert "- lectura de pantalla: no" in txt and not (t / "pantalla.json").exists()
+
+
 def test_contexto_transcribe_si_falta_palabras(tmp_path, video_vertical, monkeypatch):
     t = _trabajo(tmp_path, video_vertical, palabras=False)
     llamadas = []

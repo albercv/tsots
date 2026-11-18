@@ -220,6 +220,7 @@ class PanelOpciones(QWidget):
     crear_shorts = Signal()
     publicar_shorts = Signal()
     editar_con_claude = Signal()
+    configurar_pixabay = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -475,6 +476,18 @@ class PanelOpciones(QWidget):
                   "verticales al procesarlos."))
         # También es el estilo de «Editar con Claude…»: no depende de la casilla.
         self.combo_estilo_shorts.setEnabled(self._claude_disponible)
+        self.boton_pixabay = QPushButton(_("Pixabay…"))
+        self.boton_pixabay.setToolTip(
+            sin_claude if not self._claude_disponible else
+            _("Guarda la clave gratuita de Pixabay que usa «Editar con Claude» "
+              "para añadir B-roll."))
+        self.boton_pixabay.setEnabled(self._claude_disponible)
+        self.boton_pixabay.clicked.connect(self.configurar_pixabay)
+        fila_estilo = QWidget()
+        lay_estilo = QHBoxLayout(fila_estilo)
+        lay_estilo.setContentsMargins(0, 0, 0, 0)
+        lay_estilo.addWidget(self.combo_estilo_shorts, 1)
+        lay_estilo.addWidget(self.boton_pixabay)
         self.boton_editar_con_claude = QPushButton(_("Editar con Claude…"))
         self.boton_editar_con_claude.setToolTip(
             sin_claude if not self._claude_disponible else
@@ -508,7 +521,7 @@ class PanelOpciones(QWidget):
             self._etiqueta(_("Encuadre:"), "combo_encuadre_shorts"), self.combo_encuadre_shorts)
         form_shorts.addRow(self.check_editar_claude)
         form_shorts.addRow(
-            self._etiqueta(_("Estilo:"), "combo_estilo_shorts"), self.combo_estilo_shorts)
+            self._etiqueta(_("Estilo:"), "combo_estilo_shorts"), fila_estilo)
         form_shorts.addRow(self.check_shorts_al_procesar)
         # Fila propia, como «Términos…»: junto al combo ensancharía la columna.
         form_shorts.addRow("", self.boton_crear_shorts)

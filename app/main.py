@@ -53,6 +53,7 @@ from .widgets import dialogo_publicar
 from .widgets.dialogo_programadas import DialogoProgramadas
 from .widgets.dialogo_publicar import DialogoPublicar
 from .widgets.dialogo_publicar_shorts import DialogoPublicarShorts
+from .widgets.dialogo_pixabay import DialogoPixabay
 from .widgets.dialogo_redes import DialogoRedes
 from .widgets.dialogo_reproceso import preguntar_reproceso
 from .widgets.panel_caption import PanelCaption
@@ -271,6 +272,7 @@ class VentanaPrincipal(QMainWindow):
         self.panel.crear_shorts.connect(self._crear_shorts)
         self.panel.publicar_shorts.connect(self._publicar_shorts)
         self.panel.editar_con_claude.connect(self._editar_con_claude)
+        self.panel.configurar_pixabay.connect(self._configurar_pixabay)
         self._cargar_modelos_ollama()
         self.vista_cola.selectionModel().currentChanged.connect(
             self._al_cambiar_seleccion
@@ -687,6 +689,11 @@ class VentanaPrincipal(QMainWindow):
         caja.setDefaultButton(cancelar)
         caja.exec()
         return {shorts_: "shorts", video: "video"}.get(caja.clickedButton())
+
+    def _configurar_pixabay(self) -> None:
+        dialogo = DialogoPixabay(parent=self)
+        dialogo.exec()
+        dialogo.deleteLater()
 
     def _editar_con_claude(self) -> None:
         """Botón «Editar con Claude…»: encola con Claude los shorts del vídeo

@@ -48,6 +48,7 @@ protobuf==7.35.1
 pycparser==3.0
 pydub==0.25.1
 Pygments==2.20.0
+pyobjc-framework-Vision==13.0 ; sys_platform == "darwin"  # OCR de Apple (Vision) para leer la pantalla
 PySide6==6.11.1
 PySide6_Addons==6.11.1
 PySide6_Essentials==6.11.1

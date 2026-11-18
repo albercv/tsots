@@ -11,7 +11,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from videopipeline import edicion
-from videopipeline.edicion import componer, emojis, estilos, musica, rotulos, sonidos
+from videopipeline.edicion import (broll, callouts, componer, emojis, estilos, graficos, musica,
+                                   rotulos, sonidos)
+from videopipeline.edicion import pantalla as ocr
 from videopipeline.edicion.componer import Overlay, Zoom
 from videopipeline.edicion.estilos import Estilo
 from videopipeline.edicion.plan import DURACION, DURACION_FINAL, Momento, Plan, leer
@@ -20,15 +22,20 @@ from videopipeline.edicion.sonidos import EventoSfx
 log = logging.getLogger(__name__)
 
 DUR_MIN = 0.2
+# Primer sonido de la lista que tenga el estilo; ninguno si no tiene ninguno.
+SFX_NUEVOS = {"senalar": ("tap", "tick", "pop"), "lupa": ("whoosh_b", "tick", "pop"),
+              "broll": ("whoosh_g", "whoosh_b", "pluck"), "icono": ("pop", "tick", "tap"),
+              "dato": ("tick2", "tick", "pluck")}
 FREQS_TAP = (650, 700, 750, 800, 850, 900)
 
 
 @dataclass
 class Pieza:
-    clase: str  # etiqueta | contador | emoji | transicion | vineta
+    clase: str  # etiqueta | contador | emoji | transicion | vineta | senalar | lupa | broll | icono | dato
     t: float
     dur: float
     params: dict
+    sfx: EventoSfx | None = None  # sonido propio: se descarta si la pieza se omite
 
 
 @dataclass
@@ -43,7 +50,8 @@ def _lineas(texto) -> list[str]:
     return [texto] if isinstance(texto, str) else list(texto or [])
 
 
-def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> Specs:
+def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
+            pantalla: list | None = None) -> Specs:
     piezas: list[Pieza] = []
     sfx: list[EventoSfx] = []
 
@@ -58,11 +66,19 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> Specs:
         if tipo in estilo.sfx:
             sfx.append(EventoSfx(max(0.0, t), tipo, estilo.sfx[tipo], **kw))
 
+    def sonido_nuevo(tipo, t):
+        primero = next((s for s in SFX_NUEVOS[tipo] if s in estilo.sfx), None)
+        if primero:
+            # pop/pluck piden num y tap pide freq (los sintetizadores los exigen)
+            sonido(primero, t + 0.08, **{"pop": {"num": 1}, "pluck": {"num": 1},
+                                          "tap": {"freq": FREQS_TAP[0]}}.get(primero, {}))
+            piezas[-1].sfx = sfx[-1]  # la pieza recién añadida
+
     sonido("boom", 0.05)
     visuales = sorted((m for m in plan.momentos if m.tipo != "zoom"), key=lambda m: m.t)
     ticks = letra = 0
     lado: dict = {}  # contador de lado por lista: cada lista empieza en L
-    for m in (m for m in visuales if m.tipo != "emoji"):
+    for m in (m for m in visuales if m.tipo not in ("emoji", "icono")):
         t = m.t
         if m.tipo == "etiqueta":
             if pieza("etiqueta", t, DURACION["etiqueta"], lineas=_lineas(m.texto)):
@@ -88,18 +104,38 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float) -> Specs:
         elif m.tipo == "error":
             if pieza("emoji", t, DURACION["error"], emoji="❌", cx=540, cy=385, tam=200):
                 sonido("error", t)
+        elif m.tipo in ("senalar", "lupa"):
+            caja = ocr.buscar(pantalla, m.pantalla, t) if pantalla else None
+            if caja is not None:  # un plan validado la encuentra; si no, se omite
+                extra = {"forma": m.forma or "circulo"} if m.tipo == "senalar" else {}
+                if pieza(m.tipo, t, DURACION[m.tipo], pantalla=m.pantalla, caja=caja, **extra):
+                    sonido_nuevo(m.tipo, t)
+        elif m.tipo == "broll":
+            modo = ocr.modo_broll(pantalla or [], t, broll.DURACION)
+            extra = {}
+            if modo == "ventana":  # franja vertical del texto que se ve en el tramo
+                extra["evitar"] = ocr.franja_texto(pantalla or [], t, broll.DURACION)
+            if pieza("broll", t, DURACION["broll"], buscar=m.buscar, modo=modo, **extra):
+                sonido_nuevo("broll", t)
+        elif m.tipo == "dato":
+            if pieza("dato", t, DURACION["dato"], valor=m.valor, texto=_lineas(m.texto)[0],
+                     unidad=m.unidad):
+                sonido_nuevo("dato", t)
     if plan.final:
         t = max(0.0, duracion - DURACION_FINAL)
         if pieza("etiqueta", t, DURACION_FINAL, lineas=_lineas(plan.final["texto"]), grande=True,
                  check=bool(plan.final.get("check"))):
             sonido("ding", t)
-    ocupado = [(p.t, p.t + p.dur) for p in piezas if p.clase in ("etiqueta", "contador")]
+    ocupado = [(p.t, p.t + p.dur) for p in piezas if p.clase in ("etiqueta", "contador", "dato", "lupa")]
     taps = 0
-    for m in (m for m in visuales if m.tipo == "emoji"):
-        fin = min(m.t + DURACION["emoji"], duracion)
+    for m in (m for m in visuales if m.tipo in ("emoji", "icono")):
+        fin = min(m.t + DURACION[m.tipo], duracion)
         lateral = any(a < fin and m.t < b for a, b in ocupado)
-        if pieza("emoji", m.t, DURACION["emoji"], emoji=m.emoji, cy=330,
-                 cx=950 if lateral else 540, tam=170 if lateral else 220):
+        pos = dict(cy=330, cx=950 if lateral else 540, tam=170 if lateral else 220)
+        if m.tipo == "icono":
+            if pieza("icono", m.t, DURACION["icono"], icono=m.icono, **pos):
+                sonido_nuevo("icono", m.t)
+        elif pieza("emoji", m.t, DURACION["emoji"], emoji=m.emoji, **pos):
             sonido("tap", m.t, freq=FREQS_TAP[taps % len(FREQS_TAP)])
             taps += 1
     sfx.sort(key=lambda e: e.t)
@@ -137,7 +173,54 @@ def _fps_overlay(fuente: Path) -> int:
     return min(30, round(float(n) / float(d or 1)))
 
 
-def _render_pieza(p: Pieza, estilo: Estilo, fps: int, destino: Path) -> Path:
+@dataclass
+class RenderCtx:
+    video: Path
+    zonas: dict
+    carpeta_broll: Path
+    usados: set[int]
+    creditos: list[dict]
+    clave: str | None = None
+
+
+def _render_nueva(p: Pieza, estilo: Estilo, fps: int, destino: Path, ctx: RenderCtx) -> Path | None:
+    q = p.params
+    if p.clase in ("senalar", "lupa"):
+        cajas = callouts.seguir(ctx.video, q["pantalla"], p.t, p.dur, fps, q["caja"], ctx.zonas)
+        if sum(c is not None for c in cajas) < callouts.VISIBLE_MIN * fps:
+            log.warning("Pieza %s en t=%.1f omitida: el texto se pierde enseguida", p.clase, p.t)
+            return None
+        if p.clase == "senalar":
+            fr = callouts.frames_senalar(cajas, q["forma"], estilo.paleta, fps, ctx.zonas, p.t,
+                                         q["caja"].inclinacion)
+        else:
+            fr = callouts.frames_lupa(ctx.video, cajas, p.t, p.dur, ctx.zonas, estilo.paleta, fps)
+    elif p.clase == "broll":
+        clip = broll.obtener(q["buscar"], ctx.usados, ctx.carpeta_broll, ctx.clave)
+        if clip is None:
+            return None
+        fr = broll.frames_broll(clip.archivo, q["modo"], p.dur, ctx.zonas, estilo.paleta, fps,
+                                q.get("evitar"), p.t)
+        ruta = rotulos.render_slot(fr, destino, fps)  # el crédito solo cuenta si se renderizó
+        ctx.usados.add(clip.id)
+        ctx.creditos.append({"autor": clip.autor, "url": clip.url, "buscar": q["buscar"], "t": p.t})
+        return ruta
+    elif p.clase == "icono":
+        fr = graficos.frames_icono(q["icono"], p.dur, q["cx"], q["cy"], q["tam"], estilo.paleta, fps)
+    else:
+        fr = graficos.frames_dato(q["valor"], q["texto"], q["unidad"], p.dur, estilo.paleta, fps)
+    return rotulos.render_slot(fr, destino, fps)
+
+
+def _render_pieza(p: Pieza, estilo: Estilo, fps: int, destino: Path, ctx: RenderCtx) -> Path | None:
+    """`None` si la pieza se omite: los recursos nuevos nunca tumban el render."""
+    if p.clase in ("senalar", "lupa", "broll", "icono", "dato"):
+        try:
+            return _render_nueva(p, estilo, fps, destino, ctx)
+        except Exception as e:  # noqa: BLE001 — OCR, red, ffmpeg o clip malo: se omite
+            log.warning("Pieza %s en t=%.1f omitida: %s", p.clase, p.t, type(e).__name__)
+            destino.unlink(missing_ok=True)
+            return None
     q = p.params
     if p.clase == "etiqueta":
         fr = rotulos.frames_etiqueta(q["lineas"], p.dur, estilo.paleta, fps,
@@ -179,13 +262,27 @@ def renderizar(trabajo: Path, borrador: bool = False) -> Path:
     plan = leer(trabajo / "plan.validado.json")
     video = trabajo / "video.mp4"
     duracion = float(componer._duracion(video))
-    specs = derivar(plan, zonas, estilo, duracion)
+    ruta_pantalla = trabajo / "pantalla.json"
+    muestras = ocr.cargar(ruta_pantalla) if ruta_pantalla.exists() else None
+    specs = derivar(plan, zonas, estilo, duracion, muestras)
     tmp = trabajo / "tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir()
     fps = _fps_overlay(video)
-    overlays = [Overlay(_render_pieza(p, estilo, fps, tmp / f"slot_{i:02d}.mov"), p.t, p.dur)
-                for i, p in enumerate(specs.piezas)]
+    ctx = RenderCtx(video, zonas, trabajo / "broll", set(), [], broll.leer_clave())
+    overlays, omitidos = [], []
+    for i, p in enumerate(specs.piezas):
+        ruta = _render_pieza(p, estilo, fps, tmp / f"slot_{i:02d}.mov", ctx)
+        if ruta is not None:
+            overlays.append(Overlay(ruta, p.t, p.dur))
+        elif p.sfx is not None:
+            omitidos.append(p.sfx)
+    specs.sfx = [e for e in specs.sfx if not any(e is o for o in omitidos)]  # sin imagen, sin sonido
+    creditos = trabajo / "broll.json"
+    if ctx.creditos:
+        creditos.write_text(json.dumps(ctx.creditos, ensure_ascii=False, indent=2), "utf-8")
+    else:
+        creditos.unlink(missing_ok=True)
     pista_sfx = sonidos.pista(specs.sfx, duracion, tmp / "sfx.wav")
     pista_musica = _pista_musica(specs.musica, estilo.id, duracion, tmp, trabajo.name)
     franja = tuple(zonas["franja_zoom"]) if zonas.get("franja_zoom") else None

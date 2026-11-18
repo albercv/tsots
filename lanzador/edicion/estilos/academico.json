@@ -1,6 +1,6 @@
 {
   "densidad_max": 0.2,
-  "tipos": ["titulo", "etiqueta", "contador", "transicion"],
+  "tipos": ["titulo", "etiqueta", "contador", "transicion", "senalar", "lupa", "broll", "icono", "dato"],
   "transiciones": "A",
   "zoom_max": 0,
   "zoom_lento": 0,
