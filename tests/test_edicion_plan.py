@@ -301,3 +301,23 @@ def test_error_pantalla_lista_coincidencias_cercanas():
                                  for p in PAL2 if -0.25 <= i / 2 - p.inicio <= 1.0)) for i in range(0, 121)]
     _, errs = val2([Momento("senalar", t=53.36, palabra="llama", pantalla="otra cosa")], pantalla=pant)
     assert errs and "'llama'" in errs[0] and "'hola'" not in errs[0]
+
+
+ANCHA = [Muestra(t / 2, (Deteccion("Revisión de las fichas de la empresa", (100, 800, 800, 80), 0.98),))
+         for t in range(0, 130)]
+
+
+def test_lupa_texto_demasiado_ancho():
+    lupa = lambda p: Momento("lupa", t=31.76, palabra="melón", pantalla=p)
+    _, errs = val2([lupa("Revisión de las fichas de la empresa")], pantalla=ANCHA)
+    assert errs and "demasiado ancho para la lupa" in errs[0]
+    assert val2([lupa("Revisión")], pantalla=ANCHA)[1] == []  # un fragmento corto sí cabe
+    assert val2([Momento("senalar", t=31.76, palabra="melón", pantalla="Revisión de las fichas de la empresa")],
+                pantalla=ANCHA)[1] == []
+
+
+def test_sugerencia_no_con_texto_diminuto_ni_ya_senalado():
+    x = [Muestra(t / 2, (Deteccion("X", (100, 800, 20, 20), 0.9),)) for t in range(0, 130)]
+    assert P.sugerencias(Plan([et(31.76, texto=("EXTRA",), palabra="melón")]), x) == []
+    assert P.sugerencias(Plan([et(31.76, texto=("REVISIÓN",), palabra="melón"), sen()]), PANT) == []
+    assert P.sugerencias(Plan([et(31.76, texto=("REVISIÓN",), palabra="melón"), sen(t=50.0)]), PANT)

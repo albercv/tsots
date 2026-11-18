@@ -9,7 +9,7 @@ import re
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
-from videopipeline.edicion import broll, emojis, graficos, numeros, pantalla as pant, rotulos
+from videopipeline.edicion import broll, callouts, emojis, graficos, numeros, pantalla as pant, rotulos
 from videopipeline.edicion.estilos import Estilo
 from videopipeline.edicion.texto import normalizar
 from videopipeline.subtitles import Palabra
@@ -152,9 +152,13 @@ def _revisar_pantalla(m, etq, pantalla, palabras) -> list[str]:
         return [f"{etq}: falta 'pantalla' (el texto que se ve en el vídeo en ese momento)"]
     if m.forma is not None and m.forma not in FORMAS:
         return [f"{etq}: forma {m.forma!r} no válida; permitidas: {', '.join(FORMAS)}"]
-    if pant.buscar(pantalla, m.pantalla, m.t) is None:
+    d = pant.buscar(pantalla, m.pantalla, m.t)
+    if d is None:
         return [f"{etq}: el texto {m.pantalla!r} no está visible en pantalla en t={m.t:g} (±0.5 s); "
                 f"coincidencias disponibles: {_coincidencias_txt(pantalla, palabras, m.t)}"]
+    if m.tipo == "lupa" and not callouts.cabe_en_lupa(d.caja):
+        return [f"{etq}: el texto {m.pantalla!r} es demasiado ancho para la lupa (no se ampliaría); "
+                "usa senalar o un fragmento más corto"]
     return []
 
 
@@ -336,16 +340,29 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
     return Plan(nuevos, plan.final), errs
 
 
+def _palabras(s: str) -> list[str]:
+    return [w for w in (normalizar(x) for x in re.split(r"\W+", s)) if w]
+
+
+def _repite(a: list[str], b: list[str]) -> bool:
+    """Una lista de palabras está dentro de la otra, con palabras enteras y al menos MIN_LETRAS letras."""
+    corta, larga = sorted((a, b), key=len)
+    return (len("".join(corta)) >= pant.MIN_LETRAS
+            and any(larga[i:i + len(corta)] == corta for i in range(len(larga) - len(corta) + 1)))
+
+
 def sugerencias(plan: Plan, pantalla: list | None) -> list[str]:
     """Avisos que no bloquean: Haiku puede aplicarlos o ignorarlos."""
     sug = []
     for i, m in enumerate(plan.momentos):
         if m.tipo != "etiqueta" or not pantalla or not isinstance(m.texto, list):
             continue
-        lineas = [normalizar(l) for l in m.texto] + [normalizar(" ".join(m.texto))]
+        lineas = [_palabras(l) for l in m.texto] + [_palabras(" ".join(m.texto))]
+        ya = [normalizar(o.pantalla or "") for o in plan.momentos if o.tipo in ("senalar", "lupa")
+              and o.t < m.t + DURACION["etiqueta"] and m.t < o.t + DURACION[o.tipo]]  # ya señalado a la vez
         for ms in (x for x in pantalla if abs(x.t - m.t) <= 0.5):
-            vis = next((d.texto for d in ms.detecciones for l in lineas
-                        if l and normalizar(d.texto) and (l in normalizar(d.texto) or normalizar(d.texto) in l)), None)
+            vis = next((d.texto for d in ms.detecciones for l in lineas if _repite(l, _palabras(d.texto))
+                        and not any(s and s in normalizar(d.texto) for s in ya)), None)
             if vis:
                 sug.append(f"Sugerencia: la etiqueta del momento {i} repite lo que ya se ve en pantalla ({vis!r}); "
                            f"considera un momento 'senalar' con \"pantalla\": {vis!r} en su lugar")

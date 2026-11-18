@@ -71,3 +71,15 @@ def test_numeros_dichos_articulos_y_compuestos():
         assert _dichos(frase) == [(1.0, v, frase.split()[0], False)], frase
     assert _dichos("veinte por ciento") == [(1.0, 20, "veinte", True)]
     assert _dichos("treinta y cinco por ciento") == [(1.0, 35, "treinta", True)]
+
+
+def test_frames_dato_numero_sobre_tarjeta():
+    for estilo in ("divertido", "formal", "academico"):
+        pal = estilos.cargar(estilo).paleta
+        a = np.array(list(graficos.frames_dato(2, "empresas", None, 2.4, pal, 10))[12]).astype(int)
+        num = a[150:360, 380:700]  # alrededor del número (cx=540, cy=270)
+        tarjeta = (num[..., 3] > 200) & (np.abs(num[..., :3] - pal.fondo[:3]).sum(-1) < 12)
+        cifra = (num[..., 3] > 200) & (np.abs(num[..., :3] - pal.texto).sum(-1) < 12)
+        assert tarjeta.sum() > 5000 and cifra.sum() > 2000, estilo  # cifra sobre una tarjeta opaca
+        lum = lambda c: 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+        assert abs(lum(pal.fondo) - lum(pal.texto)) > 120, estilo

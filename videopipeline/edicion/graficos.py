@@ -75,11 +75,16 @@ def _formato(v: float) -> str:
 
 
 def frames_dato(valor: float, texto: str, unidad: str | None, dur: float, paleta: Paleta, fps: int):
-    """Número grande que cuenta de 0 a valor, píldora con el texto y, con '%', barra de progreso."""
+    """Número grande sobre una tarjeta que cuenta de 0 a valor, píldora con el texto y, con '%',
+    barra de progreso."""
     cx, cy, pad = 540, 330, 34
     f_num, f_lab = _fuente(paleta, 190), _fuente(paleta, 46)
     texto = texto.upper()
     tw_lab, th_lab = _tam_texto(f_lab, texto)
+    # tarjeta del número: del tamaño de la cifra final (no salta al contar) y con el fondo de
+    # la paleta, que contrasta con su texto; sin ella la cifra se pierde en pantallas claras
+    l, t, r, b = f_num.getbbox(_formato(valor) + (unidad or ""), anchor="mm")
+    tarjeta = [cx + l - 36, cy - 60 + t - 26, cx + r + 36, cy - 60 + b + 26]
     for i in range(int(round(dur * fps))):
         ts = i / fps
         k = _ease_out_cubic(min(1.0, ts / 0.8))
@@ -89,8 +94,8 @@ def frames_dato(valor: float, texto: str, unidad: str | None, dur: float, paleta
         s = _formato(round(v, 1) if not float(valor).is_integer() else round(v)) + (unidad or "")
         img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
         d = ImageDraw.Draw(img)
-        d.text((cx, cy - 60), s, font=f_num, fill=(*paleta.texto, a), anchor="mm",
-               stroke_width=8, stroke_fill=(*paleta.fondo[:3], a))
+        d.rounded_rectangle(tarjeta, radius=28, fill=(*paleta.fondo[:3], int(paleta.fondo[3] * fade)))
+        d.text((cx, cy - 60), s, font=f_num, fill=(*paleta.texto, a), anchor="mm")
         py = cy + 60
         d.rounded_rectangle([cx - tw_lab / 2 - pad, py, cx + tw_lab / 2 + pad, py + th_lab + pad],
                             radius=(th_lab + pad) // 2, fill=(*paleta.fondo[:3], int(paleta.fondo[3] * fade)),
