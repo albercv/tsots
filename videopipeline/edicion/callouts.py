@@ -94,7 +94,7 @@ def _ultima(cajas: list, i: int) -> Caja | None:
     return next((c for c in reversed(cajas[:i + 1]) if c is not None), None)
 
 
-def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict | None = None, t: float = 0.0):
+def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict, t: float):
     """Fotogramas RGBA con círculo, flecha o subrayado sobre la caja."""
     color = (*paleta.acento, 255)
     for i in range(len(cajas)):
@@ -109,10 +109,9 @@ def frames_senalar(cajas, forma: str, paleta, fps: int, zonas: dict | None = Non
                 dib.arc([x - m, y - m, x + w + m, y + h + m], -90, -90 + 360 * p, fill=color, width=GROSOR)
             elif forma == "subrayado":
                 dib.line([x, y + h + 12, x + w * p, y + h + 12], fill=color, width=GROSOR)
-            else:  # flecha: llega en diagonal desde arriba-izquierda hasta el borde superior de la caja
-                px, py = x + w * 0.35, y - 10
-                tx, ty = px - 140 * (2 - p), py - 190 * (2 - p) * 0.9
-                dib.line([tx, ty, px - 14, py - 20], fill=color, width=GROSOR)
+            else:  # flecha: viaja entera en diagonal desde arriba-izquierda hasta tocar el borde superior de la caja
+                px, py = x + w * 0.35 - 200 * (1 - p), y - 10 - 240 * (1 - p)
+                dib.line([px - 140, py - 171, px - 14, py - 20], fill=color, width=GROSOR)
                 dib.polygon([(px, py), (px - 34, py - 12), (px - 12, py - 36)], fill=color)
         yield _terminar(img, zonas, t + i / fps, _alfa(i, cajas, fps))
 
@@ -141,6 +140,16 @@ def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, f
     # arriba: bajo el título si se ve en algún momento del tramo (fijo, para que la tarjeta no salte)
     y_min = tit["y"][1] if tit and t < tit["hasta"] else 120
     y_max = zonas["graficos_hasta"]
+    primera = next((c for c in cajas if c is not None), None)
+    if primera:  # hueco de la tarjeta: se decide una vez, con la primera caja, para que no salte
+        _, y0, _, h0 = primera
+        if y0 + h0 / 2 < H // 2:
+            hueco_ini, hueco_fin = max(y_min, H // 2), y_max
+        else:
+            hueco_ini, hueco_fin = y_min, min(y_max, H // 2)
+        if hueco_fin - hueco_ini < 150:  # mitad opuesta sin sitio: el lado de la caja con más espacio
+            encima, debajo = (y_min, y0 - 20), (y0 + h0 + 20, y_max)
+            hueco_ini, hueco_fin = max((encima, debajo), key=lambda r: r[1] - r[0])
     frames = _decodificar(video, W, H, dur, fps, t)
     rgb = None
     for i in range(len(cajas)):
@@ -153,9 +162,6 @@ def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, f
             izq, arr = max(0, round(x - mx)), max(0, round(y - my))
             der, aba = min(W, round(x + w + mx)), min(H, round(y + h + my))
             k = min(ZOOM, ANCHO_LUPA_MAX / max(1, der - izq))
-            hueco_ini, hueco_fin = (max(y_min, H // 2), y_max) if y + h / 2 < H // 2 else (y_min, min(y_max, H // 2))
-            if hueco_fin - hueco_ini < 150:  # mitad opuesta sin sitio: todo el rango permitido
-                hueco_ini, hueco_fin = y_min, y_max
             k = min(k, (hueco_fin - hueco_ini - 2 * BORDE - 40) / max(1, aba - arr))
             recorte = rgb.crop((izq, arr, der, aba)).resize(
                 (max(1, round((der - izq) * k)), max(1, round((aba - arr) * k))), Image.LANCZOS)
@@ -168,6 +174,6 @@ def frames_lupa(video: Path, cajas, t: float, dur: float, zonas: dict, paleta, f
             ex = min(max(bx, cx + 60), cx + tw - 60)
             ey = cy + th - 40 - BORDE if arriba else cy + 40 + BORDE
             dib = ImageDraw.Draw(img)
-            dib.line([ex, ey, bx, y if not arriba else y + h], fill=color, width=GROSOR)
+            dib.line([ex, ey, bx, y + h if not arriba else y], fill=color, width=GROSOR)
             img.alpha_composite(tarjeta, (cx, cy))
         yield _terminar(img, zonas, t + i / fps, _alfa(i, cajas, fps))

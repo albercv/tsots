@@ -70,7 +70,7 @@ def test_frames_senalar_formas_y_fundido():
     caja = (300, 400, 300, 80)
     cajas = [caja] * 8 + [None] * 7
     for forma in ("circulo", "flecha", "subrayado"):
-        frames = list(callouts.frames_senalar(cajas, forma, PALETA, FPS))
+        frames = list(callouts.frames_senalar(cajas, forma, PALETA, FPS, ZONAS, 0.0))
         assert len(frames) == 15 and frames[0].size == (1080, 1920)
         pintado = frames[6].crop((200, 200, 700, 600)).getchannel("A").getbbox()
         assert pintado, forma
@@ -94,3 +94,24 @@ def test_frames_lupa_no_tapa_subtitulos(video):
     # el recorte ampliado es texto blanco sobre negro dentro de la tarjeta
     assert any(p[:3] == (255, 255, 255) and p[3] == 255 for p in inferior.getdata())
     assert any(p[:3] == (0, 0, 0) and p[3] == 255 for p in inferior.getdata())
+
+
+def test_lupa_trazo_no_cruza_la_caja(video):
+    caja = (60, Y + 10, 300, 70)
+    f = list(callouts.frames_lupa(video, [caja] * 12, 0.0, 1.2, ZONAS, PALETA, FPS))[6]
+    interior = f.getchannel("A").crop((caja[0] + 5, caja[1] + 5, caja[0] + caja[2] - 5, caja[1] + caja[3] - 5))
+    assert interior.getextrema() == (0, 0)
+
+
+def test_flecha_viaja_hacia_la_caja():
+    caja = (300, 400, 300, 80)
+    fr = list(callouts.frames_senalar([caja] * 8, "flecha", PALETA, FPS, ZONAS, 0.0))
+    bajos = [f.getchannel("A").getbbox()[3] for f in fr[:4]]
+    assert bajos == sorted(bajos) and bajos[0] < bajos[3] <= caja[1]
+
+
+def test_senalar_respeta_banda_de_subtitulos():
+    caja = (300, 1420, 300, 80)
+    for forma in ("circulo", "flecha", "subrayado"):
+        for f in callouts.frames_senalar([caja] * 8, forma, PALETA, FPS, ZONAS, 0.0):
+            assert f.getchannel("A").crop((0, 1500, 1080, 1700)).getextrema() == (0, 0)
