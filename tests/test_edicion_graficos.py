@@ -55,3 +55,19 @@ def test_numeros_dichos_porcentaje():
 def test_parecidos():
     assert "documento" in graficos.parecidos("documentos")
     assert graficos.icono_disponible("casa") and not graficos.icono_disponible("zzz")
+
+
+def _dichos(frase, t0=1.0):
+    ps = [Palabra(w, t0 + i * 0.3, t0 + i * 0.3 + 0.2) for i, w in enumerate(frase.split())]
+    return numeros.numeros_dichos(ps)
+
+
+def test_numeros_dichos_articulos_y_compuestos():
+    assert _dichos("una vez") == [] and _dichos("una empresa") == []
+    assert _dichos("uno %") == [(1.0, 1, "uno", True)]
+    for frase, v in [("treinta y cinco", 35), ("ciento veinte", 120), ("doscientos", 200), ("tres mil", 3000),
+                     ("dos mil euros", 2000), ("mil doscientos", 1200), ("tres mil quinientos", 3500),
+                     ("veintiún", 21), ("1.000", 1000)]:
+        assert _dichos(frase) == [(1.0, v, frase.split()[0], False)], frase
+    assert _dichos("veinte por ciento") == [(1.0, 20, "veinte", True)]
+    assert _dichos("treinta y cinco por ciento") == [(1.0, 35, "treinta", True)]

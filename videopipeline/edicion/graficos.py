@@ -37,6 +37,7 @@ def _glifo(nombre: str) -> str:
     return chr(int(_codepoints()[ICONOS[nombre]], 16))
 
 
+@lru_cache(maxsize=None)
 def _fuente_iconos(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(_RECURSOS / "MaterialIcons-Regular.ttf"), size)
 
@@ -55,7 +56,7 @@ def _fade(ts: float, dur: float) -> float:
 
 def frames_icono(nombre: str, dur: float, cx: int, cy: int, tam: int, paleta: Paleta, fps: int):
     """Insignia redonda de acento con el glifo; entrada con rebote como frames_emoji."""
-    glifo, fnt = _glifo(nombre), _fuente_iconos(int(tam * 0.6))
+    glifo = _glifo(nombre)
     for i in range(int(round(dur * fps))):
         ts = i / fps
         s = _ease_out_back(min(1.0, ts / 0.3))
