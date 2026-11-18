@@ -198,3 +198,17 @@ def test_coincidencias_no_lista_lo_dicho_tras_desaparecer():
     # el texto se ve hasta 42.0: dicha a 42.3 ya no (aunque `buscar` la aceptaría); a 41.0 sí
     assert pantalla.coincidencias(m, [Palabra("documentos", 42.3, 42.6)]) == []
     assert len(pantalla.coincidencias(m, [Palabra("documentos", 41.0, 41.4)])) == 1
+
+
+@pytest.mark.parametrize("frag,vale", [("Revisión", True), ("de", False), ("sdel", False),
+                                       ("Mirador del Puerto", True), ("fichas Mirador", True),
+                                       ("ndef", False), ("fichasmirador", False)])
+def test_buscar_fragmentos_de_palabras_enteras(frag, vale):
+    m = _muestras(10, 12, [_det("Revisión de fichas Mirador del Puerto")])
+    assert (pantalla.buscar(m, frag, 10.5) is not None) == vale
+
+
+def test_recortar_solo_palabras_enteras():
+    d = Deteccion("aaaa bbbb cccc", (0, 100, 1400, 40), 0.9)
+    assert pantalla.recortar(d, "bbbb").caja == (467, 100, 467, 40)
+    assert pantalla.recortar(d, "aabb") == d

@@ -346,15 +346,13 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
     return Plan(nuevos, plan.final), errs
 
 
-def _palabras(s: str) -> list[str]:
-    return [w for w in (normalizar(x) for x in re.split(r"\W+", s)) if w]
+_palabras = pant.palabras_norm
 
 
 def _repite(a: list[str], b: list[str]) -> bool:
     """Una lista de palabras está dentro de la otra, con palabras enteras y al menos MIN_LETRAS letras."""
     corta, larga = sorted((a, b), key=len)
-    return (len("".join(corta)) >= pant.MIN_LETRAS
-            and any(larga[i:i + len(corta)] == corta for i in range(len(larga) - len(corta) + 1)))
+    return pant.posicion_palabras(larga, corta) >= 0
 
 
 def sugerencias(plan: Plan, pantalla: list | None) -> list[str]:

@@ -19,7 +19,7 @@ from videopipeline.edicion.texto import normalizar
 
 W, H = 1080, 1920
 SALTO_MAX = 0.25 * W      # px entre lecturas seguidas (cada 2 fotogramas): más es «otro texto»
-HUECO_MAX = 0.3           # s sin lectura antes de darlo por perdido
+HUECO_MAX = 0.5           # s sin lectura antes de darlo por perdido (el margen de `pantalla.buscar`)
 VISIBLE_MIN = 0.6         # s: si se pierde antes, la pieza se omite (sería un parpadeo)
 GROSOR = 8
 FUNDIDO = 0.2             # s
@@ -49,9 +49,9 @@ def seguir(video: Path, texto: str, t: float, dur: float, fps: int, inicial, zon
     candidato que salta más de SALTO_MAX por lectura perdida cuenta como no leído y, tras
     HUECO_MAX s sin lectura, se da por perdido."""
     n = round(dur * fps)
-    obj = normalizar(texto)
+    obj = pantalla.palabras_norm(texto)
     largo = 1.5 * len(normalizar(inicial.texto))  # el OCR corta las líneas largas en sitios distintos
-    exacto = normalizar(inicial.texto) == obj
+    exacto = pantalla.palabras_norm(inicial.texto) == obj
     lecturas: dict[int, Caja] = {}  # índice de fotograma -> caja leída
     perdido = n
     for i, img in enumerate(_decodificar(video, W, H, dur, fps, t)):
@@ -60,8 +60,9 @@ def seguir(video: Path, texto: str, t: float, dur: float, fps: int, inicial, zon
         if i % 2:
             continue
         dets = [d for d in pantalla.leer_fotograma(pantalla.enmascarar(img, zonas, t + i / fps))
-                if obj and obj in normalizar(d.texto) and len(normalizar(d.texto)) <= largo]
-        exactas = [d for d in dets if normalizar(d.texto) == obj]
+                if pantalla.posicion_palabras(pantalla.palabras_norm(d.texto), obj) >= 0
+                and len(normalizar(d.texto)) <= largo]
+        exactas = [d for d in dets if pantalla.palabras_norm(d.texto) == obj]
         previa = max(lecturas, default=None)
         ref = inicial.caja if previa is None else lecturas[previa]
         cands = [pantalla.recortar(d, texto).caja for d in exactas or dets]

@@ -174,15 +174,30 @@ def franja_texto(muestras: list[Muestra], t: float, dur: float) -> tuple[int, in
     return (min(a for a, _ in ys), max(b for _, b in ys)) if ys else None
 
 
+def palabras_norm(s: str) -> list[str]:
+    """Las palabras de `s`, normalizadas (sin vacías)."""
+    return [w for w in (normalizar(x) for x in re.split(r"\W+", s)) if w]
+
+
+def posicion_palabras(linea: list[str], frag: list[str]) -> int:
+    """Índice donde `frag` aparece como palabras enteras seguidas en `linea`; -1 si no (o si
+    suma menos de MIN_LETRAS letras)."""
+    if len("".join(frag)) < MIN_LETRAS:
+        return -1
+    return next((i for i in range(len(linea) - len(frag) + 1) if linea[i:i + len(frag)] == frag), -1)
+
+
 def recortar(d: Deteccion, texto: str) -> Deteccion:
     """La detección con la caja reducida al fragmento `texto` de su línea.
 
     Vision da una caja por línea: la del fragmento se estima por su posición en el texto
     normalizado y, si la línea está inclinada, por la altura de la línea base en ese tramo."""
-    linea, frag = normalizar(d.texto), normalizar(texto)
-    i = linea.find(frag)
-    if i < 0 or not frag or len(frag) == len(linea):
+    lw, fw = palabras_norm(d.texto), palabras_norm(texto)
+    k = posicion_palabras(lw, fw)
+    if k < 0 or len(fw) == len(lw):
         return d
+    linea = "".join(lw)
+    i, frag = len("".join(lw[:k])), "".join(fw)
     x, y, w, h = d.caja
     k = d.inclinacion
     x1, x2 = x + w * i / len(linea), x + w * (i + len(frag)) / len(linea)
@@ -194,10 +209,9 @@ def recortar(d: Deteccion, texto: str) -> Deteccion:
 def buscar(muestras: list[Muestra], texto: str, t: float, margen: float = 0.5) -> Deteccion | None:
     """La detección más fiable que contiene `texto` (normalizado) en t ± margen, con la caja
     recortada a ese fragmento."""
-    n = normalizar(texto)
-    if not n:
-        return None
-    cands = [d for m in muestras if abs(m.t - t) <= margen for d in m.detecciones if n in normalizar(d.texto)]
+    fw = palabras_norm(texto)
+    cands = [d for m in muestras if abs(m.t - t) <= margen for d in m.detecciones
+             if posicion_palabras(palabras_norm(d.texto), fw) >= 0]
     mejor = max(cands, key=lambda d: d.confianza, default=None)
     return recortar(mejor, texto) if mejor else None
 
@@ -210,7 +224,7 @@ def coincidencias(muestras: list[Muestra], palabras: list[Palabra]) -> list[Coin
     con el texto (el render ya no lo encontraría). Sin repetir seguidas (misma línea y palabra)."""
     huecos = 1.5 / FPS_MUESTREO  # más separación entre muestras = tramo distinto
     # palabras normalizadas de cada línea, una sola vez
-    lineas = {id(m): [(d.texto, {normalizar(w) for w in re.split(r"\W+", d.texto)})
+    lineas = {id(m): [(d.texto, set(palabras_norm(d.texto)))
                       for d in m.detecciones] for m in muestras}
     res = []
     for p in palabras:

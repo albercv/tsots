@@ -58,7 +58,7 @@ def test_seguir_salto_o_perdida_da_none(video, monkeypatch, fallo):
         if fallo == "perdida":
             return []
         d = _leer_real(imagen)[0]
-        return [Deteccion(d.texto, (d.caja[0] + 600, *d.caja[1:]), 0.9)]
+        return [Deteccion(d.texto, (d.caja[0] + 900, *d.caja[1:]), 0.9)]
 
     monkeypatch.setattr(pantalla, "leer_fotograma", leer)
     cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, _inicial(video), ZONAS)
@@ -144,7 +144,7 @@ def test_seguir_un_candidato_lejano_no_corta(video, monkeypatch):
     def leer(imagen):
         llamadas.append(1)
         d = _leer_real(imagen)[0]
-        return [Deteccion(d.texto, (d.caja[0] + 600, *d.caja[1:]), 0.9)] if len(llamadas) == 4 else [d]
+        return [Deteccion(d.texto, (d.caja[0] + 900, *d.caja[1:]), 0.9)] if len(llamadas) == 4 else [d]
 
     monkeypatch.setattr(pantalla, "leer_fotograma", leer)
     cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, _inicial(video), ZONAS)
@@ -187,3 +187,19 @@ def test_lupa_no_encoge_el_texto(video):
     with pytest.raises(ValueError):
         list(callouts.frames_lupa(video, [(60, Y + 10, 700, 70)] * 12, 0.0, 1.2, ZONAS, PALETA, FPS))
     assert callouts.cabe_en_lupa((0, 0, 400, 60)) and not callouts.cabe_en_lupa((0, 0, 700, 60))
+
+
+@pytest.mark.parametrize("aparece,sigue", [(0.45, True), (0.7, False)])
+def test_seguir_espera_la_primera_lectura_medio_segundo(video, monkeypatch, aparece, sigue):
+    def leer(imagen):
+        return [] if leer.n < aparece * FPS else _leer_real(imagen)
+
+    def contar(imagen):
+        r = leer(imagen)
+        leer.n += 2
+        return r
+
+    leer.n = 0
+    monkeypatch.setattr(pantalla, "leer_fotograma", contar)
+    cajas = callouts.seguir(video, "Revisión", 0.0, 1.5, FPS, _inicial(video), ZONAS)
+    assert (cajas[-1] is not None) == sigue
