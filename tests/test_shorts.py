@@ -1379,3 +1379,92 @@ def test_editar_existentes_un_pendiente_con_el_origen_cambiado_no_bloquea(
     with corto.open("ab") as f:  # ese short se rehízo
         f.write(b"mas")
     assert shorts.editar_existentes(e.ficha, e.config, opciones) == 1
+
+
+# --- Segmentación en temas ---------------------------------------------------
+
+def _temas(*inicios):
+    return {"temas": [{"frase_inicio": i, "titulo": f"tema {i}",
+                       "sigue_al_anterior": False} for i in inicios]}
+
+
+def test_ventana_diez_minutos():
+    frases = _frases_de(120, 10)  # 20 minutos
+    assert shorts.ventana(frases, 0) == 60
+    assert shorts.ventana(frases, 119) == 120
+
+
+def test_validar_temas_filtra_y_ordena():
+    datos = {"temas": [
+        {"frase_inicio": 20, "titulo": "  b  c ", "sigue_al_anterior": True},
+        {"frase_inicio": 5, "titulo": "a", "sigue_al_anterior": "sí"},
+        {"frase_inicio": "7", "titulo": "d", "sigue_al_anterior": False},
+        {"frase_inicio": 20, "titulo": "repetido", "sigue_al_anterior": False},
+        {"frase_inicio": 1, "titulo": "fuera", "sigue_al_anterior": False},
+        {"frase_inicio": 31, "titulo": "fuera", "sigue_al_anterior": False},
+        {"frase_inicio": None, "titulo": "x"},
+        "basura",
+    ]}
+    assert shorts.validar_temas(datos, 1, 30) == [
+        (5, "a", False), (7, "d", False), (20, "b c", True)]
+
+
+def test_validar_temas_sin_lista_falla():
+    with pytest.raises(PasoFallido):
+        shorts.validar_temas({"temas": "no"}, 0, 10)
+    with pytest.raises(PasoFallido):
+        shorts.validar_temas([], 0, 10)
+
+
+def test_segmentar_una_ventana(monkeypatch):
+    frases = _frases_de(30, 10)
+    datos = _temas(1, 10, 20)
+    datos["temas"][1]["sigue_al_anterior"] = True
+    datos["temas"][0]["sigue_al_anterior"] = True
+    _chat_falso(monkeypatch, datos)
+    temas = shorts.segmentar(frases, "m")
+    assert [(t.frase_inicio, t.frase_fin) for t in temas] == [(1, 9), (10, 19), (20, 30)]
+    assert [(t.inicio, t.fin) for t in temas] == [(0, 90), (90, 190), (190, 300)]
+    assert [t.sigue_al_anterior for t in temas] == [False, True, False]
+
+
+def test_segmentar_encadena_desde_el_ultimo_tema(monkeypatch):
+    llamadas = _chat_falso(monkeypatch, [_temas(1, 30, 50), _temas(50, 80), _temas(80)])
+    porcentajes = []
+    temas = shorts.segmentar(_frases_de(120, 10), "m", porcentajes.append)
+    assert llamadas[1]["mensajes"][1]["content"].split("\n")[1].startswith("[50]")
+    assert llamadas[1]["mensajes"][0] == llamadas[0]["mensajes"][0]
+    assert [t.frase_inicio for t in temas] == [1, 30, 50, 80]
+    assert len(llamadas) == 3  # la 2.ª ventana llega a la frase 109
+    assert porcentajes[-1] == 100.0
+
+
+def test_segmentar_tema_mas_largo_que_la_ventana_no_se_atasca(monkeypatch):
+    llamadas = _chat_falso(monkeypatch, [_temas(1), {"temas": []}])
+    temas = shorts.segmentar(_frases_de(120, 10), "m")
+    assert len(llamadas) == 2
+    assert [(t.frase_inicio, t.frase_fin) for t in temas] == [(1, 120)]
+
+
+def test_segmentar_reintenta_una_vez(monkeypatch):
+    llamadas = _chat_falso(monkeypatch, [{"basura": 1}, _temas(1, 5)])
+    assert len(shorts.segmentar(_frases_de(10, 10), "m")) == 2
+    assert len(llamadas) == 2
+    _chat_falso(monkeypatch, [{"basura": 1}, {"basura": 2}])
+    with pytest.raises(PasoFallido):
+        shorts.segmentar(_frases_de(10, 10), "m")
+
+
+def test_segmentar_sin_frases_no_llama_al_modelo(monkeypatch):
+    llamadas = _chat_falso(monkeypatch, _temas(1))
+    assert shorts.segmentar([], "m") == []
+    assert llamadas == []
+
+
+def test_segmentar_temperatura_y_keep_alive(monkeypatch):
+    llamadas = _chat_falso(monkeypatch, [_temas(1, 30, 50), _temas(50), _temas(80)])
+    shorts.segmentar(_frases_de(120, 10), "m")
+    assert len(llamadas) == 3
+    for llamada in llamadas:
+        assert llamada["temperatura"] == shorts.TEMPERATURA_TEMAS
+        assert llamada["keep_alive"] == shorts.KEEP_ALIVE_SHORTS

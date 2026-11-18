@@ -46,6 +46,8 @@ PAUSA_FRASE = 1.0  # s de silencio que cierran una frase sin puntuación
 MAX_PALABRAS_FRASE = 60
 MARGEN_CORTE = 0.25  # s de aire antes y después del trozo
 MINUTOS_PARTE = 20
+MINUTOS_VENTANA = 10  # ventana de la segmentación en temas
+TEMPERATURA_TEMAS = 0.2
 KEEP_ALIVE_SHORTS = "5m"  # el modelo sigue cargado entre las llamadas de un vídeo
 MINUTOS_SOLAPE = 3  # > DURACION_MAX: un trozo cortado cabe entero en otra parte
 MAX_NOMBRE = 60
@@ -77,6 +79,16 @@ class Frase:
     @property
     def texto(self) -> str:
         return " ".join(p.texto for p in self.palabras)
+
+
+@dataclass
+class Tema:
+    frase_inicio: int  # de 1 a n, globales, ambas incluidas
+    frase_fin: int
+    titulo: str
+    sigue_al_anterior: bool
+    inicio: float = 0.0  # segundos de las frases, sin margen
+    fin: float = 0.0
 
 
 @dataclass
@@ -365,6 +377,124 @@ def buscar_candidatos(
         if on_percent is not None:
             on_percent(100.0 * k / len(por_partes))
     return candidatos
+
+
+_SYSTEM_TEMAS = (
+    "Eres editor de vídeo. Te doy un trozo de la transcripción de un vídeo largo "
+    "en frases numeradas con su segundo de inicio y fin. Devuelve los temas que "
+    "EMPIEZAN en este texto: para cada uno, frase_inicio (el número de su primera "
+    "frase), un título de 3 a 5 palabras en el idioma de la transcripción y "
+    "sigue_al_anterior. Un tema es un asunto que se puede contar entero. "
+    "sigue_al_anterior es true si es otro punto de la misma conversación que el "
+    "tema anterior y false si cambia de asunto. Responde solo JSON."
+)
+
+ESQUEMA_TEMAS = {
+    "type": "object",
+    "properties": {
+        "temas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "frase_inicio": {"type": "integer"},
+                    "titulo": {"type": "string"},
+                    "sigue_al_anterior": {"type": "boolean"},
+                },
+                "required": ["frase_inicio", "titulo", "sigue_al_anterior"],
+            },
+        },
+    },
+    "required": ["temas"],
+}
+
+
+def ventana(frases: list[Frase], desde: int) -> int:
+    """`hasta` (exclusivo) de la ventana que empieza en `frases[desde]`: las
+    frases que acaban como mucho `MINUTOS_VENTANA` minutos después. Al menos una."""
+    limite = frases[desde].inicio + MINUTOS_VENTANA * 60
+    hasta = desde + 1
+    while hasta < len(frases) and frases[hasta].fin <= limite:
+        hasta += 1
+    return hasta
+
+
+def construir_mensajes_temas(frases: list[Frase], desde: int, hasta: int
+                             ) -> list[dict]:
+    lineas = [
+        f"[{i}] {f.inicio:.0f}s-{f.fin:.0f}s: {f.texto}"
+        for i, f in enumerate(frases[desde:hasta], desde + 1)
+    ]
+    return [
+        {"role": "system", "content": _SYSTEM_TEMAS},
+        {"role": "user", "content": "Transcripción:\n" + "\n".join(lineas)},
+    ]
+
+
+def validar_temas(datos: dict, desde: int, hasta: int
+                  ) -> list[tuple[int, str, bool]]:
+    """`(frase_inicio, título, sigue_al_anterior)` de los temas válidos, con
+    inicios en `[desde + 1, hasta]`, crecientes y sin repetir."""
+    entradas = datos.get("temas") if isinstance(datos, dict) else None
+    if not isinstance(entradas, list):
+        raise PasoFallido(
+            _("La respuesta del modelo no es válida: faltan los temas"),
+            detalle=json.dumps(datos, ensure_ascii=False, default=str)[:2000],
+        )
+    temas: dict[int, tuple[str, bool]] = {}
+    for entrada in entradas:
+        if not isinstance(entrada, dict):
+            continue
+        ini = _entero(entrada.get("frase_inicio"))
+        if ini is None or not desde + 1 <= ini <= hasta or ini in temas:
+            continue
+        temas[ini] = (" ".join(str(entrada.get("titulo") or "").split()),
+                      entrada.get("sigue_al_anterior") is True)
+    return [(ini, *temas[ini]) for ini in sorted(temas)]
+
+
+def segmentar(frases: list[Frase], modelo: str,
+              on_percent: Callable[[float], None] | None = None) -> list[Tema]:
+    """Los temas del vídeo, en ventanas encadenadas de `MINUTOS_VENTANA` minutos.
+
+    Cada ventana vuelve a mirar desde el inicio del último tema, que puede
+    seguir; lo que dice la ventana posterior manda. Sin frases, ninguno.
+    """
+    inicios: dict[int, tuple[str, bool]] = {}  # frase global -> (título, sigue)
+    desde = 0
+    while desde < len(frases):
+        hasta = ventana(frases, desde)
+        for intento in (1, 2):
+            try:
+                datos = chat_json(
+                    modelo, construir_mensajes_temas(frases, desde, hasta),
+                    ESQUEMA_TEMAS, temperatura=TEMPERATURA_TEMAS,
+                    keep_alive=KEEP_ALIVE_SHORTS)
+                nuevos = validar_temas(datos, desde, hasta)
+                break
+            except PasoFallido:
+                if intento == 2:
+                    raise
+        for ini, titulo, sigue in nuevos:
+            inicios[ini] = (titulo, sigue)  # la ventana posterior manda
+        if on_percent is not None:
+            on_percent(100.0 * hasta / len(frases))
+        if hasta == len(frases):
+            break
+        ultimo = max((i for i in inicios if i <= hasta), default=desde + 1)
+        # Si el último tema empieza en la primera frase de la ventana (más largo
+        # que ella), se sigue por `hasta`: mirar desde su inicio no avanzaría.
+        desde = ultimo - 1 if ultimo - 1 > desde else hasta
+    if frases:
+        inicios.setdefault(1, ("", False))
+    orden = sorted(inicios)
+    temas = []
+    for k, ini in enumerate(orden):
+        fin = orden[k + 1] - 1 if k + 1 < len(orden) else len(frases)
+        titulo, sigue = inicios[ini]
+        temas.append(Tema(ini, fin, titulo, sigue and k > 0,
+                          frases[ini - 1].inicio, frases[fin - 1].fin))
+    return temas
 
 
 def _respuesta_invalida(juez: str, datos) -> PasoFallido:
