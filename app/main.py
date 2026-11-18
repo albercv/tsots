@@ -36,7 +36,7 @@ from videopipeline import edicion
 from videopipeline.edicion import estado as estado_edicion
 from videopipeline.edicion import lanzar_agente_edicion
 from videopipeline.ficha import (
-    CAPTION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
+    CAPTION, TRANSCRIPCION, Ficha, cargar, limpiar_temporales, guardar, mover_salidas, ocupa,
     olvidar, reconocer,
 )
 from videopipeline.i18n import _
@@ -418,6 +418,12 @@ class VentanaPrincipal(QMainWindow):
     def _ficha_de(self, trabajo) -> Ficha | None:
         return cargar(trabajo.ficha_id) if trabajo.ficha_id else None
 
+    def _idioma_de(self, ficha: Ficha | None) -> str:
+        """Idioma con que se procesó el vídeo; si no consta, el del panel."""
+        transcripcion = ficha.artefactos.get(TRANSCRIPCION) if ficha else None
+        idioma = transcripcion.ajustes.get("idioma") if transcripcion else None
+        return idioma or self.panel.valores()["idioma_subs"]
+
     def _carpeta_shorts_de(self, trabajo) -> Path | None:
         """Carpeta de shorts: la de esta sesión o, si no, la de su ficha en disco."""
         if trabajo is None:
@@ -642,7 +648,8 @@ class VentanaPrincipal(QMainWindow):
             return
         video = shorts.editado_al_dia(video) or video  # el editado, si está al día
         dialogo = DialogoPublicar(video, caption, self.ajustes,
-                                  perfil=ficha.perfil if ficha else "", parent=self)
+                                  perfil=ficha.perfil if ficha else "",
+                                  idioma=self._idioma_de(ficha), parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()
@@ -666,7 +673,8 @@ class VentanaPrincipal(QMainWindow):
             return
         ficha = self._ficha_de(trabajo) if trabajo else None
         dialogo = DialogoPublicarShorts(cortos, self.ajustes,
-                                        perfil=ficha.perfil if ficha else "", parent=self)
+                                        perfil=ficha.perfil if ficha else "",
+                                        idioma=self._idioma_de(ficha), parent=self)
         dialogo.configurar_redes.connect(
             lambda: self._configurar_redes(dialogo.refrescar_servicio, dialogo))
         dialogo.exec()

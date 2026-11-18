@@ -424,3 +424,11 @@ def test_publicar_shorts_quita_tiktok_del_short_mas_largo_que_la_cuenta(
         dialogo.boton_publicar.click()
     assert [(c[1], c[2].video.name) for c in proveedor.llamadas if c[0] == "publicar"] == [
         (T, "01 - Uno.mp4"), (Y, "01 - Uno.mp4"), (Y, "02 - Dos.mp4")]
+
+
+def test_opciones_lleva_el_idioma_recibido(qtbot, video, ajustes):
+    dialogo = DialogoPublicar(
+        video, Caption("T", "C", [], []), ajustes, idioma="en",
+        fabrica=lambda n, c, d: ProveedorFalso(), medir=lambda v: 30.0)
+    qtbot.addWidget(dialogo)
+    assert dialogo.opciones().idioma == "en"

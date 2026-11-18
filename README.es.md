@@ -577,6 +577,18 @@ FB, LI) y el título. Al pulsar una etiqueta ves cada red con su botón
 vídeo se programó desde TSOTS, Publicar deja de avisar de que ya está
 programado. Para cambiar la fecha, cancela y vuelve a programar.
 
+**Qué declara TSOTS por ti y qué eliges tú.** En tu nombre, TSOTS dice a
+YouTube que el vídeo no es para niños y el idioma con el que se procesó, y
+dice a todas las redes que no está hecho con IA. En cada publicación
+directa de TikTok eliges quién puede verla, los comentarios, los dúos, el
+stitch y el contenido comercial; nada de eso se recuerda. Si TikTok no
+deja publicar a la cuenta en ese momento, el error llega al subir. La
+música que pongas en `~/TSOTS/musica` debe tener licencia para redes (la
+que sintetiza TSOTS no da problema). La etiqueta de colaboración pagada de
+Instagram y Facebook se pone en su app. La miniatura de YouTube necesita un
+canal verificado. La portada es el fotograma más nítido de los primeros 5
+segundos, donde se ve el título.
+
 ## Si algo va mal
 
 - Una fila en **rojo** en la cola es un vídeo que ha fallado. **Doble clic**

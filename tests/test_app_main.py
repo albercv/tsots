@@ -19,7 +19,7 @@ from videopipeline.steps import PasoFallido
 from videopipeline.caption import leer_md
 from videopipeline.config import PipelineConfig
 from videopipeline.ficha import (
-    BASE, CAPTION, VERTICAL, Artefacto, Huella, cargar, guardar, ocupa,
+    BASE, CAPTION, TRANSCRIPCION, VERTICAL, Artefacto, Huella, cargar, guardar, ocupa,
     olvidar, reconocer,
 )
 from videopipeline.reproceso_plan import (
@@ -614,6 +614,32 @@ def test_publicar_abre_dialogo_con_video_y_caption(qtbot, tmp_path, monkeypatch)
     assert video == salida
     assert caption.titulo == "Título X"
     assert ajustes is ventana.ajustes
+
+
+@pytest.mark.parametrize("en_ficha, esperado", [("en", "en"), (None, "auto")])
+def test_publicar_pasa_el_idioma_del_video(qtbot, tmp_path, monkeypatch, en_ficha, esperado):
+    ventana = _ventana(qtbot, tmp_path, monkeypatch)
+    ficha = _ficha_hecha(tmp_path)
+    if en_ficha:
+        ficha.artefactos[TRANSCRIPCION] = Artefacto(
+            "k", "transcripcion.json", ajustes={"idioma": en_ficha})
+        guardar(ficha)
+    ventana.panel.combo_idioma_subs.setCurrentIndex(
+        ventana.panel.combo_idioma_subs.findData("auto"))
+    ventana.anadir_videos([tmp_path / "a.mp4"])
+    _eligiendo_la_fila(ventana)
+    idiomas = []
+
+    class Falso(_DialogoFalso):
+        abiertos: list = []
+
+        def __init__(self, *args, idioma="", **kwargs):
+            super().__init__(*args, **kwargs)
+            idiomas.append(idioma)
+
+    monkeypatch.setattr("app.main.DialogoPublicar", Falso)
+    ventana.panel_caption.boton_publicar.click()
+    assert idiomas == [esperado]
 
 
 def test_publicar_propone_el_perfil_de_la_ficha_y_anota_el_usado(qtbot, tmp_path, monkeypatch):

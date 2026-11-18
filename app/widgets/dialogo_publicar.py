@@ -229,7 +229,7 @@ class DialogoPublicar(QDialog):
                  llavero=credenciales, fabrica: Fabrica | None = None,
                  medir: Callable[[Path], float] | None = None,
                  ahora: Callable[[], datetime] | None = None, zona: tzinfo | None = None, perfil: str = "",
-                 parent=None):
+                 idioma: str = "", parent=None):
         super().__init__(parent)
         self.video = Path(video)
         self._zona = zona or zona_local()
@@ -268,7 +268,7 @@ class DialogoPublicar(QDialog):
         # Vídeo de la vista previa de la portada.
         self._portada_de: Path | None = None
         self._portada_n = 0
-        self._idioma = ""
+        self._idioma = idioma
         # Lo que el usuario quiere marcado; las casillas deshabilitadas
         # (cuenta no conectada, vídeo largo para X…) se desmarcan sin olvidarlo.
         self._deseadas: set[Plataforma] = set(ajustes.plataformas_redes)
