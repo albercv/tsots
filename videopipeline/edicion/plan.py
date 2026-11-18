@@ -5,13 +5,12 @@ qué falla y qué se permite.
 """
 import json
 import math
-import re
-import unicodedata
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from videopipeline.edicion import emojis, rotulos
 from videopipeline.edicion.estilos import Estilo
+from videopipeline.edicion.texto import normalizar
 from videopipeline.subtitles import Palabra
 
 TIPOS = ("etiqueta", "titulo", "contador", "emoji", "golpe", "error", "transicion", "zoom")
@@ -104,11 +103,6 @@ def guardar(plan: Plan, ruta: Path) -> None:
     Path(ruta).write_text(json.dumps(datos, ensure_ascii=False, indent=2), "utf-8")
 
 
-def _norm(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s.lower())
-    return re.sub(r"[^\w]|_", "", "".join(c for c in s if not unicodedata.combining(c)))
-
-
 def _malos(texto: str, check: bool) -> str:
     return "".join(dict.fromkeys(c for c in texto if not rotulos.glifos_validos(c, check)))
 
@@ -132,7 +126,7 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
             duracion: float) -> tuple[Plan, list[str]]:
     errs: list[str] = []
     nuevos: list[Momento] = []
-    busca = [(_norm(p.texto), p) for p in palabras]
+    busca = [(normalizar(p.texto), p) for p in palabras]
     hasta = (zonas.get("titulo") or {}).get("hasta")
     for i, m in enumerate(plan.momentos):
         etq = f"Momento {i} ({m.tipo})"
@@ -159,7 +153,7 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
             if not m.palabra:
                 errs.append(f"{etq}: falta 'palabra' (la palabra del transcript donde cae el momento)")
                 continue
-            w = _norm(m.palabra)
+            w = normalizar(m.palabra)
             cand = [p for n, p in busca if n == w and w]
             if not cand:
                 errs.append(f"{etq}: la palabra {m.palabra!r} no aparece en el transcript")
