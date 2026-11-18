@@ -160,3 +160,136 @@ def test_texto_str_o_lista_incorrecta():
         assert val([Momento(tipo, t=1.0, palabra="hola", texto=["A", "B", "C"])])[1]
     assert val([Momento("contador", t=1.0, palabra="hola", lista=1, num=1, texto=["X"])])[1]
     assert val([], {"texto": "FIN", "check": False})[1]
+
+
+# ---- tipos nuevos: señalar, lupa, B-roll, icono, dato ----
+from videopipeline.edicion.pantalla import Deteccion, Muestra
+
+PAL2 = PAL + [Palabra("diez", 20.0, 20.3), Palabra("por", 40.0, 40.1), Palabra("ciento", 40.1, 40.4),
+              Palabra("cuarenta", 39.8, 40.0)]
+PAL2.sort(key=lambda p: p.inicio)
+PANT = [Muestra(t / 2, (Deteccion("Revisión", (100, 800, 400, 80), 0.98),)) for t in range(0, 130)]
+
+
+def val2(momentos, pantalla=PANT, broll=True, estilo=DIV, zonas=ZONAS, dur=60.0, final=None):
+    return P.validar(Plan(momentos, final), PAL2, zonas, estilo, dur, pantalla, broll)
+
+
+def sen(t=31.76, tipo="senalar", **kw):
+    return Momento(tipo, t=t, palabra="melón", pantalla="revision", **kw)
+
+
+def test_senalar_y_lupa_validos():
+    plan, errs = val2([sen()])
+    assert errs == [] and plan.momentos[0].forma == "circulo"
+    plan, errs = val2([sen(tipo="lupa")])
+    assert errs == [] and plan.momentos[0].forma == "circulo"
+
+
+def test_senalar_texto_no_visible():
+    _, errs = val2([Momento("senalar", t=31.76, palabra="melón", pantalla="otra cosa")], pantalla=[])
+    assert errs and "no está visible" in errs[0] and "coincidencia" in errs[0]
+
+
+def test_senalar_sin_ocr():
+    _, errs = val2([sen()], pantalla=None)
+    assert errs == ["Momento 0 (senalar): este vídeo no tiene lectura de pantalla; quita el momento"]
+
+
+def test_forma_invalida():
+    assert "forma" in val2([sen(forma="cuadro")])[1][0]
+    assert val2([sen(forma="flecha")])[1] == []
+
+
+def test_broll_requiere_clave_y_busqueda():
+    b = lambda s: Momento("broll", t=31.76, palabra="melón", buscar=s)
+    assert val2([b("person typing")], broll=False)[1]
+    assert val2([b("person typing")])[1] == []
+    for malo in ("laptop", "a b c d e f g", "persona ñandú", "日本 語"):
+        assert val2([b(malo)])[1], malo
+
+
+def test_broll_maximo_por_duracion():
+    ms = [Momento("broll", t=t, palabra=p, buscar="person typing") for t, p in ((1.0, "hola"), (20.0, "diez"), (31.76, "melón"))]
+    assert any("B-roll" in e for e in val2(ms, dur=30.0)[1])
+    assert not any("B-roll" in e for e in val2(ms[:2], dur=30.0)[1])
+
+
+def test_broll_no_coincide_con_nada_visual():
+    b = Momento("broll", t=31.76, palabra="melón", buscar="person typing")
+    otros = [et(31.76, palabra="melón"), Momento("icono", t=31.76, palabra="melón", icono="check"),
+             sen(), sen(tipo="lupa"), Momento("emoji", t=31.76, palabra="melón", emoji="🔥")]
+    for o in otros:
+        assert val2([b, o])[1], o.tipo
+    assert val2([b], final={"texto": ["FIN"], "check": False}, dur=33.0)[1]
+    assert val2([b, Momento("transicion", t=32.5)])[1] == []
+
+
+def test_icono_desconocido_sugiere_parecidos():
+    _, errs = val2([Momento("icono", t=31.76, palabra="melón", icono="chek")])
+    assert errs and "parecidos" in errs[0] and "check" in errs[0]
+
+
+def test_dato_valor_dicho():
+    d = lambda v, **kw: Momento("dato", t=20.0, palabra="diez", valor=v, texto="USUARIOS", **kw)
+    assert val2([d(10)])[1] == []
+    assert val2([d(12)])[1]
+    assert val2([Momento("dato", t=20.0, palabra="diez", valor=10, texto="X" * 23)])[1]
+
+
+def test_dato_porcentaje():
+    d = lambda **kw: Momento("dato", t=40.0, palabra="cuarenta", valor=40, texto="TASA", **kw)
+    assert val2([d(unidad="%")])[1] == []
+    _, errs = val2([Momento("dato", t=20.0, palabra="diez", valor=10, texto="X", unidad="%")])
+    assert errs
+
+
+def test_lupa_y_dato_ocupan_zona_superior():
+    d = Momento("dato", t=20.0, palabra="diez", valor=10, texto="X")
+    assert val2([Momento("lupa", t=20.0, palabra="diez", pantalla="revision"), d])[1]
+    assert val2([d, et(20.0, palabra="diez")])[1]
+
+
+def test_icono_lateral_como_emoji():
+    ic = Momento("icono", t=31.76, palabra="melón", icono="check")
+    assert val2([ic, et(31.76, palabra="melón")])[1] == []
+
+
+def test_senalar_no_coincide_con_zoom():
+    z = Momento("zoom", t0=30.0, t1=34.0)
+    assert val2([sen(), z])[1]
+    assert val2([sen()])[1] == []
+    assert val2([sen()], zonas={**ZONAS, "franja_zoom": None})[1] == []
+    ultimo = Momento("senalar", t=58.0, palabra="fin", pantalla="revision")  # zoom lento automático
+    assert val2([ultimo])[1]
+    assert val2([ultimo], zonas={**ZONAS, "franja_zoom": None})[1] == []
+
+
+def test_senalar_inicio_con_zoom_lento():
+    assert val2([Momento("senalar", t=1.0, palabra="hola", pantalla="revision")])[1]
+
+
+def test_sugerencia_etiqueta_en_pantalla():
+    plan = Plan([et(31.76, texto=("REVISIÓN",), palabra="melón")])
+    s = P.sugerencias(plan, PANT)
+    assert len(s) == 1 and s[0].startswith("Sugerencia: ") and "senalar" in s[0] and "momento 0" in s[0]
+    assert P.sugerencias(plan, None) == []
+
+
+def test_sugerencia_variedad():
+    plan = Plan([Momento("golpe", t=1.0), Momento("golpe", t=2.0), Momento("zoom", t0=1, t1=3), Momento("golpe", t=3.0)])
+    assert len(P.sugerencias(plan, None)) == 1
+
+
+def test_cli_sugerencia(tmp_path, capsys):
+    _trabajo(tmp_path, [{"tipo": "etiqueta", "t": 31.76, "palabra": "melón", "texto": ["REVISIÓN"]}])
+    (tmp_path / "pantalla.json").write_text(json.dumps({"version": 1, "muestras": [
+        {"t": 31.5, "detecciones": [{"texto": "Revisión", "caja": [0, 0, 10, 10], "confianza": 0.9}]}]}))
+    assert validar_plan.main([str(tmp_path)]) == 0
+    sal = capsys.readouterr().out.splitlines()
+    assert sal[0] == "OK" and sal[1].startswith("Sugerencia: ")
+
+
+def test_densidad_cuenta_nuevos():
+    ms = [Momento("icono", t=1.0 + i, palabra="hola", icono="check") for i in range(30)]
+    assert any("momentos" in e for e in val2(ms)[1])

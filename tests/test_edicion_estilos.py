@@ -35,3 +35,8 @@ def test_titulo_en_todos_y_formal_sin_zoom_de_golpe():
     for i in IDS:
         assert "titulo" in cargar(i).tipos
     assert "zoom" not in cargar("formal").tipos
+
+
+def test_estilos_admiten_tipos_nuevos():
+    for i in IDS:
+        assert {"senalar", "lupa", "broll", "icono", "dato"} <= set(cargar(i).tipos)

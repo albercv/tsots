@@ -1,6 +1,6 @@
 {
   "densidad_max": 0.4,
-  "tipos": ["titulo", "etiqueta", "contador", "emoji", "golpe", "error", "zoom", "transicion"],
+  "tipos": ["titulo", "etiqueta", "contador", "emoji", "golpe", "error", "zoom", "transicion", "senalar", "lupa", "broll", "icono", "dato"],
   "transiciones": "ABCDEFG",
   "zoom_max": 1.25,
   "zoom_lento": 1.08,
