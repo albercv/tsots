@@ -140,8 +140,9 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      el nombre del vídeo junto a sus salidas, cada uno con su propio
      caption (`.md`, si el caption SEO está activo). **Crear shorts al
      procesar** lo hace al final de cada procesado. Volver a crearlos
-     sustituye solo los shorts que hizo la app. Uno cada 10 minutos como
-     mucho, temas completos de todo el vídeo. Si el modelo `tev1:0.8b` no
+     sustituye solo los shorts que hizo la app. De 1 a 3 shorts por cada
+     10 minutos de vídeo, con temas completos; un tramo sin ningún tema
+     lo bastante bueno se queda sin short. Si el modelo `tev1:0.8b` no
      está instalado en Ollama, los puntúa el modelo del caption (más
      despacio). Para probar solo la selección, sin cortar nada:
      `python -m videopipeline.shorts_prueba <ficha> <salida.json>`.

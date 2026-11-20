@@ -128,8 +128,11 @@ def trocear_frases(palabras: list[Palabra]) -> list[Frase]:
 
 
 def maximo_shorts(duracion: float) -> int:
-    # Uno por cada 10 minutos, y al menos uno si el vídeo da para un short.
-    return 0 if duracion < 180 else max(1, int(duracion // 600))
+    # Hasta MAX_POR_TRAMO por cada tramo de MINUTOS_TRAMO minutos, contando el
+    # último aunque esté incompleto: el tope real es el de cada tramo.
+    if duracion < 180:
+        return 0
+    return MAX_POR_TRAMO * -(-int(duracion) // (MINUTOS_TRAMO * 60))
 
 
 def _entero(valor) -> int | None:
@@ -251,6 +254,7 @@ def candidatos_de_temas(
 
 
 MINUTOS_TRAMO = 10
+MAX_POR_TRAMO = 3  # shorts como mucho por cada tramo de MINUTOS_TRAMO minutos
 EMPATE_INTERES = 0.3  # diferencia de nota en la que gana el short más largo
 
 
@@ -263,8 +267,9 @@ def elegir(candidatos: list[Candidato], maximo: int,
     """Los mejores candidatos puntuados, repartidos por el vídeo y sin solapes.
 
     Primera vuelta: el mejor de cada tramo de `MINUTOS_TRAMO` minutos; segunda,
-    el resto por nota hasta `maximo`. Entre dos que se solapan con casi la misma
-    nota gana el más largo. Marca en `descarte` el motivo de los que no entran
+    el resto por nota, hasta `MAX_POR_TRAMO` por tramo y `maximo` en total. Un
+    tramo sin candidatos que pasen la nota se queda sin short. Entre dos que se
+    solapan con casi la misma nota gana el más largo. Marca en `descarte` el motivo de los que no entran
     y devuelve los elegidos de mejor a peor. Un candidato sin nota no pasa. Se
     solapan los que comparten alguna frase, no los que solo se tocan por el
     margen del corte.
@@ -283,15 +288,29 @@ def elegir(candidatos: list[Candidato], maximo: int,
     # de EMPATE_INTERES.
     techo: dict[int, float] = {}
 
-    def colocar(c: Candidato) -> bool:
+    def en_tramo(t: int) -> int:
+        return sum(1 for e in elegidos if tramo(e) == t)
+
+    def cabe_cambio(c: Candidato, e: Candidato) -> bool:
+        # Cambiar `e` por `c` no puede pasar del tope del tramo de `c` ni dejar
+        # sin short el tramo de `e`.
+        if tramo(c) == tramo(e):
+            return True
+        return en_tramo(tramo(c)) < MAX_POR_TRAMO and en_tramo(tramo(e)) > 1
+
+    def colocar(c: Candidato, por_tramo: bool = False) -> bool:
         choques = [e for e in elegidos if _se_solapan(c, e)]
         if not choques:
+            if por_tramo and en_tramo(tramo(c)) >= MAX_POR_TRAMO:
+                c.descarte = "sobra"
+                return False
             elegidos.append(c)
             return True
         e = choques[0]
         alto = techo.get(id(e), e.interes)
         if (len(choques) == 1 and alto - c.interes <= EMPATE_INTERES + 1e-9
-                and c.fin - c.inicio > e.fin - e.inicio):
+                and c.fin - c.inicio > e.fin - e.inicio
+                and (not por_tramo or cabe_cambio(c, e))):
             elegidos[next(k for k, x in enumerate(elegidos) if x is e)] = c
             techo[id(c)] = alto
             e.descarte = "solapa"
@@ -319,7 +338,7 @@ def elegir(candidatos: list[Candidato], maximo: int,
         if len(elegidos) >= maximo:
             c.descarte = "sobra"
         else:
-            colocar(c)
+            colocar(c, por_tramo=True)
     elegidos.sort(key=lambda c: orden[id(c)])
     return elegidos
 

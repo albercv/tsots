@@ -78,7 +78,9 @@ def test_trocear_frases_vacio():
 
 
 def test_maximo_shorts():
-    assert [shorts.maximo_shorts(d) for d in (179, 180, 599, 1199, 1800, 7860)] == [0, 1, 1, 1, 3, 13]
+    # Hasta 3 por cada tramo de 10 minutos, contando el último aunque esté incompleto.
+    assert [shorts.maximo_shorts(d) for d in (179, 180, 300, 600, 1199, 1800, 7860)] == [
+        0, 3, 3, 3, 6, 9, 42]
 
 
 def test_validar_descarta_rango_duracion_y_repetidos():
@@ -296,6 +298,43 @@ def test_elegir_segunda_vuelta_rellena():
     b = _nota(200, 270, 3.0, 0.9)
     c = _nota(700, 770, 2.5, 0.9)
     assert shorts.elegir([a, b, c], maximo=3, duracion=3000) == [a, b, c]
+
+
+def test_elegir_hasta_tres_por_tramo():
+    buenos = [_nota(100 * k, 100 * k + 70, 3.5 - 0.1 * k, 0.9) for k in range(4)]
+    elegidos = shorts.elegir(buenos, maximo=shorts.maximo_shorts(1800), duracion=1800)
+    assert elegidos == buenos[:3]
+    assert buenos[3].descarte == "sobra"
+
+
+def test_elegir_cada_tramo_aporta_lo_que_pasa_la_nota():
+    solo = _nota(100, 170, 3.0, 0.9)
+    flojo = _nota(300, 370, 1.5, 0.9)
+    otros = [_nota(700 + 100 * k, 770 + 100 * k, 3.4 - 0.1 * k, 0.9) for k in range(3)]
+    elegidos = shorts.elegir([solo, flojo] + otros, maximo=9, duracion=1800)
+    assert elegidos == otros + [solo]
+    assert flojo.descarte == "flojo"
+
+
+def test_elegir_segunda_vuelta_no_llena_de_mas_el_tramo_del_largo():
+    # El tramo 0 ya tiene 3; `c` (tramo 0, más largo) no puede sustituir a `e`
+    # (tramo 1): el tramo 0 pasaría a tener 4.
+    llenos = [_nota(100 * k, 100 * k + 70, 3.5 - 0.1 * k, 0.9, frases=(10 * k + 1, 10 * k + 2))
+              for k in range(3)]
+    e = _nota(605, 675, 3.0, 0.9, frases=(60, 61))
+    c = _nota(590, 760, 2.9, 0.9, frases=(59, 61))
+    elegidos = shorts.elegir(llenos + [e, c], maximo=9, duracion=1800)
+    assert elegidos == llenos + [e]
+    assert c.descarte == "solapa"
+
+
+def test_elegir_segunda_vuelta_no_deja_sin_short_el_tramo_del_sustituido():
+    a = _nota(100, 170, 3.5, 0.9, frases=(1, 2))
+    e = _nota(605, 675, 3.0, 0.9, frases=(60, 61))  # único del tramo 1
+    c = _nota(590, 760, 2.9, 0.9, frases=(59, 61))  # tramo 0, más largo, pisa a `e`
+    elegidos = shorts.elegir([a, e, c], maximo=6, duracion=1200)
+    assert elegidos == [a, e]
+    assert c.descarte == "solapa"
 
 
 def test_nombre_archivo_limpia_el_titulo():
@@ -638,7 +677,7 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
         archivos + ["shorts.json"])
     datos = _leer_json(e.carpeta / "shorts.json")
     assert (datos["version"], datos["ficha"], datos["video"], datos["juez"],
-            datos["maximo"]) == (2, "f1", "charla", "tev1:0.8b", 2)
+            datos["maximo"]) == (2, "f1", "charla", "tev1:0.8b", 6)
     assert [t["titulo"] for t in datos["temas"]] == ["Charla"]
     assert {c["origen"] for c in datos["candidatos"]} == {"fragmento"}
     assert datos["archivos"] == archivos
