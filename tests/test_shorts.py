@@ -328,6 +328,16 @@ def test_elegir_segunda_vuelta_no_llena_de_mas_el_tramo_del_largo():
     assert c.descarte == "solapa"
 
 
+def test_elegir_segunda_vuelta_cambia_entre_tramos_si_el_del_sustituido_tiene_otro():
+    a = _nota(100, 170, 3.5, 0.9, frases=(1, 2))
+    e1 = _nota(700, 770, 3.2, 0.9, frases=(70, 71))  # tramo 1
+    e = _nota(605, 675, 3.0, 0.9, frases=(60, 61))  # tramo 1, el segundo
+    c = _nota(590, 760, 2.9, 0.9, frases=(59, 61))  # tramo 0, más largo, pisa a `e`
+    elegidos = shorts.elegir([a, e1, e, c], maximo=6, duracion=1200)
+    assert elegidos == [a, e1, c]
+    assert e.descarte == "solapa"
+
+
 def test_elegir_segunda_vuelta_no_deja_sin_short_el_tramo_del_sustituido():
     a = _nota(100, 170, 3.5, 0.9, frases=(1, 2))
     e = _nota(605, 675, 3.0, 0.9, frases=(60, 61))  # único del tramo 1

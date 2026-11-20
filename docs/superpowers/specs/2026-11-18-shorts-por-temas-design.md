@@ -228,3 +228,12 @@ Mismos umbrales: `UMBRAL_INTERES` 2.0 y `UMBRAL_INDEPENDIENTE` 0.5.
 - Cómo se generan los tramos de temas sin explotar combinaciones. Por
   ejemplo, desde cada inicio de tema, el tramo más largo que quepa en 179 s.
 - Nombres de funciones y la forma del parámetro de `keep_alive`.
+
+## 8. Cambio (2026-11-20): de 1 a 3 shorts por tramo
+
+A petición del usuario, cada tramo de 10 minutos aporta **de 1 a 3** shorts en lugar de uno solo.
+
+- `MAX_POR_TRAMO = 3`. El tope global (`maximo_shorts`) es 3 × el número de tramos, contando el último aunque esté incompleto. Así nunca recorta lo que corresponde a un tramo.
+- La primera vuelta no cambia: el mejor de cada tramo. La segunda rellena por nota hasta 3 por tramo. Un cambio por «gana el más largo» en la segunda vuelta no puede pasar de 3 en el tramo del nuevo ni dejar sin short el tramo del sustituido.
+- Los umbrales de nota no cambian. Un tramo sin ningún tema que pase la nota se queda sin short: no se meten shorts flojos para llegar a 1.
+- En el Episodio 20 (reproducción de la elección con los candidatos guardados) salen 29 shorts en lugar de 13, con 1 a 3 en cada tramo completo. Solo la cola de 2 minutos, que no tiene candidatos, se queda sin short.
