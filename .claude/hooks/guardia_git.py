@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 PROTEGIDAS = {"develop", "main"}
-OPERADORES = {"&&", "||", ";", "|", "&", "(", ")", ";;", "|&"}
+PUNTUACION = "();<>|&\n"
 ATRIBUCION = re.compile(
     r"co-authored-by:[^\n]*(claude|anthropic)|generated with \[?claude",
     re.IGNORECASE,
@@ -39,7 +39,7 @@ def sin_heredocs(cmd):
             if linea.strip() == fin:
                 fin = None
             continue
-        m = re.search(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?", linea)
+        m = re.search(r"(?<!<)<<(?!<)-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?", linea)
         if m:
             fin = m.group(1)
         salida.append(linea)
@@ -50,18 +50,27 @@ def segmentos(cmd):
     """Divide una línea de shell en órdenes simples (listas de tokens)."""
     cmd = sin_heredocs(cmd).replace("\\\n", " ")
     # El salto de línea separa órdenes salvo dentro de comillas (un --body de varias líneas).
-    lex = shlex.shlex(cmd, posix=True, punctuation_chars="();<>|&\n")
+    lex = shlex.shlex(cmd, posix=True, punctuation_chars=PUNTUACION)
     lex.whitespace = " \t\r"
     lex.whitespace_split = True
     lex.commenters = ""
-    resultado, actual = [], []
-    for tok in lex:  # puede lanzar ValueError con comillas sin cerrar
-        if tok in OPERADORES or set(tok) == {"\n"}:
+    toks = list(lex)  # puede lanzar ValueError con comillas sin cerrar
+    resultado, actual, i = [], [], 0
+    while i < len(toks):
+        tok = toks[i]
+        if set(tok) <= set(PUNTUACION) and ("<" in tok or ">" in tok):
+            # Redirección (`2>&1`, `> f`, `<<< x`): fuera ella, su destino y el fd delante.
+            if actual and actual[-1].isdigit():
+                actual.pop()
+            i += 2
+            continue
+        if set(tok) <= set(PUNTUACION):  # &&, ;, |, saltos de línea y sus combinaciones
             if actual:
                 resultado.append(actual)
             actual = []
         else:
             actual.append(tok)
+        i += 1
     if actual:
         resultado.append(actual)
     return resultado
@@ -91,6 +100,18 @@ def git_partes(toks, cwd):
     if i >= len(toks):
         return None
     return toks[i], toks[i + 1:], cwd
+
+
+def repo_comun(cwd):
+    r = subprocess.run(["git", "-C", cwd, "rev-parse", "--git-common-dir"],
+                       capture_output=True, text=True)
+    return Path(cwd, r.stdout.strip()).resolve() if r.returncode == 0 else None
+
+
+def es_este_repo(cwd):
+    """Las reglas son de TSOTS: un git en otro repo (o fuera de uno) no se toca."""
+    proyecto = os.environ.get("CLAUDE_PROJECT_DIR")
+    return not proyecto or repo_comun(cwd) == repo_comun(proyecto)
 
 
 def rama_actual(cwd):
@@ -179,6 +200,8 @@ def motivo_bloqueo(cmd, cwd):
         ordenes = segmentos(cmd)
     except ValueError:
         # shortcut: sin poder trocear, se decide por patrones sobre el texto entero
+        if not es_este_repo(cwd):
+            return None
         if re.search(r"\bgit\b.*\bpush\b.*\b(develop|main)\b", cmd):
             return "no puedo analizar el comando y parece un push a develop/main"
         if ATRIBUCION.search(cmd) and re.search(r"\bgit\b.*\bcommit\b|\bgh\s+(pr|release)\b", cmd):
@@ -193,6 +216,8 @@ def motivo_bloqueo(cmd, cwd):
         partes = git_partes(toks, cwd)
         if partes:
             sub, args, dir_git = partes
+            if sub not in ("push", "commit") or not es_este_repo(dir_git):
+                continue
             if sub == "push":
                 motivo = destino_protegido(args, dir_git)
                 if motivo:
@@ -202,7 +227,7 @@ def motivo_bloqueo(cmd, cwd):
                 if ATRIBUCION.search(texto):
                     return "Commit bloqueado: lleva atribución a la IA (CLAUDE.md la prohíbe)."
                 tests_pendientes = dir_git
-        elif toks[:1] == ["gh"] and tuple(toks[1:3]) in GH_PUBLICA:
+        elif toks[:1] == ["gh"] and tuple(toks[1:3]) in GH_PUBLICA and es_este_repo(cwd):
             texto = cmd + ficheros_de_mensaje(toks[3:], {"-F", "--body-file", "--notes-file"})
             if ATRIBUCION.search(texto):
                 return f"`gh {' '.join(toks[1:3])}` bloqueado: lleva atribución a la IA (CLAUDE.md)."

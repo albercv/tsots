@@ -38,8 +38,9 @@ if it persists, report it in the body instead of hiding it.
 
 `git push -u origin <branch>`
 
-Title: what the user gets, in Spanish, not the branch name. Body in Spanish,
-written to a file and passed with `--body-file`:
+Title in English: what the user gets, not the branch name (e.g. "Shorts: 1 to
+3 per 10-minute stretch"). Body in Spanish, written to a file and passed with
+`--body-file`:
 
 ```
 ## Qué cambia

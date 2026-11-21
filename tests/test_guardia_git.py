@@ -27,7 +27,9 @@ def repo(tmp_path):
 
 @pytest.fixture(autouse=True)
 def sin_tests_reales(monkeypatch):
-    """El hook pasaría la suite entera en cada commit: aquí nunca."""
+    """El hook pasaría la suite entera en cada commit: aquí nunca. Y sin el
+    CLAUDE_PROJECT_DIR que hereda la suite cuando la lanza el propio hook."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
     llamadas = []
     monkeypatch.setattr(guardia, "fallo_de_tests", lambda cwd: llamadas.append(cwd))
     return llamadas
@@ -66,6 +68,29 @@ def test_push_sin_destino_estando_en_rama_protegida(rama, repo):
     assert guardia.motivo_bloqueo("git push", cwd)
     assert guardia.motivo_bloqueo("git push origin HEAD", cwd)
     assert guardia.motivo_bloqueo(f"cd {cwd} && git push", "/")
+
+
+@pytest.mark.parametrize("cmd", [
+    "git push 2>&1 | tail -3",
+    "git push origin > /dev/null",
+    "git push origin develop 2>&1",
+    "git push origin &> log.txt",
+    "git add -A &&\ngit commit -m x &&\ngit push origin develop",
+    "git status;\ngit push",
+    'cat <<< "hola"\ngit push origin develop',
+])
+def test_redirecciones_y_operadores_al_final_de_linea(cmd, repo):
+    assert guardia.motivo_bloqueo(cmd, repo("develop"))
+
+
+def test_otro_repo_no_es_asunto_del_hook(repo, tmp_path_factory, monkeypatch):
+    cwd = repo("develop")
+    otro = tmp_path_factory.mktemp("otro")
+    subprocess.run(["git", "init", "-q", str(otro)], check=True)
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(otro))
+    assert guardia.motivo_bloqueo("git push origin develop", cwd) is None
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", cwd)
+    assert guardia.motivo_bloqueo("git push origin develop", cwd)
 
 
 def test_un_heredoc_que_menciona_push_no_es_un_push(repo):
@@ -119,3 +144,6 @@ def test_extremo_a_extremo_por_stdin(repo):
     assert salida["permissionDecision"] == "deny"
     assert hook("ls -la") == ""
     assert hook("git push -u origin feature/x") == ""
+    # Commit real del hook (sin monkeypatch): sin venv no hay tests, así que se deniega.
+    motivo = json.loads(hook('git commit -m "x"'))["hookSpecificOutput"]["permissionDecisionReason"]
+    assert ".venv-clearvoice" in motivo

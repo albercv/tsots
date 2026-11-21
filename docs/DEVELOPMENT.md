@@ -137,12 +137,18 @@ QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/t
 (it does not reach the headless `claude -p` agents, which run in their own
 job folders):
 
-- `hooks/guardia_git.py` (PreToolUse on Bash, wired in `settings.json`):
-  denies any push that writes or deletes `develop`/`main` (including
-  `HEAD:main`, `--all`, `--mirror`, or a bare `git push` while on them),
-  denies commits, PRs and releases with AI attribution, and runs
-  `pytest -q` before every `git commit`, denying it when the suite fails.
-  In a worktree it uses the main checkout's `.venv-clearvoice`. Tests:
+- `hooks/guardia_git.py` (PreToolUse on Bash, wired in `settings.json`),
+  only for git/gh commands on this repository:
+  - denies pushes that write or delete `develop`/`main` in the forms its
+    tests cover: explicit refspecs (`HEAD:main`, `+x:develop`,
+    `refs/heads/…`), `--all`/`--mirror`/`--delete`, a bare `git push` while
+    on them, behind `cd …&&`, `git -C`, redirections and pipes;
+  - denies commits, PRs and releases with AI attribution;
+  - runs `pytest -q` (slow tests included, about 100 s) before every
+    `git commit` and denies it when the suite fails. In a worktree it uses
+    the main checkout's `.venv-clearvoice`.
+
+  It is a safety net, not a parser of every shell form. Tests:
   `tests/test_guardia_git.py`.
 - Skills, invoked only by the user: `/release [vX.Y.Z]` (release PR, tag,
   GitHub release, cleanup) and `/pr` (checks, tests, push, PR against
