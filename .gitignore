@@ -16,3 +16,5 @@ checkpoints/
 *.pth
 *.pt
 TheSilenceOfTheShorts.app/Contents/_CodeSignature/
+.codegraph/
+.claude/settings.local.json

@@ -131,6 +131,31 @@ only**, using the key in the Keychain and the profile from Networks… (or
 QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/test_redes_real.py -s
 ```
 
+## Claude Code
+
+`.claude/` holds the setup for Claude Code sessions opened in this repository
+(it does not reach the headless `claude -p` agents, which run in their own
+job folders):
+
+- `hooks/guardia_git.py` (PreToolUse on Bash, wired in `settings.json`),
+  only for git/gh commands on this repository:
+  - denies pushes that write or delete `develop`/`main` in the forms its
+    tests cover: explicit refspecs (`HEAD:main`, `+x:develop`,
+    `refs/heads/…`), `--all`/`--mirror`/`--delete`, a bare `git push` while
+    on them, behind `cd …&&`, `git -C`, redirections and pipes;
+  - denies commits, PRs and releases with AI attribution;
+  - runs `pytest -q` (slow tests included, about 100 s) before every
+    `git commit` and denies it when the suite fails. In a worktree it uses
+    the main checkout's `.venv-clearvoice`.
+
+  It is a safety net, not a parser of every shell form. Tests:
+  `tests/test_guardia_git.py`.
+- Skills, invoked only by the user: `/release [vX.Y.Z]` (release PR, tag,
+  GitHub release, cleanup) and `/pr` (checks, tests, push, PR against
+  `develop` with the usual body).
+- Subagents: `test-runner` (runs the suite, reports only failures) and
+  `revisor-credenciales` (read-only review of Keychain/publishing changes).
+
 ## Architecture
 
 ```
