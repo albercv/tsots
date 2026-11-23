@@ -170,4 +170,7 @@ def entorno_vertical(entorno_subs, monkeypatch):
 
     _parchear(monkeypatch, "convertir_vertical", falso_convertir)
     _parchear(monkeypatch, "preparar_seguimiento", falso_seguimiento)
+    # Los pesos de S3FD no están en git: sin esto la etiqueta del paso de caras
+    # depende de si otro test ya los ha descargado.
+    _parchear(monkeypatch, "RUTA_PESOS", Path(__file__))
     return llamadas, video, base, resolucion
