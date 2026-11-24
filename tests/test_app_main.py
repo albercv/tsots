@@ -885,8 +885,21 @@ def test_datos_shorts_llevan_edicion(qtbot, tmp_path, monkeypatch):
     ventana.panel.check_editar_claude.setChecked(True)
     ventana.panel.combo_estilo_shorts.setCurrentIndex(
         ventana.panel.combo_estilo_shorts.findData("formal"))
+    assert ventana._datos_shorts("x")["banner"] is None
+    banner = tmp_path / "banner.png"
+    banner.write_bytes(b"png")
+    ventana.panel._poner_banner(str(banner))
+    assert ventana._datos_shorts("x")["banner"] is None  # elegida pero sin marcar
+    ventana.panel.check_shorts_banner.setChecked(True)
     datos = ventana._datos_shorts("x")
-    assert (datos["editar"], datos["estilo"]) == (True, "formal")
+    assert (datos["editar"], datos["estilo"], datos["banner"]) == (True, "formal", str(banner))
+    # Casilla y ruta sobreviven a los ajustes reales (QSettings) y a otra sesión.
+    ventana._guardar_panel()
+    guardado = ventana.ajustes.cargar_panel()
+    ventana.panel.cargar({})
+    assert not ventana.panel.check_shorts_banner.isChecked()
+    ventana.panel.cargar(guardado)
+    assert ventana._datos_shorts("x")["banner"] == str(banner)
 
 
 def test_al_terminar_cola_lanza_agente_de_edicion(qtbot, tmp_path, monkeypatch):
@@ -1908,7 +1921,7 @@ def test_crear_shorts_lanza_un_trabajo_de_shorts(qtbot, tmp_path, monkeypatch):
     assert fila == 0
     assert datos["shorts"] == {
         "ficha": ficha.id, "subtitulos": False, "encuadre": "barras",
-        "editar": False, "estilo": "divertido"}
+        "editar": False, "estilo": "divertido", "banner": None}
     assert "reproceso" not in datos
     assert ventana._procesando
     guardado = ventana.ajustes.cargar_panel()
@@ -2020,7 +2033,7 @@ def test_procesar_con_shorts_al_procesar_los_anade(
             assert datos["shorts"] == {
                 "ficha": ventana.modelo_cola.trabajo(fila).ficha_id,
                 "subtitulos": False, "encuadre": "central",
-                "editar": False, "estilo": "divertido"}
+                "editar": False, "estilo": "divertido", "banner": None}
         else:
             assert "shorts" not in datos
 

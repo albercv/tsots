@@ -118,6 +118,13 @@ def test_senalar_respeta_banda_de_subtitulos():
             assert f.getchannel("A").crop((0, 1500, 1080, 1700)).getextrema() == (0, 0)
 
 
+def test_senalar_respeta_el_banner():
+    caja = (300, 1720, 300, 80)  # bajo los subtítulos, sobre el banner
+    zonas = {**ZONAS, "banner": [1740, 1831]}
+    for f in callouts.frames_senalar([caja] * 8, "circulo", PALETA, FPS, zonas, 0.0):
+        assert f.getchannel("A").crop((0, 1740, 1080, 1831)).getextrema() == (0, 0)
+
+
 def test_seguir_caja_inicial_desplazada(video, monkeypatch):
     # la muestra de pantalla.json es de otro instante: la cámara movió el texto ~300 px
     monkeypatch.setattr(pantalla, "leer_fotograma", _leer_real)

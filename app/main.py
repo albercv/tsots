@@ -112,6 +112,12 @@ def _tiene_pista_audio(ruta: Path) -> bool:
     return bool(resultado.stdout.strip())
 
 
+def _banner_elegido(valores: dict) -> Path | None:
+    """La imagen del banner de `valores_shorts()` si su casilla está marcada."""
+    ruta = valores["shorts_banner_ruta"]
+    return Path(ruta) if valores["shorts_banner"] and ruta else None
+
+
 class VentanaPrincipal(QMainWindow):
     def __init__(self, ajustes: Ajustes | None = None):
         super().__init__()
@@ -753,7 +759,8 @@ class VentanaPrincipal(QMainWindow):
                 return
         opciones = shorts.OpcionesShorts(
             elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
-            editar=True, estilo=elegidos["shorts_estilo"])
+            editar=True, estilo=elegidos["shorts_estilo"],
+            banner=_banner_elegido(elegidos))
         editar = shorts.editar_existentes if que == "shorts" else shorts.editar_video
         try:
             encolados = editar(ficha, self._config_de(trabajo, valores), opciones)
@@ -837,7 +844,8 @@ class VentanaPrincipal(QMainWindow):
         editar_al_terminar = elegidos["shorts_editar"] and self.panel.hay_claude()
         opciones_edicion = shorts.OpcionesShorts(
             elegidos["shorts_subtitulos"], elegidos["shorts_encuadre"],
-            editar=True, estilo=elegidos["shorts_estilo"])
+            editar=True, estilo=elegidos["shorts_estilo"],
+            banner=_banner_elegido(elegidos))
         self._editar_al_terminar = {}
         filas: list[tuple[int, PipelineConfig, Ficha | None]] = []
         avisos = []
@@ -944,6 +952,7 @@ class VentanaPrincipal(QMainWindow):
             "encuadre": valores["shorts_encuadre"],
             "editar": valores["shorts_editar"],
             "estilo": valores["shorts_estilo"],
+            "banner": str(banner) if (banner := _banner_elegido(valores)) else None,
         }
 
     def _crear_shorts(self) -> None:

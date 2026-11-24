@@ -1,15 +1,25 @@
 """Zonas de la pantalla vertical (1080x1920) que el plan de edición debe respetar."""
+from pathlib import Path
+
 from videopipeline.config import PipelineConfig
 from videopipeline.subtitles import PRESETS
 from videopipeline.titulo import DURACION, MARGEN_SUPERIOR_VERTICAL, TAMANO_VERTICAL
-from videopipeline.vertical import ALTO_VERTICAL, ANCHO_VERTICAL, ancho_ventana_cara
+from videopipeline.vertical import (ALTO_VERTICAL, ANCHO_VERTICAL, ancho_ventana_cara,
+                                   banner_vertical)
 
 MIN_FRANJA = 200
 
 
 def calcular(config: PipelineConfig, encuadre: str, resolucion_fuente: tuple[int, int],
-             con_titulo: bool) -> dict:
+             con_titulo: bool, banner: Path | None = None) -> dict:
+    """Con `banner` (la imagen de los shorts, ya quemada), su franja: ni el
+    zoom ni los gráficos llegan a ella, y se tapa como los subtítulos."""
     ancho, alto = resolucion_fuente
+    franja_banner = None
+    if banner:
+        imagen, y = banner_vertical(banner, config.posicion_subs)
+        franja_banner = [y, y + imagen.height]
+    tope = franja_banner[0] if franja_banner else ALTO_VERTICAL
     if encuadre == "central":
         contenido = [0, 0, ANCHO_VERTICAL, ALTO_VERTICAL]
     else:
@@ -29,7 +39,7 @@ def calcular(config: PipelineConfig, encuadre: str, resolucion_fuente: tuple[int
 
     franja = None
     if contenido[1] > 0:  # a marco completo no hay franja de vídeo reencuadrable
-        fin = contenido[1] + contenido[3]
+        fin = min(contenido[1] + contenido[3], tope)
         if subtitulos:
             fin = min(fin, subtitulos[0])
         if fin - contenido[1] >= MIN_FRANJA:
@@ -45,4 +55,5 @@ def calcular(config: PipelineConfig, encuadre: str, resolucion_fuente: tuple[int
     else:
         graficos_hasta = (subtitulos[0] if subtitulos else round(ALTO_VERTICAL * 0.6)) - (fuente if subtitulos else 0)
     return {"contenido": contenido, "subtitulos": subtitulos, "titulo": titulo,
-            "franja_zoom": franja, "graficos_hasta": graficos_hasta}
+            "franja_zoom": franja, "graficos_hasta": min(graficos_hasta, tope),
+            "banner": franja_banner}

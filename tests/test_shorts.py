@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from PIL import Image
 
 from videopipeline import ficha as modulo_ficha
 from videopipeline import pipeline, reproceso, shorts
@@ -21,6 +22,8 @@ from videopipeline.reproceso_plan import clave_seguimiento
 from videopipeline.steps import PasoFallido
 from videopipeline.subtitles import Palabra
 from videopipeline.titulo import lineas_titulo
+from tests.falsos_pipeline import banner_sintetico
+from videopipeline.vertical import banner_vertical
 
 
 def _frases_de(n: int, segundos: float) -> list[shorts.Frase]:
@@ -603,9 +606,10 @@ def ficha_con_base(tmp_path, monkeypatch):
             e.servidor_abierto = False
 
     def falso_convertir(video, salida_, filtro, cwd, usa_ass, desde_original=False,
-                        on_percent=None, tramo=None):
+                        on_percent=None, tramo=None, banner=None):
         comandos, ass = cwd / "cara.cmd", cwd / "subs_vertical.ass"
         e.cortes.append({"video": video, "tramo": tramo, "filtro": filtro,
+                         "banner": banner and Image.open(banner).size,
                          "usa_ass": usa_ass, "desde_original": desde_original,
                          "cara": comandos.read_text() if comandos.is_file() else None,
                          "ass": ass.read_text(encoding="utf-8") if ass.is_file() else None})
@@ -671,6 +675,9 @@ def test_opciones_shorts_de_datos():
     assert shorts.OpcionesShorts.de_datos(
         {"subtitulos": False, "encuadre": "barras"}) == shorts.OpcionesShorts(
         False, "barras")
+    assert shorts.OpcionesShorts.de_datos({"banner": "/b/banner.png"}).banner == Path(
+        "/b/banner.png")
+    assert shorts.OpcionesShorts.de_datos({"banner": None}).banner is None
     with pytest.raises(ValueError, match="encuadre"):
         shorts.OpcionesShorts.de_datos({"encuadre": "zoom"})
 
@@ -1100,6 +1107,33 @@ def dir_edicion(tmp_path, monkeypatch):
     ruta = tmp_path / "edicion"
     monkeypatch.setattr(edicion, "DIR_EDICION", ruta)
     return ruta
+
+
+def test_crear_sin_banner_no_lo_quema(ficha_con_base):
+    e = ficha_con_base
+    _crear(e)
+    assert e.cortes and all(c["banner"] is None for c in e.cortes)
+    assert all("[1:v]" not in c["filtro"] for c in e.cortes)
+
+
+def test_crear_con_banner_lo_quema_bajo_los_subtitulos(ficha_con_base, dir_edicion, tmp_path):
+    e = ficha_con_base
+    banner = banner_sintetico(tmp_path)
+    _crear(e, shorts.OpcionesShorts(banner=banner, editar=True))
+    imagen, y = banner_vertical(banner, e.config.posicion_subs)
+    assert e.cortes and all(c["banner"] == (1080, imagen.height) for c in e.cortes)
+    assert all(f"[1:v]overlay=0:{y}," in c["filtro"] for c in e.cortes)
+    # La edición con Claude sabe que está ahí: ni zoom ni gráficos lo pisan.
+    for t in (dir_edicion / "pendientes").iterdir():
+        zonas = _leer_json(t / "trabajo.json")["zonas"]
+        assert zonas["graficos_hasta"] <= y and zonas["franja_zoom"][1] <= y
+
+
+def test_crear_con_un_banner_que_no_esta_falla_antes_de_empezar(ficha_con_base, tmp_path):
+    e = ficha_con_base
+    with pytest.raises(PasoFallido, match="No se encuentra la imagen del banner"):
+        _crear(e, shorts.OpcionesShorts(banner=tmp_path / "borrado.png"))
+    assert not e.cortes
 
 
 def test_crear_sin_editar_no_encola(ficha_con_base, dir_edicion):
