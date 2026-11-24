@@ -394,6 +394,11 @@ sounds, in the style you choose. The untouched original stays where it is.
   decides, validating, rendering, checking) and the estimated time left,
   based on how long the finished ones took. When the batch ends it shows how
   many were edited and how many failed; hover the row to see which.
+- **Red cross and transitions:** the ❌ with the error buzzer only shows when
+  the video talks about an error, something wrong or something that cannot
+  be done ("no funciona", "no se puede"); a plain negation does not get it
+  (otherwise the plan is rejected). Each short starts the transition
+  rotation (and its whooshes) at a different one.
 - **Explanatory visuals:** besides labels and counters, Claude can point at
   text that already shows on screen (a circle, arrow or underline), blow up a
   small piece of text in a magnifier card, cover or sit beside the footage

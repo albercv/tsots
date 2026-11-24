@@ -341,3 +341,16 @@ def test_zoom_no_empieza_antes_del_titulo_si_solapa_la_franja():
     # Sin solape (encuadre central, titulo por encima de la franja) no hay restricción.
     z = {**ZONAS, "titulo": {"y": [442, 600], "hasta": 5.0}}
     assert val([Momento("zoom", t0=2.0, t1=4.0)], zonas=z)[1] == []
+
+
+def test_error_solo_si_se_habla_de_un_error():
+    pal = [Palabra("La", 9.6, 9.7), Palabra("novedad", 9.7, 10.0), Palabra("no", 10.0, 10.1),
+           Palabra("es", 10.1, 10.2), Palabra("simplemente", 10.2, 10.7),
+           Palabra("ahora", 20.0, 20.2), Palabra("no", 20.3, 20.4), Palabra("se", 20.4, 20.5),
+           Palabra("puede.", 20.5, 20.8)]
+
+    def v(t):
+        return P.validar(Plan([Momento("error", t=t, palabra="no")]), pal, ZONAS, DIV, 60.0)[1]
+    errs = v(10.0)  # una negación sin más no lleva cruz
+    assert len(errs) == 1 and "error" in errs[0] and "novedad" in errs[0]
+    assert v(20.3) == []

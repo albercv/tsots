@@ -50,7 +50,6 @@ Si un comando te pide aprobación o se deniega, no busques otra forma: para.
     {"t": 12.70, "palabra": "The",      "tipo": "titulo",   "texto": ["THE SILENCE", "OF THE SHORTS"]},
     {"t": 31.76, "palabra": "melón",    "tipo": "emoji",    "emoji": "🍉"},
     {"t": 18.08, "palabra": "Anibal",   "tipo": "golpe"},
-    {"t": 53.36, "palabra": "llama",    "tipo": "error"},
     {"t": 56.60, "palabra": "negocio",  "tipo": "contador", "lista": 1, "num": 1, "texto": "NEGOCIO"},
     {"t": 24.30, "tipo": "transicion"},
     {"t": 40.10, "palabra": "Revisión", "tipo": "senalar", "pantalla": "Revisión", "forma": "flecha"},
@@ -73,9 +72,9 @@ líneas. `contador`: `texto` es una sola cadena de 22 caracteres como mucho.
 | titulo | El nombre propio o la tesis del vídeo. Máximo 1. |
 | contador | Cada ítem de una enumeración hablada, en la palabra clave del ítem. `lista` 1 para la primera enumeración y 2 para la segunda; `num` 1, 2, 3… |
 | emoji | Un chiste o una imagen concreta dicha («melón» → 🍉, «junior» → 🐣). |
-| golpe | El chiste principal. Máximo 2. |
-| error | Una negación rotunda («no es…», «nunca»). |
-| transicion | Un cambio de tema. Entre 3 y 5 por vídeo. |
+| golpe | El chiste principal, si lo hay. Máximo 2. |
+| error | Solo si se habla de un error, un fallo o algo que está mal o no se puede hacer («es un error», «esto está mal», «no se puede hacer», «no funciona»). Una negación normal («no», «nunca», «no es…») **no** es un error. La mayoría de vídeos no lleva ninguno; como mucho 1. |
+| transicion | Un cambio de tema claro; si no lo hay, ninguna. Como mucho 4 por vídeo. |
 | senalar | Lo dicho sale escrito en pantalla (`## En pantalla`): `pantalla` es ese texto (o un trozo corto) y `forma` es `circulo` (por defecto), `flecha` o `subrayado`. Dura 2 s. |
 | lupa | Un texto corto de la pantalla (hasta 4 palabras), o el más importante del tramo: `pantalla` es ese texto o un trozo corto. Dura 2,6 s y ocupa la zona superior como una etiqueta. |
 | broll | Algo concreto que se nombra y no se ve: `buscar` son de 2 a 6 palabras en inglés, concretas y visuales. Dura 2,5 s. Solo si `B-roll: disponible`. |
@@ -95,7 +94,8 @@ Para cada momento, elige el primer recurso que encaje, en este orden:
    `broll`, con la búsqueda en inglés, concreta y visual.
 4. Un concepto abstracto con icono en el catálogo (`## Iconos`) → `icono`.
 5. Una frase clave → `etiqueta`; una enumeración → `contador`.
-6. Solo un chiste o una imagen dicha → `emoji`, `golpe`, `error`.
+6. Un chiste o una imagen dicha → `emoji` o `golpe`. Se habla de un error o de
+   algo que está mal o no se puede hacer → `error` (el validador lo comprueba).
 
 - `senalar` y `lupa` solo con textos de `## En pantalla`, visibles en ese
   segundo, y nunca durante un `zoom`. `pantalla` es el texto exacto que sale
@@ -106,7 +106,9 @@ Para cada momento, elige el primer recurso que encaje, en este orden:
 - `broll` como mucho 1 cada 15 s de vídeo, y no puede coincidir con ningún
   otro momento visual (sí con una `transicion`). Las búsquedas, en inglés,
   concretas y visuales («hands typing on laptop», no «productividad»).
-- Variedad: no pongas 3 momentos seguidos del mismo tipo.
+- Variedad: no pongas 3 momentos seguidos del mismo tipo. Ningún tipo es
+  obligatorio: no sigas una receta fija (título, golpe, error, transiciones…);
+  pon solo lo que encaje con lo que se dice en este vídeo.
 - Si en `## Estilo` pone `B-roll: no disponible` o `lectura de pantalla: no`,
   no uses esos tipos (`broll`; `senalar` y `lupa`).
 
