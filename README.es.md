@@ -418,7 +418,9 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
     `requirements.txt`). Si actualizas desde una versión anterior, vuelve a
     ejecutar `instalar.command` (o `pip install -r requirements.txt` en el
     entorno de la app, `.venv-clearvoice`) para instalarlo. Sin él no se lee la
-    pantalla y Claude no puede señalar textos ni ampliarlos con la lupa.
+    pantalla y Claude no puede señalar textos ni ampliarlos con la lupa. Si
+    Vision no responde en 30 s, ese short se edita sin lectura de pantalla en
+    lugar de parar la cola.
   - **Créditos del B-roll:** los clips usados se guardan en el `broll.json`
     del trabajo.
 - **Música de fondo:** mete pistas libres de derechos en
