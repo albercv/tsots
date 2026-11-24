@@ -6,7 +6,9 @@ Python y llama a `al_terminar(resultado)` en el hilo de la interfaz. Si
 
 La tarea no cuelga de ningún widget: vive en `_VIVAS` hasta que termina, así
 que cerrar o destruir el diálogo que la pidió no rompe nada (Qt desconecta
-sola la señal de un receptor destruido).
+sola la señal de un receptor destruido). Eso solo vale si `al_terminar`
+es un método del widget: una lambda no tiene receptor, se llamaría con el
+widget ya borrado.
 """
 from __future__ import annotations
 
