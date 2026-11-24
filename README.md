@@ -141,6 +141,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      model is not installed in Ollama, the caption model scores them
      instead (slower). To try only the selection, without cutting
      anything: `python -m videopipeline.shorts_prueba <card> <output.json>`.
+     **Banner** burns an image you choose with the button next to it (a
+     strip on a transparent background, such as a 1920-pixel-wide PNG)
+     across the full width, without its transparent part, just below the
+     subtitles; if it does not fit there, at the bottom. Ticking it with no
+     image asks for one; the app remembers the file, not a copy of it.
    - **Terms…**: your brands and proper names, one per line, so Whisper
      spells them right in the subtitles and the caption. After `=`, the
      ways Whisper gets them wrong; they are fixed automatically:
@@ -370,7 +375,7 @@ sounds, in the style you choose. The untouched original stays where it is.
   and its shorts are edited.
 - **Shorts or videos you already have:** select the video in the queue,
   pick the **Style** and click **Edit with Claude…**. If it has shorts it
-  edits them (using the framing and subtitle settings of the panel, so keep
+  edits them (using the framing, subtitle and banner settings of the panel, so keep
   the ones you created them with; the video uses the ones saved with it); if it has none and its final is vertical
   1080×1920 it edits the video itself; if it has both it asks which
   (**All N shorts** / **The video**); if neither, it warns that a vertical
@@ -394,6 +399,11 @@ sounds, in the style you choose. The untouched original stays where it is.
   decides, validating, rendering, checking) and the estimated time left,
   based on how long the finished ones took. When the batch ends it shows how
   many were edited and how many failed; hover the row to see which.
+- **Red cross and transitions:** the ❌ with the error buzzer only shows when
+  the video talks about an error, something wrong or something that cannot
+  be done ("no funciona", "no se puede"); a plain negation does not get it
+  (otherwise the plan is rejected). Each short starts the transition
+  rotation (and its whooshes) at a different one.
 - **Explanatory visuals:** besides labels and counters, Claude can point at
   text that already shows on screen (a circle, arrow or underline), blow up a
   small piece of text in a magnifier card, cover or sit beside the footage

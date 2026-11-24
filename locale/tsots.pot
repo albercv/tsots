@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-18 19:14+0100\n"
+"POT-Creation-Date: 2026-11-24 08:53+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -243,6 +243,9 @@ msgid "Añadir subtítulos"
 msgstr ""
 
 msgid "Añadir…"
+msgstr ""
+
+msgid "Banner"
 msgstr ""
 
 msgid "Barras negras"
@@ -720,6 +723,9 @@ msgstr ""
 msgid "El vídeo ya era vertical: se reescala con barras."
 msgstr ""
 
+msgid "Elegir imagen…"
+msgstr ""
+
 msgid "Elegir imágenes"
 msgstr ""
 
@@ -1006,6 +1012,9 @@ msgstr ""
 msgid ""
 "Igual que el encuadre del formato vertical, pero propio de los shorts.\n"
 "Recorte central, Fondo difuminado, Barras negras o Seguir la cara (por defecto; más lento porque analiza el vídeo)."
+msgstr ""
+
+msgid "Imagen del banner"
 msgstr ""
 
 msgid "Impacto"
@@ -1333,6 +1342,10 @@ msgid "No se encuentra la ficha de este vídeo ({id}). Arrastra el original para
 msgstr ""
 
 #, python-brace-format
+msgid "No se encuentra la imagen del banner \"{ruta}\". Elígela otra vez en la sección Shorts."
+msgstr ""
+
+#, python-brace-format
 msgid "No se encuentra la imagen: {nombre}"
 msgstr ""
 
@@ -1506,6 +1519,10 @@ msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más des
 msgstr ""
 
 msgid "No se puede añadir"
+msgstr ""
+
+#, python-brace-format
+msgid "No se puede usar \"{ruta}\" como banner: {error}."
 msgstr ""
 
 #, python-brace-format
@@ -1777,6 +1794,9 @@ msgid "Página de Facebook:"
 msgstr ""
 
 msgid "Público"
+msgstr ""
+
+msgid "Quema la imagen elegida a lo ancho, justo debajo de los subtítulos de cada short."
 msgstr ""
 
 msgid "Quemando el título"
@@ -2237,6 +2257,9 @@ msgid ""
 "El corte se hace sobre el audio ya limpio, así que con la mejora activada suele bastar 2–3 %; por encima de 4–5 % puede comerse sílabas suaves. Por defecto 4 %."
 msgstr ""
 
+msgid "Una franja con fondo transparente, como un PNG de 1920 píxeles de ancho."
+msgstr ""
+
 msgid "Una línea por término: marcas, productos, nombres propios. Whisper los recibe como pista y el caption respeta su ortografía. Después de «=», las formas en que Whisper se equivoca, separadas por comas: se corrigen al transcribir. Las líneas con # son comentarios."
 msgstr ""
 
@@ -2370,6 +2393,9 @@ msgstr ""
 msgid "error"
 msgstr ""
 
+msgid "es demasiado alta para un banner: recórtala a una franja con fondo transparente"
+msgstr ""
+
 #, python-brace-format
 msgid "faltan ~{min} min"
 msgstr ""
@@ -2384,6 +2410,9 @@ msgid "hecho"
 msgstr ""
 
 msgid "la descarga no produjo ningún fichero"
+msgstr ""
+
+msgid "la imagen es transparente entera"
 msgstr ""
 
 msgid "la limpieza de audio"

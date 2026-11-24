@@ -131,6 +131,31 @@ only**, using the key in the Keychain and the profile from Networks… (or
 QT_QPA_PLATFORM=offscreen .venv-clearvoice/bin/python -m pytest -m lenta tests/test_redes_real.py -s
 ```
 
+## Claude Code
+
+`.claude/` holds the setup for Claude Code sessions opened in this repository
+(it does not reach the headless `claude -p` agents, which run in their own
+job folders):
+
+- `hooks/guardia_git.py` (PreToolUse on Bash, wired in `settings.json`),
+  only for git/gh commands on this repository:
+  - denies pushes that write or delete `develop`/`main` in the forms its
+    tests cover: explicit refspecs (`HEAD:main`, `+x:develop`,
+    `refs/heads/…`), `--all`/`--mirror`/`--delete`, a bare `git push` while
+    on them, behind `cd …&&`, `git -C`, redirections and pipes;
+  - denies commits, PRs and releases with AI attribution;
+  - runs `pytest -q` (slow tests included, about 100 s) before every
+    `git commit` and denies it when the suite fails. In a worktree it uses
+    the main checkout's `.venv-clearvoice`.
+
+  It is a safety net, not a parser of every shell form. Tests:
+  `tests/test_guardia_git.py`.
+- Skills, invoked only by the user: `/release [vX.Y.Z]` (release PR, tag,
+  GitHub release, cleanup) and `/pr` (checks, tests, push, PR against
+  `develop` with the usual body).
+- Subagents: `test-runner` (runs the suite, reports only failures) and
+  `revisor-credenciales` (read-only review of Keychain/publishing changes).
+
 ## Architecture
 
 ```
@@ -475,7 +500,19 @@ shorts when processing**, **Create shorts** button).
    says.
 8. Each short is encoded with the vertical step (`_fase_vertical`, which
    burns the title at 0-5 s with the subtitles) into `.shorts_tmp/`, plus
-   its `.srt` and, with the SEO caption on, its `.md`.
+   its `.srt` and, with the SEO caption on, its `.md`. With **Banner**,
+   `OpcionesShorts.banner` is the image the user picked in the panel
+   (setting `shorts_banner_ruta`; the repository ships none).
+   `banner_vertical` crops its transparent part, scales it to 1080 wide
+   (more than `ALTO_MAXIMO_BANNER`, 480 px, or fully transparent is a
+   `ValueError`) and places it 40 px below the subtitles' baseline
+   (wherever they would be when they are off), or at the bottom if it
+   does not fit. `crear` and `editar_existentes` check the image first
+   (`_comprobar_banner`), so a missing file fails before any short is cut.
+   It is the second ffmpeg input, overlaid before the `.ass` so the text
+   stays on top. `zonas.calcular(banner=<image>)` adds its `banner` band:
+   the Claude edit keeps the zoom, graphics and B-roll cover above it, and
+   masks it like the subtitles for the screen OCR and the callouts.
 
 Progress is `2 + n` steps (search, scoring and the titles, one per short).
 Cancelling kills the runner before its cleanup, so the app deletes

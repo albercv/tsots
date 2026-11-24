@@ -180,8 +180,9 @@ def frames_broll(clip: Path, modo: str, dur: float, zonas: dict, paleta, fps: in
     `graficos_hasta`, sin pisar la franja vertical `evitar` (el texto en pantalla).
     Sin hueco para VENTANA_MIN px, ValueError: la pieza se omite."""
     sub = zonas.get("subtitulos")
-    if modo == "tapa":
-        ancho, alto, x0, y0 = W, (sub[0] if sub else H), 0, 0
+    if modo == "tapa":  # hasta los subtítulos o el banner, lo que llegue antes
+        alto = min(sub[0] if sub else H, (zonas.get("banner") or [H])[0])
+        ancho, x0, y0 = W, 0, 0
     else:
         h0, h1, alto = hueco_ventana(zonas, t, evitar)
         ancho = round(alto * VENTANA_ANCHO / VENTANA_ALTO)  # apaisada, también si se encoge

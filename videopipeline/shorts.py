@@ -35,6 +35,7 @@ from .seguimiento import recortar_comandos
 from .steps import PasoFallido, duracion_video, resolucion_video
 from .subtitles import Palabra, agrupar, generar_srt
 from .titulo import generar_titulo
+from .vertical import banner_vertical
 
 log = logging.getLogger(__name__)
 
@@ -756,6 +757,7 @@ class OpcionesShorts:
     encuadre: str = "cara"
     editar: bool = False
     estilo: str = "divertido"
+    banner: Path | None = None  # la imagen que se quema bajo los subtítulos
 
     @classmethod
     def de_datos(cls, datos: dict) -> OpcionesShorts:
@@ -763,7 +765,8 @@ class OpcionesShorts:
         opciones = cls(bool(datos.get("subtitulos", True)),
                        datos.get("encuadre", "cara"),
                        bool(datos.get("editar", False)),
-                       datos.get("estilo", "divertido"))
+                       datos.get("estilo", "divertido"),
+                       Path(datos["banner"]) if datos.get("banner") else None)
         if opciones.estilo not in estilos.IDS:
             raise ValueError(f"estilo inválido: {opciones.estilo!r} "
                              f"(esperado uno de {estilos.IDS})")
@@ -865,6 +868,22 @@ def _con_etiqueta(on_progress: Progreso | None, etiqueta: str) -> Progreso | Non
         {**evento, "label": etiqueta} if "step" in evento else evento)
 
 
+def _comprobar_banner(opciones: OpcionesShorts) -> None:
+    """PasoFallido si el banner elegido no se puede quemar: antes de empezar,
+    no a mitad de los shorts."""
+    if opciones.banner is None:
+        return
+    if not opciones.banner.is_file():
+        raise PasoFallido(_('No se encuentra la imagen del banner "{ruta}". '
+                            'Elígela otra vez en la sección Shorts.'
+                            ).format(ruta=opciones.banner))
+    try:
+        banner_vertical(opciones.banner, 0)
+    except (OSError, ValueError) as error:
+        raise PasoFallido(_('No se puede usar "{ruta}" como banner: {error}.'
+                            ).format(ruta=opciones.banner.name, error=error)) from error
+
+
 def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
           on_progress: Progreso | None = None) -> Resultado:
     """Saca los shorts de `ficha` a `carpeta_shorts(ficha)`; PasoFallido si no.
@@ -887,6 +906,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
         raise PasoFallido(_('La versión sin subtítulos de "{nombre}" ya no está. '
                             'Vuelve a procesarlo para sacar shorts.'
                             ).format(nombre=nombre))
+    _comprobar_banner(opciones)
     pasada = _Pasada(ficha, Plan([], config, []), on_progress)
     # Antes de transcribir o seguir la cara, que no cambian la base.
     duracion = duracion_video(pasada.base)
@@ -993,7 +1013,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
                            2 + i, total, degradar=False,
                            desde_original=pasada.base == pasada.fuente,
                            seguimiento=seguimiento, titulo=c.titulo_video,
-                           tramo=(c.inicio, c.fin))
+                           tramo=(c.inicio, c.fin), banner=opciones.banner)
             if bloques:
                 generar_srt(bloques, mp4.with_suffix(".srt"))
             if config.caption_seo:  # escribe el .md o deja su propio aviso
@@ -1047,7 +1067,7 @@ def _encolar_edicion(carpeta: Path, nombre: str, config: PipelineConfig,
     resolucion = resolucion_video(base)
     config_shorts = replace(config, subtitulos=opciones.subtitulos)
     zonas = {stem: zonas_edicion.calcular(config_shorts, opciones.encuadre, resolucion,
-                                          con_titulo=bool(titulo))
+                                          con_titulo=bool(titulo), banner=opciones.banner)
              for stem, _palabras, titulo in cortes}
     return edicion.encolar(carpeta, nombre, [stem for stem, *_resto in cortes],
                            {stem: palabras for stem, palabras, _titulo in cortes},
@@ -1090,6 +1110,7 @@ def editar_existentes(ficha: Ficha, config: PipelineConfig,
     if not creados:
         raise PasoFallido(_('"{nombre}" no tiene shorts creados que editar.'
                             ).format(nombre=ficha.nombre))
+    _comprobar_banner(opciones)
     pasada = _Pasada(ficha, Plan([], config, []), None)
     if not _transcrita(ficha, pasada.linea):
         raise PasoFallido(_('"{nombre}" no tiene la transcripción de sus shorts: '

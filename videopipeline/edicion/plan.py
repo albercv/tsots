@@ -26,6 +26,12 @@ MAX_CONTADOR = 22
 _VISUALES = ("etiqueta", "titulo", "contador", "emoji", "error", "final", "icono", "senalar", "lupa", "dato")
 FORMAS = ("circulo", "flecha", "subrayado")
 _BUSCAR = re.compile(r"^[A-Za-z][A-Za-z' -]*$")
+# Lo que pide la cruz roja: «es un error», «está mal», «no se puede», «no funciona».
+# Una negación sin más («no es…», «nunca») no es un error.
+_ERROR = re.compile(r"\b(?:errore?s?|erroneo|erronea|fall[oa]\w*|mal[oa]?s?|incorrect[oa]s?|equivoc\w*"
+                    r"|bugs?|prohibid[oa]s?|no (?:se )?puedes?|no se puede\w*|no funcion\w*|no (?:lo |la )?hagas"
+                    r"|no (?:se )?debe\w*|wrong|mistakes?|broken|fail\w*|cannot)\b")
+MARGEN_ERROR = 1.5  # s alrededor de t donde se busca de qué se habla
 _LATERALES = ("emoji", "icono")  # conviven en el lateral con lo que ocupa la zona superior
 _ZONA_SUP = ("etiqueta", "contador", "lupa", "dato")
 
@@ -255,6 +261,12 @@ def validar(plan: Plan, palabras: list[Palabra], zonas: dict, estilo: Estilo,
                 errs.append(f"{etq}: el texto del contador tiene {len(m.texto)} caracteres; máximo {MAX_CONTADOR}")
             elif _malos(m.texto, False):
                 errs.append(f"{etq}: el texto {m.texto!r} contiene caracteres no permitidos ({_malos(m.texto, False)})")
+        elif m.tipo == "error":
+            cerca = [p.texto for p in palabras if abs(p.inicio - m.t) <= MARGEN_ERROR]
+            if not _ERROR.search(" ".join(normalizar(x) for x in cerca)):
+                errs.append(f"{etq}: en t={m.t:g} no se habla de un error ni de algo que está mal o no se puede "
+                            f"hacer (se dice: «{' '.join(cerca)}»); una negación normal no lleva cruz: "
+                            "quita el momento o usa otro tipo")
         elif m.tipo == "emoji":
             if not m.emoji or not emojis.disponible(m.emoji):
                 errs.append(f"{etq}: el emoji {m.emoji!r} no está disponible; usa un emoji común")

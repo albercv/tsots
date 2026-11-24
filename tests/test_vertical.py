@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.falsos_pipeline import banner_sintetico
 from videopipeline import vertical
 from videopipeline.steps import (
     FILTRO_HUECOS_AUDIO,
@@ -20,6 +21,7 @@ from videopipeline.vertical import (
     ancho_recorte,
     ancho_ventana_cara,
     audio_cabe_en_mp4,
+    banner_vertical,
     cmd_convertir_vertical,
     convertir_vertical,
     es_ya_vertical,
@@ -134,6 +136,76 @@ def test_filtro_encuadre_desconocido_falla():
 def test_filtro_ass_al_final():
     f = filtro_vertical("difuminado", 1920, 1080, ass_nombre="subs_vertical.ass")
     assert f.endswith(f",{filtro_ass('subs_vertical.ass')},format=yuv420p[v]")
+
+
+def test_banner_a_lo_ancho_bajo_los_subtitulos(tmp_path):
+    ruta = banner_sintetico(tmp_path)
+    imagen, y = banner_vertical(ruta, 75)
+    # Solo la barra de abajo: lo transparente de encima se recorta.
+    assert imagen.size == (1080, 91) and imagen.mode == "RGBA"
+    assert y == 1440 + 40  # pie de los subtítulos al 75 % + separación
+    assert banner_vertical(ruta, 50)[1] == 1000
+    assert banner_vertical(ruta, 95)[1] == 1920 - 91  # no cabe debajo: pegado abajo
+
+
+def test_imagen_que_no_sirve_de_banner(tmp_path):
+    from PIL import Image
+    with pytest.raises(OSError):
+        banner_vertical(tmp_path / "no_esta.png", 75)
+    Image.new("RGBA", (1920, 200), (0, 0, 0, 0)).save(tmp_path / "vacia.png")
+    with pytest.raises(ValueError, match="transparente"):
+        banner_vertical(tmp_path / "vacia.png", 75)
+    # Una foto opaca de 16:9 a 1080 de ancho mediría 608: taparía el vídeo.
+    Image.new("RGB", (1920, 1080), (9, 9, 9)).save(tmp_path / "foto.jpg")
+    with pytest.raises(ValueError, match="alta"):
+        banner_vertical(tmp_path / "foto.jpg", 75)
+
+
+def test_filtro_banner_bajo_subtitulos_y_titulo():
+    ass = filtro_ass("subs_vertical.ass")
+    f = filtro_vertical("difuminado", 1920, 1080, ass_nombre="subs_vertical.ass",
+                        banner_y=1480)
+    assert f.endswith(f"setsar=1[fondo];[fondo][1:v]overlay=0:1480,{ass},format=yuv420p[v]")
+    for encuadre in ("central", "barras", "cara"):
+        assert "[1:v]overlay=0:1480,format=yuv420p[v]" in filtro_vertical(
+            encuadre, 1920, 1080, banner_y=1480)
+
+
+def test_sin_banner_el_filtro_y_el_comando_no_cambian():
+    assert filtro_vertical("central", 1920, 1080) == (
+        "[0:v]crop=606:1080,scale=1080:1920,setsar=1,format=yuv420p[v]")
+    cmd = cmd_convertir_vertical(
+        "ffmpeg", Path("in.mp4"), "[0:v]null[v]", Path("o.mp4"), "30", "aac")
+    assert cmd.count("-i") == 1
+
+
+def test_cmd_banner_es_la_segunda_entrada():
+    cmd = cmd_convertir_vertical(
+        "ffmpeg", Path("in.mp4"), "f", Path("o.mp4"), "30", "aac",
+        tramo=(5.0, 65.0), banner=Path("banner.png"))
+    i = cmd.index("-i")
+    assert cmd[i + 1:i + 4] == ["in.mp4", "-i", "banner.png"]
+    assert cmd.index("-t") < i  # el tramo solo corta el vídeo
+
+
+def test_convertir_real_con_banner(video_720p, tmp_path):
+    imagen, y = banner_vertical(banner_sintetico(tmp_path), 75)
+    imagen.save(tmp_path / "banner.png")
+    salida = tmp_path / "o.mp4"
+    convertir_vertical(video_720p, salida,
+                       filtro_vertical("difuminado", 1280, 720, banner_y=y),
+                       tmp_path, False, banner=tmp_path / "banner.png")
+    assert _probe(salida)[:3] == (1080, 1920, "yuv420p")
+    foto = tmp_path / "f.png"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "0.5", "-i", str(salida),
+                    "-frames:v", "1", str(foto)], check=True)
+    from PIL import Image
+    with Image.open(foto) as f:
+        fotograma = f.convert("RGB")
+    x, dy = 30, 60  # dentro de la barra opaca
+    assert imagen.getpixel((x, dy))[3] == 255
+    esperado = imagen.getpixel((x, dy))[:3]
+    assert all(abs(a - b) < 20 for a, b in zip(fotograma.getpixel((x, y + dy)), esperado))
 
 
 def test_cmd_convertir_copia_audio():

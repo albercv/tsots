@@ -10,6 +10,17 @@ from videopipeline import pipeline, reproceso
 from videopipeline.steps import PasoFallido
 
 
+def banner_sintetico(carpeta: Path) -> Path:
+    """Un banner como el del podcast: 1920x1080 transparente con una barra
+    opaca de 162 px abajo, que a 1080 de ancho queda en 91."""
+    from PIL import Image
+    imagen = Image.new("RGBA", (1920, 1080), (0, 0, 0, 0))
+    imagen.paste((0, 170, 170, 255), (0, 1080 - 162, 1920, 1080))
+    ruta = carpeta / "banner.png"
+    imagen.save(ruta)
+    return ruta
+
+
 def _parchear(monkeypatch, nombre: str, valor) -> None:
     """El ejecutor importa algunos pasos por su cuenta: se sustituyen en los dos."""
     for modulo in (pipeline, reproceso):
@@ -155,7 +166,7 @@ def entorno_vertical(entorno_subs, monkeypatch):
     _parchear(monkeypatch, "resolucion_video", lambda v: resolucion["valor"])
 
     def falso_convertir(video_, salida, filtro, cwd, usa_ass, desde_original=False,
-                        on_percent=None, tramo=None):
+                        on_percent=None, tramo=None, banner=None):
         if tramo is not None:  # antes de la llamada: `llamadas[-1]` sigue siendo ella
             llamadas.append(f"tramo:{tramo[0]}:{tramo[1]}")
         llamadas.append(
@@ -170,4 +181,7 @@ def entorno_vertical(entorno_subs, monkeypatch):
 
     _parchear(monkeypatch, "convertir_vertical", falso_convertir)
     _parchear(monkeypatch, "preparar_seguimiento", falso_seguimiento)
+    # Los pesos de S3FD no están en git: sin esto la etiqueta del paso de caras
+    # depende de si otro test ya los ha descargado.
+    _parchear(monkeypatch, "RUTA_PESOS", Path(__file__))
     return llamadas, video, base, resolucion

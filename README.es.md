@@ -146,6 +146,11 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      está instalado en Ollama, los puntúa el modelo del caption (más
      despacio). Para probar solo la selección, sin cortar nada:
      `python -m videopipeline.shorts_prueba <ficha> <salida.json>`.
+     **Banner** quema la imagen que eliges con el botón de al lado (una
+     franja con fondo transparente, como un PNG de 1920 píxeles de ancho)
+     a lo ancho, sin su parte transparente, justo debajo de los subtítulos;
+     si no cabe, pegada abajo. Marcarlo sin imagen la pide; la app recuerda
+     el archivo, no una copia.
    - **Términos…**: tus marcas y nombres propios, uno por línea, para que
      Whisper los escriba bien en los subtítulos y el caption. Después de
      `=`, las formas en que Whisper se equivoca; se corrigen solas:
@@ -368,7 +373,7 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   también marcado, se editan el vídeo y sus shorts.
 - **Shorts o vídeos que ya tienes:** elige el vídeo en la cola, el
   **Estilo** y pulsa **Editar con Claude…**. Si tiene shorts, edita los
-  shorts (con el encuadre y los subtítulos del panel, así que deja los que
+  shorts (con el encuadre, los subtítulos y el banner del panel, así que deja los que
   usaste al crearlos; el vídeo usa los que se guardaron con él); si no tiene y su final es vertical 1080×1920, edita
   el propio vídeo; si tiene ambos, pregunta cuál (**Los N shorts** / **El
   vídeo**); si ninguno, avisa de que hace falta un final vertical 1080×1920
@@ -392,6 +397,11 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   validando, montando el vídeo, revisando) y el tiempo que falta, estimado
   con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
   editaron y cuántos fallaron; al pasar el ratón por la fila, cuáles.
+- **Cruz roja y transiciones:** la cruz ❌ con el zumbido de error solo sale
+  cuando se habla de un error, de algo que está mal o que no se puede hacer
+  («no funciona», «no se puede»); una negación normal no la lleva (si no, el
+  plan se rechaza). Cada short empieza la rotación de transiciones (y sus
+  whooshes) en una distinta.
 - **Recursos explicativos:** además de rótulos y contadores, Claude puede
   señalar un texto que ya sale en pantalla (círculo, flecha o subrayado),
   ampliar un texto pequeño en una tarjeta con lupa, tapar la imagen o ponerse

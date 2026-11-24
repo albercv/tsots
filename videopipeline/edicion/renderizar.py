@@ -51,7 +51,8 @@ def _lineas(texto) -> list[str]:
 
 
 def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
-            pantalla: list | None = None) -> Specs:
+            pantalla: list | None = None, semilla: int = 0) -> Specs:
+    """`semilla` elige la primera transición: cada short empieza la rotación en otra."""
     piezas: list[Pieza] = []
     sfx: list[EventoSfx] = []
 
@@ -76,7 +77,8 @@ def derivar(plan: Plan, zonas: dict, estilo: Estilo, duracion: float,
 
     sonido("boom", 0.05)
     visuales = sorted((m for m in plan.momentos if m.tipo != "zoom"), key=lambda m: m.t)
-    ticks = letra = 0
+    ticks = 0
+    letra = semilla
     lado: dict = {}  # contador de lado por lista: cada lista empieza en L
     for m in (m for m in visuales if m.tipo not in ("emoji", "icono")):
         t = m.t
@@ -266,7 +268,7 @@ def renderizar(trabajo: Path, borrador: bool = False) -> Path:
     duracion = float(componer._duracion(video))
     ruta_pantalla = trabajo / "pantalla.json"
     muestras = ocr.cargar(ruta_pantalla) if ruta_pantalla.exists() else None
-    specs = derivar(plan, zonas, estilo, duracion, muestras)
+    specs = derivar(plan, zonas, estilo, duracion, muestras, zlib.crc32(trabajo.name.encode("utf-8")))
     tmp = trabajo / "tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     tmp.mkdir()

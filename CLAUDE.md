@@ -17,3 +17,7 @@
 - Code, comments and GUI text are in Spanish; translate new GUI strings with
   `lanzador/traducir.sh` and `locale/en/LC_MESSAGES/tsots.po`.
 - Pending work lives in `docs/TODO.md`.
+- A hook in `.claude/` enforces the push, attribution and test rules above;
+  if it denies a command, fix the cause instead of working around it.
+  Skills `/release` and `/pr` and the subagents `test-runner` and
+  `revisor-credenciales`: `docs/DEVELOPMENT.md` → "Claude Code".

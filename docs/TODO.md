@@ -16,6 +16,11 @@ Pending work, most urgent first. Remove an item when it is merged into
       episode with the box ticked, wait for `hechos/`, open two edited
       files, check "(editado)" in Publish shorts…, repeat in Formal and
       Academic; note times and failures.
+- [ ] **Real-app acceptance of the shorts banner:** pick the banner image in
+      the Shorts section, create the shorts of an episode with **Banner**
+      ticked (once with face framing, once with Edit with Claude) and check
+      that the bar sits under the subtitles, that the edit neither zooms nor
+      covers it, and that the image is remembered after restarting the app.
 
 - [ ] **Change the time of a scheduled post** from the calendar (Upload-Post
       `PATCH /api/uploadposts/schedule/<job_id>`; today: cancel and

@@ -938,8 +938,8 @@ def test_seccion_shorts_valores_por_defecto(qtbot):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
     assert panel.valores_shorts() == {
-        "shorts_subtitulos": True, "shorts_encuadre": "cara",
-        "shorts_al_procesar": False,
+        "shorts_subtitulos": True, "shorts_banner": False, "shorts_banner_ruta": "",
+        "shorts_encuadre": "cara", "shorts_al_procesar": False,
         "shorts_editar": False, "shorts_estilo": "divertido",
     }
     assert panel.check_shorts_subtitulos.text() == "Subtítulos"
@@ -949,27 +949,57 @@ def test_seccion_shorts_valores_por_defecto(qtbot):
     # Propio: el del vertical se desactiva sin el paso vertical.
     assert not panel.combo_encuadre.isEnabled()
     assert panel.combo_encuadre_shorts.isEnabled()
-    for control in (panel.check_shorts_subtitulos, panel.check_shorts_al_procesar,
-                    panel.boton_crear_shorts):
+    assert panel.check_shorts_banner.text() == "Banner"
+    assert panel.boton_banner.text() == "Elegir imagen…"
+    for control in (panel.check_shorts_subtitulos, panel.check_shorts_banner,
+                    panel.boton_banner,
+                    panel.check_shorts_al_procesar, panel.boton_crear_shorts):
         assert control.toolTip()
 
 
-def test_cargar_restaura_shorts_menos_al_procesar(qtbot):
+def test_cargar_restaura_shorts_menos_al_procesar(qtbot, tmp_path):
     panel = PanelOpciones()
     qtbot.addWidget(panel)
-    panel.cargar({"shorts_subtitulos": "false", "shorts_encuadre": "barras",
-                  "shorts_al_procesar": "true"})
+    banner = tmp_path / "banner.png"
+    banner.write_bytes(b"png")
+    panel.cargar({"shorts_subtitulos": "false", "shorts_banner": "true",
+                  "shorts_banner_ruta": str(banner),
+                  "shorts_encuadre": "barras", "shorts_al_procesar": "true"})
     assert panel.valores_shorts() == {
-        "shorts_subtitulos": False, "shorts_encuadre": "barras",
-        "shorts_al_procesar": False,
+        "shorts_subtitulos": False, "shorts_banner": True, "shorts_banner_ruta": str(banner),
+        "shorts_encuadre": "barras", "shorts_al_procesar": False,
         "shorts_editar": False, "shorts_estilo": "divertido",
     }
+    assert panel.boton_banner.text() == "banner.png"
     panel.cargar({})  # ajustes de antes de los shorts: valores por defecto
     assert panel.valores_shorts() == {
-        "shorts_subtitulos": True, "shorts_encuadre": "cara",
-        "shorts_al_procesar": False,
+        "shorts_subtitulos": True, "shorts_banner": False, "shorts_banner_ruta": "",
+        "shorts_encuadre": "cara", "shorts_al_procesar": False,
         "shorts_editar": False, "shorts_estilo": "divertido",
     }
+
+
+def test_banner_sin_imagen_la_pide(qtbot, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    pedidas = []
+    elegida = ""
+    monkeypatch.setattr(QFileDialog, "getOpenFileName",
+                        lambda *a: pedidas.append(a) or (elegida, ""))
+    panel = PanelOpciones()
+    qtbot.addWidget(panel)
+    # Una imagen guardada que ya no está no se marca ni abre el diálogo al cargar.
+    panel.cargar({"shorts_banner": "true", "shorts_banner_ruta": str(tmp_path / "no.png")})
+    assert not panel.check_shorts_banner.isChecked() and not pedidas
+    panel.check_shorts_banner.setChecked(True)  # sin imagen: diálogo, cancelado
+    assert len(pedidas) == 1 and not panel.check_shorts_banner.isChecked()
+    elegida = str(tmp_path / "b.png")
+    Path(elegida).write_bytes(b"png")
+    panel.check_shorts_banner.setChecked(True)
+    assert panel.check_shorts_banner.isChecked()
+    assert panel.valores_shorts()["shorts_banner_ruta"] == elegida
+    panel.check_shorts_banner.setChecked(False)
+    panel.boton_banner.click()  # el botón también elige y marca
+    assert len(pedidas) == 3 and panel.check_shorts_banner.isChecked()
 
 
 def test_editar_y_estilo_se_guardan_y_restauran(qtbot, monkeypatch):

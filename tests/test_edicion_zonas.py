@@ -1,3 +1,4 @@
+from tests.falsos_pipeline import banner_sintetico
 from videopipeline.config import PipelineConfig
 from videopipeline.edicion.zonas import calcular
 
@@ -52,3 +53,17 @@ def test_frases_parten_en_dos_lineas():
     dos = calcular(_cfg(diseno="caja"), "difuminado", FUENTE, True)  # fuente 129 px
     assert dos["subtitulos"] == [1175, 1440]  # 0.85 + 1.2 líneas de fuente (1 línea: 1330)
     assert dos["franja_zoom"][1] == dos["subtitulos"][0]
+
+
+def test_banner_frena_zoom_y_graficos(tmp_path):
+    banner = banner_sintetico(tmp_path)
+    # Sin subtítulos y con su posición baja, el banner (y 1192 al 60 %) queda
+    # dentro del vídeo de «cara» (555-1365): el zoom no llega a él.
+    sin_subs = PipelineConfig(video="x.mp4", posicion_subs=60)
+    assert calcular(sin_subs, "cara", FUENTE, True)["franja_zoom"] == [555, 1365]
+    assert calcular(sin_subs, "cara", FUENTE, True, banner=banner)["franja_zoom"] == [555, 1192]
+    assert calcular(sin_subs, "cara", FUENTE, True)["banner"] is None
+    assert calcular(sin_subs, "cara", FUENTE, True, banner=banner)["banner"] == [1192, 1283]
+    bajo = PipelineConfig(video="x.mp4", posicion_subs=50)  # banner en y 1000
+    assert calcular(bajo, "central", FUENTE, True)["graficos_hasta"] == 1152
+    assert calcular(bajo, "central", FUENTE, True, banner=banner)["graficos_hasta"] == 1000

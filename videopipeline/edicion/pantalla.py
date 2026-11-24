@@ -103,12 +103,14 @@ def leer_fotograma(imagen: Image.Image) -> list[Deteccion]:
 
 
 def enmascarar(imagen: Image.Image, zonas: dict, t: float) -> Image.Image:
-    """Copia con los subtítulos y el título (mientras dura) tapados de negro."""
+    """Copia con los subtítulos, el banner y el título (mientras dura) tapados
+    de negro."""
     img = imagen.copy()
     dib = ImageDraw.Draw(img)
-    if zonas.get("subtitulos"):
-        y0, y1 = zonas["subtitulos"]
-        dib.rectangle([0, y0, img.width, y1], fill="black")
+    for franja in (zonas.get("subtitulos"), zonas.get("banner")):
+        if franja:
+            y0, y1 = franja
+            dib.rectangle([0, y0, img.width, y1], fill="black")
     tit = zonas.get("titulo")
     if tit and t < tit["hasta"]:
         y0, y1 = tit["y"]
