@@ -803,7 +803,10 @@ class PanelOpciones(QWidget):
 
     def _poner_banner(self, ruta: str) -> None:
         self._ruta_banner = ruta
-        self.boton_banner.setText(Path(ruta).name if ruta else _("Elegir imagen…"))
+        # Elidido: un nombre largo ensancharía todo el panel; la ruta va en el tooltip.
+        self.boton_banner.setText(self.boton_banner.fontMetrics().elidedText(
+            Path(ruta).name, Qt.TextElideMode.ElideMiddle, 200) if ruta
+            else _("Elegir imagen…"))
         self.boton_banner.setToolTip(
             ruta or _("Una franja con fondo transparente, como un PNG de "
                       "1920 píxeles de ancho."))

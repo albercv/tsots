@@ -893,6 +893,13 @@ def test_datos_shorts_llevan_edicion(qtbot, tmp_path, monkeypatch):
     ventana.panel.check_shorts_banner.setChecked(True)
     datos = ventana._datos_shorts("x")
     assert (datos["editar"], datos["estilo"], datos["banner"]) == (True, "formal", str(banner))
+    # Casilla y ruta sobreviven a los ajustes reales (QSettings) y a otra sesión.
+    ventana._guardar_panel()
+    guardado = ventana.ajustes.cargar_panel()
+    ventana.panel.cargar({})
+    assert not ventana.panel.check_shorts_banner.isChecked()
+    ventana.panel.cargar(guardado)
+    assert ventana._datos_shorts("x")["banner"] == str(banner)
 
 
 def test_al_terminar_cola_lanza_agente_de_edicion(qtbot, tmp_path, monkeypatch):
