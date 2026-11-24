@@ -99,12 +99,11 @@ def _alfa(i: int, cajas: list, fps: int) -> float:
 
 
 def _terminar(img: Image.Image, zonas: dict | None, ts: float, alfa: float) -> Image.Image:
-    """Aplica el fundido y borra las bandas prohibidas (subtítulos; título mientras dura)."""
+    """Aplica el fundido y borra las bandas prohibidas (subtítulos, banner; título
+    mientras dura)."""
     zonas = zonas or {}
     img.putalpha(img.getchannel("A").point(lambda v: int(v * alfa)))
-    borrar = []
-    if zonas.get("subtitulos"):
-        borrar.append(zonas["subtitulos"])
+    borrar = [z for z in (zonas.get("subtitulos"), zonas.get("banner")) if z]
     if zonas.get("titulo") and ts < zonas["titulo"]["hasta"]:
         borrar.append(zonas["titulo"]["y"])
     for y0, y1 in borrar:

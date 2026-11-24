@@ -27,6 +27,9 @@ def test_enmascara_subtitulos_y_titulo():
     assert a.getpixel((500, 800)) == (255, 255, 255)
     b = pantalla.enmascarar(img, ZONAS, 6.0)
     assert b.getpixel((500, 1300)) == (0, 0, 0) and b.getpixel((500, 200)) == (255, 255, 255)
+    d = pantalla.enmascarar(img, {**ZONAS, "banner": [1480, 1571]}, 6.0)
+    assert d.getpixel((500, 1500)) == (0, 0, 0) and d.getpixel((500, 1600)) == (255, 255, 255)
+    assert a.getpixel((500, 1500)) == (255, 255, 255)  # sin banner, nada
     c = pantalla.enmascarar(img, {"subtitulos": None, "titulo": None}, 1.0)
     assert c.getpixel((500, 1300)) == (255, 255, 255)
     assert img.getpixel((500, 1300)) == (255, 255, 255)  # no toca el original

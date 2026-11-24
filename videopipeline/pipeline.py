@@ -33,6 +33,7 @@ from .titulo import lineas_titulo, pedir_titulo
 from .vertical import (
     ALTO_VERTICAL,
     ANCHO_VERTICAL,
+    banner_vertical,
     convertir_vertical,
     es_ya_vertical,
     filtro_vertical,
@@ -310,18 +311,21 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
                    degradar: bool, desde_original: bool,
                    seguimiento: tuple[int | None, Path] | None = None,
                    titulo: str | None = None,
-                   tramo: tuple[float, float] | None = None) -> None:
+                   tramo: tuple[float, float] | None = None,
+                   banner: Path | None = None) -> None:
     """Convierte `fuente` (sin subtítulos) a vertical y lo publica en `destino`.
 
     Con `degradar`, un fallo deja solo un aviso (el horizontal ya está
     publicado); sin él, el error se propaga. Con `seguimiento` (x inicial y
     comandos, ya calculados) no se detecta la cara otra vez: x None (sin
     caras) deja la ventana ancha quieta, en el centro. Con `tramo` (inicio,
-    fin) solo se convierte ese trozo.
+    fin) solo se convierte ese trozo. Con `banner` (la imagen de los shorts),
+    la lleva quemada bajo los subtítulos.
     """
     tmp = destino.with_name(f".{destino.stem}_tmp{destino.suffix}")
     ass = trabajo / "subs_vertical.ass"
     comandos = trabajo / "cara.cmd"
+    imagen_banner = trabajo / "banner.png"
     try:
         trabajo.mkdir(parents=True, exist_ok=True)
         ancho, alto = resolucion_video(fuente)
@@ -364,17 +368,23 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
             generar_ass(bloques or [], config.diseno, config.posicion_subs,
                         resolucion, ass, tamano=config.tamano_subs,
                         extra=lineas_titulo(titulo, resolucion) if titulo else None)
+        banner_y = None
+        if banner:
+            imagen, banner_y = banner_vertical(banner, config.posicion_subs)
+            imagen.save(imagen_banner)
         tmp.unlink(missing_ok=True)
         _emitir(on_progress, paso, total, _("Convirtiendo a vertical"))
         convertir_vertical(
             fuente, tmp,
             filtro_vertical(encuadre, ancho, alto, x_cara=x_cara,
-                            ass_nombre=ass.name if usa_ass else None),
+                            ass_nombre=ass.name if usa_ass else None,
+                            banner_y=banner_y),
             cwd=trabajo, usa_ass=usa_ass, desde_original=desde_original,
             on_percent=lambda p: _emitir(
                 on_progress, paso, total, _("Convirtiendo a vertical"), p
             ),
             tramo=tramo,
+            banner=imagen_banner if banner else None,
         )
         tmp.replace(destino)
     except Exception as error:  # noqa: BLE001 — degradación deliberada
@@ -389,6 +399,7 @@ def _fase_vertical(config: PipelineConfig, fuente: Path, destino: Path,
     finally:
         ass.unlink(missing_ok=True)
         comandos.unlink(missing_ok=True)
+        imagen_banner.unlink(missing_ok=True)
 
 
 def run(config: PipelineConfig, on_progress: Progreso | None = None) -> Path:

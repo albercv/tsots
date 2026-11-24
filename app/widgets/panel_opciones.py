@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -453,6 +454,20 @@ class PanelOpciones(QWidget):
         self.check_shorts_subtitulos.setToolTip(
             _("Con el estilo de la sección Subtítulos.")
         )
+        self.check_shorts_banner = QCheckBox(_("Banner"))
+        self.check_shorts_banner.setToolTip(
+            _("Quema la imagen elegida a lo ancho, justo debajo de los "
+              "subtítulos de cada short.")
+        )
+        self.check_shorts_banner.toggled.connect(self._al_marcar_banner)
+        self.boton_banner = QPushButton()
+        self.boton_banner.clicked.connect(self.elegir_banner)
+        self._poner_banner("")
+        fila_banner = QWidget()
+        lay_banner = QHBoxLayout(fila_banner)
+        lay_banner.setContentsMargins(0, 0, 0, 0)
+        lay_banner.addWidget(self.check_shorts_banner)
+        lay_banner.addWidget(self.boton_banner, 1)
         # Propio: el del vertical se desactiva sin el paso vertical.
         self.combo_encuadre_shorts = QComboBox()
         for etiqueta, valor in ETIQUETA_ENCUADRE.items():
@@ -517,6 +532,7 @@ class PanelOpciones(QWidget):
         self.boton_publicar_shorts.setEnabled(False)
         self.boton_publicar_shorts.clicked.connect(self.publicar_shorts)
         form_shorts.addRow(self.check_shorts_subtitulos)
+        form_shorts.addRow(fila_banner)
         form_shorts.addRow(
             self._etiqueta(_("Encuadre:"), "combo_encuadre_shorts"), self.combo_encuadre_shorts)
         form_shorts.addRow(self.check_editar_claude)
@@ -785,10 +801,34 @@ class PanelOpciones(QWidget):
             "linkedin": self.check_linkedin.isChecked(),
         }
 
+    def _poner_banner(self, ruta: str) -> None:
+        self._ruta_banner = ruta
+        self.boton_banner.setText(Path(ruta).name if ruta else _("Elegir imagen…"))
+        self.boton_banner.setToolTip(
+            ruta or _("Una franja con fondo transparente, como un PNG de "
+                      "1920 píxeles de ancho."))
+
+    def elegir_banner(self) -> None:
+        ruta, _filtro = QFileDialog.getOpenFileName(
+            self, _("Imagen del banner"), self._ruta_banner,
+            _("Imágenes ({extensiones})").format(extensiones="*.png *.jpg *.jpeg"))
+        if ruta:
+            self._poner_banner(ruta)
+            self.check_shorts_banner.setChecked(True)
+
+    def _al_marcar_banner(self, marcada: bool) -> None:
+        # Sin imagen no hay banner: marcar la casilla la pide.
+        if marcada and not Path(self._ruta_banner).is_file():
+            self.elegir_banner()
+            if not Path(self._ruta_banner).is_file():
+                self.check_shorts_banner.setChecked(False)
+
     def valores_shorts(self) -> dict:
         """Aparte de `valores`, que se pasa entero a `PipelineConfig`."""
         return {
             "shorts_subtitulos": self.check_shorts_subtitulos.isChecked(),
+            "shorts_banner": self.check_shorts_banner.isChecked(),
+            "shorts_banner_ruta": self._ruta_banner,
             "shorts_encuadre": self.combo_encuadre_shorts.currentData(),
             "shorts_al_procesar": self.check_shorts_al_procesar.isChecked(),
             "shorts_editar": self.check_editar_claude.isChecked(),
@@ -864,6 +904,11 @@ class PanelOpciones(QWidget):
             casilla.setChecked(_como_bool(valores.get(clave, valores.get("difusion")), False))
         self.check_shorts_subtitulos.setChecked(
             _como_bool(valores.get("shorts_subtitulos"), True))
+        self._poner_banner(str(valores.get("shorts_banner_ruta") or ""))
+        # Una imagen que ya no está no se marca: abriría el diálogo al arrancar.
+        self.check_shorts_banner.setChecked(
+            _como_bool(valores.get("shorts_banner"), False)
+            and Path(self._ruta_banner).is_file())
         indice = self.combo_encuadre_shorts.findData(
             valores.get("shorts_encuadre", "cara"))
         if indice >= 0:

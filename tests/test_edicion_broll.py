@@ -150,6 +150,9 @@ def test_frames_tapa_respeta_subtitulos(clip_mp4):
     assert f[0].getpixel((540, 600))[3] < 255  # fundido de entrada
     entera = list(broll.frames_broll(clip_mp4, "tapa", 1.0, {"subtitulos": None}, PALETA, 10))
     assert entera[5].getpixel((540, 1900))[3] == 255
+    banner = list(broll.frames_broll(clip_mp4, "tapa", 1.0,
+                                     {"subtitulos": None, "banner": [1480, 1571]}, PALETA, 10))
+    assert banner[5].getpixel((540, 1479))[3] == 255 and banner[5].getpixel((540, 1480))[3] == 0
 
 
 def _tarjeta(frame):
