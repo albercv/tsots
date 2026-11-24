@@ -355,3 +355,10 @@ def test_zoom_lento_no_empieza_antes_del_titulo_si_solapa_la_franja():
     # Con el título encima de la franja (o sin título) el zoom lento sigue igual.
     for libre in ({**ZONAS, "titulo": {"y": [442, 600], "hasta": 5.0}}, ZONAS):
         assert Zoom(0, 2.5, 1, D.zoom_lento) in der([], zonas=libre).zooms
+
+
+def test_transiciones_empiezan_segun_la_semilla():
+    ms = [M("transicion", 2 * i + 1) for i in range(3)]
+    primeras = {[p.params["tipo"] for p in derivar(Plan(ms, None), ZONAS, D, 30.0, semilla=s).piezas][0]
+                for s in range(len(D.transiciones))}
+    assert primeras == set(D.transiciones)  # no siempre A, B, C

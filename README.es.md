@@ -392,6 +392,11 @@ sonidos, en el estilo que elijas. El original queda intacto donde estaba.
   validando, montando el vídeo, revisando) y el tiempo que falta, estimado
   con lo que tardaron los ya hechos. Al terminar la tanda dice cuántos se
   editaron y cuántos fallaron; al pasar el ratón por la fila, cuáles.
+- **Cruz roja y transiciones:** la cruz ❌ con el zumbido de error solo sale
+  cuando se habla de un error, de algo que está mal o que no se puede hacer
+  («no funciona», «no se puede»); una negación normal no la lleva (si no, el
+  plan se rechaza). Cada short empieza la rotación de transiciones (y sus
+  whooshes) en una distinta.
 - **Recursos explicativos:** además de rótulos y contadores, Claude puede
   señalar un texto que ya sale en pantalla (círculo, flecha o subrayado),
   ampliar un texto pequeño en una tarjeta con lupa, tapar la imagen o ponerse
