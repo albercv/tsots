@@ -215,3 +215,25 @@ def test_recortar_solo_palabras_enteras():
     d = Deteccion("aaaa bbbb cccc", (0, 100, 1400, 40), 0.9)
     assert pantalla.recortar(d, "bbbb").caja == (467, 100, 467, 40)
     assert pantalla.recortar(d, "aabb") == d
+
+
+def test_vision_colgado_se_abandona(monkeypatch):
+    """Vision se ha llegado a colgar para siempre: leer_fotograma se rinde y avisa."""
+    import threading
+    import time
+    suelta = threading.Event()
+    monkeypatch.setattr(pantalla, "ESPERA_VISION", 0.2)
+    monkeypatch.setattr(pantalla, "_leer_vision", lambda img: suelta.wait(5) and [])
+    t = time.monotonic()
+    with pytest.raises(RuntimeError, match="Vision"):
+        pantalla.leer_fotograma(Image.new("RGB", (10, 10)))
+    suelta.set()
+    assert time.monotonic() - t < 2
+
+
+def test_error_de_vision_llega_a_quien_llama(monkeypatch):
+    def falla(img):
+        raise ValueError("roto")
+    monkeypatch.setattr(pantalla, "_leer_vision", falla)
+    with pytest.raises(ValueError, match="roto"):
+        pantalla.leer_fotograma(Image.new("RGB", (10, 10)))

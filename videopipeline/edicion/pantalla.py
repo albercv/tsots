@@ -18,6 +18,7 @@ import io
 import json
 import re
 import subprocess
+import threading
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -68,8 +69,33 @@ def ocr_disponible() -> bool:
         return False
 
 
+ESPERA_VISION = 30  # s por fotograma; Vision tarda ~0,1-0,5 s, pero se ha llegado a colgar para siempre
+
+
 def leer_fotograma(imagen: Image.Image) -> list[Deteccion]:
-    """Una Deteccion por línea reconocida (mejor candidato), cajas en píxeles arriba-izquierda."""
+    """Una Deteccion por línea reconocida (mejor candidato), cajas en píxeles arriba-izquierda.
+
+    Vision va en un hilo aparte: si no responde en ESPERA_VISION s, RuntimeError
+    (no se puede cancelar; el hilo colgado se abandona) y quien llama sigue sin OCR."""
+    salida: list = []
+
+    def leer() -> None:
+        try:
+            salida.append(_leer_vision(imagen))
+        except Exception as e:  # noqa: BLE001 - se relanza en el hilo de quien llama
+            salida.append(e)
+
+    hilo = threading.Thread(target=leer, name="tsots-vision", daemon=True)
+    hilo.start()
+    hilo.join(ESPERA_VISION)
+    if not salida:
+        raise RuntimeError(f"Vision no respondió en {ESPERA_VISION} s")
+    if isinstance(salida[0], Exception):
+        raise salida[0]
+    return salida[0]
+
+
+def _leer_vision(imagen: Image.Image) -> list[Deteccion]:
     import objc
     import Vision
     from Foundation import NSData

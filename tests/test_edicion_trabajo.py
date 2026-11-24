@@ -124,6 +124,21 @@ def test_ocr_que_falla_no_rompe_preparar(tmp_path, video_vertical, monkeypatch):
     assert "- lectura de pantalla: no" in txt and not (t / "pantalla.json").exists()
 
 
+def test_vision_colgado_no_para_preparar(tmp_path, video_vertical, monkeypatch):
+    """Un Vision colgado paró la cola 20 min: ahora preparar sigue sin OCR."""
+    import threading
+
+    from videopipeline.edicion import pantalla
+    suelta = threading.Event()
+    monkeypatch.setattr(pantalla, "ocr_disponible", lambda: True)
+    monkeypatch.setattr(pantalla, "ESPERA_VISION", 0.2)
+    monkeypatch.setattr(pantalla, "_leer_vision", lambda img: suelta.wait(10) and [])
+    t = _trabajo(tmp_path, video_vertical)
+    txt = preparar(t).read_text("utf-8")  # ffmpeg real: tiene que cerrarse también
+    suelta.set()
+    assert "- lectura de pantalla: no" in txt and not (t / "pantalla.json").exists()
+
+
 def test_contexto_transcribe_si_falta_palabras(tmp_path, video_vertical, monkeypatch):
     t = _trabajo(tmp_path, video_vertical, palabras=False)
     llamadas = []

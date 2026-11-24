@@ -419,7 +419,9 @@ sounds, in the style you choose. The untouched original stays where it is.
     `requirements.txt`). If you are updating from an earlier version, run
     `instalar.command` again (or `pip install -r requirements.txt` in the
     app's environment, `.venv-clearvoice`) to install it. Without it the
-    screen is not read and Claude cannot point at text or magnify it.
+    screen is not read and Claude cannot point at text or magnify it. If
+    Vision does not answer within 30 s, that short is edited without screen
+    reading instead of stalling the queue.
   - **B-roll credits:** the clips used are saved in the job's `broll.json`.
 - **Background music:** put royalty-free tracks in
   `~/TSOTS/musica/divertido/`, `formal/` and `academico/` (mp3, wav, m4a,
