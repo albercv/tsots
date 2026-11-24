@@ -267,3 +267,18 @@ def test_dialogo_marca_editado(qtbot, carpeta, ajustes, llavero_falso):
     uno, dos, _tres = dialogo.filas
     assert uno.casilla.text().endswith("(editado)")
     assert "(editado)" not in dos.casilla.text()
+
+
+def test_medir_tras_destruir_el_dialogo(qtbot, carpeta, ajustes):
+    """ffprobe termina con el diálogo ya destruido: el aviso no toca sus casillas."""
+    import threading
+
+    from shiboken6 import delete
+    soltar = threading.Event()
+    dialogo = DialogoPublicarShorts(
+        shorts.listar(carpeta), ajustes, fabrica=lambda nombre, clave, datos: ProveedorFalso(),
+        medir=lambda mp4: soltar.wait(5) and DURACIONES[Path(mp4).name],
+        ahora=lambda: AHORA, zona=MADRID)
+    delete(dialogo)  # como al cerrarlo: Qt borra sus casillas
+    soltar.set()
+    qtbot.waitUntil(lambda: segundo_plano.vivas() == 0, timeout=5000)

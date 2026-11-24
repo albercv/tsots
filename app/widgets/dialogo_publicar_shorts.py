@@ -127,11 +127,12 @@ class DialogoPublicarShorts(DialogoPublicar):
         """Mide todos los shorts de una vez; la base mediría solo el primero."""
         self.duracion = 0.0  # lo de X se mira short a short (`_plataformas_de`)
         medir, mp4s = self._medir, [c.mp4 for c in self._cortos]
+        # Aviso con método ligado, no lambda: si el diálogo se destruye antes, Qt lo desconecta.
         segundo_plano.en_segundo_plano(
-            lambda: [float(medir(m) or 0.0) for m in mp4s],
-            lambda r: self._al_medir_todos(mp4s, r), "tsots-ffprobe")
+            lambda: [float(medir(m) or 0.0) for m in mp4s], self._al_medir_todos, "tsots-ffprobe")
 
-    def _al_medir_todos(self, mp4s: list[Path], resultado) -> None:
+    def _al_medir_todos(self, resultado) -> None:
+        mp4s = [c.mp4 for c in self._cortos]
         # Una duración ilegible no bloquea, como en el diálogo de un vídeo.
         self._duraciones = dict(zip(mp4s, resultado if isinstance(resultado, list)
                                     else [0.0] * len(mp4s)))
