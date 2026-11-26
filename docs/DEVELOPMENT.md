@@ -493,7 +493,7 @@ shorts when processing**, **Create shorts** button).
    hook, value and audience; the audience one carries the brand context,
    `PipelineConfig.contexto_marca`, cut at `MAX_MARCA` characters).
    `elegir` drops interest `< UMBRAL_INTERES`
-   (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
+   (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.3), sorts
    best first, skips anything sharing a sentence with a chosen one, and
    keeps at most `max`.
 7. Each chosen short gets its title (`generar_titulo` on the text of its
