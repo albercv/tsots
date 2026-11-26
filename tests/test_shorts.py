@@ -383,11 +383,13 @@ def _chat_falso(monkeypatch, respuestas):
 
 
 def _tev1(si: float, score: float) -> dict:
+    """Respuesta de `tev1` con las tres partes del interés a la misma nota."""
     return {
         "independiente": {"type": "choice", "choice": "si",
                           "probabilities": {"si": si, "no": 1 - si}},
-        "interes": {"type": "score", "score": score,
-                    "probabilities": {"0": 0.1, "1": 0.2}},
+        **{parte: {"type": "score", "score": score,
+                   "probabilities": {"0": 0.1, "1": 0.2}}
+           for parte in shorts.PARTES_INTERES},
     }
 
 
@@ -399,12 +401,13 @@ def test_esquema_candidatos_exige_todos_los_campos():
     assert item["properties"]["titulo"]["type"] == "string"
 
 
-def test_nota_tev1_lee_probabilidad_y_score(monkeypatch):
+def test_nota_tev1_interes_es_la_media_de_las_partes(monkeypatch):
     respuesta = {
         "independiente": {"type": "choice", "choice": "si", "probabilities": {
             "si": 0.6563623509207749, "no": 0.34363764907922517}},
-        "interes": {"type": "score", "score": 2.730191051931489,
-                    "probabilities": {"2": 0.4, "3": 0.5}},
+        "gancho": {"type": "score", "score": 3.5},
+        "valor": {"type": "score", "score": 1.0},
+        "publico": {"type": "score", "score": 3.0},
     }
     pedidos = []
 
@@ -413,44 +416,38 @@ def test_nota_tev1_lee_probabilidad_y_score(monkeypatch):
         return respuesta
 
     monkeypatch.setattr(shorts, "systemone", falso)
-    assert shorts.nota_tev1("un fragmento") == (
-        pytest.approx(0.6563623509207749), pytest.approx(2.730191051931489))
-    assert pedidos == [("tev1:0.8b", "un fragmento", shorts.PREGUNTAS)]
+    assert shorts.nota_tev1("un fragmento", "Hablo a pymes") == (
+        pytest.approx(0.6563623509207749), pytest.approx(2.5))
+    assert pedidos == [("tev1:4b-nvfp4", "un fragmento",
+                        shorts.preguntas_juez("Hablo a pymes"))]
+
+
+def test_preguntas_juez_llevan_la_marca_solo_en_publico():
+    con = shorts.preguntas_juez("  Hablo a dueños de pymes.  ")
+    sin = shorts.preguntas_juez("   ")
+    assert list(con) == ["independiente", *shorts.PARTES_INTERES]
+    assert "Hablo a dueños de pymes." in con["publico"]["instructions"]
+    assert "marca" not in sin["publico"]["instructions"]
+    assert {k: v for k, v in con.items() if k != "publico"} == {
+        k: v for k, v in sin.items() if k != "publico"}
+
+
+def test_preguntas_juez_recortan_una_marca_enorme():
+    # `tev1` responde 400 si el trozo y la pregunta pasan de su num_ctx (2048).
+    publico = shorts.preguntas_juez("x" * 10_000)["publico"]["instructions"]
+    assert publico.count("x") <= shorts.MAX_MARCA + 5
 
 
 @pytest.mark.parametrize("respuesta", [
-    {"interes": {}},
+    {"gancho": {}},
     {},
     {"independiente": {"probabilities": {"si": "mucho"}},
-     "interes": {"score": 3.0}},
+     "gancho": {"score": 3.0}, "valor": {"score": 3.0}, "publico": {"score": 3.0}},
 ])
 def test_nota_tev1_forma_inesperada_falla(monkeypatch, respuesta):
     monkeypatch.setattr(shorts, "systemone", lambda *a, **kw: respuesta)
-    with pytest.raises(PasoFallido, match="tev1:0.8b"):
+    with pytest.raises(PasoFallido, match="tev1:4b-nvfp4"):
         shorts.nota_tev1("texto")
-
-
-def test_nota_chat_temperatura_cero(monkeypatch):
-    llamadas = _chat_falso(monkeypatch, {"independiente": "no", "interes": 7})
-    assert shorts.nota_chat("el fragmento", "gemma4:12b-mlx") == (0.0, 4.0)
-    assert llamadas[0]["temperatura"] == 0
-    assert llamadas[0]["keep_alive"] == shorts.KEEP_ALIVE_SHORTS
-    assert llamadas[0]["modelo"] == "gemma4:12b-mlx"
-    assert llamadas[0]["esquema"] is shorts.ESQUEMA_JUEZ
-    sistema, usuario = llamadas[0]["mensajes"]
-    assert sistema == {"role": "system", "content": shorts._SYSTEM_JUEZ}
-    assert usuario == {"role": "user", "content": "Fragmento:\nel fragmento"}
-
-
-def test_nota_chat_si_y_acota_a_cero(monkeypatch):
-    _chat_falso(monkeypatch, {"independiente": "si", "interes": -3})
-    assert shorts.nota_chat("x", "m") == (1.0, 0.0)
-
-
-def test_nota_chat_forma_inesperada_falla(monkeypatch):
-    _chat_falso(monkeypatch, {"independiente": "si"})
-    with pytest.raises(PasoFallido, match="gemma4:12b-mlx"):
-        shorts.nota_chat("x", "gemma4:12b-mlx")
 
 
 def _para_puntuar():
@@ -472,61 +469,29 @@ def test_puntuar_con_tev1(monkeypatch):
 
     monkeypatch.setattr(shorts, "systemone", falso)
     llamadas = _chat_falso(monkeypatch, {})
-    avisos, porcentajes = [], []
-    juez = shorts.puntuar([a, b, descartado], frases, "gemma4:12b-mlx",
-                          avisos.append, porcentajes.append)
-    assert juez == "tev1:0.8b"
+    porcentajes = []
+    juez = shorts.puntuar([a, b, descartado], frases, porcentajes.append)
+    assert juez == "tev1:4b-nvfp4"
     assert (a.independiente, a.interes) == (pytest.approx(0.9), pytest.approx(3.5))
     assert (b.independiente, b.interes) == (pytest.approx(0.4), pytest.approx(1.5))
     assert (descartado.independiente, descartado.interes) == (None, None)
     assert estados == [texto(a), texto(b)]
-    assert llamadas == [] and avisos == []
+    assert llamadas == []
     assert porcentajes == [50.0, 100.0]
 
 
-def test_puntuar_respaldo_si_falla_tev1(monkeypatch):
-    frases, a, b, descartado, texto = _para_puntuar()
-    n = []
-
-    def falso(modelo, estado, preguntas, **kw):
-        n.append(estado)
-        if len(n) == 2:
-            raise PasoFallido("Ollama no responde")
-        return _tev1(0.7, 2.5)
-
-    monkeypatch.setattr(shorts, "systemone", falso)
-    llamadas = _chat_falso(monkeypatch, {"independiente": "si", "interes": 3})
-    avisos = []
-    juez = shorts.puntuar([a, b, descartado], frases, "gemma4:12b-mlx", avisos.append)
-    assert juez == "gemma4:12b-mlx"
-    assert len(n) == 2  # tras el primer fallo no se insiste con tev1
-    assert len(avisos) == 1
-    assert "tev1:0.8b" in avisos[0] and "gemma4:12b-mlx" in avisos[0]
-    assert "Ollama no responde" in avisos[0]
-    # Todos puntuados por el chat, también el primero: sin mezclar escalas.
-    assert (a.independiente, a.interes) == (1.0, 3.0)
-    assert (b.independiente, b.interes) == (1.0, 3.0)
-    assert descartado.interes is None
-    assert [l["temperatura"] for l in llamadas] == [0, 0]
-    assert [l["mensajes"][1]["content"] for l in llamadas] == [
-        "Fragmento:\n" + texto(a), "Fragmento:\n" + texto(b)]
-
-
-def test_puntuar_sin_ningun_juez_falla_claro(monkeypatch):
+def test_puntuar_sin_juez_falla_claro_y_no_recurre_a_un_llm(monkeypatch):
     frases, a, b, descartado, texto = _para_puntuar()
 
     def sin_tev1(*args, **kw):
-        raise PasoFallido("sin tev1")
-
-    def sin_chat(*args, **kw):
-        raise PasoFallido("sin chat")
+        raise PasoFallido("Modelo no descargado: tev1:4b-nvfp4")
 
     monkeypatch.setattr(shorts, "systemone", sin_tev1)
-    monkeypatch.setattr(shorts, "chat_json", sin_chat)
-    with pytest.raises(PasoFallido,
-                       match="ni tev1:0.8b ni gemma4:12b-mlx responden") as e:
-        shorts.puntuar([a, b], frases, "gemma4:12b-mlx", lambda aviso: None)
-    assert e.value.detalle == "sin chat"
+    llamadas = _chat_falso(monkeypatch, {})
+    with pytest.raises(PasoFallido, match="ollama pull tev1:4b-nvfp4") as e:
+        shorts.puntuar([a, b], frases)
+    assert "Modelo no descargado: tev1:4b-nvfp4" in str(e.value)
+    assert llamadas == []
 
 
 def test_puntuar_sin_candidatos_vivos_no_llama_a_nadie(monkeypatch):
@@ -537,7 +502,7 @@ def test_puntuar_sin_candidatos_vivos_no_llama_a_nadie(monkeypatch):
 
     monkeypatch.setattr(shorts, "systemone", prohibido)
     monkeypatch.setattr(shorts, "chat_json", prohibido)
-    assert shorts.puntuar([descartado], frases, "m", lambda aviso: None) == shorts.JUEZ
+    assert shorts.puntuar([descartado], frases) == shorts.JUEZ
 
 
 # --- crear --------------------------------------------------------------------
@@ -592,6 +557,7 @@ def ficha_con_base(tmp_path, monkeypatch):
         ficha=ficha, config=PipelineConfig(video=original, caption_seo=True),
         carpeta=salida / "charla", cortes=[], captions=[], caras=[],
         falla_corte=None,  # número de la llamada a convertir_vertical que falla
+        preguntas=[],  # las que ha recibido el juez
         titulos=[],  # (texto, idioma, modelo, ¿Ollama arrancado?) de cada generar_titulo
         titulo_modelo="Título del tramo",  # lo que devuelve generar_titulo; None si falla
         servidor_abierto=False,
@@ -634,6 +600,7 @@ def ficha_con_base(tmp_path, monkeypatch):
         return e.titulo_modelo
 
     def falso_tev1(modelo, texto, preguntas, **kw):
+        e.preguntas.append(preguntas)
         si, score = e.notas.get(texto.split()[0], (0.9, 1.0))
         return _tev1(si, score)
 
@@ -666,6 +633,14 @@ def _crear(e, opciones=None, eventos=None):
                         recibidos.append)
 
 
+def test_crear_pregunta_al_juez_con_el_contexto_de_marca(ficha_con_base):
+    e = ficha_con_base
+    e.config = PipelineConfig(video=e.config.video, contexto_marca="Hablo a pymes")
+    _crear(e)
+    assert e.preguntas and all(
+        p == shorts.preguntas_juez("Hablo a pymes") for p in e.preguntas)
+
+
 def _leer_json(ruta):
     return json.loads(ruta.read_text(encoding="utf-8"))
 
@@ -694,7 +669,7 @@ def test_crear_escribe_la_carpeta_ordenada_y_el_json(ficha_con_base):
         archivos + ["shorts.json"])
     datos = _leer_json(e.carpeta / "shorts.json")
     assert (datos["version"], datos["ficha"], datos["video"], datos["juez"],
-            datos["maximo"]) == (2, "f1", "charla", "tev1:0.8b", 6)
+            datos["maximo"]) == (2, "f1", "charla", "tev1:4b-nvfp4", 6)
     assert [t["titulo"] for t in datos["temas"]] == ["Charla"]
     assert {c["origen"] for c in datos["candidatos"]} == {"fragmento"}
     assert datos["archivos"] == archivos
@@ -1704,7 +1679,7 @@ def test_seleccionar_flujo_completo(monkeypatch):
     ]}
     descargados = _selec_falsa(monkeypatch, temas, {"candidatos": [
         _cand(21, 30, titulo="Dentro"), _cand(21, 30, titulo="Igual")]})
-    sel = shorts.seleccionar(frases, 1200.0, "m", on_aviso=lambda t: None)
+    sel = shorts.seleccionar(frases, 1200.0, "m")
     assert [t.titulo for t in sel.temas] == ["uno", "dos", "tres", "largo", "otro"]
     origenes = {c.origen for c in sel.candidatos}
     assert {"tema", "tramo", "fragmento"} <= origenes
@@ -1720,7 +1695,7 @@ def test_seleccionar_flujo_completo(monkeypatch):
 def test_seleccionar_descarga_aunque_falle(monkeypatch):
     descargados = _selec_falsa(monkeypatch, {"temas": "no"}, {"candidatos": []})
     with pytest.raises(PasoFallido):
-        shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
+        shorts.seleccionar(_frases_de(60, 10), 600.0, "m")
     assert descargados == ["m"]
 
 
@@ -1728,7 +1703,7 @@ def test_seleccionar_todos_cortos_sin_candidatos(monkeypatch):
     temas = {"temas": [{"frase_inicio": i, "titulo": f"t{i}", "sigue_al_anterior": False}
                        for i in range(1, 60, 3)]}  # temas de 30 s sin seguir
     _selec_falsa(monkeypatch, temas, {"candidatos": []})
-    sel = shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
+    sel = shorts.seleccionar(_frases_de(60, 10), 600.0, "m")
     assert sel.elegidos == []
     assert {c.descarte for c in sel.candidatos} == {"tema_corto"}
 

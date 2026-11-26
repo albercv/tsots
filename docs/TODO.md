@@ -133,3 +133,8 @@ Pending work, most urgent first. Remove an item when it is merged into
       (time, `ollama ps` memory, title/hook quality) and set the default in
       `videopipeline/config.py`, `app/settings.py` and `videopipeline/errores.py`.
       `qwen3.8:27b` would be as heavy as `gemma4:26b`.
+
+- [ ] **Brand context in `shorts_prueba`.** The shorts judge now scores the
+      audience against the brand context, but
+      `python -m videopipeline.shorts_prueba` runs without one, so its scores
+      can differ a little from the app's.
