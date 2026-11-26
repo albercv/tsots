@@ -133,3 +133,13 @@ Pending work, most urgent first. Remove an item when it is merged into
       (time, `ollama ps` memory, title/hook quality) and set the default in
       `videopipeline/config.py`, `app/settings.py` and `videopipeline/errores.py`.
       `qwen3.8:27b` would be as heavy as `gemma4:26b`.
+
+- [ ] **Brand context in `shorts_prueba`.** The shorts judge now scores the
+      audience against the brand context, but
+      `python -m videopipeline.shorts_prueba` runs without one, so its scores
+      can differ a little from the app's.
+
+- [ ] **Measure the shorts judge reserves.** How many shorts
+      `pplx-decider-flash:4b-nvfp4` and `nimble-v3:9b-nvfp4` pick is not
+      measured, and `UMBRAL_INTERES` / `UMBRAL_INDEPENDIENTE` were only
+      checked against `tev1`.

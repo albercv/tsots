@@ -42,7 +42,7 @@ log = logging.getLogger(__name__)
 DURACION_MIN = 60.0
 DURACION_MAX = 179.0
 UMBRAL_INTERES = 2.0
-UMBRAL_INDEPENDIENTE = 0.5
+UMBRAL_INDEPENDIENTE = 0.3
 PAUSA_FRASE = 1.0  # s de silencio que cierran una frase sin puntuación
 MAX_PALABRAS_FRASE = 60
 MARGEN_CORTE = 0.25  # s de aire antes y después del trozo
@@ -50,7 +50,9 @@ MINUTOS_VENTANA = 10  # ventana de la segmentación en temas
 TEMPERATURA_TEMAS = 0.2
 KEEP_ALIVE_SHORTS = "5m"  # el modelo sigue cargado entre las llamadas de un vídeo
 MAX_NOMBRE = 60
-JUEZ = "tev1:0.8b"
+# Solo modelos de decisión: el primero juzga y los demás son sus reservas, en orden.
+JUECES = ("tev1:4b-nvfp4", "pplx-decider-flash:4b-nvfp4", "nimble-v3:9b-nvfp4")
+JUEZ = JUECES[0]
 
 _PUNTUACION_FINAL = (".", "!", "?", "…")
 _CIERRES = "\"'”’»)]}›"  # pueden ir pegados detrás del punto: `."`, `?»`, `!)`
@@ -379,41 +381,50 @@ ESQUEMA_CANDIDATOS = {
     "required": ["candidatos"],
 }
 
-# Preguntas de `tev1` (probadas con Ollama 0.40.14: unos 0,15 s por trozo).
-PREGUNTAS = {
-    "independiente": {
-        "type": "choice",
-        "instructions": "¿Este fragmento de vídeo se entiende solo, sin haber visto el resto del vídeo?",
-        "criteria": {"si": "Se entiende solo: tiene contexto, desarrollo y cierre.",
-                     "no": "Depende de lo anterior o se corta a medias."},
-    },
-    "interes": {
-        "type": "score",
-        "instructions": "¿Cuánto engancharía este fragmento como short en redes sociales?",
-        "criteria": ["Aburrido o sin valor", "Flojo", "Correcto", "Interesante",
-                     "Muy enganchante"],
-    },
-}
+# El interés es la media de estas tres preguntas, cada una de 0 a 4.
+PARTES_INTERES = ("gancho", "valor", "publico")
+# `tev1` corre con num_ctx 2048 y responde 400 si se pasa: la marca se recorta.
+MAX_MARCA = 1500
 
-# Juez de respaldo: con gemma4 a temperatura 0 da lo mismo en dos pasadas
-# (unos 9 s por trozo).
-_SYSTEM_JUEZ = (
-    "Juzgas fragmentos de vídeo para publicarlos como short en redes. Responde "
-    "solo JSON con: independiente: \"si\" si se entiende solo, sin haber visto "
-    "el resto del vídeo (tiene contexto, desarrollo y cierre), o \"no\" si "
-    "depende de lo anterior o se corta a medias; interes: de 0 a 4, cuánto "
-    "engancharía como short (0 aburrido o sin valor, 1 flojo, 2 correcto, "
-    "3 interesante, 4 muy enganchante)."
-)
 
-ESQUEMA_JUEZ = {
-    "type": "object",
-    "properties": {
-        "independiente": {"type": "string", "enum": ["si", "no"]},
-        "interes": {"type": "integer", "minimum": 0, "maximum": 4},
-    },
-    "required": ["independiente", "interes"],
-}
+def _escala(instrucciones: str, niveles: list[str]) -> dict:
+    return {"type": "score", "instructions": instrucciones, "criteria": niveles}
+
+
+def preguntas_juez(marca: str = "") -> dict:
+    """Las preguntas al juez; `marca` es el contexto de marca de quien publica."""
+    marca = marca.strip()[:MAX_MARCA]
+    publico = "¿Cuánto le importa este fragmento al público al que va dirigido el vídeo?"
+    if marca:
+        publico = ("El canal es de esta marca:\n" + marca + "\n\n¿Cuánto le importa "
+                   "este fragmento al público al que se dirige esa marca?")
+    return {
+        "independiente": {
+            "type": "choice",
+            "instructions": ("Alguien que no ha visto nada más, ¿entiende de qué se "
+                             "habla y qué se concluye?"),
+            "criteria": {
+                "si": ("El tema se sabe pronto, las referencias se entienden y la "
+                       "idea llega a una conclusión."),
+                "no": ("Empieza a mitad de conversación, remite a algo no explicado "
+                       "o se corta antes de concluir."),
+            },
+        },
+        "gancho": _escala(
+            "Mira solo las dos primeras frases. ¿Dan un motivo para seguir viendo?",
+            ["Saludo, relleno o frase a medias", "Anuncia el tema sin más",
+             "Plantea un tema o pregunta concreta", "Promete algo útil o sorprendente",
+             "Abre con un problema, dato u opinión fuerte"]),
+        "valor": _escala(
+            "¿Qué se lleva quien ve el fragmento entero?",
+            ["Nada concreto", "Comentarios generales", "Una idea clara",
+             "Un ejemplo, dato o paso que puede aplicar",
+             "Un caso real con resultado o varios datos aplicables"]),
+        "publico": _escala(
+            publico,
+            ["Nada", "Poco", "Le suena interesante", "Le afecta de cerca",
+             "Resuelve algo que le preocupa ahora"]),
+    }
 
 
 _SYSTEM_TEMAS = (
@@ -630,70 +641,51 @@ def _respuesta_invalida(juez: str, datos) -> PasoFallido:
     )
 
 
-def nota_tev1(texto: str) -> tuple[float, float]:
-    """`(probabilidad de que se entienda solo, interés de 0 a 4)` según `tev1`."""
-    respuestas = systemone(JUEZ, texto, PREGUNTAS)
+def nota_juez(texto: str, marca: str = "", juez: str = JUEZ) -> tuple[float, float]:
+    """`(probabilidad de que se entienda solo, interés de 0 a 4)` según `juez`."""
+    respuestas = systemone(juez, texto, preguntas_juez(marca))
     try:
         return (float(respuestas["independiente"]["probabilities"]["si"]),
-                float(respuestas["interes"]["score"]))
+                sum(float(respuestas[p]["score"]) for p in PARTES_INTERES)
+                / len(PARTES_INTERES))
     except (KeyError, TypeError, ValueError):
-        raise _respuesta_invalida(JUEZ, respuestas) from None
-
-
-def nota_chat(texto: str, modelo: str) -> tuple[float, float]:
-    """Lo mismo que `nota_tev1` con el modelo del caption: `(1.0 o 0.0, interés)`."""
-    datos = chat_json(
-        modelo,
-        [{"role": "system", "content": _SYSTEM_JUEZ},
-         {"role": "user", "content": "Fragmento:\n" + texto}],
-        ESQUEMA_JUEZ,
-        temperatura=0,
-        keep_alive=KEEP_ALIVE_SHORTS,
-    )
-    try:
-        return (1.0 if datos["independiente"] == "si" else 0.0,
-                min(4.0, max(0.0, float(datos["interes"]))))
-    except (KeyError, TypeError, ValueError):
-        raise _respuesta_invalida(modelo, datos) from None
+        raise _respuesta_invalida(juez, respuestas) from None
 
 
 def puntuar(
     candidatos: list[Candidato],
     frases: list[Frase],
-    modelo: str,
     on_aviso: Callable[[str], None],
     on_percent: Callable[[float], None] | None = None,
+    marca: str = "",
 ) -> str:
-    """Rellena `independiente` e `interes` de los candidatos en pie.
+    """Rellena `independiente` e `interes` de los candidatos en pie y devuelve
+    el nombre del juez que ha puntuado.
 
-    Usa `tev1`; si falla, puntúa todos de nuevo con `modelo` (así no se mezclan
-    dos escalas) y avisa. Devuelve el nombre del juez que puntuó.
+    Prueba los de `JUECES` en orden. Si uno falla, el siguiente puntúa todos de
+    nuevo (así no se mezclan dos escalas) y se avisa. Si fallan todos,
+    PasoFallido dice cómo instalarlos.
     """
     vivos = [c for c in candidatos if not c.descarte]
-    textos = [" ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
-              for c in vivos]
-
-    def puntuar_con(nota: Callable[[str], tuple[float, float]]) -> None:
-        for k, (c, texto) in enumerate(zip(vivos, textos), 1):
-            c.independiente, c.interes = nota(texto)
-            if on_percent is not None:
-                on_percent(100.0 * k / len(vivos))
-
-    try:
-        puntuar_con(nota_tev1)
-        return JUEZ
-    except PasoFallido as error:
-        on_aviso(_("No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio.")
-                 .format(juez=JUEZ, error=error, modelo=modelo))
-    try:
-        puntuar_con(lambda texto: nota_chat(texto, modelo))
-    except PasoFallido as error:
-        raise PasoFallido(
-            _("No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden.")
-            .format(juez=JUEZ, modelo=modelo),
-            detalle=str(error),
-        ) from error
-    return modelo
+    errores: list[str] = []
+    for n, juez in enumerate(JUECES):
+        try:
+            for k, c in enumerate(vivos, 1):
+                texto = " ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
+                c.independiente, c.interes = nota_juez(texto, marca, juez)
+                if on_percent is not None:
+                    on_percent(100.0 * k / len(vivos))
+            return juez
+        except PasoFallido as error:
+            errores.append(f"{juez}: {error}\n{getattr(error, 'detalle', '') or ''}".strip())
+            if n + 1 < len(JUECES):
+                on_aviso(_("No se pudo usar {juez} para puntuar ({error}): puntúa {reserva}.")
+                         .format(juez=juez, error=error, reserva=JUECES[n + 1]))
+    raise PasoFallido(
+        _("No se pudieron puntuar los trozos: ningún juez responde. Instala alguno: "
+          "{comandos}").format(comandos=", ".join(f"ollama pull {j}" for j in JUECES)),
+        detalle="\n".join(errores),
+    )
 
 
 @dataclass
@@ -710,6 +702,7 @@ def seleccionar(
     avance_temas: Callable[[float], None] | None = None,
     avance_momentos: Callable[[float], None] | None = None,
     avance_notas: Callable[[float], None] | None = None,
+    marca: str = "",
 ) -> Seleccion:
     """Temas, candidatos, notas y elegidos de un vídeo; descarga el modelo al acabar."""
     try:
@@ -727,7 +720,7 @@ def seleccionar(
             if (c.frase_inicio, c.frase_fin) in vistos:
                 c.descarte = "repetido"
             vistos.add((c.frase_inicio, c.frase_fin))
-        juez = puntuar(candidatos, frases, modelo, on_aviso, avance_notas)
+        juez = puntuar(candidatos, frases, on_aviso, avance_notas, marca)
         elegidos = elegir(candidatos, maximo_shorts(duracion), duracion)
     finally:
         descargar(modelo)
@@ -949,7 +942,8 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
             on_aviso=lambda texto: _avisar(on_progress, texto),
             avance_temas=avance(1, _("Buscando temas")),
             avance_momentos=avance(1, _("Buscando los mejores momentos"), False),
-            avance_notas=avance(2, _("Puntuando los trozos"), False))
+            avance_notas=avance(2, _("Puntuando los trozos"), False),
+            marca=config.contexto_marca)
         elegidos = seleccion.elegidos
         # Todo short lleva su título quemado, con o sin el de inicio del panel:
         # el del modelo sobre su trozo o, si falla, el del candidato.

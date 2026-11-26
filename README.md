@@ -137,9 +137,11 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      does it at the end of every run. Doing it again replaces only the
      shorts the app made. From 1 to 3 shorts for every 10 minutes of video,
      built from whole topics; a stretch with no topic good enough gets
-     none. If the `tev1:0.8b`
-     model is not installed in Ollama, the caption model scores them
-     instead (slower). To try only the selection, without cutting
+     none. A decision model in Ollama
+     scores them: `tev1:4b-nvfp4` and, if it fails,
+     `pplx-decider-flash:4b-nvfp4` or `nimble-v3:9b-nvfp4`
+     (`ollama pull <model>`); with none of them no shorts are created. To
+     try only the selection, without cutting
      anything: `python -m videopipeline.shorts_prueba <card> <output.json>`.
      **Banner** burns an image you choose with the button next to it (a
      strip on a transparent background, such as a 1920-pixel-wide PNG)
@@ -419,7 +421,9 @@ sounds, in the style you choose. The untouched original stays where it is.
     `requirements.txt`). If you are updating from an earlier version, run
     `instalar.command` again (or `pip install -r requirements.txt` in the
     app's environment, `.venv-clearvoice`) to install it. Without it the
-    screen is not read and Claude cannot point at text or magnify it.
+    screen is not read and Claude cannot point at text or magnify it. If
+    Vision does not answer within 30 s, that short is edited without screen
+    reading instead of stalling the queue.
   - **B-roll credits:** the clips used are saved in the job's `broll.json`.
 - **Background music:** put royalty-free tracks in
   `~/TSOTS/musica/divertido/`, `formal/` and `academico/` (mp3, wav, m4a,

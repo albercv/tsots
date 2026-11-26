@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 08:53+0100\n"
+"POT-Creation-Date: 2026-11-26 17:03+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -1418,7 +1418,7 @@ msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
 msgstr ""
 
 #, python-brace-format
-msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
+msgid "No se pudieron puntuar los trozos: ningún juez responde. Instala alguno: {comandos}"
 msgstr ""
 
 #, python-brace-format
@@ -1515,7 +1515,7 @@ msgid "No se pudo usar el Llavero ({tipo})."
 msgstr ""
 
 #, python-brace-format
-msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
+msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {reserva}."
 msgstr ""
 
 msgid "No se puede añadir"

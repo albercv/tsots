@@ -44,7 +44,7 @@ def test_shorts_prueba_no_escribe_en_la_ficha(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(shorts, "descargar", lambda m: None)
     monkeypatch.setattr(shorts, "systemone", lambda *a, **k: {
         "independiente": {"probabilities": {"si": 0.9}},
-        "interes": {"score": 3.0}})
+        **{parte: {"score": 3.0} for parte in shorts.PARTES_INTERES}})
     monkeypatch.setattr(shorts, "chat_json", lambda m, ms, esquema, **k: {
         "temas": [{"frase_inicio": 1, "titulo": "Todo", "sigue_al_anterior": False},
                   {"frase_inicio": 18, "titulo": "Cola", "sigue_al_anterior": False}]})
