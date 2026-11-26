@@ -191,7 +191,7 @@ def _nota(ini: float, fin: float, interes: float, indep: float,
 
 def test_elegir_umbrales_orden_solapes_y_maximo():
     flojo = _nota(0, 70, 1.9, 0.9)
-    no_solo = _nota(100, 170, 3.0, 0.4)
+    no_solo = _nota(100, 170, 3.0, 0.29)
     mejor = _nota(200, 270, 3.5, 0.9)
     solapa = _nota(250, 320, 3.0, 0.8, frases=(202, 203))  # comparte la 202
     segundo = _nota(400, 470, 2.5, 0.8)
@@ -202,6 +202,12 @@ def test_elegir_umbrales_orden_solapes_y_maximo():
     assert [c.descarte for c in (flojo, no_solo, mejor, solapa, segundo, de_mas)] == [
         "flojo", "no_se_entiende_solo", "", "solapa", "", "sobra",
     ]
+
+
+def test_elegir_acepta_se_entiende_solo_desde_0_3():
+    # `tev1` 4B puntúa más bajo que 0.8B en esta pregunta: con 0,5 caían trozos buenos.
+    justo = _nota(0, 70, 3.0, 0.3)
+    assert shorts.elegir([justo], maximo=1, duracion=600) == [justo]
 
 
 def test_elegir_desempata_por_independiente_y_luego_inicio():
