@@ -59,8 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     t0 = time.monotonic()
     servidor = asegurar_servidor()
     try:
-        sel = seleccionar(trocear_frases(palabras), duracion, args.modelo,
-                          on_aviso=lambda texto: print(texto, file=sys.stderr))
+        sel = seleccionar(trocear_frases(palabras), duracion, args.modelo)
     except PasoFallido as error:
         print(f"{error}\n{getattr(error, 'detalle', '') or ''}".strip(), file=sys.stderr)
         return 1

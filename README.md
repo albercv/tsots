@@ -137,9 +137,9 @@ SIN_DOCK=1 ./instalar.command     # without the Dock icon
      does it at the end of every run. Doing it again replaces only the
      shorts the app made. From 1 to 3 shorts for every 10 minutes of video,
      built from whole topics; a stretch with no topic good enough gets
-     none. If the `tev1:4b-nvfp4`
-     model is not installed in Ollama, the caption model scores them
-     instead (slower). To try only the selection, without cutting
+     none. The decision model `tev1:4b-nvfp4` scores them and must be
+     installed in Ollama (`ollama pull tev1:4b-nvfp4`): without it no
+     shorts are created. To try only the selection, without cutting
      anything: `python -m videopipeline.shorts_prueba <card> <output.json>`.
      **Banner** burns an image you choose with the button next to it (a
      strip on a transparent background, such as a 1920-pixel-wide PNG)

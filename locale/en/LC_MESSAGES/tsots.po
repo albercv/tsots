@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: The Silence of the Shorts\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 08:53+0100\n"
+"POT-Creation-Date: 2026-11-26 16:44+0100\n"
 "PO-Revision-Date: 2026-09-11 08:30+0200\n"
 "Last-Translator: Alberto Carrasco <alberto.carrasco@evolve2digital.com>\n"
 "Language-Team: English\n"
@@ -1460,8 +1460,8 @@ msgid "No se pudieron encolar los shorts para la edición con Claude: {error}"
 msgstr "Could not queue the shorts for editing with Claude: {error}"
 
 #, python-brace-format
-msgid "No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden."
-msgstr "The stretches could not be scored: neither {juez} nor {modelo} responds."
+msgid "No se pudieron puntuar los trozos con {juez}: {error}. Si no está instalado: ollama pull {juez}"
+msgstr "The stretches could not be scored with {juez}: {error}. If it is not installed: ollama pull {juez}"
 
 #, python-brace-format
 msgid "No se pudo borrar el lugar de TikTok del Llavero (código {codigo})."
@@ -1555,10 +1555,6 @@ msgstr "Could not transcribe for the title: {error}. Video saved without a title
 #, python-brace-format
 msgid "No se pudo usar el Llavero ({tipo})."
 msgstr "Could not use the Keychain ({tipo})."
-
-#, python-brace-format
-msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
-msgstr "Could not use {juez} to score ({error}): {modelo} scores instead, more slowly."
 
 msgid "No se puede añadir"
 msgstr "Cannot add"
@@ -2729,6 +2725,10 @@ msgstr "📅 Scheduled for {fecha}"
 
 #~ msgid "Modo"
 #~ msgstr "Mode"
+
+#, python-brace-format
+#~ msgid "No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio."
+#~ msgstr "Could not use {juez} to score ({error}): {modelo} scores instead, more slowly."
 
 #~ msgid "Pexels"
 #~ msgstr "Pexels"

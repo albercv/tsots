@@ -425,42 +425,6 @@ def preguntas_juez(marca: str = "") -> dict:
     }
 
 
-# Juez de respaldo: con gemma4 a temperatura 0 da lo mismo en dos pasadas
-# (unos 9 s por trozo). «Se entiende solo» no usa el texto de `tev1`: con él,
-# gemma4 rechazaba 3 de 4 trozos que antes aprobaba.
-_INDEPENDIENTE_RESERVA = {
-    "type": "choice",
-    "instructions": "¿Este fragmento de vídeo se entiende solo, sin haber visto el resto del vídeo?",
-    "criteria": {"si": "Se entiende solo: tiene contexto, desarrollo y cierre.",
-                 "no": "Depende de lo anterior o se corta a medias."},
-}
-
-
-def _system_juez(marca: str) -> str:
-    """Las mismas partes del interés y niveles que `tev1`, para no cambiar de escala."""
-    lineas = ["Juzgas fragmentos de vídeo para publicarlos como short en redes. "
-              "Responde solo JSON con estas claves."]
-    preguntas = {**preguntas_juez(marca), "independiente": _INDEPENDIENTE_RESERVA}
-    for clave, p in preguntas.items():
-        if p["type"] == "choice":
-            niveles = "; ".join(f'"{k}": {v}' for k, v in p["criteria"].items())
-        else:
-            niveles = "; ".join(f"{k}: {v}" for k, v in enumerate(p["criteria"]))
-        lineas.append(f"{clave}: {p['instructions']} ({niveles})")
-    return "\n".join(lineas)
-
-
-ESQUEMA_JUEZ = {
-    "type": "object",
-    "properties": {
-        "independiente": {"type": "string", "enum": ["si", "no"]},
-        **{parte: {"type": "integer", "minimum": 0, "maximum": 4}
-           for parte in PARTES_INTERES},
-    },
-    "required": ["independiente", *PARTES_INTERES],
-}
-
-
 _SYSTEM_TEMAS = (
     "Eres editor de vídeo. Te doy un trozo de la transcripción de un vídeo largo "
     "en frases numeradas con su segundo de inicio y fin. Devuelve los temas que "
@@ -686,62 +650,32 @@ def nota_tev1(texto: str, marca: str = "") -> tuple[float, float]:
         raise _respuesta_invalida(JUEZ, respuestas) from None
 
 
-def nota_chat(texto: str, modelo: str, marca: str = "") -> tuple[float, float]:
-    """Lo mismo que `nota_tev1` con el modelo del caption: `(1.0 o 0.0, interés)`."""
-    datos = chat_json(
-        modelo,
-        [{"role": "system", "content": _system_juez(marca)},
-         {"role": "user", "content": "Fragmento:\n" + texto}],
-        ESQUEMA_JUEZ,
-        temperatura=0,
-        keep_alive=KEEP_ALIVE_SHORTS,
-    )
-    try:
-        return (1.0 if datos["independiente"] == "si" else 0.0,
-                sum(min(4.0, max(0.0, float(datos[p]))) for p in PARTES_INTERES)
-                / len(PARTES_INTERES))
-    except (KeyError, TypeError, ValueError):
-        raise _respuesta_invalida(modelo, datos) from None
-
-
 def puntuar(
     candidatos: list[Candidato],
     frases: list[Frase],
-    modelo: str,
-    on_aviso: Callable[[str], None],
     on_percent: Callable[[float], None] | None = None,
     marca: str = "",
 ) -> str:
-    """Rellena `independiente` e `interes` de los candidatos en pie.
+    """Rellena `independiente` e `interes` de los candidatos en pie y devuelve
+    el nombre del juez.
 
-    Usa `tev1`; si falla, puntúa todos de nuevo con `modelo` (así no se mezclan
-    dos escalas) y avisa. Devuelve el nombre del juez que puntuó.
+    Solo puntúa un modelo de decisión (`JUEZ`): si falla no hay respaldo con un
+    LLM, y PasoFallido dice cómo instalarlo.
     """
     vivos = [c for c in candidatos if not c.descarte]
-    textos = [" ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
-              for c in vivos]
-
-    def puntuar_con(nota: Callable[[str], tuple[float, float]]) -> None:
-        for k, (c, texto) in enumerate(zip(vivos, textos), 1):
-            c.independiente, c.interes = nota(texto)
+    try:
+        for k, c in enumerate(vivos, 1):
+            texto = " ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
+            c.independiente, c.interes = nota_tev1(texto, marca)
             if on_percent is not None:
                 on_percent(100.0 * k / len(vivos))
-
-    try:
-        puntuar_con(lambda texto: nota_tev1(texto, marca))
-        return JUEZ
-    except PasoFallido as error:
-        on_aviso(_("No se pudo usar {juez} para puntuar ({error}): puntúa {modelo}, más despacio.")
-                 .format(juez=JUEZ, error=error, modelo=modelo))
-    try:
-        puntuar_con(lambda texto: nota_chat(texto, modelo, marca))
     except PasoFallido as error:
         raise PasoFallido(
-            _("No se pudieron puntuar los trozos: ni {juez} ni {modelo} responden.")
-            .format(juez=JUEZ, modelo=modelo),
-            detalle=str(error),
+            _("No se pudieron puntuar los trozos con {juez}: {error}. Si no está "
+              "instalado: ollama pull {juez}").format(juez=JUEZ, error=error),
+            detalle=getattr(error, "detalle", None) or str(error),
         ) from error
-    return modelo
+    return JUEZ
 
 
 @dataclass
@@ -754,7 +688,6 @@ class Seleccion:
 
 def seleccionar(
     frases: list[Frase], duracion: float, modelo: str,
-    on_aviso: Callable[[str], None],
     avance_temas: Callable[[float], None] | None = None,
     avance_momentos: Callable[[float], None] | None = None,
     avance_notas: Callable[[float], None] | None = None,
@@ -776,7 +709,7 @@ def seleccionar(
             if (c.frase_inicio, c.frase_fin) in vistos:
                 c.descarte = "repetido"
             vistos.add((c.frase_inicio, c.frase_fin))
-        juez = puntuar(candidatos, frases, modelo, on_aviso, avance_notas, marca)
+        juez = puntuar(candidatos, frases, avance_notas, marca)
         elegidos = elegir(candidatos, maximo_shorts(duracion), duracion)
     finally:
         descargar(modelo)
@@ -995,7 +928,6 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
     try:
         seleccion = seleccionar(
             frases, duracion, config.modelo_caption,
-            on_aviso=lambda texto: _avisar(on_progress, texto),
             avance_temas=avance(1, _("Buscando temas")),
             avance_momentos=avance(1, _("Buscando los mejores momentos"), False),
             avance_notas=avance(2, _("Puntuando los trozos"), False),

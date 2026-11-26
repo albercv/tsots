@@ -528,19 +528,15 @@ Cancelling kills the runner before its cleanup, so the app deletes
 `MINUTOS_SOLAPE`, `JUEZ`, `PARTES_INTERES`, `MAX_MARCA`. The prompts and the questions put to the judge
 are in Spanish and not translated.
 
-**The judge and its fallback.** `JUEZ = "tev1:4b-nvfp4"` answers
-`POST /v1/systemone` of the Ollama server (`ollama.systemone`): the
-questions of `preguntas_juez` (three scores and a choice), ~1 s per clip.
-The model runs with `num_ctx` 2048 and the route answers 400 beyond it.
-**That route is undocumented**; it was checked on Ollama 0.40.14 and
-may change or disappear, and the installer does not pull the model. If
-the model is missing, the route fails or the answer has another shape,
-`puntuar` scores *every* candidate again with the caption model through
-`chat_json` at temperature 0 (~9 s per clip; one scale, never two mixed)
-and emits a warning. The fallback asks the same three interest questions
-but keeps a looser wording for "stands alone" (with `tev1`'s, gemma4
-rejected most clips). If that fails too, there are no shorts and the job
-reports why. The judge's name goes in `shorts.json`.
+**The judge.** `JUEZ = "tev1:4b-nvfp4"` answers `POST /v1/systemone` of
+the Ollama server (`ollama.systemone`): the questions of `preguntas_juez`
+(three scores and a choice), ~1 s per clip. The model runs with `num_ctx`
+2048 and the route answers 400 beyond it. **That route is undocumented**; it
+was checked on Ollama 0.40.14 and may change or disappear, and the installer
+does not pull the model. Only decision models judge: there is no LLM
+fallback. If the model is missing, the route fails or the answer has another
+shape, there are no shorts and the job says why, with the `ollama pull`
+command. The judge's name goes in `shorts.json`.
 
 **Output.** `<output folder>/<video name>/` (`carpeta_shorts`):
 `NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:
