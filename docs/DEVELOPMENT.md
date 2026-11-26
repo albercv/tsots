@@ -489,7 +489,9 @@ shorts when processing**, **Create shorts** button).
    overlaps neighbouring sentences, the cut steps on the neighbour instead
    of losing words).
 6. The judge scores each survivor (`puntuar`): probability of "stands
-   alone" and interest 0–4. `elegir` drops interest `< UMBRAL_INTERES`
+   alone" and interest 0–4, the mean of three questions (`PARTES_INTERES`:
+   hook, value and audience; the audience one carries the brand context,
+   `PipelineConfig.contexto_marca`, cut at `MAX_MARCA` characters). `elegir` drops interest `< UMBRAL_INTERES`
    (2) and stand-alone probability `< UMBRAL_INDEPENDIENTE` (0.5), sorts
    best first, skips anything sharing a sentence with a chosen one, and
    keeps at most `max`.
@@ -525,22 +527,24 @@ Cancelling kills the runner before its cleanup, so the app deletes
 `MINUTOS_SOLAPE`, `JUEZ`. The prompts and the questions put to the judge
 are in Spanish and not translated.
 
-**The judge and its fallback.** `JUEZ = "tev1:0.8b"` answers
-`POST /v1/systemone` of the Ollama server (`ollama.systemone`): a score
-question and a choice question, ~0.15 s per clip and the same in two
-passes. **That route is undocumented**; it was checked on Ollama 0.40.14 and
+**The judge and its fallback.** `JUEZ = "tev1:4b-nvfp4"` answers
+`POST /v1/systemone` of the Ollama server (`ollama.systemone`): the
+questions of `preguntas_juez` (three scores and a choice), ~1 s per clip.
+The model runs with `num_ctx` 2048 and the route answers 400 beyond it. **That route is undocumented**; it was checked on Ollama 0.40.14 and
 may change or disappear, and the installer does not pull the model. If
 the model is missing, the route fails or the answer has another shape,
 `puntuar` scores *every* candidate again with the caption model through
 `chat_json` at temperature 0 (~9 s per clip; one scale, never two mixed)
-and emits a warning. If that fails too, there are no shorts and the job
+and emits a warning. The fallback asks the same three interest questions
+but keeps a looser wording for "stands alone" (with `tev1`'s, gemma4
+rejected most clips). If that fails too, there are no shorts and the job
 reports why. The judge's name goes in `shorts.json`.
 
 **Output.** `<output folder>/<video name>/` (`carpeta_shorts`):
 `NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:
 
 ```json
-{ "version": 1, "ficha": "a1b2c3", "video": "talk", "juez": "tev1:0.8b",
+{ "version": 1, "ficha": "a1b2c3", "video": "talk", "juez": "tev1:4b-nvfp4",
   "maximo": 10,
   "archivos": ["01 - Title.mp4", "01 - Title.srt", "01 - Title.md"],
   "candidatos": [ { "frase_inicio": 12, "frase_fin": 31, "titulo": "…",

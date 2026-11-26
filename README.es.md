@@ -142,7 +142,7 @@ SIN_DOCK=1 ./instalar.command     # sin icono en el Dock
      procesar** lo hace al final de cada procesado. Volver a crearlos
      sustituye solo los shorts que hizo la app. De 1 a 3 shorts por cada
      10 minutos de vídeo, con temas completos; un tramo sin ningún tema
-     lo bastante bueno se queda sin short. Si el modelo `tev1:0.8b` no
+     lo bastante bueno se queda sin short. Si el modelo `tev1:4b-nvfp4` no
      está instalado en Ollama, los puntúa el modelo del caption (más
      despacio). Para probar solo la selección, sin cortar nada:
      `python -m videopipeline.shorts_prueba <ficha> <salida.json>`.
