@@ -525,18 +525,22 @@ Cancelling kills the runner before its cleanup, so the app deletes
 **Constants to tune** (module level, tune them against real videos):
 `DURACION_MIN` / `DURACION_MAX`, `UMBRAL_INTERES`, `UMBRAL_INDEPENDIENTE`,
 `PAUSA_FRASE`, `MAX_PALABRAS_FRASE`, `MARGEN_CORTE`, `MINUTOS_PARTE` /
-`MINUTOS_SOLAPE`, `JUEZ`, `PARTES_INTERES`, `MAX_MARCA`. The prompts and the questions put to the judge
+`MINUTOS_SOLAPE`, `JUECES`, `PARTES_INTERES`, `MAX_MARCA`. The prompts and the questions put to the judge
 are in Spanish and not translated.
 
-**The judge.** `JUEZ = "tev1:4b-nvfp4"` answers `POST /v1/systemone` of
-the Ollama server (`ollama.systemone`): the questions of `preguntas_juez`
-(three scores and a choice), ~1 s per clip. The model runs with `num_ctx`
-2048 and the route answers 400 beyond it. **That route is undocumented**; it
+**The judge and its reserves.** `JUECES` holds decision models only:
+`tev1:4b-nvfp4`, then `pplx-decider-flash:4b-nvfp4`, then
+`nimble-v3:9b-nvfp4`. Each answers `POST /v1/systemone` of the Ollama
+server (`ollama.systemone`) with the questions of `preguntas_juez` (three
+scores and a choice); `tev1` takes ~1 s per clip and runs with `num_ctx`
+2048, beyond which the route answers 400. **That route is undocumented**; it
 was checked on Ollama 0.40.14 and may change or disappear, and the installer
-does not pull the model. Only decision models judge: there is no LLM
-fallback. If the model is missing, the route fails or the answer has another
-shape, there are no shorts and the job says why, with the `ollama pull`
-command. The judge's name goes in `shorts.json`.
+does not pull the models. There is no LLM fallback. If a model is missing,
+the route fails or the answer has another shape, `puntuar` scores *every*
+candidate again with the next one (one scale, never two mixed) and emits a
+warning. If all fail, there are no shorts and the job says why, with the
+`ollama pull` commands. `UMBRAL_INTERES` and `UMBRAL_INDEPENDIENTE` were
+only checked against `tev1`. The judge's name goes in `shorts.json`.
 
 **Output.** `<output folder>/<video name>/` (`carpeta_shorts`):
 `NN - <Title>.mp4`, `.srt` and `.md` for each short, and `shorts.json`:

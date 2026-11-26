@@ -401,7 +401,7 @@ def test_esquema_candidatos_exige_todos_los_campos():
     assert item["properties"]["titulo"]["type"] == "string"
 
 
-def test_nota_tev1_interes_es_la_media_de_las_partes(monkeypatch):
+def test_nota_juez_interes_es_la_media_de_las_partes(monkeypatch):
     respuesta = {
         "independiente": {"type": "choice", "choice": "si", "probabilities": {
             "si": 0.6563623509207749, "no": 0.34363764907922517}},
@@ -416,7 +416,7 @@ def test_nota_tev1_interes_es_la_media_de_las_partes(monkeypatch):
         return respuesta
 
     monkeypatch.setattr(shorts, "systemone", falso)
-    assert shorts.nota_tev1("un fragmento", "Hablo a pymes") == (
+    assert shorts.nota_juez("un fragmento", "Hablo a pymes") == (
         pytest.approx(0.6563623509207749), pytest.approx(2.5))
     assert pedidos == [("tev1:4b-nvfp4", "un fragmento",
                         shorts.preguntas_juez("Hablo a pymes"))]
@@ -444,10 +444,10 @@ def test_preguntas_juez_recortan_una_marca_enorme():
     {"independiente": {"probabilities": {"si": "mucho"}},
      "gancho": {"score": 3.0}, "valor": {"score": 3.0}, "publico": {"score": 3.0}},
 ])
-def test_nota_tev1_forma_inesperada_falla(monkeypatch, respuesta):
+def test_nota_juez_forma_inesperada_falla(monkeypatch, respuesta):
     monkeypatch.setattr(shorts, "systemone", lambda *a, **kw: respuesta)
     with pytest.raises(PasoFallido, match="tev1:4b-nvfp4"):
-        shorts.nota_tev1("texto")
+        shorts.nota_juez("texto")
 
 
 def _para_puntuar():
@@ -469,28 +469,63 @@ def test_puntuar_con_tev1(monkeypatch):
 
     monkeypatch.setattr(shorts, "systemone", falso)
     llamadas = _chat_falso(monkeypatch, {})
-    porcentajes = []
-    juez = shorts.puntuar([a, b, descartado], frases, porcentajes.append)
+    avisos, porcentajes = [], []
+    juez = shorts.puntuar([a, b, descartado], frases, avisos.append, porcentajes.append)
     assert juez == "tev1:4b-nvfp4"
     assert (a.independiente, a.interes) == (pytest.approx(0.9), pytest.approx(3.5))
     assert (b.independiente, b.interes) == (pytest.approx(0.4), pytest.approx(1.5))
     assert (descartado.independiente, descartado.interes) == (None, None)
     assert estados == [texto(a), texto(b)]
-    assert llamadas == []
+    assert llamadas == [] and avisos == []
     assert porcentajes == [50.0, 100.0]
+
+
+def test_jueces_son_modelos_de_decision_en_orden():
+    assert shorts.JUECES == (
+        "tev1:4b-nvfp4", "pplx-decider-flash:4b-nvfp4", "nimble-v3:9b-nvfp4")
+    assert shorts.JUEZ == shorts.JUECES[0]
+
+
+@pytest.mark.parametrize("caidos", [1, 2])
+def test_puntuar_baja_a_la_reserva_y_repuntua_todo(monkeypatch, caidos):
+    frases, a, b, descartado, texto = _para_puntuar()
+    pedidos = []
+    reserva = shorts.JUECES[caidos]
+
+    def falso(modelo, estado, preguntas, **kw):
+        pedidos.append((modelo, estado))
+        # Los anteriores fallan en el segundo trozo, con el primero ya puntuado.
+        if modelo != reserva:
+            if [m for m, _ in pedidos].count(modelo) == 2:
+                raise PasoFallido(f"Modelo no descargado: {modelo}")
+            return _tev1(0.1, 0.5)
+        return _tev1(0.7, 2.5)
+
+    monkeypatch.setattr(shorts, "systemone", falso)
+    llamadas = _chat_falso(monkeypatch, {})
+    avisos = []
+    assert shorts.puntuar([a, b, descartado], frases, avisos.append) == reserva
+    # Todos con el mismo juez, también el primero: sin mezclar escalas.
+    assert (a.independiente, a.interes) == (pytest.approx(0.7), pytest.approx(2.5))
+    assert (b.independiente, b.interes) == (pytest.approx(0.7), pytest.approx(2.5))
+    assert pedidos == [(m, texto(c)) for m in shorts.JUECES[:caidos + 1] for c in (a, b)]
+    assert len(avisos) == caidos
+    assert shorts.JUECES[caidos - 1] in avisos[-1] and reserva in avisos[-1]
+    assert llamadas == []
 
 
 def test_puntuar_sin_juez_falla_claro_y_no_recurre_a_un_llm(monkeypatch):
     frases, a, b, descartado, texto = _para_puntuar()
 
-    def sin_tev1(*args, **kw):
-        raise PasoFallido("Modelo no descargado: tev1:4b-nvfp4")
+    def sin_modelo(modelo, estado, preguntas, **kw):
+        raise PasoFallido(f"Modelo no descargado: {modelo}")
 
-    monkeypatch.setattr(shorts, "systemone", sin_tev1)
+    monkeypatch.setattr(shorts, "systemone", sin_modelo)
     llamadas = _chat_falso(monkeypatch, {})
-    with pytest.raises(PasoFallido, match="ollama pull tev1:4b-nvfp4") as e:
-        shorts.puntuar([a, b], frases)
-    assert "Modelo no descargado: tev1:4b-nvfp4" in str(e.value)
+    with pytest.raises(PasoFallido) as e:
+        shorts.puntuar([a, b], frases, lambda aviso: None)
+    for juez in shorts.JUECES:
+        assert f"ollama pull {juez}" in str(e.value)
     assert llamadas == []
 
 
@@ -502,7 +537,7 @@ def test_puntuar_sin_candidatos_vivos_no_llama_a_nadie(monkeypatch):
 
     monkeypatch.setattr(shorts, "systemone", prohibido)
     monkeypatch.setattr(shorts, "chat_json", prohibido)
-    assert shorts.puntuar([descartado], frases) == shorts.JUEZ
+    assert shorts.puntuar([descartado], frases, lambda aviso: None) == shorts.JUEZ
 
 
 # --- crear --------------------------------------------------------------------
@@ -1679,7 +1714,7 @@ def test_seleccionar_flujo_completo(monkeypatch):
     ]}
     descargados = _selec_falsa(monkeypatch, temas, {"candidatos": [
         _cand(21, 30, titulo="Dentro"), _cand(21, 30, titulo="Igual")]})
-    sel = shorts.seleccionar(frases, 1200.0, "m")
+    sel = shorts.seleccionar(frases, 1200.0, "m", on_aviso=lambda t: None)
     assert [t.titulo for t in sel.temas] == ["uno", "dos", "tres", "largo", "otro"]
     origenes = {c.origen for c in sel.candidatos}
     assert {"tema", "tramo", "fragmento"} <= origenes
@@ -1695,7 +1730,7 @@ def test_seleccionar_flujo_completo(monkeypatch):
 def test_seleccionar_descarga_aunque_falle(monkeypatch):
     descargados = _selec_falsa(monkeypatch, {"temas": "no"}, {"candidatos": []})
     with pytest.raises(PasoFallido):
-        shorts.seleccionar(_frases_de(60, 10), 600.0, "m")
+        shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
     assert descargados == ["m"]
 
 
@@ -1703,7 +1738,7 @@ def test_seleccionar_todos_cortos_sin_candidatos(monkeypatch):
     temas = {"temas": [{"frase_inicio": i, "titulo": f"t{i}", "sigue_al_anterior": False}
                        for i in range(1, 60, 3)]}  # temas de 30 s sin seguir
     _selec_falsa(monkeypatch, temas, {"candidatos": []})
-    sel = shorts.seleccionar(_frases_de(60, 10), 600.0, "m")
+    sel = shorts.seleccionar(_frases_de(60, 10), 600.0, "m", on_aviso=lambda t: None)
     assert sel.elegidos == []
     assert {c.descarte for c in sel.candidatos} == {"tema_corto"}
 
