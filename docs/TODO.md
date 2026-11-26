@@ -138,3 +138,11 @@ Pending work, most urgent first. Remove an item when it is merged into
       audience against the brand context, but
       `python -m videopipeline.shorts_prueba` runs without one, so its scores
       can differ a little from the app's.
+
+- [ ] **Measure the shorts judge reserves.** How many shorts
+      `pplx-decider-flash:4b-nvfp4` and `nimble-v3:9b-nvfp4` pick is not
+      measured, and `UMBRAL_INTERES` / `UMBRAL_INDEPENDIENTE` were only
+      checked against `tev1`.
+- [ ] **Decide `UMBRAL_INDEPENDIENTE`.** `tev1:4b-nvfp4` is stricter than
+      0.8B on «se entiende solo»: of 110 stored candidates 80 pass at 0.5,
+      93 at 0.4 and 103 at 0.3 (104 passed before).

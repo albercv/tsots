@@ -50,7 +50,9 @@ MINUTOS_VENTANA = 10  # ventana de la segmentación en temas
 TEMPERATURA_TEMAS = 0.2
 KEEP_ALIVE_SHORTS = "5m"  # el modelo sigue cargado entre las llamadas de un vídeo
 MAX_NOMBRE = 60
-JUEZ = "tev1:4b-nvfp4"
+# Solo modelos de decisión: el primero juzga y los demás son sus reservas, en orden.
+JUECES = ("tev1:4b-nvfp4", "pplx-decider-flash:4b-nvfp4", "nimble-v3:9b-nvfp4")
+JUEZ = JUECES[0]
 
 _PUNTUACION_FINAL = (".", "!", "?", "…")
 _CIERRES = "\"'”’»)]}›"  # pueden ir pegados detrás del punto: `."`, `?»`, `!)`
@@ -639,43 +641,51 @@ def _respuesta_invalida(juez: str, datos) -> PasoFallido:
     )
 
 
-def nota_tev1(texto: str, marca: str = "") -> tuple[float, float]:
-    """`(probabilidad de que se entienda solo, interés de 0 a 4)` según `tev1`."""
-    respuestas = systemone(JUEZ, texto, preguntas_juez(marca))
+def nota_juez(texto: str, marca: str = "", juez: str = JUEZ) -> tuple[float, float]:
+    """`(probabilidad de que se entienda solo, interés de 0 a 4)` según `juez`."""
+    respuestas = systemone(juez, texto, preguntas_juez(marca))
     try:
         return (float(respuestas["independiente"]["probabilities"]["si"]),
                 sum(float(respuestas[p]["score"]) for p in PARTES_INTERES)
                 / len(PARTES_INTERES))
     except (KeyError, TypeError, ValueError):
-        raise _respuesta_invalida(JUEZ, respuestas) from None
+        raise _respuesta_invalida(juez, respuestas) from None
 
 
 def puntuar(
     candidatos: list[Candidato],
     frases: list[Frase],
+    on_aviso: Callable[[str], None],
     on_percent: Callable[[float], None] | None = None,
     marca: str = "",
 ) -> str:
     """Rellena `independiente` e `interes` de los candidatos en pie y devuelve
-    el nombre del juez.
+    el nombre del juez que ha puntuado.
 
-    Solo puntúa un modelo de decisión (`JUEZ`): si falla no hay respaldo con un
-    LLM, y PasoFallido dice cómo instalarlo.
+    Prueba los de `JUECES` en orden. Si uno falla, el siguiente puntúa todos de
+    nuevo (así no se mezclan dos escalas) y se avisa. Si fallan todos,
+    PasoFallido dice cómo instalarlos.
     """
     vivos = [c for c in candidatos if not c.descarte]
-    try:
-        for k, c in enumerate(vivos, 1):
-            texto = " ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
-            c.independiente, c.interes = nota_tev1(texto, marca)
-            if on_percent is not None:
-                on_percent(100.0 * k / len(vivos))
-    except PasoFallido as error:
-        raise PasoFallido(
-            _("No se pudieron puntuar los trozos con {juez}: {error}. Si no está "
-              "instalado: ollama pull {juez}").format(juez=JUEZ, error=error),
-            detalle=getattr(error, "detalle", None) or str(error),
-        ) from error
-    return JUEZ
+    errores: list[str] = []
+    for n, juez in enumerate(JUECES):
+        try:
+            for k, c in enumerate(vivos, 1):
+                texto = " ".join(f.texto for f in frases[c.frase_inicio - 1:c.frase_fin])
+                c.independiente, c.interes = nota_juez(texto, marca, juez)
+                if on_percent is not None:
+                    on_percent(100.0 * k / len(vivos))
+            return juez
+        except PasoFallido as error:
+            errores.append(f"{juez}: {error}\n{getattr(error, 'detalle', '') or ''}".strip())
+            if n + 1 < len(JUECES):
+                on_aviso(_("No se pudo usar {juez} para puntuar ({error}): puntúa {reserva}.")
+                         .format(juez=juez, error=error, reserva=JUECES[n + 1]))
+    raise PasoFallido(
+        _("No se pudieron puntuar los trozos: ningún juez responde. Instala alguno: "
+          "{comandos}").format(comandos=", ".join(f"ollama pull {j}" for j in JUECES)),
+        detalle="\n".join(errores),
+    )
 
 
 @dataclass
@@ -688,6 +698,7 @@ class Seleccion:
 
 def seleccionar(
     frases: list[Frase], duracion: float, modelo: str,
+    on_aviso: Callable[[str], None],
     avance_temas: Callable[[float], None] | None = None,
     avance_momentos: Callable[[float], None] | None = None,
     avance_notas: Callable[[float], None] | None = None,
@@ -709,7 +720,7 @@ def seleccionar(
             if (c.frase_inicio, c.frase_fin) in vistos:
                 c.descarte = "repetido"
             vistos.add((c.frase_inicio, c.frase_fin))
-        juez = puntuar(candidatos, frases, avance_notas, marca)
+        juez = puntuar(candidatos, frases, on_aviso, avance_notas, marca)
         elegidos = elegir(candidatos, maximo_shorts(duracion), duracion)
     finally:
         descargar(modelo)
@@ -928,6 +939,7 @@ def crear(ficha: Ficha, config: PipelineConfig, opciones: OpcionesShorts,
     try:
         seleccion = seleccionar(
             frases, duracion, config.modelo_caption,
+            on_aviso=lambda texto: _avisar(on_progress, texto),
             avance_temas=avance(1, _("Buscando temas")),
             avance_momentos=avance(1, _("Buscando los mejores momentos"), False),
             avance_notas=avance(2, _("Puntuando los trozos"), False),
